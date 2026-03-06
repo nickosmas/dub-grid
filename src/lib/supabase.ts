@@ -13,10 +13,19 @@ export function validateConfig(): void {
   }
 }
 
-// Singleton browser client — createBrowserClient returns the same instance on
-// repeated calls, so the internal auth mutex is shared across all consumers.
-// Cookie-based storage ensures the middleware and browser client stay in sync.
-export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+// Lazy singleton — the Proxy defers createBrowserClient() until the first
+// property access, which only happens in the browser (inside useEffect).
+// This prevents the module from throwing during SSR/prerendering when the
+// NEXT_PUBLIC_ env vars have not yet been substituted into the bundle.
+// createBrowserClient() returns the same instance on repeated calls, so the
+// internal auth mutex is shared across all consumers.
+export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
+  get(_target, prop) {
+    const client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const value = (client as unknown as Record<string, unknown>)[prop as string];
+    return typeof value === "function" ? (value as Function).bind(client) : value;
+  },
+});
