@@ -1,26 +1,114 @@
-@import "tailwindcss";
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
+/* Brand design tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg: #F8FAFC;
+  --color-surface: #ffffff;
+  --color-border: #E2E8F0;
+  --color-border-light: #F1F5F9;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #1E293B;
+  --color-text-muted: #64748B;
+  --color-text-subtle: #94A3B8;
+  --color-text-faint: #CBD5E1;
+  --color-accent-start: #38BDF8;
+  --color-accent-end: #818CF8;
+  --color-accent-gradient: linear-gradient(135deg, #38BDF8, #818CF8);
+  --color-dark: #0F172A;
+  --color-dark-elevated: #1E293B;
+  --color-today-bg: #F0F9FF;
+  --color-today-text: #0284C7;
+  --color-row-alt: #FAFBFC;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* ── Print Legend (hidden on screen, shown on last print page) ── */
+.print-legend {
+  display: none;
+}
+
+.print-legend__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #0F172A;
+}
+
+.print-legend__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px 24px;
+}
+
+.print-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.print-legend__badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.print-legend__name {
+  font-size: 12px;
+  color: #1E293B;
+}
+
+/* ── Print Styles ──────────────────────────────────────── */
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 0.4in;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Legend: force onto its own last page */
+  .print-legend {
+    display: block !important;
+    break-before: page;
+    page-break-before: always;
+  }
+
+  html,
+  body,
+  #__next {
+    overflow: visible !important;
+  }
 }

@@ -1,65 +1,171 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useRouter } from "next/navigation";
+
+export default function WelcomePage() {
+  const router = useRouter();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0F172A",
+        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        color: "#F8FAFC",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <header
+        style={{
+          padding: "24px 32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-mark.svg" alt="DubGrid" width={40} height={40} />
+          <span
+            style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}
+          >
+            DubGrid
+          </span>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <main
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 24px",
+          textAlign: "center",
+          gap: 48,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 600,
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "clamp(36px, 5vw, 56px)",
+              fontWeight: 800,
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+              margin: 0,
+            }}
+          >
+            Smart Staff{" "}
+            <span
+              style={{
+                background: "linear-gradient(135deg, #38BDF8, #818CF8)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Scheduling
+            </span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p
+            style={{
+              fontSize: 18,
+              color: "#94A3B8",
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            Effortless shift planning for care facilities. Build schedules,
+            manage staff, and keep your team organized — all in one place.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* Login Buttons */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            width: "100%",
+            maxWidth: 320,
+          }}
+        >
+          <button
+            onClick={() => router.push("/login")}
+            style={{
+              width: "100%",
+              padding: "14px 24px",
+              background: "linear-gradient(135deg, #38BDF8, #818CF8)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 10,
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "opacity 0.2s, transform 0.2s",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.opacity = "0.9";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.opacity = "1";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Staff Login
+          </button>
+
+          <button
+            onClick={() => router.push("/admin/login")}
+            style={{
+              width: "100%",
+              padding: "14px 24px",
+              background: "transparent",
+              color: "#94A3B8",
+              border: "1px solid #334155",
+              borderRadius: 10,
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "border-color 0.2s, color 0.2s, transform 0.2s",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = "#818CF8";
+              e.currentTarget.style.color = "#C4B5FD";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = "#334155";
+              e.currentTarget.style.color = "#94A3B8";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
           >
-            Documentation
-          </a>
+            Admin Portal
+          </button>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer
+        style={{
+          padding: "24px 32px",
+          textAlign: "center",
+          fontSize: 13,
+          color: "#475569",
+        }}
+      >
+        © {new Date().getFullYear()} DubGrid
+      </footer>
     </div>
   );
 }

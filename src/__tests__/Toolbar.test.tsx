@@ -1,0 +1,291 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import Toolbar from "@/components/Toolbar";
+import { Wing } from "@/types";
+
+const defaultWings: Wing[] = [
+  {
+    id: 1,
+    orgId: "org-1",
+    name: "North",
+    colorBg: "#EFF6FF",
+    colorText: "#1D4ED8",
+    sortOrder: 1,
+  },
+  {
+    id: 2,
+    orgId: "org-1",
+    name: "South",
+    colorBg: "#F0FDF4",
+    colorText: "#166534",
+    sortOrder: 2,
+  },
+];
+
+const defaultProps = {
+  viewMode: "schedule" as const,
+  weekStart: new Date(2024, 0, 7), // Jan 7, 2024 (Sunday)
+  spanWeeks: 1 as const,
+  activeWing: "All",
+  staffSearch: "",
+  wings: defaultWings,
+  onPrev: vi.fn(),
+  onNext: vi.fn(),
+  onToday: vi.fn(),
+  onSpanChange: vi.fn(),
+  onWingChange: vi.fn(),
+  onStaffSearchChange: vi.fn(),
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("Toolbar — schedule mode rendering", () => {
+  it("renders ‹ previous button", () => {
+    render(<Toolbar {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "‹" })).toBeInTheDocument();
+  });
+
+  it("renders Today button", () => {
+    render(<Toolbar {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
+  });
+
+  it("renders › next button", () => {
+    render(<Toolbar {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
+  });
+
+  it("renders span buttons 1W, 2W, M", () => {
+    render(<Toolbar {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "1W" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2W" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument();
+  });
+
+  it("renders All wing button plus one per wing in wings prop", () => {
+    render(<Toolbar {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "North" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "South" })).toBeInTheDocument();
+  });
+
+  it("renders staff search input with placeholder Find staff…", () => {
+    render(<Toolbar {...defaultProps} />);
+    expect(screen.getByPlaceholderText("Find staff…")).toBeInTheDocument();
+  });
+});
+
+describe("Toolbar — non-schedule mode", () => {
+  const nonScheduleProps = { ...defaultProps, viewMode: "staff" as const };
+
+  it("does NOT render week nav buttons", () => {
+    render(<Toolbar {...nonScheduleProps} />);
+    expect(screen.queryByRole("button", { name: "‹" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "›" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Today" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does NOT render span toggle buttons", () => {
+    render(<Toolbar {...nonScheduleProps} />);
+    expect(
+      screen.queryByRole("button", { name: "1W" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "2W" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "M" })).not.toBeInTheDocument();
+  });
+
+  it("does NOT render wing filter buttons", () => {
+    render(<Toolbar {...nonScheduleProps} />);
+    expect(
+      screen.queryByRole("button", { name: "All" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "North" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does NOT render staff search input", () => {
+    render(<Toolbar {...nonScheduleProps} />);
+    expect(
+      screen.queryByPlaceholderText("Find staff…"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("DOES render Tools button", () => {
+    render(<Toolbar {...nonScheduleProps} />);
+    expect(screen.getByRole("button", { name: /Tools/i })).toBeInTheDocument();
+  });
+});
+
+describe("Toolbar — Tools dropdown", () => {
+  it("opens on click and shows Print / Save as PDF", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    expect(screen.getByText(/Print \/ Save as PDF/i)).toBeInTheDocument();
+  });
+
+  it("closes when clicking outside", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    expect(screen.getByText(/Print \/ Save as PDF/i)).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByText(/Print \/ Save as PDF/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Toolbar — active state styles", () => {
+  it("active span button (matching spanWeeks) has dark background style", () => {
+    render(<Toolbar {...defaultProps} spanWeeks={1} />);
+    const btn1W = screen.getByRole("button", { name: "1W" });
+    const btn2W = screen.getByRole("button", { name: "2W" });
+    expect(btn1W.style.background).toBe("var(--color-dark)");
+    expect(btn2W.style.background).toBe("none");
+  });
+
+  it("active wing button (matching activeWing) has dark background style", () => {
+    render(<Toolbar {...defaultProps} activeWing="North" />);
+    const northBtn = screen.getByRole("button", { name: "North" });
+    const allBtn = screen.getByRole("button", { name: "All" });
+    expect(northBtn.style.background).toBe("var(--color-dark)");
+    expect(allBtn.style.background).toBe("none");
+  });
+});
+
+describe("Toolbar — callbacks", () => {
+  it("clicking ‹ calls onPrev", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "‹" }));
+    expect(defaultProps.onPrev).toHaveBeenCalledTimes(1);
+  });
+
+  it("clicking › calls onNext", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "›" }));
+    expect(defaultProps.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("clicking Today calls onToday", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    expect(defaultProps.onToday).toHaveBeenCalledTimes(1);
+  });
+
+  it("clicking 1W calls onSpanChange(1)", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "1W" }));
+    expect(defaultProps.onSpanChange).toHaveBeenCalledWith(1);
+  });
+
+  it("clicking 2W calls onSpanChange(2)", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "2W" }));
+    expect(defaultProps.onSpanChange).toHaveBeenCalledWith(2);
+  });
+
+  it('clicking M calls onSpanChange("month")', async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "M" }));
+    expect(defaultProps.onSpanChange).toHaveBeenCalledWith("month");
+  });
+
+  it("clicking a wing button calls onWingChange with wing name", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "North" }));
+    expect(defaultProps.onWingChange).toHaveBeenCalledWith("North");
+  });
+});
+
+describe("Toolbar — staff search", () => {
+  it("× clear button appears when staffSearch is non-empty", () => {
+    render(<Toolbar {...defaultProps} staffSearch="Alice" />);
+    expect(screen.getByRole("button", { name: "×" })).toBeInTheDocument();
+  });
+
+  it("× clear button is absent when staffSearch is empty", () => {
+    render(<Toolbar {...defaultProps} staffSearch="" />);
+    expect(screen.queryByRole("button", { name: "×" })).not.toBeInTheDocument();
+  });
+
+  it("clicking × calls onStaffSearchChange with empty string", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} staffSearch="Alice" />);
+    await user.click(screen.getByRole("button", { name: "×" }));
+    expect(defaultProps.onStaffSearchChange).toHaveBeenCalledWith("");
+  });
+
+  it("typing in search input calls onStaffSearchChange with typed value", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    const input = screen.getByPlaceholderText("Find staff…");
+    await user.type(input, "B");
+    // The input is controlled (value=staffSearch stays ""), so each keystroke fires
+    // onChange with just that character. Verify the callback was invoked with "B".
+    expect(defaultProps.onStaffSearchChange).toHaveBeenCalledWith("B");
+  });
+});
+
+// ─── Property-Based Tests ────────────────────────────────────────────────────
+import * as fc from "fast-check";
+
+describe("Toolbar — property tests", () => {
+  // Feature: ui-ux-test-suite, Property 1: Week label format for numeric spans
+  it("week label always matches M/D – M/D for spans 1 and 2", () => {
+    // Validates: Requirements 2.9, 2.10, 8.1
+    const arbDate = fc
+      .date({ min: new Date(2000, 0, 1), max: new Date(2030, 11, 31) })
+      .filter((d) => !isNaN(d.getTime()));
+    const arbNumericSpan = fc.constantFrom(1 as const, 2 as const);
+
+    fc.assert(
+      fc.property(arbDate, arbNumericSpan, (date, span) => {
+        const { unmount } = render(
+          <Toolbar {...defaultProps} weekStart={date} spanWeeks={span} />,
+        );
+        const label = screen.getByText(/\d{1,2}\/\d{1,2}/);
+        const result = /^\d{1,2}\/\d{1,2} – \d{1,2}\/\d{1,2}$/.test(
+          label.textContent ?? "",
+        );
+        unmount();
+        return result;
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  // Feature: ui-ux-test-suite, Property 2: Month label format
+  it("month label always matches MonthName YYYY when spanWeeks is month", () => {
+    // Validates: Requirements 2.11
+    const arbDate = fc
+      .date({ min: new Date(2000, 0, 1), max: new Date(2030, 11, 31) })
+      .filter((d) => !isNaN(d.getTime()));
+
+    fc.assert(
+      fc.property(arbDate, (date) => {
+        const { unmount } = render(
+          <Toolbar {...defaultProps} weekStart={date} spanWeeks="month" />,
+        );
+        const label = screen.getByText(/^[A-Za-z]+ \d{4}$/);
+        const result = /^[A-Za-z]+ \d{4}$/.test(label.textContent ?? "");
+        unmount();
+        return result;
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
