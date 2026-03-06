@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add .gitignore README.md package-lock.json package.json src/app/globals.css src/app/layout.tsx src/app/page.tsx public/logo-mark.svg public/logo.svg src/app/icon.tsx src/app/admin/ src/app/login/ src/app/onboarding/ src/app/schedule/ src/components/ src/lib/ src/middleware.ts src/types/ supabase/ vitest.config.ts PRD.md src/__tests__/)"
+    ]
+  }
+}
