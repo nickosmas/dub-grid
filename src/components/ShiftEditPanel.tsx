@@ -74,8 +74,18 @@ export default function ShiftEditPanel({
           cursor: disabled ? "not-allowed" : "pointer",
           opacity: allowShiftEdits ? 1 : 0.5,
           textAlign: "left",
-          transition: "border-color 0.1s",
+          transition: "border-color 150ms ease, background 150ms ease",
           position: "relative",
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled && !isActive) {
+            e.currentTarget.style.borderColor = s.border;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!disabled && !isActive) {
+            e.currentTarget.style.borderColor = "var(--color-border)";
+          }
         }}
       >
         <div
@@ -100,36 +110,32 @@ export default function ShiftEditPanel({
     );
   }
 
+  const sectionLabel: React.CSSProperties = {
+    marginBottom: 8,
+    fontSize: 10,
+    fontWeight: 700,
+    color: "var(--color-text-subtle)",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+  };
+
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{ position: "fixed", inset: 0, zIndex: 200 }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 340,
-          background: "#fff",
-          zIndex: 201,
-          boxShadow: "-4px 0 32px rgba(0,0,0,0.13)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
+      {/* Backdrop */}
+      <div className="dg-panel-overlay" onClick={onClose} />
+
+      {/* Slide-over panel */}
+      <div className="dg-panel">
+        {/* Panel Header */}
         <div
           style={{
-            padding: "18px 20px 14px",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--color-border)",
             display: "flex",
             alignItems: "flex-start",
             justifyContent: "space-between",
             flexShrink: 0,
+            background: "#fff",
           }}
         >
           <div>
@@ -146,97 +152,76 @@ export default function ShiftEditPanel({
               style={{
                 fontSize: 12,
                 color: "var(--color-text-subtle)",
-                marginTop: 3,
+                marginTop: 2,
               }}
             >
               {formatDate(modal.date)}
+              {modal.empDesignation && (
+                <>
+                  {" · "}
+                  <span style={{ color: "var(--color-text-muted)", fontWeight: 500 }}>
+                    {modal.empDesignation}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: "none",
-              border: "1px solid var(--color-border)",
-              borderRadius: 6,
-              cursor: "pointer",
-              color: "var(--color-text-muted)",
-              fontSize: 16,
-              lineHeight: 1,
-              padding: "4px 8px",
-            }}
+            className="dg-btn dg-btn-ghost"
+            style={{ border: "1px solid var(--color-border)", padding: "4px 8px", fontSize: 16, lineHeight: 1 }}
+            title="Close"
           >
             ×
           </button>
         </div>
 
-        {/* Scrollable content */}
-        <div style={{ flex: 1, overflow: "auto", padding: "14px 16px" }}>
-          {/* Wing tabs */}
-          {tabs.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                gap: 2,
-                marginBottom: 14,
-                borderBottom: "1px solid var(--color-border)",
-                overflowX: "auto",
-              }}
-            >
-              {tabs.map((wing) => {
-                const isActive = wing === activeTab;
-                const isHome =
-                  modal.empWings.includes(wing) && wing === modal.empWings[0];
-                return (
-                  <button
-                    key={wing}
-                    onClick={() => setActiveTab(wing)}
-                    style={{
-                      padding: "6px 10px",
-                      fontSize: 11,
-                      fontWeight: isActive ? 700 : 500,
-                      cursor: "pointer",
-                      border: "none",
-                      borderBottom: isActive
-                        ? "2px solid var(--color-text-primary)"
-                        : "2px solid transparent",
-                      background: "transparent",
-                      color: isActive
-                        ? "var(--color-text-primary)"
-                        : "var(--color-text-subtle)",
-                      marginBottom: -1,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {wing}
-                    {isHome ? " ★" : ""}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        {/* Wing tabs (Tier 2 sub-tabs) */}
+        {tabs.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              borderBottom: "1px solid var(--color-border)",
+              overflowX: "auto",
+              flexShrink: 0,
+              background: "#fff",
+              paddingLeft: 16,
+              paddingRight: 16,
+            }}
+          >
+            {tabs.map((wing) => {
+              const isActive = wing === activeTab;
+              const isHome =
+                modal.empWings.includes(wing) && wing === modal.empWings[0];
+              return (
+                <button
+                  key={wing}
+                  onClick={() => setActiveTab(wing)}
+                  className={`dg-sub-tab${isActive ? " active" : ""}`}
+                  style={{ fontSize: 12 }}
+                >
+                  {wing}
+                  {isHome ? " ★" : ""}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
           {allowShiftEdits ? (
             <>
               {/* Wing-specific shifts */}
               {wingShifts.length > 0 && (
                 <>
-                  <div
-                    style={{
-                      marginBottom: 8,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: "var(--color-text-subtle)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Shift Assignment
-                  </div>
+                  <div style={sectionLabel}>Shift Assignment</div>
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
                       gap: 8,
+                      marginBottom: 16,
                     }}
                   >
                     {wingShifts.map((s) => renderShiftButton(s))}
@@ -247,18 +232,7 @@ export default function ShiftEditPanel({
               {/* General shifts */}
               {generalShifts.length > 0 && (
                 <>
-                  <div
-                    style={{
-                      margin: "12px 0 8px",
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: "var(--color-text-subtle)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    General
-                  </div>
+                  <div style={{ ...sectionLabel, marginTop: wingShifts.length > 0 ? 4 : 0 }}>General</div>
                   <div
                     style={{
                       display: "grid",
@@ -270,14 +244,27 @@ export default function ShiftEditPanel({
                   </div>
                 </>
               )}
+
+              {wingShifts.length === 0 && generalShifts.length === 0 && (
+                <div
+                  style={{
+                    padding: "24px 16px",
+                    textAlign: "center",
+                    color: "var(--color-text-subtle)",
+                    fontSize: 13,
+                  }}
+                >
+                  No shifts available for this wing.
+                </div>
+              )}
             </>
           ) : (
             <div
               style={{
                 border: "1px solid var(--color-border)",
                 borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 12,
+                padding: "12px",
+                fontSize: 13,
                 color: "var(--color-text-muted)",
               }}
             >
@@ -285,91 +272,82 @@ export default function ShiftEditPanel({
             </div>
           )}
 
+          {/* Indicators / Notes */}
           {canEditNotes && (
-            <div style={{ marginTop: 14 }}>
-              <div
-                style={{
-                  marginBottom: 8,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "var(--color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Indicators
-              </div>
+            <div style={{ marginTop: 24 }}>
+              <div style={sectionLabel}>Indicators</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {([
-                  { type: "readings" as NoteType, label: "Readings", color: "#EF4444", desc: "Appears as a red dot" },
-                  { type: "shower" as NoteType, label: "Shower", color: "#1E293B", desc: "Appears as a black dot" },
-                ] as { type: NoteType; label: string; color: string; desc: string }[]).map(
-                  ({ type, label, color, desc }) => {
-                    const isActive = noteTypes.includes(type);
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => onNoteToggle?.(type, !isActive)}
+                {(
+                  [
+                    { type: "readings" as NoteType, label: "Readings", color: "#EF4444", desc: "Appears as a red dot" },
+                    { type: "shower" as NoteType, label: "Shower", color: "#1E293B", desc: "Appears as a black dot" },
+                  ] as { type: NoteType; label: string; color: string; desc: string }[]
+                ).map(({ type, label, color, desc }) => {
+                  const isActive = noteTypes.includes(type);
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => onNoteToggle?.(type, !isActive)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        border: `1.5px solid ${isActive ? color : "var(--color-border)"}`,
+                        borderRadius: 8,
+                        background: isActive ? `${color}18` : "#fff",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "border-color 150ms ease, background 150ms ease",
+                        width: "100%",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      <div
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "10px 12px",
-                          border: `1.5px solid ${isActive ? color : "var(--color-border)"}`,
-                          borderRadius: 8,
-                          background: isActive ? `${color}18` : "#fff",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          transition: "border-color 0.1s, background 0.1s",
-                          width: "100%",
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: color,
+                          flexShrink: 0,
+                          border: "1px solid rgba(0,0,0,0.08)",
                         }}
-                      >
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            background: color,
-                            flexShrink: 0,
-                            border: "1px solid rgba(0,0,0,0.08)",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: isActive ? color : "var(--color-text-secondary)",
                           }}
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: isActive ? color : "var(--color-text-secondary)",
-                            }}
-                          >
-                            {label}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 10,
-                              color: "var(--color-text-subtle)",
-                              marginTop: 1,
-                            }}
-                          >
-                            {desc}
-                          </div>
+                        >
+                          {label}
                         </div>
-                        {isActive && (
-                          <div
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: color,
-                              flexShrink: 0,
-                            }}
-                          >
-                            ON
-                          </div>
-                        )}
-                      </button>
-                    );
-                  },
-                )}
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "var(--color-text-subtle)",
+                            marginTop: 1,
+                          }}
+                        >
+                          {desc}
+                        </div>
+                      </div>
+                      {isActive && (
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: color,
+                            flexShrink: 0,
+                          }}
+                        >
+                          ON
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
