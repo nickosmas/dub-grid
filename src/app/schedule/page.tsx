@@ -13,7 +13,7 @@ import PrintLegend from "@/components/PrintLegend";
 import { addDays, formatDateKey, getWeekStart } from "@/lib/utils";
 import { filterAndSortEmployees } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
-import { validateConfig, supabase } from "@/lib/supabase";
+import { validateConfig } from "@/lib/supabase";
 import { usePermissions } from "@/hooks";
 import {
   Employee,
@@ -55,7 +55,7 @@ function writeScheduleCache(data: ScheduleCache): void {
 }
 
 function SchedulerContent() {
-  const { isLoading: permissionsLoading, canEditSchedule, canAddNotes, canManageOrg } = usePermissions();
+  const { canEditSchedule, canAddNotes, canManageOrg } = usePermissions();
   const today = useRef(new Date()).current;
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
@@ -73,8 +73,6 @@ function SchedulerContent() {
   const [viewMode, setViewMode] = useState<ViewMode>("schedule");
   const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(2);
   const [loading, setLoading] = useState(true);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [hasDrafts, setHasDrafts] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [staffSearch, setStaffSearch] = useState("");
 
@@ -116,7 +114,7 @@ function SchedulerContent() {
           db.fetchWings(org.id),
           db.fetchShiftTypes(org.id),
           db.fetchEmployees(org.id),
-          db.fetchShifts(org.id, canEditSchedule), // Schedulers see drafts
+          db.fetchShifts(org.id, canEditSchedule),
           db.fetchScheduleNotes(org.id),
         ]);
         const noteMap: Record<string, NoteType[]> = {};
@@ -149,141 +147,7 @@ function SchedulerContent() {
       }
     }
     load();
-  }, [canEditSchedule]);
-
-  // ── Realtime subscriptions ────────────────────────────────────────────────────
-  // Subscribe to DB changes so all open tabs/devices stay in sync automatically.
-
-  const orgIdRef = useRef<string | null>(null);
-  orgIdRef.current = organization?.id ?? null;
-
-  const canEditRef = useRef(false);
-  canEditRef.current = canEditSchedule;
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("schedule-realtime")
-
-      // ── Shifts ──────────────────────────────────────────────────────────────
-      .on("postgres_changes", { event: "*", schema: "public", table: "shifts" }, (payload: any) => {
-        const orgId = orgIdRef.current;
-        if (!orgId) return;
-
-        const isScheduler = canEditRef.current;
-
-        if (payload.eventType === "DELETE") {
-          const old = payload.old as { emp_id: string; date: string };
-          const key = `${old.emp_id}_${old.date}`;
-          setShifts((prev) => { const next = { ...prev }; delete next[key]; return next; });
-          return;
-        }
-
-        const row = payload.new as { emp_id: string; date: string; draft_label: string | null; published_label: string | null; org_id: string | null };
-        if (row.org_id !== orgId) return;
-
-        const effectiveLabel = isScheduler
-          ? (row.draft_label ?? row.published_label)
-          : row.published_label;
-
-        const key = `${row.emp_id}_${row.date}`;
-        if (effectiveLabel && effectiveLabel !== "OFF") {
-          setShifts((prev) => ({ ...prev, [key]: effectiveLabel }));
-        } else {
-          setShifts((prev) => { const next = { ...prev }; delete next[key]; return next; });
-        }
-      })
-
-      // ── Schedule Notes ───────────────────────────────────────────────────────
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_notes" }, (payload: any) => {
-        const orgId = orgIdRef.current;
-        if (!orgId) return;
-
-        if (payload.eventType === "DELETE") {
-          const old = payload.old as { emp_id: string; date: string; note_type: NoteType };
-          const key = `${old.emp_id}_${old.date}`;
-          setNotes((prev) => ({
-            ...prev,
-            [key]: (prev[key] ?? []).filter((t) => t !== old.note_type),
-          }));
-          return;
-        }
-
-        const row = payload.new as { emp_id: string; date: string; note_type: NoteType; org_id: string };
-        if (row.org_id !== orgId) return;
-        const key = `${row.emp_id}_${row.date}`;
-        setNotes((prev) => ({
-          ...prev,
-          [key]: [...new Set([...(prev[key] ?? []), row.note_type])],
-        }));
-      })
-
-      // ── Employees ────────────────────────────────────────────────────────────
-      .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, (payload: any) => {
-        const orgId = orgIdRef.current;
-        if (!orgId) return;
-
-        if (payload.eventType === "DELETE") {
-          const old = payload.old as { id: string };
-          setEmployees((prev) => prev.filter((e) => e.id !== old.id));
-          return;
-        }
-
-        const row = payload.new as db.DbEmployee;
-        if (row.org_id !== orgId) return;
-        const emp = db.rowToEmployee(row);
-        setEmployees((prev) => {
-          const idx = prev.findIndex((e) => e.id === emp.id);
-          return idx >= 0 ? prev.map((e) => (e.id === emp.id ? emp : e)) : [...prev, emp];
-        });
-      })
-
-      // ── Wings ────────────────────────────────────────────────────────────────
-      .on("postgres_changes", { event: "*", schema: "public", table: "wings" }, (payload: any) => {
-        const orgId = orgIdRef.current;
-        if (!orgId) return;
-
-        if (payload.eventType === "DELETE") {
-          const old = payload.old as { id: number };
-          setWings((prev) => prev.filter((w) => w.id !== old.id));
-          return;
-        }
-
-        const row = payload.new as db.DbWing;
-        if (row.org_id !== orgId) return;
-        const wing = db.rowToWing(row);
-        setWings((prev) => {
-          const idx = prev.findIndex((w) => w.id === wing.id);
-          return idx >= 0 ? prev.map((w) => (w.id === wing.id ? wing : w)) : [...prev, wing];
-        });
-      })
-
-      // ── Shift Types ──────────────────────────────────────────────────────────
-      .on("postgres_changes", { event: "*", schema: "public", table: "shift_types" }, (payload: any) => {
-        const orgId = orgIdRef.current;
-        if (!orgId) return;
-
-        if (payload.eventType === "DELETE") {
-          const old = payload.old as { id: number };
-          setShiftTypes((prev) => prev.filter((st) => st.id !== old.id));
-          return;
-        }
-
-        const row = payload.new as db.DbShiftType;
-        if (row.org_id !== orgId) return;
-        const st = db.rowToShiftType(row);
-        setShiftTypes((prev) => {
-          const idx = prev.findIndex((s) => s.id === st.id);
-          return idx >= 0 ? prev.map((s) => (s.id === st.id ? st : s)) : [...prev, st];
-        });
-      })
-
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []); // Runs once; refs keep closures fresh.
-
+  }, []);
 
   const dates = useMemo(
     () =>
@@ -346,27 +210,30 @@ function SchedulerContent() {
     [notes],
   );
 
-  const organizationRef = useRef<Organization | null>(null);
-  organizationRef.current = organization;
+  const setShift = useCallback(
+    (empId: string, date: Date, type: string) => {
+      const orgId = organization?.id;
+      if (!orgId) {
+        console.error("Cannot modify shifts before organization is loaded");
+        return;
+      }
 
-  const setShift = useCallback((empId: string, date: Date, type: string) => {
-    const dateKey = formatDateKey(date);
-    const key = `${empId}_${dateKey}`;
-    const orgId = organizationRef.current?.id;
-    if (!orgId) return;
-    if (type === "OFF") {
-      setShifts((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      db.deleteShift(empId, dateKey, orgId).catch(console.error); // Saves draft as 'OFF'
-    } else {
-      setShifts((prev) => ({ ...prev, [key]: type }));
-      db.upsertShift(empId, dateKey, type, orgId).catch(console.error); // Saves draft_label
-    }
-    setHasDrafts(true);
-  }, []);
+      const dateKey = formatDateKey(date);
+      const key = `${empId}_${dateKey}`;
+      if (type === "OFF") {
+        setShifts((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        db.deleteShift(empId, dateKey, orgId).catch(console.error);
+      } else {
+        setShifts((prev) => ({ ...prev, [key]: type }));
+        db.upsertShift(empId, dateKey, type, orgId).catch(console.error);
+      }
+    },
+    [organization?.id],
+  );
 
   const getShiftStyle = useCallback(
     (type: string): ShiftType =>
@@ -424,11 +291,15 @@ function SchedulerContent() {
 
       try {
         if (active) {
-          await db.upsertScheduleNote(organization.id, editPanel.empId, dateKey, noteType);
+          await db.upsertScheduleNote(
+            organization.id,
+            editPanel.empId,
+            dateKey,
+            noteType,
+          );
         } else {
           await db.deleteScheduleNote(editPanel.empId, dateKey, noteType);
         }
-        setHasDrafts(true);
       } catch (error) {
         console.error(error);
       }
@@ -498,36 +369,6 @@ function SchedulerContent() {
     [today],
   );
 
-  const handlePublish = useCallback(async () => {
-    if (!organization) return;
-    setIsPublishing(true);
-    try {
-      // Calculate current view's date range
-      const startDate = spanWeeks === "month" ? monthStart : weekStart;
-      let endDate: Date;
-      if (spanWeeks === "month") {
-        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-      } else {
-        endDate = addDays(startDate, spanWeeks * 7 - 1);
-      }
-
-      await db.publishSchedule(organization.id, startDate, endDate);
-      
-      // We can also re-fetch shifts from the current view optionally, 
-      // but if the user is an admin they're already seeing effective state.
-      // However, making a refetch is safe to verify.
-      const updatedShifts = await db.fetchShifts(organization.id, canEditSchedule);
-      setShifts(updatedShifts);
-      setHasDrafts(false);
-      alert(`Schedule published for ${formatDateKey(startDate)} to ${formatDateKey(endDate)}`);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to publish schedule. Please check permissions or try again.");
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [organization, spanWeeks, monthStart, weekStart, canEditSchedule]);
-
   // ── Loading / error states ───────────────────────────────────────────────────
 
   if (loadError) {
@@ -566,10 +407,7 @@ function SchedulerContent() {
     );
   }
 
-  // If permissions are still loading, don't show the skeleton grid since it might
-  // briefly initialize with the wrong fallback viewModes (like 'schedule' only)
-  // which causes the tabs to jump.
-  if (loading || permissionsLoading) {
+  if (loading) {
     return (
       <div
         style={{
@@ -622,9 +460,6 @@ function SchedulerContent() {
             onSpanChange={setSpanWeeks}
             onWingChange={setActiveWing}
             onStaffSearchChange={setStaffSearch}
-            canEditSchedule={canEditSchedule}
-            onPublish={hasDrafts ? handlePublish : undefined}
-            isPublishing={isPublishing}
           />
         </div>
 
@@ -644,7 +479,6 @@ function SchedulerContent() {
             shiftTypes={shiftTypes}
             isCellInteractive={canAddNotes}
             noteTypesForKey={noteTypesForKey}
-            activeWing={activeWing}
           />
         )}
 

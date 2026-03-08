@@ -32,9 +32,17 @@ vi.mock("@/hooks", () => ({
   useLogout: () => ({ signOutLocal: mockSignOut }),
 }));
 
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
+
+function setupAuth(isSuperAdmin = false) {
+  // empty
+}
 
 const defaultProps = {
   viewMode: "schedule" as const,
@@ -43,6 +51,7 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setupAuth(false);
 });
 
 describe("Header rendering", () => {
