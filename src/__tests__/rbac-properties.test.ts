@@ -2383,7 +2383,7 @@ describe("RBAC Property Tests", () => {
       ).map(([a, b, c, d]) => `${a}.${b}.${c}.${d}`)
     );
 
-    const arbRefreshTokenHash = fc.string({ minLength: 64, maxLength: 64 }).map(s => 
+    const arbRefreshTokenHash = fc.string({ minLength: 64, maxLength: 64 }).map(s =>
       s.split('').map(c => c.charCodeAt(0).toString(16).padStart(2, '0').slice(0, 2)).join('').slice(0, 64).padEnd(64, '0')
     );
 
@@ -3620,7 +3620,7 @@ describe("Property 27: Middleware Route Protection", () => {
 function simulateHeaderInjection(claims: {
   platform_role?: string;
   org_role?: string;
-  org_id?: string | null;
+  org_id?: string | undefined;
 }): { role: string; orgId: string } {
   const effectiveRole = calculateEffectiveRole(claims);
   const orgId = claims.org_id ?? "";
@@ -3643,7 +3643,7 @@ describe("Property 28: Middleware Header Injection", () => {
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
   const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
-  const arbOrgId = fc.option(fc.uuid(), { nil: null });
+  const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for JWT claims
   const arbJWTClaims = fc.record({
@@ -3746,7 +3746,7 @@ describe("Property 28: Middleware Header Injection", () => {
           const claims = {
             platform_role: platformRole,
             org_role: orgRole,
-            org_id: null,
+            org_id: undefined,
           };
 
           const headers = simulateHeaderInjection(claims);
@@ -3889,8 +3889,7 @@ function createMockShiftUpdateSystem() {
       public readonly actualVersion?: number
     ) {
       super(
-        `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${
-          actualVersion !== undefined ? `, but found version ${actualVersion}` : ""
+        `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${actualVersion !== undefined ? `, but found version ${actualVersion}` : ""
         }`
       );
       this.name = "OptimisticLockError";

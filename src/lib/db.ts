@@ -427,11 +427,15 @@ export async function fetchShifts(orgId: string, isScheduler: boolean): Promise<
       ? (row.draft_label ?? row.published_label)
       : row.published_label;
 
+    const isDraft = row.draft_label !== null && row.draft_label !== row.published_label;
+
     // An 'OFF' draft acts as a deletion for a draft, but we only set it to the map if it's not 'OFF'
     // Actually, if it's OFF, we shouldn't show a shift in the UI.
     // So if effectiveLabel is null or 'OFF', we leave it absent from the map.
-    if (effectiveLabel && effectiveLabel !== 'OFF') {
-      map[`${row.emp_id}_${row.date}`] = effectiveLabel;
+    // But wait, if it's OFF and isDraft, it means they deleted a published shift and we need to know it's a draft change.
+    // To keep the map correct but identify changes, we'll store OFF as well but let the UI filter it from being shown.
+    if (effectiveLabel) {
+      map[`${row.emp_id}_${row.date}`] = { label: effectiveLabel, isDraft };
     }
   }
   return map;
@@ -475,6 +479,68 @@ export async function publishSchedule(
     p_end_date: endDate.toISOString().split("T")[0],
   });
   if (error) throw error;
+}
+
+export async function discardScheduleDrafts(
+  orgId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<void> {
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  // 1. Fetch all shifts in the date range
+  const { data: shifts, error: fetchError } = await supabase
+    .from("shifts")
+    .select("emp_id, date, draft_label, published_label")
+    .eq("org_id", orgId)
+    .gte("date", startStr)
+    .lte("date", endStr);
+
+  if (fetchError) throw fetchError;
+  if (!shifts || shifts.length === 0) return;
+
+  // 2. Identify which rows need updating or deleting
+  const toUpsert: { emp_id: string; date: string; org_id: string; draft_label: string; published_label: string }[] = [];
+  const toDelete: { emp_id: string; date: string }[] = [];
+
+  for (const shift of shifts) {
+    if (shift.draft_label !== shift.published_label) {
+      if (shift.published_label) {
+        // Was edited from an existing published shift, restore the original
+        toUpsert.push({
+          emp_id: shift.emp_id,
+          date: shift.date,
+          org_id: orgId,
+          draft_label: shift.published_label,
+          published_label: shift.published_label,
+        });
+      } else {
+        // Was created as a draft but never published
+        toDelete.push({ emp_id: shift.emp_id, date: shift.date });
+      }
+    }
+  }
+
+  // 3. Execute bulk operations
+  if (toUpsert.length > 0) {
+    const { error: upsertError } = await supabase
+      .from("shifts")
+      .upsert(toUpsert, { onConflict: "emp_id,date" });
+    if (upsertError) throw upsertError;
+  }
+
+  if (toDelete.length > 0) {
+    // Supabase JS doesn't have an easy bulk-delete by composite key without an IN clause matching both,
+    // so we can execute deletes iteratively (there shouldn't be too many for a single scheduling session)
+    // or use a matching 'or' filter. We'll map them to an 'or' query.
+    const orClauses = toDelete.map(d => `and(emp_id.eq.${d.emp_id},date.eq.${d.date})`).join(",");
+    const { error: deleteError } = await supabase
+      .from("shifts")
+      .delete()
+      .or(orClauses);
+    if (deleteError) throw deleteError;
+  }
 }
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────

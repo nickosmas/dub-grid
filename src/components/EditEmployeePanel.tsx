@@ -99,52 +99,43 @@ export default function EditEmployeePanel({
     [],
   );
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "8px 11px",
-    border: "1.5px solid var(--color-border)",
-    borderRadius: 8,
-    fontSize: 13,
-    outline: "none",
-    background: "#fff",
-  };
-
   const labelStyle: React.CSSProperties = {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 700,
     color: "var(--color-text-subtle)",
-    letterSpacing: "0.05em",
+    letterSpacing: "0.06em",
     display: "block",
-    marginBottom: 5,
+    marginBottom: 6,
   };
 
   return (
-    <div style={{ padding: "20px 20px 20px calc(20px - 4px)" }}>
+    <div style={{ padding: "20px 24px" }}>
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: 20,
+          gap: 24,
         }}
       >
         {/* Left column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Name + FTE */}
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>FULL NAME</label>
               <input
+                className="dg-input"
                 value={form.name}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, name: e.target.value }))
                 }
-                style={inputStyle}
+                placeholder="e.g. Maria S."
               />
             </div>
             <div style={{ width: 80 }}>
               <label style={labelStyle}>FTE</label>
               <input
+                className="dg-input"
                 type="number"
                 step="0.1"
                 min="0"
@@ -153,61 +144,62 @@ export default function EditEmployeePanel({
                 onChange={(e) =>
                   setForm((p) => ({ ...p, fteWeight: e.target.value }))
                 }
-                style={inputStyle}
               />
             </div>
           </div>
 
           {/* Contact details */}
-          <div>
-            <label style={labelStyle}>PHONE</label>
-            <input
-              value={form.phone}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, phone: e.target.value }))
-              }
-              placeholder="e.g. (415) 555-0100"
-              style={inputStyle}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>PHONE</label>
+              <input
+                className="dg-input"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, phone: e.target.value }))
+                }
+                placeholder="(415) 555-0100"
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>EMAIL</label>
+              <input
+                className="dg-input"
+                type="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, email: e.target.value }))
+                }
+                placeholder="name@example.com"
+              />
+            </div>
           </div>
+
           <div>
-            <label style={labelStyle}>EMAIL</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, email: e.target.value }))
-              }
-              placeholder="e.g. name@example.com"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>CONTACT NOTES</label>
+            <label style={labelStyle}>INTERNAL NOTES</label>
             <textarea
+              className="dg-input"
               value={form.contactNotes}
               onChange={(e) =>
                 setForm((p) => ({ ...p, contactNotes: e.target.value }))
               }
-              placeholder="Emergency contact, preferences, etc."
-              rows={2}
+              placeholder="Preferences, availability, etc."
+              rows={3}
               style={{
-                ...inputStyle,
                 resize: "vertical",
-                fontFamily: "inherit",
+                minHeight: 80,
               }}
             />
           </div>
 
-          {/* Skill Level */}
           <div>
-            <label style={labelStyle}>SKILL LEVEL</label>
+            <label style={labelStyle}>DESIGNATION</label>
             <select
+              className="dg-input"
               value={form.designation}
               onChange={(e) =>
                 setForm((p) => ({ ...p, designation: e.target.value }))
               }
-              style={inputStyle}
             >
               {skillLevels.map((d) => (
                 <option key={d} value={d}>
@@ -219,11 +211,11 @@ export default function EditEmployeePanel({
         </div>
 
         {/* Right column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Assigned Wings */}
           <div>
             <label style={labelStyle}>ASSIGNED WINGS</label>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {wings.map((wing) => {
                 const active = form.wings.includes(wing.name);
                 return (
@@ -240,12 +232,12 @@ export default function EditEmployeePanel({
                       border: active
                         ? `1.5px solid ${wing.colorText}40`
                         : "1.5px solid transparent",
-                      borderRadius: 6,
-                      padding: "7px 12px",
-                      fontSize: 13,
+                      borderRadius: 20,
+                      padding: "5px 14px",
+                      fontSize: 12,
                       fontWeight: 600,
                       cursor: "pointer",
-                      textAlign: "left",
+                      transition: "all 150ms ease",
                     }}
                   >
                     {wing.name}
@@ -272,10 +264,11 @@ export default function EditEmployeePanel({
                       color: active ? "#fff" : "var(--color-text-muted)",
                       border: "none",
                       borderRadius: 20,
-                      padding: "4px 12px",
-                      fontSize: 12,
-                      fontWeight: 600,
+                      padding: "5px 14px",
+                      fontSize: 11,
+                      fontWeight: 700,
                       cursor: "pointer",
+                      transition: "all 150ms ease",
                     }}
                   >
                     {role}
@@ -290,11 +283,11 @@ export default function EditEmployeePanel({
       {/* Actions */}
       <div
         style={{
-          marginTop: 18,
+          marginTop: 24,
           paddingTop: 16,
-          borderTop: "1px solid var(--color-border-light)",
+          borderTop: "1px solid var(--color-border)",
           display: "flex",
-          gap: 8,
+          gap: 12,
           alignItems: "center",
         }}
       >
@@ -305,96 +298,55 @@ export default function EditEmployeePanel({
               disabled={
                 !isModified || !form.name.trim() || form.wings.length === 0
               }
-              style={{
-                background:
-                  isModified && form.name.trim() && form.wings.length > 0
-                    ? "var(--color-accent-gradient)"
-                    : "#ccc",
-                border: "none",
-                color: "#fff",
-                borderRadius: 8,
-                padding: "9px 20px",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: isModified ? "pointer" : "not-allowed",
-              }}
+              className="dg-btn dg-btn-primary"
+              style={{ minWidth: 120 }}
             >
               Save Changes
             </button>
             <button
               onClick={onCancel}
-              style={{
-                background: "var(--color-border-light)",
-                border: "none",
-                borderRadius: 8,
-                color: "var(--color-text-muted)",
-                fontSize: 13,
-                padding: "9px 16px",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
+              className="dg-btn dg-btn-secondary"
             >
-              Cancel
+              Discard Changes
             </button>
             <div style={{ flex: 1 }} />
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              style={{
-                background: "none",
-                border: "1px solid #FEE2E2",
-                borderRadius: 8,
-                color: "#EF4444",
-                fontSize: 13,
-                padding: "9px 16px",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
+              className="dg-btn dg-btn-ghost"
+              style={{ color: "var(--color-error)", border: "1px solid #FEE2E2" }}
             >
-              Delete Employee
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+              Remove Staff
             </button>
           </>
         ) : (
-          <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--color-error-bg)", padding: "8px 16px", borderRadius: 8, width: "100%" }}>
             <span
               style={{
                 fontSize: 13,
-                color: "var(--color-text-secondary)",
-                marginRight: 8,
+                fontWeight: 600,
+                color: "var(--color-error)",
+                flex: 1,
               }}
             >
-              Delete {form.name}? This cannot be undone.
+              Remove {form.name}? All historical shift data will be preserved but they will no longer appear on the grid.
             </span>
             <button
               onClick={() => onDelete(employee.id)}
-              style={{
-                background: "#EF4444",
-                border: "none",
-                color: "#fff",
-                borderRadius: 8,
-                padding: "9px 16px",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: 13,
-              }}
+              className="dg-btn dg-btn-primary"
+              style={{ background: "var(--color-error)", border: "none" }}
             >
-              Delete
+              Confirm Removal
             </button>
             <button
               onClick={() => setShowDeleteConfirm(false)}
-              style={{
-                background: "var(--color-border-light)",
-                border: "none",
-                borderRadius: 8,
-                color: "var(--color-text-muted)",
-                padding: "9px 16px",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: 13,
-              }}
+              className="dg-btn dg-btn-secondary"
             >
               Cancel
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>

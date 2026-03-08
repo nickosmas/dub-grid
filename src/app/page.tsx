@@ -253,33 +253,37 @@ export default function RootPage() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        const parsed = parseHost(window.location.host);
-        if (isApexHost(parsed)) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("organizations(slug)")
-            .eq("id", session.user.id)
-            .maybeSingle();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session) {
+          const parsed = parseHost(window.location.host);
+          if (isApexHost(parsed)) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("organizations(slug)")
+              .eq("id", session.user.id)
+              .maybeSingle();
 
-          const slug = (
-            profile as {
-              organizations?: { slug?: string | null } | null;
-            } | null
-          )?.organizations?.slug;
-          if (slug) {
-            const host = buildSubdomainHost(slug, parsed);
-            window.location.replace(
-              `${window.location.protocol}//${host}/schedule`,
-            );
-            return;
+            const slug = (
+              profile as {
+                organizations?: { slug?: string | null } | null;
+              } | null
+            )?.organizations?.slug;
+            if (slug) {
+              const host = buildSubdomainHost(slug, parsed);
+              window.location.replace(
+                `${window.location.protocol}//${host}/schedule`,
+              );
+              return;
+            }
           }
+          router.replace("/schedule");
+        } else {
+          setReady(true);
         }
-        router.replace("/schedule");
-      } else {
+      } catch {
         setReady(true);
       }
     };
