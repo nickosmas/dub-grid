@@ -1,19 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 
 import { Organization, Wing, ShiftType } from "@/types";
 import * as db from "@/lib/db";
-import ActiveSessions from "@/components/ActiveSessions";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { usePermissions } from "@/hooks";
-
-const ORG_ROLES: { value: string; label: string }[] = [
-  { value: "user", label: "Staff (view only)" },
-  { value: "supervisor", label: "Supervisor (view + notes)" },
-  { value: "scheduler", label: "Scheduler (edit schedule)" },
-  { value: "admin", label: "Admin (full access)" },
-];
 
 interface SettingsPageProps {
   organization: Organization;
@@ -41,6 +33,7 @@ function Section({
         border: "1px solid var(--color-border)",
         overflow: "hidden",
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        maxWidth: 860,
       }}
     >
       <div
@@ -449,12 +442,14 @@ function ShiftTypeRow({
   st,
   wings,
   orgId,
+  orgSkillLevels,
   onSaved,
   onDeleted,
 }: {
   st: ShiftType & { isNew?: boolean };
   wings: Wing[];
   orgId: string;
+  orgSkillLevels: string[];
   onSaved: (s: ShiftType) => void;
   onDeleted: (id: number) => void;
 }) {
@@ -470,6 +465,7 @@ function ShiftTypeRow({
     isOrientation: st.isOrientation ?? false,
     isGeneral: st.isGeneral ?? false,
     wingName: st.wingName ?? "",
+    requiredDesignations: st.requiredDesignations ?? [],
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -494,6 +490,7 @@ function ShiftTypeRow({
         isGeneral: form.isGeneral,
         wingName: form.wingName || null,
         sortOrder: st.sortOrder,
+        requiredDesignations: form.requiredDesignations,
       });
       onSaved(saved);
       setExpanded(false);
@@ -763,6 +760,68 @@ function ShiftTypeRow({
             ))}
           </div>
 
+          {/* Required Skill Levels */}
+          {orgSkillLevels.length > 0 && (
+            <div>
+              <label style={labelStyle}>
+                REQUIRED SKILL LEVELS (leave all unchecked = any qualification)
+              </label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
+                {orgSkillLevels.map((desig) => {
+                  const checked = form.requiredDesignations.includes(desig);
+                  return (
+                    <label
+                      key={desig}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 13,
+                        cursor: "pointer",
+                        padding: "4px 10px",
+                        borderRadius: 20,
+                        border: `1.5px solid ${
+                          checked ? "var(--color-accent-start)" : "var(--color-border)"
+                        }`,
+                        background: checked ? "#EEF2FF" : "transparent",
+                        transition: "border-color 0.1s, background 0.1s",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        style={{ display: "none" }}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            requiredDesignations: e.target.checked
+                              ? [...p.requiredDesignations, desig]
+                              : p.requiredDesignations.filter((d) => d !== desig),
+                          }))
+                        }
+                      />
+                      <span
+                        style={{
+                          fontWeight: checked ? 700 : 500,
+                          color: checked
+                            ? "var(--color-accent-start)"
+                            : "var(--color-text-secondary)",
+                        }}
+                      >
+                        {desig}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {form.requiredDesignations.length > 0 && (
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>
+                  Only {form.requiredDesignations.join(", ")} can be assigned this shift.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
@@ -824,11 +883,13 @@ function ShiftTypesSettings({
   shiftTypes,
   wings,
   orgId,
+  orgSkillLevels,
   onChange,
 }: {
   shiftTypes: ShiftType[];
   wings: Wing[];
   orgId: string;
+  orgSkillLevels: string[];
   onChange: (types: ShiftType[]) => void;
 }) {
   const [local, setLocal] =
@@ -883,6 +944,7 @@ function ShiftTypesSettings({
           st={st}
           wings={wings}
           orgId={orgId}
+          orgSkillLevels={orgSkillLevels}
           onSaved={handleSaved}
           onDeleted={handleDeleted}
         />
@@ -908,109 +970,308 @@ function ShiftTypesSettings({
   );
 }
 
-// ── Workspace access (assign users so they can sign in) ────────────────────────
-function WorkspaceAccess({ orgId }: { orgId: string }) {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<string>("user");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{
-    text: string;
-    isError: boolean;
-  } | null>(null);
+// ── String List Editor ────────────────────────────────────────────────────────
+// Tag list with live-preview drag reordering.
+function StringListSettings({
+  label,
+  items,
+  onSave,
+  placeholder,
+}: {
+  label: string;
+  items: string[];
+  onSave: (items: string[]) => Promise<void>;
+  placeholder: string;
+}) {
+  const [local, setLocal] = useState<string[]>(items);
+  const [newItem, setNewItem] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAssign = useCallback(async () => {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed) return;
-    setLoading(true);
-    setMessage(null);
+  const dragOrigin = useRef<string[]>([]);
+  const dragItem = useRef<string | null>(null);
+  const dropped = useRef(false);
+
+  const isDirty = JSON.stringify(local) !== JSON.stringify(items);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
     try {
-      await db.assignOrgRoleByEmail(orgId, trimmed, role);
-      setMessage({
-        text: `${trimmed} has been assigned to this workspace. They can sign in now.`,
-        isError: false,
-      });
-      setEmail("");
-    } catch (err: unknown) {
-      const text =
-        err instanceof Error ? err.message : "Failed to assign user.";
-      setMessage({ text, isError: true });
+      await onSave(local);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? (err as { message: string }).message
+          : JSON.stringify(err);
+      setError(msg || "Unknown error");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
-  }, [orgId, email, role]);
+  };
+
+  const handleAdd = () => {
+    const trimmed = newItem.trim();
+    if (!trimmed || local.includes(trimmed)) return;
+    setLocal((prev) => [...prev, trimmed]);
+    setNewItem("");
+  };
+
+  const handleRemove = (i: number) => {
+    setLocal((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const handleDragStart = (_e: React.DragEvent<HTMLSpanElement>, index: number) => {
+    dragOrigin.current = [...local];
+    dragItem.current = local[index];
+    dropped.current = false;
+    setDragging(index);
+  };
+
+  const handleDragEnter = (_e: React.DragEvent<HTMLSpanElement>, targetIndex: number) => {
+    if (dragItem.current === null) return;
+    setLocal((prev) => {
+      const fromIndex = prev.indexOf(dragItem.current!);
+      if (fromIndex === -1 || fromIndex === targetIndex) return prev;
+      const next = [...prev];
+      next.splice(fromIndex, 1);
+      next.splice(targetIndex, 0, dragItem.current!);
+      setDragging(targetIndex);
+      return next;
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLSpanElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLSpanElement>) => {
+    e.preventDefault();
+    dropped.current = true;
+  };
+
+  const handleDragEnd = () => {
+    if (!dropped.current) {
+      setLocal(dragOrigin.current);
+    }
+    dragItem.current = null;
+    dragOrigin.current = [];
+    setDragging(null);
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
-        Users must be assigned to this workspace before they can sign in. Enter
-        the email they use to log in and choose a role.
+    <div>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 0, marginBottom: 12 }}>
+        {label}
       </p>
+
+      {/* Tag list */}
       <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-          alignItems: "flex-end",
-        }}
+        style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => { dropped.current = true; }}
       >
-        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
-          <label style={labelStyle}>EMAIL</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="colleague@example.com"
-            style={inputStyle}
-          />
-        </div>
-        <div style={{ width: 180 }}>
-          <label style={labelStyle}>ROLE</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            style={inputStyle}
+        {local.map((item, i) => (
+          <span
+            key={item}
+            draggable
+            onDragStart={(e) => handleDragStart(e, i)}
+            onDragEnter={(e) => handleDragEnter(e, i)}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background:
+                dragging === i
+                  ? "var(--color-accent-light, #EEF2FF)"
+                  : "var(--color-border-light)",
+              border:
+                dragging === i
+                  ? "1.5px dashed var(--color-accent-start, #6366F1)"
+                  : "1.5px solid transparent",
+              borderRadius: 20,
+              padding: "3px 10px 3px 12px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              cursor: "grab",
+              opacity: dragging === i ? 0.7 : 1,
+              transition: "background 0.1s ease",
+              userSelect: "none",
+            }}
           >
-            {ORG_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </div>
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--color-text-faint, #CBD5E1)",
+                letterSpacing: "-1px",
+                pointerEvents: "none",
+              }}
+            >
+              ⠿
+            </span>
+            {item}
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--color-text-muted)",
+                fontSize: 15,
+                lineHeight: 1,
+                padding: "0 2px",
+              }}
+              title="Remove"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {/* Add new */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+        <input
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          placeholder={placeholder}
+          style={{ ...inputStyle, flex: 1 }}
+        />
         <button
-          onClick={handleAssign}
-          disabled={loading || !email.trim()}
+          onClick={handleAdd}
+          disabled={!newItem.trim()}
           style={{
-            background:
-              email.trim() && !loading
-                ? "var(--color-accent-gradient)"
-                : "#ccc",
+            background: newItem.trim() ? "var(--color-accent-gradient)" : "#ccc",
+            border: "none",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "8px 16px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: newItem.trim() ? "pointer" : "not-allowed",
+          }}
+        >
+          + Add
+        </button>
+      </div>
+
+      {/* Save */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || saving}
+          style={{
+            background: isDirty ? "var(--color-accent-gradient)" : "#ccc",
             border: "none",
             color: "#fff",
             borderRadius: 8,
             padding: "9px 20px",
             fontSize: 13,
             fontWeight: 700,
-            cursor: email.trim() && !loading ? "pointer" : "not-allowed",
+            cursor: isDirty ? "pointer" : "not-allowed",
           }}
         >
-          {loading ? "Adding…" : "Add to workspace"}
+          {saving ? "Saving…" : "Save"}
         </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>Saved!</span>
+        )}
       </div>
-      {message && (
+
+      {error && (
         <div
           style={{
-            padding: "10px 12px",
+            marginTop: 12,
+            padding: 12,
+            background: "#FEF2F2",
+            border: "1px solid #FCA5A5",
             borderRadius: 8,
+            color: "#B91C1C",
             fontSize: 13,
-            background: message.isError ? "#FEF2F2" : "#F0FDF4",
-            color: message.isError ? "#B91C1C" : "#166534",
+            fontWeight: 500,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
           }}
         >
-          {message.text}
+          <strong>Save Error:</strong> {error}
         </div>
       )}
     </div>
+  );
+}
+
+
+// ── Sidebar nav link ──────────────────────────────────────────────────────────
+function SidebarLink({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 9,
+        width: "100%",
+        padding: "7px 12px",
+        background: active
+          ? "var(--color-surface-overlay)"
+          : hovered
+          ? "var(--color-border-light)"
+          : "transparent",
+        border: "none",
+        borderRadius: 7,
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: active ? 600 : 500,
+        color: active ? "var(--color-text-primary)" : hovered ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+        textAlign: "left",
+        fontFamily: "inherit",
+        transition: "background 120ms ease, color 120ms ease",
+        position: "relative",
+      }}
+    >
+      {active && (
+        <span style={{
+          position: "absolute",
+          left: 0,
+          top: "20%",
+          height: "60%",
+          width: 3,
+          borderRadius: 2,
+          background: "var(--color-accent-gradient)",
+        }} />
+      )}
+      <span style={{
+        color: active ? "var(--color-text-secondary)" : "var(--color-text-muted)",
+        flexShrink: 0,
+      }}>
+        {icon}
+      </span>
+      {label}
+    </button>
   );
 }
 
@@ -1025,58 +1286,126 @@ export default function SettingsPage({
   canManageOrg,
 }: SettingsPageProps) {
   const { isGridmaster } = usePermissions();
+  const [activeSection, setActiveSection] = useState<string>(
+    canManageOrg ? "org" : "impersonation"
+  );
+
+  const orgLinks = canManageOrg ? [
+    {
+      id: "org", label: "Organization",
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+    },
+    {
+      id: "shift-types", label: "Shift Types",
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+    },
+    {
+      id: "staff-config", label: "Staff Configuration",
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    },
+  ] : [];
+
+  const gridmasterLinks = isGridmaster ? [
+    {
+      id: "impersonation", label: "Impersonation",
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    },
+  ] : [];
+
+  const allLinks = [...orgLinks, ...gridmasterLinks];
 
   return (
-    <div
-      style={{
+    <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+
+      {/* Sidebar — flush to top, full height */}
+      <aside style={{
+        width: 220,
+        flexShrink: 0,
+        height: "100%",
+        borderRight: "1px solid var(--color-border)",
+        background: "#fff",
         display: "flex",
         flexDirection: "column",
-        gap: 20,
-        maxWidth: 900,
-      }}
-    >
-      <Section title="My Active Sessions">
-        <ActiveSessions />
-      </Section>
-
-      {canManageOrg && (
-        <Section title="Workspace access">
-          <WorkspaceAccess orgId={organization.id} />
-        </Section>
-      )}
-
-      {canManageOrg && (
-        <Section title="Organization Details">
-          <OrgSettings organization={organization} onSave={onOrgSave} />
-        </Section>
-      )}
-
-      {canManageOrg && (
-        <Section title="Wings">
-          <WingsSettings
-            wings={wings}
-            orgId={organization.id}
-            onChange={onWingsChange}
+        padding: "32px 12px",
+        gap: 2,
+        overflowY: "auto",
+      }}>
+        {allLinks.map((link) => (
+          <SidebarLink
+            key={link.id}
+            label={link.label}
+            icon={link.icon}
+            active={activeSection === link.id}
+            onClick={() => setActiveSection(link.id)}
           />
-        </Section>
-      )}
+        ))}
+      </aside>
 
-      {canManageOrg && (
-        <Section title="Shift Types">
-          <ShiftTypesSettings
-            shiftTypes={shiftTypes}
-            wings={wings}
-            orgId={organization.id}
-            onChange={onShiftTypesChange}
-          />
-        </Section>
-      )}
+      {/* Content — scrolls independently */}
+      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px" }}>
 
-      {isGridmaster && (
-        <Section title="Gridmaster Impersonation">
-          <ImpersonationPanel />
-        </Section>
-      )}
+        {activeSection === "org" && canManageOrg && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <Section title="Organization Details">
+              <OrgSettings organization={organization} onSave={onOrgSave} />
+            </Section>
+            <Section title="Wings">
+              <WingsSettings
+                wings={wings}
+                orgId={organization.id}
+                onChange={onWingsChange}
+              />
+            </Section>
+          </div>
+        )}
+
+        {activeSection === "shift-types" && canManageOrg && (
+          <Section title="Shift Types">
+            <ShiftTypesSettings
+              shiftTypes={shiftTypes}
+              wings={wings}
+              orgId={organization.id}
+              orgSkillLevels={organization.skillLevels ?? []}
+              onChange={onShiftTypesChange}
+            />
+          </Section>
+        )}
+
+        {activeSection === "staff-config" && canManageOrg && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <Section title="Skill Levels">
+              <StringListSettings
+                label="Define the skill levels available when adding or editing staff. These also determine the order in which they appear in dropdowns."
+                items={organization.skillLevels ?? []}
+                placeholder="e.g. RN"
+                onSave={async (updated) => {
+                  const updatedOrg = { ...organization, skillLevels: updated };
+                  await db.updateOrganization(updatedOrg);
+                  onOrgSave(updatedOrg);
+                }}
+              />
+            </Section>
+            <Section title="Roles">
+              <StringListSettings
+                label="Define the roles available when adding or editing staff. These also determine the order in which they appear in dropdowns."
+                items={organization.roles ?? []}
+                placeholder="e.g. Charge Nurse"
+                onSave={async (updated) => {
+                  const updatedOrg = { ...organization, roles: updated };
+                  await db.updateOrganization(updatedOrg);
+                  onOrgSave(updatedOrg);
+                }}
+              />
+            </Section>
+          </div>
+        )}
+
+        {activeSection === "impersonation" && isGridmaster && (
+          <Section title="Gridmaster Impersonation">
+            <ImpersonationPanel />
+          </Section>
+        )}
+      </div>
     </div>
   );
 }

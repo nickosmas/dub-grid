@@ -10,6 +10,8 @@ import SettingsPage from "@/components/SettingsPage";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import PrintLegend from "@/components/PrintLegend";
+import ShiftKeyPanel from "@/components/ShiftKeyPanel";
+import DraftBanner from "@/components/DraftBanner";
 import { addDays, formatDateKey, getWeekStart } from "@/lib/utils";
 import { filterAndSortEmployees } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
@@ -76,6 +78,13 @@ function SchedulerContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [staffSearch, setStaffSearch] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const hasUnpublishedChanges = useMemo(() => {
+    return Object.values(shifts).some(shift => shift.isDraft);
+  }, [shifts]);
 
   // Role-based view modes: settings requires admin+, staff requires scheduler+
   const availableViewModes: ViewMode[] = useMemo(() => {
@@ -202,7 +211,7 @@ function SchedulerContent() {
 
   const shiftForKey = useCallback(
     (empId: string, date: Date): string | null =>
-      shifts[`${empId}_${formatDateKey(date)}`] ?? null,
+      shifts[`${empId}_${formatDateKey(date)}`]?.label ?? null,
     [shifts],
   );
 
@@ -225,12 +234,13 @@ function SchedulerContent() {
       if (type === "OFF") {
         setShifts((prev) => {
           const next = { ...prev };
-          delete next[key];
+          // If we are deleting a shift, it's now a draft deletion 
+          next[key] = { label: "OFF", isDraft: true };
           return next;
         });
         db.deleteShift(empId, dateKey, orgId).catch(console.error);
       } else {
-        setShifts((prev) => ({ ...prev, [key]: type }));
+        setShifts((prev) => ({ ...prev, [key]: { label: type, isDraft: true } }));
         db.upsertShift(empId, dateKey, type, orgId).catch(console.error);
       }
     },
@@ -316,17 +326,22 @@ function SchedulerContent() {
   }, [availableViewModes, viewMode]);
 
   const handleAddEmployee = useCallback(
-    async (data: Omit<Employee, "id" | "seniority">) => {
+    async (dataList: Omit<Employee, "id" | "seniority">[]) => {
       if (!organization) return;
-      const maxSen = Math.max(
-        ...employeesRef.current.map((e) => e.seniority),
-        0,
-      );
-      const newEmp = await db.insertEmployee(
-        { ...data, seniority: maxSen + 1 },
-        organization.id,
-      );
-      setEmployees((prev) => [...prev, newEmp]);
+      const added: Employee[] = [];
+      for (const data of dataList) {
+        const maxSen = Math.max(
+          ...employeesRef.current.map((e) => e.seniority),
+          ...added.map((e) => e.seniority),
+          0,
+        );
+        const newEmp = await db.insertEmployee(
+          { ...data, seniority: maxSen + 1 },
+          organization.id,
+        );
+        added.push(newEmp);
+      }
+      setEmployees((prev) => [...prev, ...added]);
       setShowAddModal(false);
     },
     [organization],
@@ -370,6 +385,100 @@ function SchedulerContent() {
     () => setWeekStart(getWeekStart(today)),
     [today],
   );
+
+  const handlePublish = useCallback(async () => {
+    if (!organization) return;
+    setIsPublishing(true);
+    try {
+      let startDate: Date;
+      let endDate: Date;
+
+      if (spanWeeks === "month") {
+        startDate = new Date(monthStart);
+        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0); // Last day of month
+      } else {
+        startDate = new Date(weekStart);
+        endDate = addDays(weekStart, (spanWeeks * 7) - 1);
+      }
+
+      await db.publishSchedule(organization.id, startDate, endDate);
+
+      const [shiftData, noteRows] = await Promise.all([
+        db.fetchShifts(organization.id, canEditSchedule),
+        db.fetchScheduleNotes(organization.id),
+      ]);
+      const noteMap: Record<string, NoteType[]> = {};
+      for (const note of noteRows) {
+        const key = `${note.empId}_${note.date}`;
+        if (!noteMap[key]) noteMap[key] = [];
+        noteMap[key].push(note.noteType);
+      }
+      const cached = readScheduleCache();
+      if (cached) {
+        writeScheduleCache({
+          ...cached,
+          shifts: shiftData,
+          notes: noteMap,
+        });
+      }
+      setIsEditMode(false);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [organization, weekStart, monthStart, spanWeeks, canEditSchedule, setIsPublishing]);
+
+  const handleCancelChanges = useCallback(async () => {
+    if (!organization) return;
+    // No drafts — just exit edit mode without hitting the DB
+    if (!hasUnpublishedChanges) {
+      setIsEditMode(false);
+      return;
+    }
+    setIsCanceling(true);
+    try {
+      let startDate: Date;
+      let endDate: Date;
+
+      if (spanWeeks === "month") {
+        startDate = new Date(monthStart);
+        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0); // Last day of month
+      } else {
+        startDate = new Date(weekStart);
+        endDate = addDays(weekStart, (spanWeeks * 7) - 1);
+      }
+
+      await db.discardScheduleDrafts(organization.id, startDate, endDate);
+
+      const [shiftData, noteRows] = await Promise.all([
+        db.fetchShifts(organization.id, canEditSchedule),
+        db.fetchScheduleNotes(organization.id),
+      ]);
+      const noteMap: Record<string, NoteType[]> = {};
+      for (const note of noteRows) {
+        const key = `${note.empId}_${note.date}`;
+        if (!noteMap[key]) noteMap[key] = [];
+        noteMap[key].push(note.noteType);
+      }
+      setShifts(shiftData);
+      setNotes(noteMap);
+
+      const cached = readScheduleCache();
+      if (cached) {
+        writeScheduleCache({
+          ...cached,
+          shifts: shiftData,
+          notes: noteMap,
+        });
+      }
+      setIsEditMode(false);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setIsCanceling(false);
+    }
+  }, [organization, weekStart, monthStart, spanWeeks, canEditSchedule, setIsCanceling]);
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
@@ -445,9 +554,18 @@ function SchedulerContent() {
           orgName={organization?.name}
           availableViewModes={availableViewModes}
         />
+        {isEditMode && canEditSchedule && viewMode === "schedule" && (
+          <DraftBanner
+            onPublish={handlePublish}
+            onCancel={handleCancelChanges}
+            isPublishing={isPublishing}
+            isCanceling={isCanceling}
+            hasChanges={hasUnpublishedChanges}
+          />
+        )}
       </div>
 
-      <div style={{ padding: "16px 16px" }}>
+      {viewMode !== "settings" && <div style={{ padding: "16px 16px" }}>
         <div className="no-print">
           <Toolbar
             viewMode={viewMode}
@@ -462,26 +580,36 @@ function SchedulerContent() {
             onSpanChange={setSpanWeeks}
             onWingChange={setActiveWing}
             onStaffSearchChange={setStaffSearch}
+            canEditSchedule={canEditSchedule}
+            isEditMode={isEditMode}
+            onToggleEditMode={() => setIsEditMode((v) => !v)}
           />
         </div>
 
         {viewMode === "schedule" && spanWeeks !== "month" && (
-          <ScheduleGrid
-            filteredEmployees={visibleScheduleEmployees}
-            allEmployees={employees}
-            week1={week1}
-            week2={week2}
-            spanWeeks={spanWeeks}
-            shiftForKey={shiftForKey}
-            getShiftStyle={getShiftStyle}
-            handleCellClick={handleCellClick}
-            today={today}
-            highlightEmpIds={highlightEmpIds}
-            wings={wings}
-            shiftTypes={shiftTypes}
-            isCellInteractive={canAddNotes}
-            noteTypesForKey={noteTypesForKey}
-          />
+          <div style={{ display: "flex", alignItems: "stretch", gap: 16, width: "100%" }}>
+            <ScheduleGrid
+              filteredEmployees={visibleScheduleEmployees}
+              allEmployees={employees}
+              week1={week1}
+              week2={week2}
+              spanWeeks={spanWeeks}
+              shiftForKey={shiftForKey}
+              getShiftStyle={getShiftStyle}
+              handleCellClick={handleCellClick}
+              today={today}
+              highlightEmpIds={highlightEmpIds}
+              wings={wings}
+              shiftTypes={shiftTypes}
+              isCellInteractive={isEditMode && canAddNotes}
+              noteTypesForKey={noteTypesForKey}
+              activeWing={activeWing}
+              isEditMode={isEditMode}
+            />
+            <div className="no-print" style={{ flex: 1, display: "flex" }}>
+              <ShiftKeyPanel shiftTypes={shiftTypes} />
+            </div>
+          </div>
         )}
 
         {viewMode === "schedule" && spanWeeks === "month" && (
@@ -492,6 +620,7 @@ function SchedulerContent() {
             getShiftStyle={getShiftStyle}
             today={today}
             wings={wings}
+            activeWing={activeWing}
           />
         )}
 
@@ -504,21 +633,22 @@ function SchedulerContent() {
             onSave={handleSaveEmployee}
             onDelete={handleDeleteEmployee}
             onAdd={() => setShowAddModal(true)}
+            activeWing={activeWing}
           />
         )}
+      </div>}
 
-        {viewMode === "settings" && organization && (
-          <SettingsPage
-            organization={organization}
-            wings={wings}
-            shiftTypes={shiftTypes}
-            onOrgSave={setOrganization}
-            onWingsChange={setWings}
-            onShiftTypesChange={setShiftTypes}
-            canManageOrg={canManageOrg}
-          />
-        )}
-      </div>
+      {viewMode === "settings" && organization && (
+        <SettingsPage
+          organization={organization}
+          wings={wings}
+          shiftTypes={shiftTypes}
+          onOrgSave={setOrganization}
+          onWingsChange={setWings}
+          onShiftTypesChange={setShiftTypes}
+          canManageOrg={canManageOrg}
+        />
+      )}
 
       {editPanel && (
         <ShiftEditPanel

@@ -11,6 +11,7 @@ export function useLogout() {
   async function signOutLocal(): Promise<void> {
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;
+    sessionStorage.removeItem("dg_user_name");
     const parsed = parseHost(window.location.host);
     const apexUrl = `${window.location.protocol}//${parsed.rootDomain}${parsed.port}/`;
     window.location.replace(apexUrl);

@@ -2,15 +2,15 @@
 
 import React, { memo, useMemo } from "react";
 import { DAY_LABELS } from "@/lib/constants";
-import { formatDateKey, formatDate } from "@/lib/utils";
-import { computeDailyCounts } from "@/lib/schedule-logic";
+import { formatDateKey } from "@/lib/utils";
+import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
 import { Employee, ShiftType, Wing, NoteType } from "@/types";
 
 const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
-  JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },
-  "CSN III": { bg: "#DBEAFE", text: "#1D4ED8" },
-  "CSN II": { bg: "#CCFBF1", text: "#0E7490" },
-  STAFF: { bg: "#F1F5F9", text: "#475569" },
+  JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },      // Purple
+  "CSN III": { bg: "#DBEAFE", text: "#1D4ED8" },  // Blue
+  "CSN II": { bg: "#CCFBF1", text: "#0E7490" },   // Teal
+  STAFF: { bg: "#F1F5F9", text: "#475569" },     // Slate
 };
 const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#94A3B8" };
 
@@ -30,11 +30,9 @@ interface ScheduleGridProps {
   isCellInteractive?: boolean;
   noteTypesForKey?: (empId: string, date: Date) => NoteType[];
   activeWing?: string;
+  isEditMode?: boolean;
 }
 
-function formatRange(w: Date[]) {
-  return `${DAY_LABELS[w[0].getDay()]} ${formatDate(w[0])} – ${DAY_LABELS[w[w.length - 1].getDay()]} ${formatDate(w[w.length - 1])}`;
-}
 
 interface SectionBlockProps {
   sectionName: string;
@@ -71,11 +69,31 @@ const SectionBlock = memo(function SectionBlock({
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
-  const dailyCounts = useMemo(() => {
+  const dailyTallies = useMemo(() => {
     return weekDates.map((date) =>
-      computeDailyCounts(employees, date, shiftForKey, getShiftStyle),
+      computeDailyTallies(
+        employees,
+        date,
+        shiftForKey,
+        getShiftStyle,
+        exclusiveLabels,
+      ),
     );
-  }, [weekDates, employees, shiftForKey, getShiftStyle]);
+  }, [weekDates, employees, shiftForKey, getShiftStyle, exclusiveLabels]);
+
+  const renderTally = (tally: Tally) => {
+    const entries = Object.entries(tally);
+    if (entries.length === 0) return "-";
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {entries.map(([label, count]) => (
+          <div key={label} style={{ whiteSpace: "nowrap" }}>
+            {label}: {count}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   // Compute which count rows to show based on shift types for this wing
   const sectionShiftTypes = shiftTypes.filter(
@@ -85,7 +103,7 @@ const SectionBlock = memo(function SectionBlock({
   const showEveCount = sectionShiftTypes.some((st) => st.countsTowardEve);
   const showNightCount = sectionShiftTypes.some((st) => st.countsTowardNight);
 
-  const gridTemplate = `max-content repeat(${weekDates.length}, ${colWidth}px)`;
+  const gridTemplate = `220px repeat(${weekDates.length}, ${colWidth}px)`;
 
   const rowGrid: React.CSSProperties = {
     display: "grid",
@@ -98,25 +116,14 @@ const SectionBlock = memo(function SectionBlock({
       {/* Section label */}
       <div
         style={{
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: 700,
-          color: "var(--color-dark)",
-          marginBottom: 8,
+          color: "var(--color-text-secondary)",
+          marginBottom: 10,
           paddingLeft: 4,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
         }}
       >
-        <div
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: 3,
-            background: "var(--color-accent-start)",
-          }}
-        />
-        {sectionName.toUpperCase()}
+        {sectionName}
       </div>
 
       <div
@@ -142,10 +149,10 @@ const SectionBlock = memo(function SectionBlock({
             <div
               style={{
                 padding: "10px 14px",
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 700,
                 color: "var(--color-text-subtle)",
-                letterSpacing: "0.06em",
+                letterSpacing: "0.08em",
               }}
             >
               STAFF NAME
@@ -444,29 +451,36 @@ const SectionBlock = memo(function SectionBlock({
                       alignItems: "center",
                     }}
                   >
-                    COUNT DAY
+                    TALLY DAY
                   </div>
-                  {dailyCounts.map((counts, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        textAlign: "center",
-                        padding: "6px 0",
-                        borderLeft:
-                          splitAtIndex !== undefined && i === splitAtIndex
-                            ? "2px solid var(--color-dark)"
-                            : "1px solid var(--color-border)",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color:
-                          counts.day > 0
+                  {dailyTallies.map((tallies, i) => {
+                    const hasCount = Object.keys(tallies.day).length > 0;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          textAlign: "center",
+                          padding: "8px 4px",
+                          borderLeft:
+                            splitAtIndex !== undefined && i === splitAtIndex
+                              ? "2px solid var(--color-dark)"
+                              : "1px solid var(--color-border)",
+                          fontSize: 10,
+                          lineHeight: 1.3,
+                          fontWeight: 700,
+                          color: hasCount
                             ? "#1E3A8A"
                             : "var(--color-text-faint)",
-                      }}
-                    >
-                      {counts.day > 0 ? counts.day : "-"}
-                    </div>
-                  ))}
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {renderTally(tallies.day)}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {showEveCount && (
@@ -488,29 +502,36 @@ const SectionBlock = memo(function SectionBlock({
                       alignItems: "center",
                     }}
                   >
-                    COUNT EVE
+                    TALLY EVE
                   </div>
-                  {dailyCounts.map((counts, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        textAlign: "center",
-                        padding: "6px 0",
-                        borderLeft:
-                          splitAtIndex !== undefined && i === splitAtIndex
-                            ? "2px solid var(--color-dark)"
-                            : "1px solid var(--color-border)",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color:
-                          counts.eve > 0
+                  {dailyTallies.map((tallies, i) => {
+                    const hasCount = Object.keys(tallies.eve).length > 0;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          textAlign: "center",
+                          padding: "8px 4px",
+                          borderLeft:
+                            splitAtIndex !== undefined && i === splitAtIndex
+                              ? "2px solid var(--color-dark)"
+                              : "1px solid var(--color-border)",
+                          fontSize: 10,
+                          lineHeight: 1.3,
+                          fontWeight: 700,
+                          color: hasCount
                             ? "#9A3412"
                             : "var(--color-text-faint)",
-                      }}
-                    >
-                      {counts.eve > 0 ? counts.eve : "-"}
-                    </div>
-                  ))}
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {renderTally(tallies.eve)}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {showNightCount && (
@@ -532,29 +553,36 @@ const SectionBlock = memo(function SectionBlock({
                       alignItems: "center",
                     }}
                   >
-                    COUNT NIGHT
+                    TALLY NIGHT
                   </div>
-                  {dailyCounts.map((counts, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        textAlign: "center",
-                        padding: "6px 0",
-                        borderLeft:
-                          splitAtIndex !== undefined && i === splitAtIndex
-                            ? "2px solid var(--color-dark)"
-                            : "1px solid var(--color-border)",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color:
-                          counts.night > 0
+                  {dailyTallies.map((tallies, i) => {
+                    const hasCount = Object.keys(tallies.night).length > 0;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          textAlign: "center",
+                          padding: "8px 4px",
+                          borderLeft:
+                            splitAtIndex !== undefined && i === splitAtIndex
+                              ? "2px solid var(--color-dark)"
+                              : "1px solid var(--color-border)",
+                          fontSize: 10,
+                          lineHeight: 1.3,
+                          fontWeight: 700,
+                          color: hasCount
                             ? "#5B21B6"
                             : "var(--color-text-faint)",
-                      }}
-                    >
-                      {counts.night > 0 ? counts.night : "-"}
-                    </div>
-                  ))}
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {renderTally(tallies.night)}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -581,6 +609,7 @@ export default function ScheduleGrid({
   isCellInteractive = true,
   noteTypesForKey,
   activeWing = "All",
+  isEditMode = true,
 }: ScheduleGridProps) {
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   
@@ -607,26 +636,40 @@ export default function ScheduleGrid({
     );
   }, [sections, shiftTypes]);
 
+  // Shift labels that are "general" — not tied to any specific wing
+  const generalShiftLabels = useMemo(
+    () =>
+      new Set(
+        shiftTypes
+          .filter((st) => st.isGeneral || !st.wingName)
+          .map((st) => st.label),
+      ),
+    [shiftTypes],
+  );
+
   return (
-    <div>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: "var(--color-text-subtle)",
-          letterSpacing: "0.08em",
-          marginBottom: 12,
-          paddingLeft: 4,
-          textTransform: "uppercase",
-        }}
-      >
-        {formatRange(allDates)}
-      </div>
+    <div style={{ width: "fit-content", maxWidth: "100%" }}>
       {sections.map((section) => {
         const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
-        const homeEmps = filteredEmployees.filter((e) =>
+        const rawHomeEmps = filteredEmployees.filter((e) =>
           e.wings.includes(section),
         );
+        // In published view (not editing), hide wing-assigned staff who have no
+        // shifts in this wing AND no general shifts during the visible period.
+        // Staff with general shifts always appear.
+        const homeEmps = isEditMode
+          ? rawHomeEmps
+          : rawHomeEmps.filter((emp) =>
+              allDates.some((date) => {
+                const shift = shiftForKey(emp.id, date);
+                return (
+                  shift !== null &&
+                  shift !== "OFF" &&
+                  (exclusiveLabels.includes(shift) ||
+                    generalShiftLabels.has(shift))
+                );
+              }),
+            );
         const guestEmps = allEmployees.filter(
           (e) =>
             !e.wings.includes(section) &&

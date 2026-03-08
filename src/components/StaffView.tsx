@@ -13,6 +13,7 @@ interface StaffViewProps {
   onSave: (emp: Employee) => void;
   onDelete: (empId: string) => void;
   onAdd: () => void;
+  activeWing?: string;
 }
 
 function hashCode(s: string): number {
@@ -31,11 +32,14 @@ export default function StaffView({
   onSave,
   onDelete,
   onAdd,
+  activeWing = "All",
 }: StaffViewProps) {
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"name" | "seniority" | "wing">(
-    "seniority",
-  );
+  const [sortBy, setSortBy] = useState<"name" | "seniority" | "wing">("seniority");
+  const [isReordering, setIsReordering] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<Employee[] | null>(null);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const wingColorMap = useMemo(() => {
     const map: Record<string, { bg: string; text: string }> = {};
@@ -43,9 +47,14 @@ export default function StaffView({
     return map;
   }, [wings]);
 
+  const filteredByWing = useMemo(() => {
+    if (activeWing === "All") return employees;
+    return employees.filter(e => e.wings.includes(activeWing));
+  }, [employees, activeWing]);
+
   const sorted = useMemo(
     () =>
-      [...employees].sort((a, b) => {
+      [...filteredByWing].sort((a, b) => {
         switch (sortBy) {
           case "name":
             return a.name.localeCompare(b.name);
@@ -60,6 +69,67 @@ export default function StaffView({
       }),
     [employees, sortBy],
   );
+
+  // Base list: pendingOrder during reorder mode, otherwise sorted
+  const baseList = isReordering && pendingOrder !== null ? pendingOrder : sorted;
+
+  // Compute display order during an active drag
+  const displayList = useMemo(() => {
+    if (!isReordering || draggedIdx === null || dragOverIdx === null) return baseList;
+    const list = [...baseList];
+    const [item] = list.splice(draggedIdx, 1);
+    list.splice(dragOverIdx, 0, item);
+    return list;
+  }, [baseList, draggedIdx, dragOverIdx, isReordering]);
+
+  const handleEnterReorder = useCallback(() => {
+    setIsReordering(true);
+    setPendingOrder([...sorted]);
+    setExpandedEmpId(null);
+  }, [sorted]);
+
+  const handleSaveOrder = useCallback(() => {
+    if (!pendingOrder) return;
+    pendingOrder.forEach((emp, i) => {
+      if (emp.seniority !== i + 1) {
+        onSave({ ...emp, seniority: i + 1 });
+      }
+    });
+    setIsReordering(false);
+    setPendingOrder(null);
+  }, [pendingOrder, onSave]);
+
+  const handleCancelReorder = useCallback(() => {
+    setIsReordering(false);
+    setPendingOrder(null);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  }, []);
+
+  const handleDragStart = useCallback((idx: number) => {
+    setDraggedIdx(idx);
+    setDragOverIdx(idx);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  }, []);
+
+  const handleDrop = useCallback(() => {
+    if (draggedIdx === null || dragOverIdx === null || !pendingOrder) return;
+    const list = [...pendingOrder];
+    const [item] = list.splice(draggedIdx, 1);
+    list.splice(dragOverIdx, 0, item);
+    setPendingOrder(list);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  }, [draggedIdx, dragOverIdx, pendingOrder]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  }, []);
 
   const handleSave = useCallback(
     (emp: Employee) => {
@@ -77,74 +147,91 @@ export default function StaffView({
     [onDelete],
   );
 
+  const isDirty = useMemo(() => {
+    if (!isReordering || !pendingOrder) return false;
+    return pendingOrder.some((emp, i) => emp.id !== sorted[i]?.id);
+  }, [isReordering, pendingOrder, sorted]);
+
+  const gridCols = isReordering
+    ? "36px 40px 1fr 220px 120px 160px"
+    : "48px 1fr 220px 120px 160px 28px";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Controls */}
       <div
         style={{
           display: "flex",
-          gap: 8,
+          gap: 12,
           alignItems: "center",
           justifyContent: "space-between",
+          marginBottom: 8,
         }}
       >
-        <button
-          onClick={onAdd}
-          style={{
-            background: "var(--color-accent-gradient)",
-            border: "none",
-            color: "#fff",
-            borderRadius: 8,
-            padding: "7px 16px",
-            fontSize: 13,
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          + Add Employee
-        </button>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {!isReordering && (
+            <button
+              onClick={onAdd}
+              className="dg-btn dg-btn-primary"
+              style={{ padding: "8px 16px" }}
+            >
+              + Add Staff Members
+            </button>
+          )}
+          {sortBy === "seniority" && (
+            <button
+              onClick={isReordering ? undefined : handleEnterReorder}
+              className={`dg-btn${isReordering ? " active" : ""}`}
+              style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="7 15 12 20 17 15" />
+                <polyline points="7 9 12 4 17 9" />
+              </svg>
+              Edit order
+            </button>
+          )}
+          {isReordering && isDirty && (
+            <button
+              onClick={handleSaveOrder}
+              className="dg-btn dg-btn-primary"
+              style={{ padding: "7px 14px" }}
+            >
+              Save
+            </button>
+          )}
+          {isReordering && (
+            <button
+              onClick={handleCancelReorder}
+              className="dg-btn"
+              style={{ padding: "7px 14px" }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <label
             style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--color-text-muted)",
+              fontSize: 10,
+              fontWeight: 700,
+              color: "var(--color-text-subtle)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
             }}
           >
-            Sort by:
+            Sort by
           </label>
-          <div
-            style={{
-              display: "flex",
-              background: "#fff",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
-              overflow: "hidden",
-            }}
-          >
+          <div className="dg-segment">
             {(["seniority", "name", "wing"] as const).map((option) => (
               <button
                 key={option}
-                onClick={() => setSortBy(option)}
-                style={{
-                  background: sortBy === option ? "var(--color-dark)" : "none",
-                  border: "none",
-                  color: sortBy === option ? "#fff" : "var(--color-text-muted)",
-                  padding: "7px 12px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  borderRight:
-                    option !== "wing"
-                      ? "1px solid var(--color-border)"
-                      : "none",
-                }}
+                onClick={() => { setSortBy(option); if (isReordering) handleCancelReorder(); }}
+                className={`dg-segment-btn${sortBy === option ? " active" : ""}`}
+                style={{ fontSize: 12 }}
               >
-                {option === "seniority"
-                  ? "Seniority"
-                  : option === "name"
-                    ? "Name"
-                    : "Assigned Wings"}
+                {option === "seniority" ? "Seniority" : option === "name" ? "Name" : "Wings"}
               </button>
             ))}
           </div>
@@ -156,75 +243,109 @@ export default function StaffView({
         style={{
           background: "#fff",
           borderRadius: 12,
-          border: "1px solid var(--color-border)",
+          border: isReordering ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
           overflow: "hidden",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: isReordering ? "0 0 0 3px rgba(37,99,235,0.1)" : "0 1px 4px rgba(0,0,0,0.04)",
+          transition: "border-color 0.15s, box-shadow 0.15s",
         }}
       >
         {/* Header row */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "48px 1fr 220px 120px 160px 28px",
+            gridTemplateColumns: gridCols,
             padding: "10px 20px",
             borderBottom: "1px solid var(--color-border-light)",
+            background: isReordering ? "#EFF6FF" : undefined,
           }}
         >
-          {["#", "Name", "Assigned Wings", "Skill Level", "Roles", ""].map(
-            (h, i) => (
-              <div
-                key={i}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                {h}
-              </div>
-            ),
-          )}
+          {(isReordering
+            ? ["", "#", "Name", "Assigned Wings", "Skill Level", "Roles"]
+            : ["#", "Name", "Assigned Wings", "Skill Level", "Roles", ""]
+          ).map((h, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--color-text-subtle)",
+                letterSpacing: "0.06em",
+              }}
+            >
+              {h}
+            </div>
+          ))}
         </div>
 
         {/* Employee rows */}
-        {sorted.map((emp, i) => {
-          const isExpanded = emp.id === expandedEmpId;
+        {displayList.map((emp, i) => {
+          const isExpanded = !isReordering && emp.id === expandedEmpId;
+          const isDragging = isReordering && draggedIdx !== null && baseList[draggedIdx]?.id === emp.id;
+          const isDropTarget = isReordering && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
           return (
             <div key={emp.id}>
               {/* Row */}
               <div
-                onClick={() => setExpandedEmpId(isExpanded ? null : emp.id)}
+                draggable={isReordering}
+                onDragStart={isReordering ? () => handleDragStart(i) : undefined}
+                onDragOver={isReordering ? (e) => handleDragOver(e, i) : undefined}
+                onDrop={isReordering ? handleDrop : undefined}
+                onDragEnd={isReordering ? handleDragEnd : undefined}
+                onClick={!isReordering ? () => setExpandedEmpId(isExpanded ? null : emp.id) : undefined}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "48px 1fr 220px 120px 160px 28px",
+                  gridTemplateColumns: gridCols,
                   padding: "12px 20px",
-                  borderTop:
-                    i === 0 ? "none" : "1px solid var(--color-border-light)",
+                  borderTop: isDropTarget
+                    ? "2px solid #2563EB"
+                    : i === 0
+                      ? "none"
+                      : "1px solid var(--color-border-light)",
                   alignItems: "center",
                   background: isExpanded
                     ? "#EFF6FF"
                     : i % 2 === 0
                       ? "#fff"
                       : "var(--color-row-alt)",
-                  cursor: "pointer",
-                  transition: "background 0.15s",
+                  cursor: isReordering ? "grab" : "pointer",
+                  transition: "background 0.15s, opacity 0.15s",
+                  opacity: isDragging ? 0.4 : 1,
                   borderLeft: isExpanded
                     ? "4px solid #2563EB"
                     : "4px solid transparent",
                   paddingLeft: "calc(20px - 4px)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isExpanded)
-                    e.currentTarget.style.background =
-                      "var(--color-row-hover, rgba(0,0,0,0.02))";
+                  if (!isExpanded && !isReordering)
+                    e.currentTarget.style.background = "var(--color-row-hover, rgba(0,0,0,0.02))";
                 }}
                 onMouseLeave={(e) => {
-                  if (!isExpanded)
-                    e.currentTarget.style.background =
-                      i % 2 === 0 ? "#fff" : "var(--color-row-alt)";
+                  if (!isExpanded && !isReordering)
+                    e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "var(--color-row-alt)";
                 }}
               >
+                {/* Drag handle (reorder mode only) */}
+                {isReordering && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--color-text-faint)",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                      <rect x="3" y="2" width="2" height="2" rx="1"/>
+                      <rect x="9" y="2" width="2" height="2" rx="1"/>
+                      <rect x="3" y="6" width="2" height="2" rx="1"/>
+                      <rect x="9" y="6" width="2" height="2" rx="1"/>
+                      <rect x="3" y="10" width="2" height="2" rx="1"/>
+                      <rect x="9" y="10" width="2" height="2" rx="1"/>
+                    </svg>
+                  </div>
+                )}
+
+                {/* Position number */}
                 <div
                   style={{
                     fontSize: 13,
@@ -232,8 +353,9 @@ export default function StaffView({
                     color: "var(--color-text-faint)",
                   }}
                 >
-                  {emp.seniority}
+                  {i + 1}
                 </div>
+
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div
                     style={{
@@ -292,12 +414,10 @@ export default function StaffView({
                     )}
                   </div>
                 </div>
+
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {emp.wings.map((wing) => {
-                    const wc = wingColorMap[wing] ?? {
-                      bg: "#F1F5F9",
-                      text: "#475569",
-                    };
+                    const wc = wingColorMap[wing] ?? { bg: "#F1F5F9", text: "#475569" };
                     return (
                       <span
                         key={wing}
@@ -316,6 +436,7 @@ export default function StaffView({
                     );
                   })}
                 </div>
+
                 <div>
                   <span
                     style={{
@@ -330,21 +451,26 @@ export default function StaffView({
                     {emp.designation}
                   </span>
                 </div>
+
                 <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                   {emp.roles.length > 0 ? emp.roles.join(", ") : "—"}
                 </div>
-                <div
-                  style={{
-                    color: "var(--color-text-faint)",
-                    fontSize: 16,
-                    lineHeight: 1,
-                    transform: isExpanded ? "rotate(180deg)" : "none",
-                    transition: "transform 0.15s",
-                    userSelect: "none",
-                  }}
-                >
-                  ▾
-                </div>
+
+                {/* Expand chevron (normal mode only) */}
+                {!isReordering && (
+                  <div
+                    style={{
+                      color: "var(--color-text-faint)",
+                      fontSize: 16,
+                      lineHeight: 1,
+                      transform: isExpanded ? "rotate(180deg)" : "none",
+                      transition: "transform 0.15s",
+                      userSelect: "none",
+                    }}
+                  >
+                    ▾
+                  </div>
+                )}
               </div>
 
               {/* Inline edit panel */}

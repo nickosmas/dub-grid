@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo } from "react";
 import { addDays, formatDate } from "@/lib/utils";
 import { Wing } from "@/types";
 import { ViewMode } from "@/components/Header";
@@ -24,8 +24,8 @@ interface ToolbarProps {
   onWingChange: (wing: string) => void;
   onStaffSearchChange: (q: string) => void;
   canEditSchedule?: boolean;
-  onPublish?: () => void;
-  isPublishing?: boolean;
+  isEditMode?: boolean;
+  onToggleEditMode?: () => void;
 }
 
 export default function Toolbar({
@@ -42,23 +42,9 @@ export default function Toolbar({
   onWingChange,
   onStaffSearchChange,
   canEditSchedule,
-  onPublish,
-  isPublishing,
+  isEditMode,
+  onToggleEditMode,
 }: ToolbarProps) {
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const toolsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!toolsOpen) return;
-    function handleOutside(e: MouseEvent) {
-      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
-        setToolsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [toolsOpen]);
-
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
       return `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
@@ -70,218 +56,189 @@ export default function Toolbar({
 
   const wingOptions = [{ name: "All" }, ...wings];
 
+  if (viewMode !== "schedule") {
+    return <div style={{ marginBottom: 18 }} />;
+  }
+
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
+        gap: 12,
+        flexWrap: "wrap",
         marginBottom: 18,
       }}
     >
-      {viewMode === "schedule" ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {/* Week nav */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background: "#fff",
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              overflow: "hidden",
-            }}
-          >
-            <button
-              onClick={onPrev}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                padding: "7px 14px", color: "var(--color-text-muted)", fontSize: 16, lineHeight: 1,
-              }}
-            >
-              ‹
-            </button>
-            <span
-              style={{
-                fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)",
-                padding: "0 8px", whiteSpace: "nowrap",
-              }}
-            >
-              {weekLabel}
-            </span>
-            <button
-              onClick={onToday}
-              style={{
-                background: "none", border: "none",
-                borderLeft: "1px solid var(--color-border)",
-                borderRight: "1px solid var(--color-border)",
-                cursor: "pointer", padding: "7px 12px",
-                color: "var(--color-text-muted)", fontSize: 12, fontWeight: 600,
-              }}
-            >
-              Today
-            </button>
-            <button
-              onClick={onNext}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                padding: "7px 14px", color: "var(--color-text-muted)", fontSize: 16, lineHeight: 1,
-              }}
-            >
-              ›
-            </button>
-          </div>
+      {/* ── LEFT ZONE: Contextual controls ── */}
 
-          {/* 1W / 2W / M toggle */}
-          <div
-            style={{
-              display: "flex", background: "#fff", borderRadius: 10,
-              border: "1px solid var(--color-border)", overflow: "hidden",
-            }}
-          >
-            {([1, 2, "month"] as const).map((n) => (
-              <button
-                key={n}
-                onClick={() => onSpanChange(n)}
-                style={{
-                  background: spanWeeks === n ? "var(--color-dark)" : "none",
-                  border: "none",
-                  color: spanWeeks === n ? "#fff" : "var(--color-text-muted)",
-                  padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  borderRight: n !== "month" ? "1px solid var(--color-border)" : "none",
-                }}
-              >
-                {n === "month" ? "M" : `${n}W`}
-              </button>
-            ))}
-          </div>
-
-          {/* Wing filter */}
-          <div
-            style={{
-              display: "flex", background: "#fff", borderRadius: 10,
-              border: "1px solid var(--color-border)", overflow: "hidden",
-            }}
-          >
-            {wingOptions.map((w, i) => (
-              <button
-                key={w.name}
-                onClick={() => onWingChange(w.name)}
-                style={{
-                  background: activeWing === w.name ? "var(--color-dark)" : "none",
-                  border: "none",
-                  color: activeWing === w.name ? "#fff" : "var(--color-text-muted)",
-                  padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  borderRight: i < wingOptions.length - 1 ? "1px solid var(--color-border)" : "none",
-                }}
-              >
-                {w.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Staff search */}
-          <div style={{ position: "relative" }}>
-            <svg
-              width="13" height="13" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{
-                position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-                color: "var(--color-text-faint)", pointerEvents: "none",
-              }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Find staff…"
-              value={staffSearch}
-              onChange={(e) => onStaffSearchChange(e.target.value)}
-              style={{
-                background: "#fff", border: "1px solid var(--color-border)", borderRadius: 10,
-                padding: "7px 10px 7px 30px", fontSize: 12, fontWeight: 500,
-                color: "var(--color-text-secondary)", width: 160, outline: "none",
-              }}
-            />
-            {staffSearch && (
-              <button
-                onClick={() => onStaffSearchChange("")}
-                style={{
-                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "var(--color-text-faint)", fontSize: 14, lineHeight: 1, padding: 0,
-                }}
-              >
-                ×
-              </button>
-            )}
-          </div>
-          
-          {/* Publish Button */}
-          {canEditSchedule && onPublish && (
-            <button
-              onClick={onPublish}
-              disabled={isPublishing}
-              style={{
-                marginLeft: "auto",
-                background: "var(--color-dark)",
-                border: "none",
-                borderRadius: 10,
-                color: "#fff",
-                padding: "8px 16px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: isPublishing ? "default" : "pointer",
-                opacity: isPublishing ? 0.7 : 1,
-              }}
-            >
-              {isPublishing ? "Publishing..." : "Publish"}
-            </button>
-          )}
-
-        </div>
-      ) : (
-        <div style={{ flex: 1 }} />
-      )}
-
-      {/* Tools dropdown */}
-      <div ref={toolsRef} style={{ position: "relative" }}>
+      {/* Week navigation */}
+      <div className="dg-segment">
         <button
-          onClick={() => setToolsOpen((o) => !o)}
+          className="dg-segment-btn"
+          onClick={onPrev}
+          style={{ padding: "7px 10px", fontSize: 15, lineHeight: 1 }}
+          title="Previous period"
+        >
+          ‹
+        </button>
+        <div
           style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: toolsOpen ? "var(--color-dark)" : "#fff",
-            border: "1px solid var(--color-border)", borderRadius: 10,
-            padding: "7px 14px", fontSize: 12, fontWeight: 600,
-            color: toolsOpen ? "#fff" : "var(--color-text-muted)", cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 10px",
+            borderLeft: "1px solid var(--color-border)",
+            borderRight: "1px solid var(--color-border)",
           }}
         >
-          Tools <span style={{ fontSize: 10, marginLeft: 2 }}>▾</span>
-        </button>
-        {toolsOpen && (
-          <div
+          <span
             style={{
-              position: "absolute", top: "calc(100% + 6px)", right: 0,
-              background: "#fff", border: "1px solid var(--color-border)",
-              borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-              zIndex: 100, minWidth: 190, overflow: "hidden",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              whiteSpace: "nowrap",
+              minWidth: 120,
+              textAlign: "center",
             }}
           >
+            {weekLabel}
+          </span>
+        </div>
+        <button
+          className="dg-segment-btn"
+          onClick={onToday}
+          style={{ fontSize: 12 }}
+        >
+          Today
+        </button>
+        <button
+          className="dg-segment-btn"
+          onClick={onNext}
+          style={{ padding: "7px 10px", fontSize: 15, lineHeight: 1 }}
+          title="Next period"
+        >
+          ›
+        </button>
+      </div>
+
+      {/* Span toggle: 1W / 2W / M */}
+      <div className="dg-segment">
+        {([1, 2, "month"] as const).map((n) => (
+          <button
+            key={n}
+            onClick={() => onSpanChange(n)}
+            className={`dg-segment-btn${spanWeeks === n ? " active" : ""}`}
+          >
+            {n === "month" ? "M" : `${n}W`}
+          </button>
+        ))}
+      </div>
+
+      {/* Wing filter */}
+      {wingOptions.length > 1 && (
+        <div className="dg-segment">
+          {wingOptions.map((w) => (
             <button
-              onClick={() => { setToolsOpen(false); window.print(); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%",
-                background: "none", border: "none", padding: "11px 16px",
-                fontSize: 13, fontWeight: 500, color: "var(--color-text-secondary)",
-                cursor: "pointer", textAlign: "left",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-border-light)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+              key={w.name}
+              onClick={() => onWingChange(w.name)}
+              className={`dg-segment-btn${activeWing === w.name ? " active" : ""}`}
             >
-              🖨️ Print / Save as PDF
+              {w.name}
             </button>
-          </div>
+          ))}
+        </div>
+      )}
+
+      {/* Staff search */}
+      <div style={{ position: "relative" }}>
+        <svg
+          width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{
+            position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
+            color: "var(--color-text-faint)", pointerEvents: "none",
+          }}
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Find staff…"
+          value={staffSearch}
+          onChange={(e) => onStaffSearchChange(e.target.value)}
+          className="dg-input"
+          style={{ paddingLeft: 30, width: 160, borderRadius: 10 }}
+        />
+        {staffSearch && (
+          <button
+            onClick={() => onStaffSearchChange("")}
+            className="dg-btn-ghost"
+            style={{
+              position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+              padding: "2px 5px", fontSize: 14, lineHeight: 1, borderRadius: 6,
+            }}
+            title="Clear search"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* ── RIGHT ZONE: Global actions ── */}
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+
+        {/* Download — disabled while editing to prevent printing draft state */}
+        <button
+          onClick={() => window.print()}
+          disabled={isEditMode}
+          className="dg-btn dg-btn-ghost"
+          style={{
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            padding: "7px 12px",
+            opacity: isEditMode ? 0.4 : 1,
+            cursor: isEditMode ? "not-allowed" : "pointer",
+          }}
+          title={isEditMode ? "Exit edit mode to download" : "Print / Download schedule"}
+        >
+          <svg
+            width="13" height="13" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download
+        </button>
+
+        {/* Edit mode toggle — only for schedulers */}
+        {canEditSchedule && onToggleEditMode && (
+          isEditMode ? (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#B45309",
+                background: "#FEF3C7",
+                border: "1px solid #FCD34D",
+                borderRadius: 8,
+                padding: "5px 10px",
+                letterSpacing: "0.02em",
+                userSelect: "none",
+              }}
+            >
+              Edit Mode: ON
+            </span>
+          ) : (
+            <button
+              onClick={onToggleEditMode}
+              className="dg-btn dg-btn-primary"
+            >
+              Edit
+            </button>
+          )
         )}
       </div>
     </div>

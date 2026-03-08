@@ -1,25 +1,51 @@
 import { Employee, ShiftType } from "@/types";
 
+export interface Tally {
+  [label: string]: number;
+}
+
+export interface DailyTallies {
+  day: Tally;
+  eve: Tally;
+  night: Tally;
+}
+
 /**
- * Computes the day/eve/night FTE counts for a single date across a set of employees.
+ * Computes the day/eve/night FTE counts for a single date across a set of employees,
+ * tallying each individual shift type.
  */
-export function computeDailyCounts(
+export function computeDailyTallies(
   employees: Employee[],
   date: Date,
   shiftForKey: (empId: string, date: Date) => string | null,
   getShiftStyle: (type: string) => ShiftType,
-): { day: number; eve: number; night: number } {
-  let day = 0, eve = 0, night = 0;
+  exclusiveLabels: string[],
+): DailyTallies {
+  const tallies: DailyTallies = {
+    day: {},
+    eve: {},
+    night: {},
+  };
+
   for (const emp of employees) {
-    const type = shiftForKey(emp.id, date);
-    if (type) {
-      const style = getShiftStyle(type);
-      if (style.countsTowardDay) day += emp.fteWeight;
-      if (style.countsTowardEve) eve += emp.fteWeight;
-      if (style.countsTowardNight) night += emp.fteWeight;
+    const typeLabel = shiftForKey(emp.id, date);
+    if (typeLabel && exclusiveLabels.includes(typeLabel)) {
+      const style = getShiftStyle(typeLabel);
+
+      const bucket = style.countsTowardDay
+        ? tallies.day
+        : style.countsTowardEve
+          ? tallies.eve
+          : style.countsTowardNight
+            ? tallies.night
+            : null;
+
+      if (bucket) {
+        bucket[typeLabel] = (bucket[typeLabel] || 0) + emp.fteWeight;
+      }
     }
   }
-  return { day, eve, night };
+  return tallies;
 }
 
 /**

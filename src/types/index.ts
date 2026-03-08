@@ -56,7 +56,7 @@ export interface Employee {
   contactNotes: string;
 }
 
-export type ShiftMap = Record<string, string>;
+export type ShiftMap = Record<string, { label: string; isDraft: boolean }>;
 
 export interface EditModalState {
   empId: string;
@@ -90,6 +90,8 @@ export type InvitableOrgRole = 'scheduler' | 'supervisor' | 'user';
 export interface Profile {
   id: string;
   orgId: string;
+  firstName: string | null;
+  lastName: string | null;
   orgRole: OrgRole;
   platformRole: PlatformRole;
   version: number;

@@ -12,6 +12,7 @@ interface MonthViewProps {
   getShiftStyle: (type: string) => ShiftType;
   today: Date;
   wings: Wing[];
+  activeWing?: string;
 }
 
 function buildMonthCells(monthStart: Date): (Date | null)[] {
@@ -56,6 +57,7 @@ export default function MonthView({
   getShiftStyle,
   today,
   wings,
+  activeWing = "All",
 }: MonthViewProps) {
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
@@ -152,7 +154,10 @@ export default function MonthView({
           );
 
           // Preserve wing table order; only show wings that have workers on this day
-          const wingSections = wingNames.filter((w) => byWing.has(w));
+          // AND match the active wing filter
+          const wingSections = wingNames.filter(
+            (w) => byWing.has(w) && (activeWing === "All" || w === activeWing),
+          );
 
           return (
             <div
