@@ -26,7 +26,13 @@ interface SettingsPageProps {
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div
       style={{
@@ -74,7 +80,13 @@ const labelStyle: React.CSSProperties = {
 };
 
 // ── Organization Settings ─────────────────────────────────────────────────────
-function OrgSettings({ organization, onSave }: { organization: Organization; onSave: (o: Organization) => void }) {
+function OrgSettings({
+  organization,
+  onSave,
+}: {
+  organization: Organization;
+  onSave: (o: Organization) => void;
+}) {
   const [form, setForm] = useState({
     name: organization.name,
     address: organization.address,
@@ -88,7 +100,8 @@ function OrgSettings({ organization, onSave }: { organization: Organization; onS
     form.name !== organization.name ||
     form.address !== organization.address ||
     form.phone !== organization.phone ||
-    (form.employeeCount || "") !== (organization.employeeCount?.toString() ?? "");
+    (form.employeeCount || "") !==
+      (organization.employeeCount?.toString() ?? "");
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) return;
@@ -146,26 +159,41 @@ function OrgSettings({ organization, onSave }: { organization: Organization; onS
           type="number"
           min="0"
           value={form.employeeCount}
-          onChange={(e) => setForm((p) => ({ ...p, employeeCount: e.target.value }))}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, employeeCount: e.target.value }))
+          }
           placeholder="e.g. 28"
           style={inputStyle}
         />
       </div>
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, alignItems: "center" }}>
+      <div
+        style={{
+          gridColumn: "1 / -1",
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
         <button
           onClick={handleSave}
           disabled={!isModified || saving}
           style={{
             background: isModified ? "var(--color-accent-gradient)" : "#ccc",
-            border: "none", color: "#fff", borderRadius: 8,
-            padding: "9px 20px", fontSize: 13, fontWeight: 700,
+            border: "none",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "9px 20px",
+            fontSize: 13,
+            fontWeight: 700,
             cursor: isModified ? "pointer" : "not-allowed",
           }}
         >
           {saving ? "Saving…" : "Save"}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>Saved!</span>
+          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>
+            Saved!
+          </span>
         )}
       </div>
     </div>
@@ -218,7 +246,10 @@ function WingRow({
   }, [form, wing, orgId, onSaved]);
 
   const handleDelete = useCallback(async () => {
-    if (wing.isNew) { onDeleted(wing.id); return; }
+    if (wing.isNew) {
+      onDeleted(wing.id);
+      return;
+    }
     setDeleting(true);
     try {
       await db.deleteWing(wing.id);
@@ -253,13 +284,27 @@ function WingRow({
           <input
             type="color"
             value={form.colorBg}
-            onChange={(e) => setForm((p) => ({ ...p, colorBg: e.target.value }))}
-            style={{ width: 32, height: 28, border: "1px solid var(--color-border)", borderRadius: 4, cursor: "pointer", padding: 2 }}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, colorBg: e.target.value }))
+            }
+            style={{
+              width: 32,
+              height: 28,
+              border: "1px solid var(--color-border)",
+              borderRadius: 4,
+              cursor: "pointer",
+              padding: 2,
+            }}
           />
           <span
             style={{
-              display: "inline-block", padding: "2px 8px", borderRadius: 20,
-              background: form.colorBg, color: form.colorText, fontSize: 11, fontWeight: 600,
+              display: "inline-block",
+              padding: "2px 8px",
+              borderRadius: 20,
+              background: form.colorBg,
+              color: form.colorText,
+              fontSize: 11,
+              fontWeight: 600,
             }}
           >
             Preview
@@ -271,8 +316,17 @@ function WingRow({
         <input
           type="color"
           value={form.colorText}
-          onChange={(e) => setForm((p) => ({ ...p, colorText: e.target.value }))}
-          style={{ width: 32, height: 28, border: "1px solid var(--color-border)", borderRadius: 4, cursor: "pointer", padding: 2 }}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, colorText: e.target.value }))
+          }
+          style={{
+            width: 32,
+            height: 28,
+            border: "1px solid var(--color-border)",
+            borderRadius: 4,
+            cursor: "pointer",
+            padding: 2,
+          }}
         />
       </div>
       <button
@@ -280,9 +334,14 @@ function WingRow({
         disabled={!isModified || saving}
         style={{
           background: isModified ? "var(--color-accent-gradient)" : "#ccc",
-          border: "none", color: "#fff", borderRadius: 7,
-          padding: "7px 14px", fontSize: 12, fontWeight: 700,
-          cursor: isModified ? "pointer" : "not-allowed", whiteSpace: "nowrap",
+          border: "none",
+          color: "#fff",
+          borderRadius: 7,
+          padding: "7px 14px",
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: isModified ? "pointer" : "not-allowed",
+          whiteSpace: "nowrap",
         }}
       >
         {saving ? "…" : "Save"}
@@ -291,8 +350,13 @@ function WingRow({
         onClick={handleDelete}
         disabled={deleting}
         style={{
-          background: "none", border: "1px solid #FEE2E2", borderRadius: 7,
-          color: "#EF4444", padding: "7px 12px", fontSize: 12, fontWeight: 600,
+          background: "none",
+          border: "1px solid #FEE2E2",
+          borderRadius: 7,
+          color: "#EF4444",
+          padding: "7px 12px",
+          fontSize: 12,
+          fontWeight: 600,
           cursor: "pointer",
         }}
       >
@@ -312,7 +376,8 @@ function WingsSettings({
   orgId: string;
   onChange: (wings: Wing[]) => void;
 }) {
-  const [localWings, setLocalWings] = useState<(Wing & { isNew?: boolean })[]>(wings);
+  const [localWings, setLocalWings] =
+    useState<(Wing & { isNew?: boolean })[]>(wings);
   let nextTmpId = -1;
 
   const handleAdd = () => {
@@ -329,8 +394,14 @@ function WingsSettings({
   };
 
   const handleSaved = (saved: Wing) => {
-    setLocalWings((prev) => prev.map((w) => (w.name === saved.name || w.id === saved.id ? saved : w)));
-    onChange(localWings.map((w) => (w.name === saved.name || w.id === saved.id ? saved : w)));
+    setLocalWings((prev) =>
+      prev.map((w) => (w.name === saved.name || w.id === saved.id ? saved : w)),
+    );
+    onChange(
+      localWings.map((w) =>
+        w.name === saved.name || w.id === saved.id ? saved : w,
+      ),
+    );
   };
 
   const handleDeleted = (id: number) => {
@@ -355,9 +426,16 @@ function WingsSettings({
       <button
         onClick={handleAdd}
         style={{
-          marginTop: 12, background: "none", border: "1.5px dashed var(--color-border)",
-          borderRadius: 8, color: "var(--color-text-muted)", padding: "8px 16px",
-          fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%",
+          marginTop: 12,
+          background: "none",
+          border: "1.5px dashed var(--color-border)",
+          borderRadius: 8,
+          color: "var(--color-text-muted)",
+          padding: "8px 16px",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          width: "100%",
         }}
       >
         + Add Wing
@@ -427,7 +505,10 @@ function ShiftTypeRow({
   }, [form, st, orgId, onSaved]);
 
   const handleDelete = useCallback(async () => {
-    if (st.isNew) { onDeleted(st.id); return; }
+    if (st.isNew) {
+      onDeleted(st.id);
+      return;
+    }
     setDeleting(true);
     try {
       await db.deleteShiftType(st.id);
@@ -444,30 +525,59 @@ function ShiftTypeRow({
       {/* Collapsed row */}
       <div
         style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "10px 0", cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 0",
+          cursor: "pointer",
         }}
         onClick={() => setExpanded((e) => !e)}
       >
         <span
           style={{
-            display: "inline-block", minWidth: 44, padding: "3px 8px",
-            background: form.color, border: `1.5px solid ${form.border}`,
-            color: form.text, borderRadius: 6, fontSize: 12, fontWeight: 700, textAlign: "center",
+            display: "inline-block",
+            minWidth: 44,
+            padding: "3px 8px",
+            background: form.color,
+            border: `1.5px solid ${form.border}`,
+            color: form.text,
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 700,
+            textAlign: "center",
           }}
         >
           {form.label || "…"}
         </span>
-        <span style={{ fontSize: 13, color: "var(--color-text-secondary)", flex: 1 }}>
+        <span
+          style={{
+            fontSize: 13,
+            color: "var(--color-text-secondary)",
+            flex: 1,
+          }}
+        >
           {form.name || "—"}
         </span>
         {form.wingName && (
-          <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{form.wingName}</span>
+          <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            {form.wingName}
+          </span>
         )}
         {form.isGeneral && (
-          <span style={{ fontSize: 11, color: "var(--color-text-faint)" }}>General</span>
+          <span style={{ fontSize: 11, color: "var(--color-text-faint)" }}>
+            General
+          </span>
         )}
-        <span style={{ fontSize: 14, color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▾</span>
+        <span
+          style={{
+            fontSize: 14,
+            color: "var(--color-text-faint)",
+            transform: expanded ? "rotate(180deg)" : "none",
+            transition: "transform 0.15s",
+          }}
+        >
+          ▾
+        </span>
       </div>
 
       {/* Expanded edit form */}
@@ -485,12 +595,20 @@ function ShiftTypeRow({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "120px 1fr",
+              gap: 10,
+            }}
+          >
             <div>
               <label style={labelStyle}>CODE / LABEL</label>
               <input
                 value={form.label}
-                onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, label: e.target.value }))
+                }
                 placeholder="e.g. D"
                 style={inputStyle}
               />
@@ -499,7 +617,9 @@ function ShiftTypeRow({
               <label style={labelStyle}>FULL NAME</label>
               <input
                 value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
                 placeholder="e.g. Day Shift"
                 style={inputStyle}
               />
@@ -507,26 +627,65 @@ function ShiftTypeRow({
           </div>
 
           {/* Colors */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 10,
+            }}
+          >
             <div>
               <label style={labelStyle}>BACKGROUND</label>
-              <input type="color" value={form.color}
-                onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-                style={{ width: "100%", height: 34, border: "1px solid var(--color-border)", borderRadius: 7, cursor: "pointer", padding: 2 }}
+              <input
+                type="color"
+                value={form.color}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, color: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  height: 34,
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  padding: 2,
+                }}
               />
             </div>
             <div>
               <label style={labelStyle}>BORDER</label>
-              <input type="color" value={form.border}
-                onChange={(e) => setForm((p) => ({ ...p, border: e.target.value }))}
-                style={{ width: "100%", height: 34, border: "1px solid var(--color-border)", borderRadius: 7, cursor: "pointer", padding: 2 }}
+              <input
+                type="color"
+                value={form.border}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, border: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  height: 34,
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  padding: 2,
+                }}
               />
             </div>
             <div>
               <label style={labelStyle}>TEXT</label>
-              <input type="color" value={form.text}
-                onChange={(e) => setForm((p) => ({ ...p, text: e.target.value }))}
-                style={{ width: "100%", height: 34, border: "1px solid var(--color-border)", borderRadius: 7, cursor: "pointer", padding: 2 }}
+              <input
+                type="color"
+                value={form.text}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, text: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  height: 34,
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  padding: 2,
+                }}
               />
             </div>
           </div>
@@ -536,9 +695,14 @@ function ShiftTypeRow({
             <label style={labelStyle}>PREVIEW</label>
             <span
               style={{
-                display: "inline-block", padding: "5px 12px",
-                background: form.color, border: `1.5px solid ${form.border}`,
-                color: form.text, borderRadius: 8, fontSize: 13, fontWeight: 700,
+                display: "inline-block",
+                padding: "5px 12px",
+                background: form.color,
+                border: `1.5px solid ${form.border}`,
+                color: form.text,
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 700,
               }}
             >
               {form.label || "Label"} — {form.name || "Name"}
@@ -547,33 +711,52 @@ function ShiftTypeRow({
 
           {/* Wing association */}
           <div>
-            <label style={labelStyle}>ASSOCIATED WING (leave blank for general)</label>
+            <label style={labelStyle}>
+              ASSOCIATED WING (leave blank for general)
+            </label>
             <select
               value={form.wingName}
-              onChange={(e) => setForm((p) => ({ ...p, wingName: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, wingName: e.target.value }))
+              }
               style={{ ...inputStyle }}
             >
               <option value="">— General shift —</option>
               {wings.map((w) => (
-                <option key={w.id} value={w.name}>{w.name}</option>
+                <option key={w.id} value={w.name}>
+                  {w.name}
+                </option>
               ))}
             </select>
           </div>
 
           {/* Flags */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-            {([
-              ["countsTowardDay", "Counts toward Day"],
-              ["countsTowardEve", "Counts toward Eve"],
-              ["countsTowardNight", "Counts toward Night"],
-              ["isOrientation", "Orientation shift"],
-              ["isGeneral", "Show in General section"],
-            ] as const).map(([key, label]) => (
-              <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+            {(
+              [
+                ["countsTowardDay", "Counts toward Day"],
+                ["countsTowardEve", "Counts toward Eve"],
+                ["countsTowardNight", "Counts toward Night"],
+                ["isOrientation", "Orientation shift"],
+                ["isGeneral", "Show in General section"],
+              ] as const
+            ).map(([key, label]) => (
+              <label
+                key={key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={form[key]}
-                  onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, [key]: e.target.checked }))
+                  }
                 />
                 {label}
               </label>
@@ -586,8 +769,14 @@ function ShiftTypeRow({
               onClick={handleSave}
               disabled={saving}
               style={{
-                background: "var(--color-accent-gradient)", border: "none", color: "#fff",
-                borderRadius: 7, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                background: "var(--color-accent-gradient)",
+                border: "none",
+                color: "#fff",
+                borderRadius: 7,
+                padding: "8px 18px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
               }}
             >
               {saving ? "Saving…" : "Save"}
@@ -595,8 +784,13 @@ function ShiftTypeRow({
             <button
               onClick={() => setExpanded(false)}
               style={{
-                background: "var(--color-border-light)", border: "none", borderRadius: 7,
-                color: "var(--color-text-muted)", padding: "8px 14px", fontSize: 13, cursor: "pointer",
+                background: "var(--color-border-light)",
+                border: "none",
+                borderRadius: 7,
+                color: "var(--color-text-muted)",
+                padding: "8px 14px",
+                fontSize: 13,
+                cursor: "pointer",
               }}
             >
               Cancel
@@ -606,8 +800,14 @@ function ShiftTypeRow({
               onClick={handleDelete}
               disabled={deleting}
               style={{
-                background: "none", border: "1px solid #FEE2E2", borderRadius: 7,
-                color: "#EF4444", padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                background: "none",
+                border: "1px solid #FEE2E2",
+                borderRadius: 7,
+                color: "#EF4444",
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
               }}
             >
               {deleting ? "…" : "Delete"}
@@ -631,7 +831,8 @@ function ShiftTypesSettings({
   orgId: string;
   onChange: (types: ShiftType[]) => void;
 }) {
-  const [local, setLocal] = useState<(ShiftType & { isNew?: boolean })[]>(shiftTypes);
+  const [local, setLocal] =
+    useState<(ShiftType & { isNew?: boolean })[]>(shiftTypes);
   let nextTmpId = -1;
 
   const handleAdd = () => {
@@ -651,7 +852,7 @@ function ShiftTypesSettings({
 
   const handleSaved = (saved: ShiftType) => {
     const updated = local.map((s) =>
-      s.label === saved.label || s.id === saved.id ? saved : s
+      s.label === saved.label || s.id === saved.id ? saved : s,
     );
     setLocal(updated);
     onChange(updated);
@@ -665,8 +866,16 @@ function ShiftTypesSettings({
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 0, marginBottom: 12 }}>
-        Click any row to expand and edit. The label (code) is used in the schedule grid.
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--color-text-muted)",
+          marginTop: 0,
+          marginBottom: 12,
+        }}
+      >
+        Click any row to expand and edit. The label (code) is used in the
+        schedule grid.
       </p>
       {local.map((st) => (
         <ShiftTypeRow
@@ -681,9 +890,16 @@ function ShiftTypesSettings({
       <button
         onClick={handleAdd}
         style={{
-          marginTop: 12, background: "none", border: "1.5px dashed var(--color-border)",
-          borderRadius: 8, color: "var(--color-text-muted)", padding: "8px 16px",
-          fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%",
+          marginTop: 12,
+          background: "none",
+          border: "1.5px dashed var(--color-border)",
+          borderRadius: 8,
+          color: "var(--color-text-muted)",
+          padding: "8px 16px",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          width: "100%",
         }}
       >
         + Add Shift Type
@@ -697,7 +913,10 @@ function WorkspaceAccess({ orgId }: { orgId: string }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<string>("user");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    isError: boolean;
+  } | null>(null);
 
   const handleAssign = useCallback(async () => {
     const trimmed = email.trim().toLowerCase();
@@ -706,10 +925,14 @@ function WorkspaceAccess({ orgId }: { orgId: string }) {
     setMessage(null);
     try {
       await db.assignOrgRoleByEmail(orgId, trimmed, role);
-      setMessage({ text: `${trimmed} has been assigned to this workspace. They can sign in now.`, isError: false });
+      setMessage({
+        text: `${trimmed} has been assigned to this workspace. They can sign in now.`,
+        isError: false,
+      });
       setEmail("");
     } catch (err: unknown) {
-      const text = err instanceof Error ? err.message : "Failed to assign user.";
+      const text =
+        err instanceof Error ? err.message : "Failed to assign user.";
       setMessage({ text, isError: true });
     } finally {
       setLoading(false);
@@ -719,9 +942,17 @@ function WorkspaceAccess({ orgId }: { orgId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
-        Users must be assigned to this workspace before they can sign in. Enter the email they use to log in and choose a role.
+        Users must be assigned to this workspace before they can sign in. Enter
+        the email they use to log in and choose a role.
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "flex-end",
+        }}
+      >
         <div style={{ flex: "1 1 200px", minWidth: 0 }}>
           <label style={labelStyle}>EMAIL</label>
           <input
@@ -740,7 +971,9 @@ function WorkspaceAccess({ orgId }: { orgId: string }) {
             style={inputStyle}
           >
             {ORG_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
             ))}
           </select>
         </div>
@@ -748,7 +981,10 @@ function WorkspaceAccess({ orgId }: { orgId: string }) {
           onClick={handleAssign}
           disabled={loading || !email.trim()}
           style={{
-            background: email.trim() && !loading ? "var(--color-accent-gradient)" : "#ccc",
+            background:
+              email.trim() && !loading
+                ? "var(--color-accent-gradient)"
+                : "#ccc",
             border: "none",
             color: "#fff",
             borderRadius: 8,
@@ -791,7 +1027,14 @@ export default function SettingsPage({
   const { isGridmaster } = usePermissions();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 900 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
+        maxWidth: 900,
+      }}
+    >
       <Section title="My Active Sessions">
         <ActiveSessions />
       </Section>
@@ -810,7 +1053,11 @@ export default function SettingsPage({
 
       {canManageOrg && (
         <Section title="Wings">
-          <WingsSettings wings={wings} orgId={organization.id} onChange={onWingsChange} />
+          <WingsSettings
+            wings={wings}
+            orgId={organization.id}
+            onChange={onWingsChange}
+          />
         </Section>
       )}
 

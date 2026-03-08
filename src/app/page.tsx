@@ -177,7 +177,7 @@ const FEATURES = [
   {
     icon: "📋",
     title: "One-Click Scheduling",
-    desc: "Build shift schedules in minutes, not hours. Drag, drop, done — no formulas required.",
+    desc: "Build shift schedules in minutes, not hours. Click, assign, done — no formulas required.",
   },
   {
     icon: "👥",
@@ -328,7 +328,7 @@ export default function RootPage() {
       {/* ── Pain Points ── */}
       <section className="comparison" id="why">
         <div className="section-inner">
-          <h2 className="section-title">Why teams are switching</h2>
+          <h2 className="section-title">Why you should switch</h2>
           <p className="section-subtitle">
             Spreadsheets were built for numbers, not shift schedules. Here's
             what changes when you move to DubGrid.

@@ -19,7 +19,9 @@ export default function ImpersonationPanel() {
       setSessionId(result.session_id);
       setExpiresAt(result.expires_at);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start impersonation");
+      setError(
+        err instanceof Error ? err.message : "Failed to start impersonation",
+      );
     } finally {
       setLoading(false);
     }
@@ -35,7 +37,9 @@ export default function ImpersonationPanel() {
       setExpiresAt(null);
       setTargetUserId("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to end impersonation");
+      setError(
+        err instanceof Error ? err.message : "Failed to end impersonation",
+      );
     } finally {
       setLoading(false);
     }
@@ -44,10 +48,18 @@ export default function ImpersonationPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted)" }}>
-        Start a support impersonation session by target user id. Sessions are capped at 30 minutes.
+        Start a support impersonation session by target user id. Sessions are
+        capped at 30 minutes.
       </p>
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <input
           value={targetUserId}
           onChange={(e) => setTargetUserId(e.target.value)}
@@ -64,7 +76,10 @@ export default function ImpersonationPanel() {
           onClick={start}
           disabled={loading || !targetUserId.trim()}
           style={{
-            background: targetUserId.trim() && !loading ? "var(--color-accent-gradient)" : "#ccc",
+            background:
+              targetUserId.trim() && !loading
+                ? "var(--color-accent-gradient)"
+                : "#ccc",
             border: "none",
             color: "#fff",
             borderRadius: 8,
@@ -97,7 +112,9 @@ export default function ImpersonationPanel() {
       {sessionId && (
         <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
           Active session: <code>{sessionId}</code>
-          {expiresAt ? ` · expires ${new Date(expiresAt).toLocaleString()}` : ""}
+          {expiresAt
+            ? ` · expires ${new Date(expiresAt).toLocaleString()}`
+            : ""}
         </div>
       )}
 

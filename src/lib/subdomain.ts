@@ -30,6 +30,29 @@ export function parseHost(hostWithPort: string): ParsedHost {
     };
   }
 
+  // Vercel project domains (e.g. dub-grid.vercel.app) should be treated as apex.
+  // Tenant hosts on Vercel can still use a leading label (e.g. tenant.dub-grid.vercel.app).
+  const isVercelApp = labels.length >= 2 && labels[labels.length - 2] === "vercel" && labels[labels.length - 1] === "app";
+  if (isVercelApp) {
+    if (labels.length === 3) {
+      return {
+        subdomain: null,
+        rootDomain: hostname,
+        port,
+        hostname,
+      };
+    }
+
+    if (labels.length >= 4) {
+      return {
+        subdomain: labels[0],
+        rootDomain: labels.slice(1).join("."),
+        port,
+        hostname,
+      };
+    }
+  }
+
   if (labels.length >= 3) {
     return {
       subdomain: labels[0],
