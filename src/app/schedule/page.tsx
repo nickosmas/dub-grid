@@ -14,6 +14,7 @@ import { addDays, formatDateKey, getWeekStart } from "@/lib/utils";
 import { filterAndSortEmployees } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
 import { validateConfig } from "@/lib/supabase";
+import { handleApiError } from "@/lib/error-handling";
 import { usePermissions } from "@/hooks";
 import {
   Employee,
@@ -139,6 +140,7 @@ function SchedulerContent() {
         });
       } catch (err) {
         console.error(err);
+        handleApiError(err);
         setLoadError(
           err instanceof Error ? err.message : "Failed to load data",
         );

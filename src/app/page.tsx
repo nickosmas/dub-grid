@@ -19,8 +19,8 @@ function SignInModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDomainSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDomainSubmit = async (e?: React.SyntheticEvent) => {
+    if (e) e.preventDefault();
     setLoading(true);
     setError(null);
     const slug = domain.trim().toLowerCase();
@@ -95,7 +95,14 @@ function SignInModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {step === "domain" && isApex ? (
-          <form onSubmit={handleDomainSubmit} className="modal-form">
+          <div
+            className="modal-form"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleDomainSubmit(e);
+              }
+            }}
+          >
             <p className="modal-subtitle">
               Enter your workspace domain to get started.
             </p>
@@ -117,24 +124,17 @@ function SignInModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
             {error && <div className="form-error">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-primary">
+            <button
+              type="button"
+              onClick={handleDomainSubmit}
+              disabled={loading}
+              className="btn-primary"
+            >
               {loading ? "Checking…" : "Continue"}
             </button>
-          </form>
+          </div>
         ) : (
           <form onSubmit={handleSignIn} className="modal-form">
-            {isApex && (
-              <button
-                type="button"
-                className="back-link"
-                onClick={() => {
-                  setStep("domain");
-                  setError(null);
-                }}
-              >
-                ← Back
-              </button>
-            )}
             <p className="modal-subtitle">
               Sign in to <strong>{domain.toLowerCase()}.dubgrid.com</strong>
             </p>
@@ -164,6 +164,22 @@ function SignInModal({ onClose }: { onClose: () => void }) {
             {error && <div className="form-error">{error}</div>}
             <button type="submit" disabled={loading} className="btn-primary">
               {loading ? "Signing in…" : "Sign In"}
+            </button>
+            <button
+              type="button"
+              className="back-link"
+              onClick={() => {
+                if (isApex) {
+                  setStep("domain");
+                  setError(null);
+                } else {
+                  const parsed = parseHost(window.location.host);
+                  const targetUrl = `${window.location.protocol}//${parsed.rootDomain}${parsed.port}/?signin=1`;
+                  window.location.assign(targetUrl);
+                }
+              }}
+            >
+              ← Change workspace
             </button>
           </form>
         )}
@@ -811,8 +827,10 @@ export default function RootPage() {
           font-weight: 600;
           cursor: pointer;
           padding: 0;
-          text-align: left;
-          margin-bottom: -4px;
+          text-align: center;
+          margin-top: 8px;
+          display: block;
+          width: 100%;
         }
         .back-link:hover { color: #0F172A; }
 
