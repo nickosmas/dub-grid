@@ -1,11 +1,18 @@
 export type Section = string; // dynamic from DB (wings table)
 
+// ── App Domain Types ──────────────────────────────────────────────────────────
+
 export interface Organization {
   id: string;
   name: string;
+  slug: string | null;
   address: string;
   phone: string;
   employeeCount: number | null;
+  /** Ordered list of skill levels (designations) for this org. */
+  skillLevels: string[];
+  /** Ordered list of roles for this org. */
+  roles: string[];
 }
 
 export interface Wing {
@@ -32,10 +39,12 @@ export interface ShiftType {
   isGeneral?: boolean;
   wingName?: string | null;
   sortOrder: number;
+  /** Designations eligible for this shift. Empty array = no restriction. */
+  requiredDesignations?: string[];
 }
 
 export interface Employee {
-  id: number;
+  id: string;
   name: string;
   designation: string;
   roles: string[];
@@ -50,8 +59,83 @@ export interface Employee {
 export type ShiftMap = Record<string, string>;
 
 export interface EditModalState {
-  empId: number;
+  empId: string;
   empName: string;
   date: Date;
   empWings: Section[];
+  empDesignation: string;
+}
+
+export type NoteType = 'readings' | 'shower';
+
+export interface ScheduleNote {
+  id: number;
+  orgId: string;
+  empId: string;
+  date: string;
+  noteType: NoteType;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── RBAC Types ────────────────────────────────────────────────────────────────
+
+export type PlatformRole = 'gridmaster' | 'none';
+export type OrgRole = 'admin' | 'scheduler' | 'supervisor' | 'user';
+// Roles that can be assigned via invitation. Admins are assigned directly
+// (not via invite), matching the org_invitations DB CHECK constraint.
+export type InvitableOrgRole = 'scheduler' | 'supervisor' | 'user';
+
+export interface Profile {
+  id: string;
+  orgId: string;
+  orgRole: OrgRole;
+  platformRole: PlatformRole;
+  version: number;
+  roleLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoleChangeLog {
+  id: string;
+  targetUserId: string;
+  changedById: string;
+  fromRole: string;
+  toRole: string;
+  idempotencyKey: string;
+  createdAt: string;
+}
+
+export interface Invitation {
+  id: string;
+  orgId: string;
+  invitedBy: string;
+  email: string;
+  roleToAssign: InvitableOrgRole;
+  token: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface UserSession {
+  id: string;
+  userId: string;
+  deviceLabel: string | null;
+  ipAddress: string | null;
+  lastActiveAt: string;
+  createdAt: string;
+  refreshTokenHash: string;
+}
+
+export interface ImpersonationSession {
+  sessionId: string;
+  gridmasterId: string;
+  targetUserId: string;
+  targetOrgId: string;
+  expiresAt: string;
+  createdAt: string;
 }

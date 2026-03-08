@@ -6,7 +6,7 @@ import { Employee, ShiftType } from "@/types";
 export function computeDailyCounts(
   employees: Employee[],
   date: Date,
-  shiftForKey: (empId: number, date: Date) => string | null,
+  shiftForKey: (empId: string, date: Date) => string | null,
   getShiftStyle: (type: string) => ShiftType,
 ): { day: number; eve: number; night: number } {
   let day = 0, eve = 0, night = 0;

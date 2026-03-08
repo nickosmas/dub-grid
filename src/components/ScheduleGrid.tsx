@@ -4,7 +4,7 @@ import React, { memo, useMemo } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, formatDate } from "@/lib/utils";
 import { computeDailyCounts } from "@/lib/schedule-logic";
-import { Employee, ShiftType, Wing } from "@/types";
+import { Employee, ShiftType, Wing, NoteType } from "@/types";
 
 const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
   JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },
@@ -20,13 +20,16 @@ interface ScheduleGridProps {
   week1: Date[];
   week2: Date[];
   spanWeeks: 1 | 2;
-  shiftForKey: (empId: number, date: Date) => string | null;
+  shiftForKey: (empId: string, date: Date) => string | null;
   getShiftStyle: (type: string) => ShiftType;
   handleCellClick: (emp: Employee, date: Date) => void;
   today: Date;
-  highlightEmpIds?: Set<number>;
+  highlightEmpIds?: Set<string>;
   wings: Wing[];
   shiftTypes: ShiftType[];
+  isCellInteractive?: boolean;
+  noteTypesForKey?: (empId: string, date: Date) => NoteType[];
+  activeWing?: string;
 }
 
 function formatRange(w: Date[]) {
@@ -39,13 +42,15 @@ interface SectionBlockProps {
   employees: Employee[];
   weekDates: Date[];
   todayKey: string;
-  shiftForKey: (empId: number, date: Date) => string | null;
+  shiftForKey: (empId: string, date: Date) => string | null;
   getShiftStyle: (type: string) => ShiftType;
   handleCellClick: (emp: Employee, date: Date) => void;
   colWidth: number;
   splitAtIndex?: number;
-  highlightEmpIds?: Set<number>;
+  highlightEmpIds?: Set<string>;
   shiftTypes: ShiftType[];
+  isCellInteractive: boolean;
+  noteTypesForKey?: (empId: string, date: Date) => NoteType[];
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -61,6 +66,8 @@ const SectionBlock = memo(function SectionBlock({
   splitAtIndex,
   highlightEmpIds,
   shiftTypes,
+  isCellInteractive,
+  noteTypesForKey,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
@@ -294,6 +301,7 @@ const SectionBlock = memo(function SectionBlock({
                   const isSplit =
                     splitAtIndex !== undefined && di === splitAtIndex;
                   const shiftType = shiftForKey(emp.id, date);
+                  const noteTypes = noteTypesForKey?.(emp.id, date) ?? [];
                   const shiftStyle = shiftType
                     ? getShiftStyle(shiftType)
                     : null;
@@ -307,26 +315,31 @@ const SectionBlock = memo(function SectionBlock({
                   return (
                     <div
                       key={dateKey}
-                      onClick={() => handleCellClick(emp, date)}
+                      onClick={() => {
+                        if (isCellInteractive) handleCellClick(emp, date);
+                      }}
                       style={{
                         height: 48,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        position: "relative",
                         borderLeft: isSplit
                           ? "2px solid var(--color-dark)"
                           : "1px solid var(--color-border-light)",
                         background: isToday
                           ? "var(--color-today-bg)"
                           : "transparent",
-                        cursor: "pointer",
+                        cursor: isCellInteractive ? "pointer" : "default",
                         transition: "background 0.1s",
                       }}
                       onMouseEnter={(e) => {
+                        if (!isCellInteractive) return;
                         e.currentTarget.style.background =
                           "var(--color-today-bg)";
                       }}
                       onMouseLeave={(e) => {
+                        if (!isCellInteractive) return;
                         e.currentTarget.style.background = isToday
                           ? "var(--color-today-bg)"
                           : rowBg;
@@ -361,6 +374,45 @@ const SectionBlock = memo(function SectionBlock({
                             borderRadius: 2,
                           }}
                         />
+                      )}
+
+                      {noteTypes.length > 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 5,
+                            right: 5,
+                            display: "flex",
+                            gap: 2,
+                          }}
+                        >
+                          {noteTypes.includes("readings") && (
+                            <div
+                              title="Readings"
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: "#EF4444",
+                                border: "1px solid #fff",
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
+                          {noteTypes.includes("shower") && (
+                            <div
+                              title="Shower"
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: "#1E293B",
+                                border: "1px solid #fff",
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -526,9 +578,18 @@ export default function ScheduleGrid({
   highlightEmpIds,
   wings,
   shiftTypes,
+  isCellInteractive = true,
+  noteTypesForKey,
+  activeWing = "All",
 }: ScheduleGridProps) {
   const todayKey = useMemo(() => formatDateKey(today), [today]);
-  const sections = wings.map((w) => w.name);
+  
+  const sections = useMemo(() => {
+    const allNames = wings.map((w) => w.name);
+    if (activeWing === "All") return allNames;
+    return allNames.filter((name) => name === activeWing);
+  }, [wings, activeWing]);
+
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
   const colWidth = spanWeeks === 2 ? 72 : 84;
@@ -590,6 +651,8 @@ export default function ScheduleGrid({
             splitAtIndex={splitAtIndex}
             highlightEmpIds={highlightEmpIds}
             shiftTypes={shiftTypes}
+            isCellInteractive={isCellInteractive}
+            noteTypesForKey={noteTypesForKey}
           />
         );
       })}

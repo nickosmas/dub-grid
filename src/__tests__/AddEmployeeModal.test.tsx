@@ -30,6 +30,9 @@ const wings: Wing[] = [
   },
 ];
 
+const defaultSkillLevels = ["JLCSN", "CSN III", "CSN II", "STAFF", "—"];
+const defaultRoles = ["DCSN", "DVCSN", "Supv", "Mentor", "CN", "SC. Mgr.", "Activity Coordinator", "SC/Asst/Act/Cor"];
+
 function renderModal(
   overrides: {
     onAdd?: ReturnType<typeof vi.fn>;
@@ -38,7 +41,7 @@ function renderModal(
 ) {
   const onAdd = overrides.onAdd ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
-  render(<AddEmployeeModal wings={wings} onAdd={onAdd} onClose={onClose} />);
+  render(<AddEmployeeModal wings={wings} skillLevels={defaultSkillLevels} roles={defaultRoles} onAdd={onAdd} onClose={onClose} />);
   return { onAdd, onClose };
 }
 
@@ -269,6 +272,8 @@ describe("AddEmployeeModal", () => {
             const { container, unmount } = render(
               <AddEmployeeModal
                 wings={testWings}
+                skillLevels={defaultSkillLevels}
+                roles={defaultRoles}
                 onAdd={onAdd}
                 onClose={onClose}
               />,

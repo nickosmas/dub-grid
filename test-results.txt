@@ -1,0 +1,494 @@
+
+ RUN  v3.2.4 /Users/nickosmas/Desktop/Dev/dub-grid
+
+ ✓ src/app/admin/login/__tests__/page.test.tsx (2 tests) 343ms
+ ✓ src/__tests__/Modal.test.tsx (11 tests) 320ms
+ ✓ src/app/login/__tests__/page.test.tsx (2 tests) 386ms
+   ✓ Login page submit states > successful sign-in: button stays disabled and message shows 'Please wait...'  301ms
+ ❯ src/__tests__/Header.test.tsx (14 tests | 2 failed) 716ms
+   × Header rendering > renders "DG" logo text 117ms
+     → Unable to find an element with the text: DG. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mstyle[39m=[32m"background: rgb(255, 255, 255); padding: 0px 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; border-bottom: 1px solid var(--color-border); box-shadow: 0 1px 4px rgba(0,0,0,0.05);"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mstyle[39m=[32m"display: flex; align-items: center; gap: 12px;"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"30"[39m
+          [33mviewBox[39m=[32m"0 0 30 30"[39m
+          [33mwidth[39m=[32m"30"[39m
+        [36m>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.3"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.3"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.3"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<span[39m
+          [33mstyle[39m=[32m"font-size: 18px; font-weight: 700; color: var(--color-text-primary); letter-spacing: -0.02em;"[39m
+        [36m>[39m
+          [0mdubgrid[0m
+        [36m</span>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mstyle[39m=[32m"display: flex; gap: 4px; align-items: center; flex: 1 1 0%; justify-content: center;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: var(--color-border-light); border-width: 1px; border-style: solid; border-color: var(--color-border); border-image: none; color: var(--color-text-secondary); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;"[39m
+        [36m>[39m
+          [0mSchedule[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: 1px transparent; color: var(--color-text-muted); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;"[39m
+        [36m>[39m
+          [0mStaff[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: 1px transparent; color: var(--color-text-muted); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"13"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"13"[39m
+          [36m>[39m
+            [36m<circle[39m
+              [33mcx[39m=[32m"12"[39m
+              [33mcy[39m=[32m"12"[39m
+              [33mr[39m=[32m"3"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0mSettings[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: 1px solid var(--color-border); color: rgb(37, 99, 235); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; margin-left: 8px;"[39m
+        [36m>[39m
+          [0mSuper Admin[0m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mstyle[39m=[32m"display: flex; align-items: center;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: medium; color: var(--color-text-muted); font-size: 13px; font-weight: 600; cursor: pointer; padding: 5px 10px; border-radius: 6px;"[39m
+        [36m>[39m
+          [0mSign Out[0m
+        [36m</button>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+   × Header rendering > renders "DubGrid" text 23ms
+     → Unable to find an element with the text: DubGrid. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mstyle[39m=[32m"background: rgb(255, 255, 255); padding: 0px 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; border-bottom: 1px solid var(--color-border); box-shadow: 0 1px 4px rgba(0,0,0,0.05);"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mstyle[39m=[32m"display: flex; align-items: center; gap: 12px;"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"30"[39m
+          [33mviewBox[39m=[32m"0 0 30 30"[39m
+          [33mwidth[39m=[32m"30"[39m
+        [36m>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"1.3499999999999999"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"8.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.3"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"16.35"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"1"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"1.3499999999999999"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.75"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"8.85"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.3"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"16.35"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+          [36m<rect[39m
+            [33mfill[39m=[32m"#1B3A2D"[39m
+            [33mheight[39m=[32m"4.800000000000001"[39m
+            [33mopacity[39m=[32m"0.3"[39m
+            [33mrx[39m=[32m"1.65"[39m
+            [33mwidth[39m=[32m"4.800000000000001"[39m
+            [33mx[39m=[32m"23.85"[39m
+            [33my[39m=[32m"23.85"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<span[39m
+          [33mstyle[39m=[32m"font-size: 18px; font-weight: 700; color: var(--color-text-primary); letter-spacing: -0.02em;"[39m
+        [36m>[39m
+          [0mdubgrid[0m
+        [36m</span>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mstyle[39m=[32m"display: flex; gap: 4px; align-items: center; flex: 1 1 0%; justify-content: center;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: var(--color-border-light); border-width: 1px; border-style: solid; border-color: var(--color-border); border-image: none; color: var(--color-text-secondary); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;"[39m
+        [36m>[39m
+          [0mSchedule[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: 1px transparent; color: var(--color-text-muted); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;"[39m
+        [36m>[39m
+          [0mStaff[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: 1px transparent; color: var(--color-text-muted); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"13"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"13"[39m
+          [36m>[39m
+            [36m<circle[39m
+              [33mcx[39m=[32m"12"[39m
+              [33mcy[39m=[32m"12"[39m
+              [33mr[39m=[32m"3"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0mSettings[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: 1px solid var(--color-border); color: rgb(37, 99, 235); border-radius: 8px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; margin-left: 8px;"[39m
+        [36m>[39m
+          [0mSuper Admin[0m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mstyle[39m=[32m"display: flex; align-items: center;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"background: transparent; border: medium; color: var(--color-text-muted); font-size: 13px; font-weight: 600; cursor: pointer; padding: 5px 10px; border-radius: 6px;"[39m
+        [36m>[39m
+          [0mSign Out[0m
+        [36m</button>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+   ✓ Header rendering > renders orgName with "/" prefix when provided 15ms
+   ✓ Header rendering > does NOT render org name when omitted 53ms
+   ✓ Header rendering > renders nav buttons: "Schedule", "Staff", "Settings" 133ms
+   ✓ Header active nav button > active nav button (schedule) has non-transparent background 31ms
+   ✓ Header active nav button > active nav button (staff) has non-transparent background 32ms
+   ✓ Header active nav button > active nav button (settings) has non-transparent background 28ms
+   ✓ Header active nav button > inactive nav buttons have transparent background 61ms
+   ✓ Header nav button interactions > clicking Schedule calls onViewChange with 'schedule' 95ms
+   ✓ Header nav button interactions > clicking Staff calls onViewChange with 'staff' 36ms
+   ✓ Header nav button interactions > clicking Settings calls onViewChange with 'settings' 29ms
+   ✓ Header Super Admin button > "Super Admin" button is always present 16ms
+   ✓ Header Sign Out > clicking "Sign Out" calls signOut 49ms
+ ✓ src/components/__tests__/AuthProvider.test.tsx (8 tests) 107ms
+ ✓ src/components/__tests__/RouteGuards.test.tsx (3 tests) 133ms
+ ✓ src/__tests__/ShiftEditPanel.test.tsx (11 tests) 228ms
+ ✓ src/__tests__/tab-coordinator.test.ts (11 tests) 72ms
+ ✓ src/__tests__/utils.test.ts (21 tests) 33ms
+ ✓ src/__tests__/business-logic.test.ts (19 tests) 34ms
+ ✓ src/__tests__/db.mappers.test.ts (15 tests) 35ms
+ ✓ src/__tests__/dub-grid-rebrand.test.tsx (1 test) 2ms
+ ✓ src/__tests__/dub-grid-rebrand.test.ts (10 tests) 4ms
+ ✓ src/__tests__/AddEmployeeModal.test.tsx (18 tests) 3165ms
+   ✓ AddEmployeeModal > Property Tests > toggling a wing button twice returns selection to its original state  1453ms
+ ✓ src/__tests__/Toolbar.test.tsx (28 tests) 3418ms
+   ✓ Toolbar — property tests > week label always matches M/D – M/D for spans 1 and 2  1326ms
+   ✓ Toolbar — property tests > month label always matches MonthName YYYY when spanWeeks is month  859ms
+ ✓ src/__tests__/EditEmployeePanel.test.tsx (15 tests) 7028ms
+   ✓ EditEmployeePanel > Property-based tests > isModified is false when unmodified and true after mutating a field  5539ms
+ ✓ src/__tests__/StaffView.test.tsx (12 tests) 9938ms
+   ✓ Property-based tests > seniority sort produces non-decreasing sequence  3597ms
+   ✓ Property-based tests > name sort produces non-decreasing alphabetical sequence  2788ms
+   ✓ Property-based tests > wing sort: first wing alphabetical, ties broken by seniority  3040ms
+
+ Test Files  2 failed | 16 passed (18)
+      Tests  2 failed | 199 passed (201)
+   Start at  13:33:19
+   Duration  11.40s (transform 613ms, setup 1.36s, collect 3.80s, tests 25.96s, environment 9.72s, prepare 1.37s)
+

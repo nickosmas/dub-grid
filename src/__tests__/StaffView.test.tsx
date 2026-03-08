@@ -4,7 +4,10 @@ import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import StaffView from "@/components/StaffView";
 import { Employee, Wing } from "@/types";
-import { DESIGNATIONS, ROLES } from "@/lib/constants";
+const DESIGNATIONS = ["JLCSN", "CSN III", "CSN II", "STAFF", "—"] as const;
+const ROLES = [
+  "DCSN", "DVCSN", "Supv", "Mentor", "CN", "SC. Mgr.", "Activity Coordinator", "SC/Asst/Act/Cor",
+] as const;
 
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: () => <div data-testid="edit-panel" />,
@@ -23,7 +26,7 @@ const wings: Wing[] = [
 
 const employees: Employee[] = [
   {
-    id: 1,
+    id: "emp-1",
     name: "Alice Smith",
     designation: "STAFF",
     roles: [],
@@ -35,7 +38,7 @@ const employees: Employee[] = [
     contactNotes: "",
   },
   {
-    id: 2,
+    id: "emp-2",
     name: "Bob Jones",
     designation: "CSN II",
     roles: [],
@@ -48,9 +51,14 @@ const employees: Employee[] = [
   },
 ];
 
+const defaultSkillLevels = [...DESIGNATIONS as unknown as string[]];
+const defaultRoles = [...ROLES as unknown as string[]];
+
 const defaultProps = {
   employees,
   wings,
+  skillLevels: defaultSkillLevels,
+  roles: defaultRoles,
   onSave: vi.fn(),
   onDelete: vi.fn(),
   onAdd: vi.fn(),
@@ -133,32 +141,42 @@ describe("StaffView", () => {
 // Feature: ui-ux-test-suite, Property 4: Name sort produces non-decreasing alphabetical sequence
 // Feature: ui-ux-test-suite, Property 5: Wing sort ordering
 describe("Property-based tests", () => {
-  const arbEmployees = fc.array(
-    fc.record({
-      id: fc.integer({ min: 1, max: 9999 }),
-      name: fc.string({ minLength: 1, maxLength: 40 }),
-      designation: fc.constantFrom(...DESIGNATIONS),
-      roles: fc.array(fc.constantFrom(...ROLES)),
-      fteWeight: fc.float({ min: Math.fround(0.1), max: Math.fround(1.0) }),
-      seniority: fc.integer({ min: 1, max: 999 }),
-      wings: fc.array(fc.string({ minLength: 1, maxLength: 20 }), {
-        minLength: 1,
+  const arbUniqueEmployees = fc
+    .array(
+      fc.record({
+        name: fc.string({ minLength: 1, maxLength: 40 }),
+        designation: fc.constantFrom(...DESIGNATIONS),
+        roles: fc.array(fc.constantFrom(...ROLES)),
+        fteWeight: fc.float({ min: Math.fround(0.1), max: Math.fround(1.0) }),
+        seniority: fc.integer({ min: 1, max: 999 }),
+        wings: fc.array(fc.string({ minLength: 1, maxLength: 20 }), {
+          minLength: 1,
+        }),
+        phone: fc.string(),
+        email: fc.string(),
+        contactNotes: fc.string(),
       }),
-      phone: fc.string(),
-      email: fc.string(),
-      contactNotes: fc.string(),
-    }),
-    { minLength: 1, maxLength: 20 },
-  );
+      { minLength: 1, maxLength: 20 },
+    )
+    .map((emps) =>
+      emps.map((emp, idx) => ({
+        ...emp,
+        id: `emp-${idx + 1}`,
+        roles: Array.from(new Set(emp.roles)) as typeof emp.roles,
+        wings: Array.from(new Set(emp.wings)),
+      })),
+    );
 
   it("seniority sort produces non-decreasing sequence", async () => {
     // Validates: Requirements 5.4, 8.2
     await fc.assert(
-      fc.asyncProperty(arbEmployees, async (emps) => {
+      fc.asyncProperty(arbUniqueEmployees, async (emps) => {
         const { unmount, container } = render(
           <StaffView
             employees={emps}
             wings={[]}
+            skillLevels={defaultSkillLevels}
+            roles={defaultRoles}
             onSave={vi.fn()}
             onDelete={vi.fn()}
             onAdd={vi.fn()}
@@ -205,27 +223,6 @@ describe("Property-based tests", () => {
     async () => {
       // Validates: Requirements 5.5
       // Use a dedicated arbitrary with unique ids to avoid React key conflicts
-      const arbUniqueEmployees = fc
-        .array(
-          fc.record({
-            name: fc.string({ minLength: 1, maxLength: 40 }),
-            designation: fc.constantFrom(...DESIGNATIONS),
-            roles: fc.array(fc.constantFrom(...ROLES)),
-            fteWeight: fc.float({
-              min: Math.fround(0.1),
-              max: Math.fround(1.0),
-            }),
-            seniority: fc.integer({ min: 1, max: 999 }),
-            wings: fc.array(fc.string({ minLength: 1, maxLength: 20 }), {
-              minLength: 1,
-            }),
-            phone: fc.string(),
-            email: fc.string(),
-            contactNotes: fc.string(),
-          }),
-          { minLength: 1, maxLength: 20 },
-        )
-        .map((emps) => emps.map((emp, idx) => ({ ...emp, id: idx + 1 })));
 
       await fc.assert(
         fc.asyncProperty(arbUniqueEmployees, async (emps) => {
@@ -233,6 +230,8 @@ describe("Property-based tests", () => {
             <StaffView
               employees={emps}
               wings={[]}
+              skillLevels={defaultSkillLevels}
+              roles={defaultRoles}
               onSave={vi.fn()}
               onDelete={vi.fn()}
               onAdd={vi.fn()}
@@ -287,27 +286,6 @@ describe("Property-based tests", () => {
     async () => {
       // Validates: Requirements 5.6
       // Use unique ids to avoid React key conflicts
-      const arbUniqueEmployees = fc
-        .array(
-          fc.record({
-            name: fc.string({ minLength: 1, maxLength: 40 }),
-            designation: fc.constantFrom(...DESIGNATIONS),
-            roles: fc.array(fc.constantFrom(...ROLES)),
-            fteWeight: fc.float({
-              min: Math.fround(0.1),
-              max: Math.fround(1.0),
-            }),
-            seniority: fc.integer({ min: 1, max: 999 }),
-            wings: fc.array(fc.string({ minLength: 1, maxLength: 20 }), {
-              minLength: 1,
-            }),
-            phone: fc.string(),
-            email: fc.string(),
-            contactNotes: fc.string(),
-          }),
-          { minLength: 1, maxLength: 20 },
-        )
-        .map((emps) => emps.map((emp, idx) => ({ ...emp, id: idx + 1 })));
 
       await fc.assert(
         fc.asyncProperty(arbUniqueEmployees, async (emps) => {
@@ -322,6 +300,8 @@ describe("Property-based tests", () => {
             <StaffView
               employees={emps}
               wings={[]}
+              skillLevels={defaultSkillLevels}
+              roles={defaultRoles}
               onSave={vi.fn()}
               onDelete={vi.fn()}
               onAdd={vi.fn()}

@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import Modal from "@/components/Modal";
-import { DESIGNATIONS, ROLES } from "@/lib/constants";
 import { Employee, Wing } from "@/types";
 
 type NewEmpForm = {
@@ -18,14 +17,16 @@ type NewEmpForm = {
 
 interface AddEmployeeModalProps {
   wings: Wing[];
+  skillLevels: string[];
+  roles: string[];
   onAdd: (emp: Omit<Employee, "id" | "seniority">) => void;
   onClose: () => void;
 }
 
-export default function AddEmployeeModal({ wings, onAdd, onClose }: AddEmployeeModalProps) {
+export default function AddEmployeeModal({ wings, skillLevels, roles, onAdd, onClose }: AddEmployeeModalProps) {
   const [form, setForm] = useState<NewEmpForm>({
     name: "",
-    designation: "STAFF",
+    designation: skillLevels[0] ?? "STAFF",
     wings: wings.length > 0 ? [wings[0].name] : [],
     roles: [],
     fteWeight: "1.0",
@@ -174,7 +175,7 @@ export default function AddEmployeeModal({ wings, onAdd, onClose }: AddEmployeeM
             onChange={(e) => setForm((p) => ({ ...p, designation: e.target.value }))}
             style={{ ...inputStyle, background: "#fff" }}
           >
-            {DESIGNATIONS.map((d) => (
+            {skillLevels.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
@@ -183,10 +184,10 @@ export default function AddEmployeeModal({ wings, onAdd, onClose }: AddEmployeeM
         {/* Roles */}
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 8 }}>
-            ROLES / QUALIFICATIONS
+            ROLES
           </label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {ROLES.map((role) => {
+            {roles.map((role) => {
               const active = form.roles.includes(role);
               return (
                 <button

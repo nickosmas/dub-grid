@@ -41,7 +41,7 @@ src/
 └── __tests__/    # Test files
 supabase/
 ├── schema.sql    # Database schema
-└── super_admin_seed.sql
+└── full_setup.sql
 ```
 
 ## Running Tests

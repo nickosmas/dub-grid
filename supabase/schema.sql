@@ -8,9 +8,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS organizations (
   id             uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   name           text NOT NULL DEFAULT 'My Organization',
+  slug           text UNIQUE,
   address        text NOT NULL DEFAULT '',
   phone          text NOT NULL DEFAULT '',
   employee_count integer,
+  skill_levels   text[] NOT NULL DEFAULT ARRAY['JLCSN','CSN III','CSN II','STAFF','—'::text],
+  roles          text[] NOT NULL DEFAULT ARRAY['DCSN','DVCSN','Supv','Mentor','CN','SC. Mgr.','Activity Coordinator','SC/Asst/Act/Cor'::text],
   created_at     timestamptz DEFAULT now(),
   CONSTRAINT organizations_name_key UNIQUE (name)
 );
@@ -58,7 +61,7 @@ CREATE TABLE IF NOT EXISTS shift_types (
 
 -- ── Employees ─────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS employees (
-  id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id            uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   org_id        uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   name          text         NOT NULL,
   designation   text         NOT NULL DEFAULT 'STAFF',
@@ -74,7 +77,7 @@ CREATE TABLE IF NOT EXISTS employees (
 
 -- ── Shifts ────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS shifts (
-  emp_id      bigint NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  emp_id      uuid NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   date        date   NOT NULL,
   shift_label text   NOT NULL,
   PRIMARY KEY (emp_id, date)
@@ -98,19 +101,6 @@ ALTER TABLE shift_types   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employees     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shifts        ENABLE ROW LEVEL SECURITY;
 
--- ── Super Admins ──────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS super_admins (
-  user_id uuid PRIMARY KEY, -- References Supabase auth.users internally
-  email text NOT NULL,
-  first_name text,
-  last_name text,
-  created_at timestamptz DEFAULT now()
-);
-ALTER TABLE super_admins ENABLE ROW LEVEL SECURITY;
--- App super admins can read the list of super admins
-CREATE POLICY "auth_super_admins_select" ON super_admins FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM super_admins WHERE user_id = auth.uid()));
-
 -- Helper: returns org IDs the authenticated user belongs to
 CREATE OR REPLACE FUNCTION current_user_orgs()
 RETURNS SETOF uuid
@@ -119,58 +109,43 @@ AS $$
   SELECT org_id FROM org_members WHERE user_id = auth.uid();
 $$;
 
--- Helper: checks if current user is a super admin
-CREATE OR REPLACE FUNCTION is_super_admin()
+-- RBAC helper: is the current user a Gridmaster?
+CREATE OR REPLACE FUNCTION public.is_gridmaster()
 RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER STABLE
 AS $$
-  SELECT EXISTS(SELECT 1 FROM super_admins WHERE user_id = auth.uid());
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+      AND platform_role = 'gridmaster'::public.platform_role
+  );
 $$;
 
--- Securely map an email to a user and insert them as an admin. Only Super Admins can execute this.
-CREATE OR REPLACE FUNCTION assign_org_admin_by_email(target_org_id uuid, target_email text)
-RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER
+-- RBAC helper: caller's org_id from profiles
+CREATE OR REPLACE FUNCTION public.caller_org_id()
+RETURNS uuid
+LANGUAGE sql SECURITY DEFINER STABLE
 AS $$
-DECLARE
-  target_user_id uuid;
-BEGIN
-  -- 1. Check if caller is super admin
-  IF NOT EXISTS(SELECT 1 FROM super_admins WHERE user_id = auth.uid()) THEN
-    RAISE EXCEPTION 'Unauthorized: only Super Admins can assign users by email';
-  END IF;
-
-  -- 2. Lookup user id
-  SELECT id INTO target_user_id FROM auth.users WHERE email = target_email;
-
-  IF target_user_id IS NULL THEN
-    RAISE EXCEPTION 'User not found for email %', target_email;
-  END IF;
-
-  -- 3. Insert into org_members
-  INSERT INTO org_members (org_id, user_id, role)
-  VALUES (target_org_id, target_user_id, 'admin')
-  ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'admin';
-END;
+  SELECT org_id FROM public.profiles WHERE id = auth.uid();
 $$;
 
 -- ── Policies for AUTHENTICATED users (multi-tenant, org-scoped) ───────────────
 
 CREATE POLICY "auth_orgs_select" ON organizations FOR SELECT TO authenticated
-  USING (id IN (SELECT current_user_orgs()) OR is_super_admin());
+  USING (id IN (SELECT current_user_orgs()) OR is_gridmaster());
 CREATE POLICY "auth_orgs_insert" ON organizations FOR INSERT TO authenticated
-  WITH CHECK (is_super_admin());
+  WITH CHECK (is_gridmaster());
 CREATE POLICY "auth_orgs_update" ON organizations FOR UPDATE TO authenticated
-  USING (id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role = 'admin') OR is_super_admin());
+  USING (id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role = 'admin') OR is_gridmaster());
 
 CREATE POLICY "auth_org_members_select" ON org_members FOR SELECT TO authenticated
-  USING (org_id IN (SELECT current_user_orgs()) OR is_super_admin());
--- Only super admins and org admins can add new members to an org.
+  USING (org_id IN (SELECT current_user_orgs()) OR is_gridmaster());
+-- Only Gridmasters and org admins can add new members to an org.
 -- Note: Supabase doesn't natively support subqueries in WITH CHECK easily if it causes infinite recursion.
 -- But since current_user_orgs() checks SELECT which depends on id IN current_user_orgs(), no recursion here.
 CREATE POLICY "auth_org_members_insert" ON org_members FOR INSERT TO authenticated
   WITH CHECK (
-    is_super_admin() OR 
+    is_gridmaster() OR 
     (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role = 'admin'))
   );
 

@@ -6,10 +6,11 @@ import { EditModalState, ShiftType } from "@/types";
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const modal: EditModalState = {
-  empId: 1,
+  empId: "emp-1",
   empName: "Alice Smith",
   date: new Date(2024, 0, 15), // Jan 15, 2024
   empWings: ["North"],
+  empDesignation: "CSN II",
 };
 
 const northShift: ShiftType = {
@@ -165,6 +166,83 @@ describe("ShiftEditPanel", () => {
       fireEvent.click(screen.getByText("South"));
       expect(screen.getByText("General")).toBeInTheDocument();
       expect(screen.getByText("X")).toBeInTheDocument();
+    });
+  });
+
+  describe("Qualification filtering", () => {
+    const restrictedShift: ShiftType = {
+      id: 4,
+      orgId: "org-1",
+      label: "JL",
+      name: "JLCSN Day",
+      color: "#EDE9FE",
+      border: "#A78BFA",
+      text: "#6D28D9",
+      sortOrder: 4,
+      wingName: "North",
+      requiredDesignations: ["JLCSN"],
+    };
+
+    it("disqualified shift button is not rendered when employee lacks the required designation", () => {
+      const modalWithDesig: EditModalState = { ...modal, empDesignation: "CSN II" };
+      render(
+        <ShiftEditPanel
+          modal={modalWithDesig}
+          currentShift={null}
+          shiftTypes={[restrictedShift, generalShift]}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+          allowShiftEdits
+        />
+      );
+      expect(screen.queryByText("JL")).not.toBeInTheDocument();
+    });
+
+    it("qualified shift button is enabled when employee has the required designation", () => {
+      const modalWithDesig: EditModalState = { ...modal, empDesignation: "JLCSN" };
+      render(
+        <ShiftEditPanel
+          modal={modalWithDesig}
+          currentShift={null}
+          shiftTypes={[restrictedShift, generalShift]}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+          allowShiftEdits
+        />
+      );
+      const button = screen.getByText("JL").closest("button");
+      expect(button).not.toBeDisabled();
+    });
+
+    it("unrestricted shift (empty requiredDesignations) is always enabled", () => {
+      const modalWithDesig: EditModalState = { ...modal, empDesignation: "STAFF" };
+      render(
+        <ShiftEditPanel
+          modal={modalWithDesig}
+          currentShift={null}
+          shiftTypes={[northShift, generalShift]}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+          allowShiftEdits
+        />
+      );
+      const button = screen.getByText("D").closest("button");
+      expect(button).not.toBeDisabled();
+    });
+
+    it("lock icon 🔒 does not appear as shifts are hidden", () => {
+      const modalWithDesig: EditModalState = { ...modal, empDesignation: "CSN II" };
+      render(
+        <ShiftEditPanel
+          modal={modalWithDesig}
+          currentShift={null}
+          shiftTypes={[restrictedShift]}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+          allowShiftEdits
+        />
+      );
+      expect(screen.queryByText("🔒")).not.toBeInTheDocument();
     });
   });
 });
