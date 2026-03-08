@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt } from "jose";
 import { createServerClient } from "@supabase/ssr";
+import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 
 /**
  * Vercel Edge Middleware for RBAC Route Protection
@@ -42,12 +43,14 @@ interface JWTClaims {
   platform_role?: string;
   org_role?: string;
   org_id?: string;
+  org_slug?: string;
 }
 
 interface ProfileClaimsRow {
   org_id: string | null;
   platform_role: string | null;
   org_role: string | null;
+  organizations?: { slug: string | null } | null;
 }
 
 /**
@@ -70,7 +73,8 @@ export function getRoleLevel(role: string): number {
 export async function middleware(req: NextRequest) {
   const host = req.headers.get("host") ?? "";
   const pathname = req.nextUrl.pathname;
-  const subdomain = host.split(".")[0];
+  const parsedHost = parseHost(host);
+  const subdomain = parsedHost.subdomain;
 
   // Public routes — accessible without authentication
   if (
@@ -128,10 +132,10 @@ export async function middleware(req: NextRequest) {
 
   // Fallback path: if custom JWT claims are missing, resolve role/org
   // from the caller's profile so route guards still work.
-  if (!claims.platform_role || !claims.org_role || !claims.org_id) {
+  if (!claims.platform_role || !claims.org_role || !claims.org_id || !claims.org_slug) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("org_id, platform_role, org_role")
+      .select("org_id, platform_role, org_role, organizations(slug)")
       .eq("id", session.user.id)
       .maybeSingle<ProfileClaimsRow>();
 
@@ -140,6 +144,7 @@ export async function middleware(req: NextRequest) {
         platform_role: claims.platform_role ?? profile.platform_role ?? "none",
         org_role: claims.org_role ?? profile.org_role ?? "user",
         org_id: claims.org_id ?? profile.org_id ?? undefined,
+        org_slug: claims.org_slug ?? profile.organizations?.slug ?? undefined,
       };
     }
   }
@@ -151,6 +156,16 @@ export async function middleware(req: NextRequest) {
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster") {
     return NextResponse.redirect(new URL("/", req.url));
+  }
+
+  // Keep org-scoped users on their organization subdomain.
+  if (effectiveRole !== "gridmaster" && claims.org_slug) {
+    const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
+    if (host !== expectedHost) {
+      const url = new URL(req.url);
+      url.host = expectedHost;
+      return NextResponse.redirect(url);
+    }
   }
 
   // Route guards - Requirements 11.2, 11.3
@@ -173,6 +188,9 @@ export async function middleware(req: NextRequest) {
   // Inject headers - Requirement 11.5
   res.headers.set("x-dubgrid-role", effectiveRole);
   res.headers.set("x-dubgrid-org-id", claims.org_id ?? "");
+  if (claims.org_slug) {
+    res.headers.set("x-dubgrid-org-slug", claims.org_slug);
+  }
   return res;
 }
 
