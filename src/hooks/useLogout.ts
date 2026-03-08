@@ -10,7 +10,6 @@ export function useLogout() {
   async function signOutLocal(): Promise<void> {
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;
-    window.location.href = "/";
   }
 
   async function signOutOthers(): Promise<void> {
