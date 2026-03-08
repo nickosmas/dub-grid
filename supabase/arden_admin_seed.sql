@@ -11,8 +11,8 @@ DECLARE
   admin_user_id uuid;
 BEGIN
   -- Organization
-  INSERT INTO organizations (id, name) VALUES (org, 'Arden Wood')
-  ON CONFLICT (id) DO UPDATE SET name = 'Arden Wood';
+  INSERT INTO organizations (id, name, slug) VALUES (org, 'Arden Wood', 'ardenwood')
+  ON CONFLICT (id) DO UPDATE SET name = 'Arden Wood', slug = 'ardenwood';
 
   -- Find or create the target user
   SELECT id INTO admin_user_id
@@ -47,10 +47,18 @@ BEGIN
     WHERE id = admin_user_id;
   END IF;
 
-  -- Assign as Admin to Organization
+  -- Assign as Admin to Organization (legacy org_members table)
   INSERT INTO org_members (org_id, user_id, role)
   VALUES (org, admin_user_id, 'admin')
   ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'admin';
+
+  -- Assign role in the new RBAC profiles table (read by the JWT hook)
+  INSERT INTO public.profiles (id, org_id, org_role, platform_role)
+  VALUES (admin_user_id, org, 'admin', 'none')
+  ON CONFLICT (id) DO UPDATE
+    SET org_id        = EXCLUDED.org_id,
+        org_role      = EXCLUDED.org_role,
+        updated_at    = NOW();
 
   RAISE NOTICE 'Successfully added nicokosmas@outlook.com as an admin to Arden Wood.';
 END $$;

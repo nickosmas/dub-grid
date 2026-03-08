@@ -4,7 +4,10 @@ import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
 import { Employee, Wing } from "@/types";
-import { DESIGNATIONS, ROLES } from "@/lib/constants";
+const DESIGNATIONS = ["JLCSN", "CSN III", "CSN II", "STAFF", "—"] as const;
+const ROLES = [
+  "DCSN", "DVCSN", "Supv", "Mentor", "CN", "SC. Mgr.", "Activity Coordinator", "SC/Asst/Act/Cor",
+] as const;
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -30,7 +33,7 @@ const wings: Wing[] = [
 ];
 
 const employee: Employee = {
-  id: 42,
+  id: "emp-42",
   name: "Alice Smith",
   designation: "STAFF",
   roles: [],
@@ -49,7 +52,7 @@ const employee: Employee = {
 function renderPanel(
   overrides: Partial<{
     onSave: (e: Employee) => void;
-    onDelete: (id: number) => void;
+    onDelete: (id: string) => void;
     onCancel: () => void;
   }> = {},
 ) {
@@ -61,6 +64,8 @@ function renderPanel(
     <EditEmployeePanel
       employee={employee}
       wings={wings}
+      skillLevels={[...DESIGNATIONS]}
+      roles={[...ROLES]}
       onSave={onSave}
       onDelete={onDelete}
       onCancel={onCancel}
@@ -183,7 +188,7 @@ describe("EditEmployeePanel", () => {
       expect(onSave).toHaveBeenCalledOnce();
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 42,
+          id: "emp-42",
           name: "Bob Jones",
           designation: "STAFF",
           wings: ["North"],
@@ -228,7 +233,7 @@ describe("EditEmployeePanel", () => {
       await user.click(screen.getByRole("button", { name: "Delete Employee" }));
       await user.click(screen.getByRole("button", { name: "Delete" }));
       expect(onDelete).toHaveBeenCalledOnce();
-      expect(onDelete).toHaveBeenCalledWith(42);
+      expect(onDelete).toHaveBeenCalledWith("emp-42");
     });
 
     it("clicking Cancel in confirmation returns to normal view without calling onDelete", async () => {
@@ -255,7 +260,7 @@ describe("EditEmployeePanel", () => {
       // Arbitrary Employee generator
       const arbWingName = fc.string({ minLength: 1, maxLength: 20 });
       const arbEmployee = fc.record({
-        id: fc.integer({ min: 1, max: 9999 }),
+        id: fc.uuid(),
         name: fc.string({ minLength: 1, maxLength: 40 }),
         designation: fc.constantFrom(...DESIGNATIONS),
         roles: fc.array(fc.constantFrom(...ROLES)),
@@ -287,6 +292,8 @@ describe("EditEmployeePanel", () => {
             <EditEmployeePanel
               employee={emp}
               wings={empWings}
+              skillLevels={[...DESIGNATIONS]}
+              roles={[...ROLES]}
               onSave={vi.fn()}
               onDelete={vi.fn()}
               onCancel={vi.fn()}

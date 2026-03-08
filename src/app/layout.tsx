@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
 };
 
-import { AuthProvider } from "@/components/AuthProvider";
+
 
 export default function RootLayout({
   children,
@@ -43,7 +43,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );

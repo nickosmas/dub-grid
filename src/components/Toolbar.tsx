@@ -23,6 +23,9 @@ interface ToolbarProps {
   onSpanChange: (n: 1 | 2 | "month") => void;
   onWingChange: (wing: string) => void;
   onStaffSearchChange: (q: string) => void;
+  canEditSchedule?: boolean;
+  onPublish?: () => void;
+  isPublishing?: boolean;
 }
 
 export default function Toolbar({
@@ -38,6 +41,9 @@ export default function Toolbar({
   onSpanChange,
   onWingChange,
   onStaffSearchChange,
+  canEditSchedule,
+  onPublish,
+  isPublishing,
 }: ToolbarProps) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
@@ -211,6 +217,29 @@ export default function Toolbar({
               </button>
             )}
           </div>
+          
+          {/* Publish Button */}
+          {canEditSchedule && onPublish && (
+            <button
+              onClick={onPublish}
+              disabled={isPublishing}
+              style={{
+                marginLeft: "auto",
+                background: "var(--color-dark)",
+                border: "none",
+                borderRadius: 10,
+                color: "#fff",
+                padding: "8px 16px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: isPublishing ? "default" : "pointer",
+                opacity: isPublishing ? 0.7 : 1,
+              }}
+            >
+              {isPublishing ? "Publishing..." : "Publish"}
+            </button>
+          )}
+
         </div>
       ) : (
         <div style={{ flex: 1 }} />

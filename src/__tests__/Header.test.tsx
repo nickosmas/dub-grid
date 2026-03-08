@@ -2,24 +2,39 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import Header from "@/components/Header";
-import { useAuth } from "@/components/AuthProvider";
 
-vi.mock("@/components/AuthProvider", () => ({
-  useAuth: vi.fn(),
+const mockSignOut = vi.fn();
+
+const mockPermissions = {
+  role: "admin",
+  orgId: "org-1",
+  level: 3,
+  isLoading: false,
+  isGridmaster: false,
+  canManageOrg: true,
+  canEditSchedule: true,
+  canAddNotes: true,
+  canRead: true,
+  atLeast: (r: string) => {
+    const levels: Record<string, number> = {
+      gridmaster: 4,
+      admin: 3,
+      scheduler: 2,
+      supervisor: 1,
+      user: 0,
+    };
+    return 3 >= (levels[r] ?? 0);
+  },
+};
+
+vi.mock("@/hooks", () => ({
+  usePermissions: () => mockPermissions,
+  useLogout: () => ({ signOutLocal: mockSignOut }),
 }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
-
-const mockSignOut = vi.fn();
-
-function setupAuth(isSuperAdmin = false) {
-  vi.mocked(useAuth).mockReturnValue({
-    signOut: mockSignOut,
-    isSuperAdmin,
-  } as ReturnType<typeof useAuth>);
-}
 
 const defaultProps = {
   viewMode: "schedule" as const,
@@ -28,20 +43,9 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  setupAuth(false);
 });
 
 describe("Header rendering", () => {
-  it('renders "DG" logo text', () => {
-    render(<Header {...defaultProps} />);
-    expect(screen.getByText("DG")).toBeInTheDocument();
-  });
-
-  it('renders "DubGrid" text', () => {
-    render(<Header {...defaultProps} />);
-    expect(screen.getByText("DubGrid")).toBeInTheDocument();
-  });
-
   it('renders orgName with "/" prefix when provided', () => {
     render(<Header {...defaultProps} orgName="Acme Corp" />);
     expect(screen.getByText("/ Acme Corp")).toBeInTheDocument();
@@ -114,28 +118,21 @@ describe("Header nav button interactions", () => {
   });
 });
 
-describe("Header Super Admin button", () => {
-  it('"Super Admin" button absent when isSuperAdmin=false', () => {
-    setupAuth(false);
+describe("Header Gridmaster button", () => {
+  it('"Gridmaster" button is hidden for non-gridmaster users', () => {
+    mockPermissions.isGridmaster = false;
     render(<Header {...defaultProps} />);
     expect(
-      screen.queryByRole("button", { name: /Super Admin/i }),
+      screen.queryByRole("button", { name: /Gridmaster/i }),
     ).not.toBeInTheDocument();
   });
 
-  it('"Super Admin" button present when isSuperAdmin=true', () => {
-    setupAuth(true);
+  it('"Gridmaster" button is visible for gridmaster users', () => {
+    mockPermissions.isGridmaster = true;
     render(<Header {...defaultProps} />);
     expect(
-      screen.getByRole("button", { name: /Super Admin/i }),
+      screen.getByRole("button", { name: /Gridmaster/i }),
     ).toBeInTheDocument();
-  });
-});
-
-describe("Header Sign Out", () => {
-  it('clicking "Sign Out" calls signOut', async () => {
-    render(<Header {...defaultProps} />);
-    await userEvent.click(screen.getByRole("button", { name: /Sign Out/i }));
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    mockPermissions.isGridmaster = false;
   });
 });

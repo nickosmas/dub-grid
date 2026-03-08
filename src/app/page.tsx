@@ -1,171 +1,211 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
-export default function WelcomePage() {
+export default function RootPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isGridmaster, setIsGridmaster] = useState(false);
+
+  useEffect(() => {
+    // Check if on gridmaster subdomain
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname;
+      setIsGridmaster(host.startsWith("gridmaster."));
+    }
+
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace("/schedule");
+      } else {
+        setLoading(false);
+      }
+    };
+    checkSession();
+  }, [router]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setAuthError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setAuthError(error.message);
+      setLoading(false);
+    } else {
+      router.replace("/schedule");
+    }
+  };
+
+  if (loading && !authError) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.spinner} />
+        <style>{`
+          @keyframes spin { 
+            to { transform: rotate(360deg); } 
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0F172A",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        color: "#F8FAFC",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <header
-        style={{
-          padding: "24px 32px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-mark.svg" alt="DubGrid" width={40} height={40} />
-          <span
-            style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}
-          >
-            DubGrid
-          </span>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <main
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "0 24px",
-          textAlign: "center",
-          gap: 48,
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 600,
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
-          }}
-        >
-          <h1
-            style={{
-              fontSize: "clamp(36px, 5vw, 56px)",
-              fontWeight: 800,
-              lineHeight: 1.1,
-              letterSpacing: "-0.03em",
-              margin: 0,
-            }}
-          >
-            Smart Staff{" "}
-            <span
-              style={{
-                background: "linear-gradient(135deg, #38BDF8, #818CF8)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Scheduling
-            </span>
-          </h1>
-          <p
-            style={{
-              fontSize: 18,
-              color: "#94A3B8",
-              lineHeight: 1.6,
-              margin: 0,
-            }}
-          >
-            Effortless shift planning for care facilities. Build schedules,
-            manage staff, and keep your team organized — all in one place.
-          </p>
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <div style={styles.header}>
+          <DubGridLogo size={48} />
+          <div style={styles.branding}>
+            <DubGridWordmark fontSize={28} />
+            {isGridmaster && <span style={styles.adminBadge}>GRIDMASTER</span>}
+          </div>
         </div>
 
-        {/* Login Buttons */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            width: "100%",
-            maxWidth: 320,
-          }}
-        >
-          <button
-            onClick={() => router.push("/login")}
-            style={{
-              width: "100%",
-              padding: "14px 24px",
-              background: "linear-gradient(135deg, #38BDF8, #818CF8)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 10,
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "opacity 0.2s, transform 0.2s",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.opacity = "0.9";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.opacity = "1";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            Staff Login
+        <form onSubmit={handleSignIn} style={styles.form}>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              style={styles.input}
+              required
+            />
+          </div>
+
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              style={styles.input}
+              required
+            />
+          </div>
+
+          {authError && <div style={styles.error}>{authError}</div>}
+
+          <button type="submit" disabled={loading} style={styles.button}>
+            {loading ? "Signing in..." : "Sign in"}
           </button>
-
-          <button
-            onClick={() => router.push("/admin/login")}
-            style={{
-              width: "100%",
-              padding: "14px 24px",
-              background: "transparent",
-              color: "#94A3B8",
-              border: "1px solid #334155",
-              borderRadius: 10,
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "border-color 0.2s, color 0.2s, transform 0.2s",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = "#818CF8";
-              e.currentTarget.style.color = "#C4B5FD";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = "#334155";
-              e.currentTarget.style.color = "#94A3B8";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            Admin Portal
-          </button>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer
-        style={{
-          padding: "24px 32px",
-          textAlign: "center",
-          fontSize: 13,
-          color: "#475569",
-        }}
-      >
-        © {new Date().getFullYear()} DubGrid
-      </footer>
+        </form>
+      </div>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "#F8F9FA",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+    fontFamily: "var(--font-dm-sans), sans-serif",
+  },
+  card: {
+    background: "#FFFFFF",
+    padding: "40px",
+    borderRadius: "16px",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
+    width: "100%",
+    maxWidth: "400px",
+    animation: "fadeIn 0.5s ease-out",
+  },
+  header: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    marginBottom: "32px",
+    gap: "16px",
+  },
+  branding: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "4px",
+  },
+  adminBadge: {
+    fontSize: "10px",
+    fontWeight: "800",
+    color: "#2563EB",
+    background: "#EFF6FF",
+    padding: "2px 8px",
+    borderRadius: "4px",
+    letterSpacing: "0.05em",
+  },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+  },
+  inputGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  label: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#374151",
+  },
+  input: {
+    padding: "12px 16px",
+    borderRadius: "8px",
+    border: "1px solid #E2E8F0",
+    fontSize: "15px",
+    outline: "none",
+    transition: "border-color 0.2s",
+  },
+  button: {
+    padding: "12px",
+    borderRadius: "8px",
+    background: "#1B3A2D",
+    color: "#FFFFFF",
+    fontSize: "16px",
+    fontWeight: "600",
+    cursor: "pointer",
+    border: "none",
+    transition: "opacity 0.2s",
+    marginTop: "10px",
+  },
+  error: {
+    color: "#DC2626",
+    fontSize: "13px",
+    background: "#FEF2F2",
+    padding: "10px",
+    borderRadius: "6px",
+    textAlign: "center",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "3px solid #E2E8F0",
+    borderTopColor: "#1B3A2D",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+  },
+};

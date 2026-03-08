@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
+import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { useLogout, usePermissions } from "@/hooks";
 
 export type ViewMode = "schedule" | "staff" | "settings";
 
@@ -10,6 +10,7 @@ interface HeaderProps {
   viewMode: ViewMode;
   onViewChange: (mode: ViewMode) => void;
   orgName?: string;
+  availableViewModes?: ViewMode[];
 }
 
 const NAV_ITEMS: { id: ViewMode; label: string; icon?: React.ReactNode }[] = [
@@ -40,9 +41,15 @@ export default function Header({
   viewMode,
   onViewChange,
   orgName,
+  availableViewModes,
 }: HeaderProps) {
-  const { signOut, isSuperAdmin } = useAuth();
   const router = useRouter();
+  const { signOutLocal } = useLogout();
+  const { isGridmaster } = usePermissions();
+  const allowedModes = availableViewModes ?? ["schedule", "staff", "settings"];
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    allowedModes.includes(item.id),
+  );
 
   return (
     <div
@@ -59,18 +66,8 @@ export default function Header({
     >
       {/* Logo */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-mark.svg" alt="DubGrid" width={30} height={30} />
-        <span
-          style={{
-            color: "var(--color-text-primary)",
-            fontWeight: 700,
-            fontSize: 15,
-            letterSpacing: "-0.3px",
-          }}
-        >
-          DubGrid
-        </span>
+        <DubGridLogo size={30} />
+        <DubGridWordmark fontSize={18} color="var(--color-text-primary)" />
         {orgName && (
           <span style={{ color: "var(--color-text-faint)", fontSize: 13 }}>
             / {orgName}
@@ -88,7 +85,7 @@ export default function Header({
           justifyContent: "center",
         }}
       >
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = viewMode === item.id;
           return (
             <button
@@ -119,7 +116,7 @@ export default function Header({
           );
         })}
 
-        {isSuperAdmin && (
+        {isGridmaster && (
           <button
             onClick={() => router.push("/admin")}
             style={{
@@ -136,7 +133,7 @@ export default function Header({
               marginLeft: 8,
             }}
           >
-            Super Admin
+            Gridmaster
           </button>
         )}
       </div>
@@ -144,25 +141,19 @@ export default function Header({
       {/* User Actions */}
       <div style={{ display: "flex", alignItems: "center" }}>
         <button
-          onClick={signOut}
+          onClick={() => signOutLocal().catch(console.error)}
           style={{
-            background: "transparent",
-            border: "none",
-            color: "var(--color-text-muted)",
-            fontSize: 13,
-            fontWeight: 600,
+            background: "#fff",
+            border: "1px solid var(--color-border)",
+            color: "var(--color-text-secondary)",
+            borderRadius: 8,
+            padding: "5px 12px",
+            fontSize: 12,
             cursor: "pointer",
-            padding: "5px 10px",
-            borderRadius: 6,
+            fontWeight: 700,
           }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.color = "var(--color-text-primary)")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.color = "var(--color-text-muted)")
-          }
         >
-          Sign Out
+          Sign out
         </button>
       </div>
     </div>

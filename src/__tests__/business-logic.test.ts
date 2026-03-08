@@ -8,7 +8,7 @@ import { Employee, ShiftType } from "@/types";
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
-    id: 1,
+    id: "emp-1",
     name: "Test Employee",
     designation: "STAFF",
     roles: [],
@@ -40,26 +40,26 @@ function makeShiftType(overrides: Partial<ShiftType> = {}): ShiftType {
 
 describe("ShiftMap key format", () => {
   it("produces the expected key for a known empId and date", () => {
-    const empId = 42;
+    const empId = "emp-42";
     const date = new Date(2024, 0, 15); // Jan 15, 2024
     const key = `${empId}_${formatDateKey(date)}`;
-    expect(key).toBe("42_2024-01-15");
+    expect(key).toBe("emp-42_2024-01-15");
   });
 
   it("matches the pattern used by fetchShifts in db.ts", () => {
     // fetchShifts builds keys as `${row.emp_id}_${row.date}` where row.date is YYYY-MM-DD
-    const empId = 7;
+    const empId = "emp-7";
     const date = new Date(2024, 11, 31); // Dec 31, 2024
     const key = `${empId}_${formatDateKey(date)}`;
-    expect(key).toMatch(/^\d+_\d{4}-\d{2}-\d{2}$/);
-    expect(key).toBe("7_2024-12-31");
+    expect(key).toMatch(/^.+_\d{4}-\d{2}-\d{2}$/);
+    expect(key).toBe("emp-7_2024-12-31");
   });
 
   it("zero-pads month and day correctly", () => {
-    const empId = 1;
+    const empId = "emp-1";
     const date = new Date(2024, 0, 5); // Jan 5
     const key = `${empId}_${formatDateKey(date)}`;
-    expect(key).toBe("1_2024-01-05");
+    expect(key).toBe("emp-1_2024-01-05");
   });
 });
 
@@ -67,18 +67,18 @@ describe("ShiftMap key format", () => {
 
 describe("Property 10: ShiftMap key format validity", () => {
   // Feature: comprehensive-test-suite, Property 10: ShiftMap key format validity
-  it("key always matches /^\\d+_\\d{4}-\\d{2}-\\d{2}$/ for any empId and date", () => {
+  it("key always matches /^.+_\\d{4}-\\d{2}-\\d{2}$/ for any empId and date", () => {
     const arbDate = fc.date({
       min: new Date("2000-01-01"),
       max: new Date("2099-12-31"),
       noInvalidDate: true,
     });
-    const arbEmpId = fc.integer({ min: 1, max: 999999 });
+    const arbEmpId = fc.uuid();
 
     fc.assert(
       fc.property(arbEmpId, arbDate, (empId, date) => {
         const key = `${empId}_${formatDateKey(date)}`;
-        expect(key).toMatch(/^\d+_\d{4}-\d{2}-\d{2}$/);
+        expect(key).toMatch(/^.+_\d{4}-\d{2}-\d{2}$/);
       }),
     );
   });
@@ -95,11 +95,11 @@ describe("computeDailyCounts", () => {
   });
 
   it("counts day FTE correctly", () => {
-    const emp1 = makeEmployee({ id: 1, fteWeight: 1 });
-    const emp2 = makeEmployee({ id: 2, fteWeight: 1 });
+    const emp1 = makeEmployee({ id: "emp-1", fteWeight: 1 });
+    const emp2 = makeEmployee({ id: "emp-2", fteWeight: 1 });
     const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
 
-    const shiftForKey = (empId: number) => (empId === 1 || empId === 2 ? "D" : null);
+    const shiftForKey = (empId: string) => (empId === "emp-1" || empId === "emp-2" ? "D" : null);
     const getShiftStyle = () => dayShift;
 
     const result = computeDailyCounts([emp1, emp2], date, shiftForKey, getShiftStyle);
@@ -109,7 +109,7 @@ describe("computeDailyCounts", () => {
   });
 
   it("counts eve FTE correctly", () => {
-    const emp = makeEmployee({ id: 1, fteWeight: 1 });
+    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
     const eveShift = makeShiftType({ label: "E", countsTowardEve: true });
 
     const result = computeDailyCounts(
@@ -124,7 +124,7 @@ describe("computeDailyCounts", () => {
   });
 
   it("counts night FTE correctly", () => {
-    const emp = makeEmployee({ id: 1, fteWeight: 1 });
+    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
     const nightShift = makeShiftType({ label: "N", countsTowardNight: true });
 
     const result = computeDailyCounts(
@@ -139,7 +139,7 @@ describe("computeDailyCounts", () => {
   });
 
   it("preserves fractional fteWeight (0.5)", () => {
-    const emp = makeEmployee({ id: 1, fteWeight: 0.5 });
+    const emp = makeEmployee({ id: "emp-1", fteWeight: 0.5 });
     const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
 
     const result = computeDailyCounts(
@@ -152,8 +152,8 @@ describe("computeDailyCounts", () => {
   });
 
   it("sums fractional weights across multiple employees", () => {
-    const emp1 = makeEmployee({ id: 1, fteWeight: 0.5 });
-    const emp2 = makeEmployee({ id: 2, fteWeight: 0.5 });
+    const emp1 = makeEmployee({ id: "emp-1", fteWeight: 0.5 });
+    const emp2 = makeEmployee({ id: "emp-2", fteWeight: 0.5 });
     const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
 
     const result = computeDailyCounts(
@@ -166,7 +166,7 @@ describe("computeDailyCounts", () => {
   });
 
   it("employees with no shift assigned do not contribute to counts", () => {
-    const emp = makeEmployee({ id: 1, fteWeight: 1 });
+    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
 
     const result = computeDailyCounts(
       [emp],
@@ -203,7 +203,7 @@ describe("Property 11: FTE aggregation correctness across all count types", () =
 
           // Build employees and shift types with unique ids
           const employees: Employee[] = entries.map((e, i) =>
-            makeEmployee({ id: i + 1, fteWeight: e.fteWeight }),
+            makeEmployee({ id: `emp-${i + 1}`, fteWeight: e.fteWeight }),
           );
 
           const shiftTypes: ShiftType[] = entries.map((e, i) =>
@@ -215,8 +215,10 @@ describe("Property 11: FTE aggregation correctness across all count types", () =
             }),
           );
 
-          const shiftForKey = (empId: number): string | null => {
-            const idx = empId - 1; // id = idx + 1
+          const shiftForKey = (empId: string): string | null => {
+            const match = empId.match(/^emp-(\d+)$/);
+            if (!match) return null;
+            const idx = parseInt(match[1], 10) - 1;
             if (idx < 0 || idx >= entries.length) return null;
             return entries[idx].hasShift ? `SHIFT_${idx}` : null;
           };
@@ -251,39 +253,39 @@ describe("Property 11: FTE aggregation correctness across all count types", () =
 
 describe("filterAndSortEmployees", () => {
   const employees: Employee[] = [
-    makeEmployee({ id: 1, wings: ["A"], seniority: 3 }),
-    makeEmployee({ id: 2, wings: ["B"], seniority: 1 }),
-    makeEmployee({ id: 3, wings: ["A", "B"], seniority: 2 }),
-    makeEmployee({ id: 4, wings: [], seniority: 0 }), // no wings — always excluded
-    makeEmployee({ id: 5, wings: ["C"], seniority: 5 }),
+    makeEmployee({ id: "emp-1", wings: ["A"], seniority: 3 }),
+    makeEmployee({ id: "emp-2", wings: ["B"], seniority: 1 }),
+    makeEmployee({ id: "emp-3", wings: ["A", "B"], seniority: 2 }),
+    makeEmployee({ id: "emp-4", wings: [], seniority: 0 }), // no wings — always excluded
+    makeEmployee({ id: "emp-5", wings: ["C"], seniority: 5 }),
   ];
 
   it('"All" filter includes all employees with at least one wing', () => {
     const result = filterAndSortEmployees(employees, "All");
     const ids = result.map((e) => e.id);
-    expect(ids).toContain(1);
-    expect(ids).toContain(2);
-    expect(ids).toContain(3);
-    expect(ids).toContain(5);
+    expect(ids).toContain("emp-1");
+    expect(ids).toContain("emp-2");
+    expect(ids).toContain("emp-3");
+    expect(ids).toContain("emp-5");
   });
 
   it('"All" filter excludes employees with empty wings', () => {
     const result = filterAndSortEmployees(employees, "All");
-    expect(result.map((e) => e.id)).not.toContain(4);
+    expect(result.map((e) => e.id)).not.toContain("emp-4");
   });
 
   it("specific wing filter includes only matching employees", () => {
     const result = filterAndSortEmployees(employees, "A");
     const ids = result.map((e) => e.id);
-    expect(ids).toContain(1);
-    expect(ids).toContain(3);
-    expect(ids).not.toContain(2);
-    expect(ids).not.toContain(5);
+    expect(ids).toContain("emp-1");
+    expect(ids).toContain("emp-3");
+    expect(ids).not.toContain("emp-2");
+    expect(ids).not.toContain("emp-5");
   });
 
   it("specific wing filter excludes employees with empty wings", () => {
     const result = filterAndSortEmployees(employees, "A");
-    expect(result.map((e) => e.id)).not.toContain(4);
+    expect(result.map((e) => e.id)).not.toContain("emp-4");
   });
 
   it("result is sorted in ascending order by seniority", () => {
@@ -307,16 +309,16 @@ describe("Property 12: Employee filter correctness and sort order", () => {
   it("filtered result satisfies wing inclusion, empty-wings exclusion, and seniority sort", () => {
     const arbWingName = fc.constantFrom("A", "B", "C", "D");
     const arbEmployee = fc.record({
-      id: fc.integer({ min: 1, max: 10000 }),
+      id: fc.uuid(),
       fteWeight: fc.double({ min: 0.1, max: 1.0, noNaN: true, noDefaultInfinity: true }),
       seniority: fc.integer({ min: 1, max: 1000 }),
       wings: fc.array(arbWingName, { minLength: 0, maxLength: 3 }),
-    }).map((e, i) =>
+    }).map((e) =>
       makeEmployee({
-        id: e.id + i,
+        id: e.id,
         fteWeight: e.fteWeight,
         seniority: e.seniority,
-        wings: [...new Set(e.wings)], // deduplicate
+        wings: [...new Set(e.wings)] as string[], // deduplicate
       }),
     );
 
@@ -326,7 +328,8 @@ describe("Property 12: Employee filter correctness and sort order", () => {
       fc.property(
         fc.array(arbEmployee, { minLength: 0, maxLength: 20 }),
         arbFilter,
-        (employees, activeWing) => {
+        (employeesRaw, activeWing) => {
+          const employees = employeesRaw.filter((e, idx, arr) => arr.findIndex(x => x.id === e.id) === idx);
           const result = filterAndSortEmployees(employees, activeWing);
 
           // (a) All results must have non-empty wings

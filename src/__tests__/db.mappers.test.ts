@@ -12,6 +12,9 @@ describe("rowToOrg", () => {
       address: "123 Main St",
       phone: "555-1234",
       employee_count: 42,
+      slug: null,
+      skill_levels: ["JLCSN", "CSN III", "CSN II", "STAFF", "—"],
+      roles: ["DCSN", "Supv"],
     };
 
     const result = rowToOrg(row);
@@ -30,6 +33,9 @@ describe("rowToOrg", () => {
       address: "456 Oak Ave",
       phone: "555-5678",
       employee_count: null,
+      slug: null,
+      skill_levels: [],
+      roles: [],
     };
 
     const result = rowToOrg(row);
@@ -79,6 +85,7 @@ const baseShiftTypeRow: DbShiftType = {
   is_general: false,
   wing_name: null,
   sort_order: 0,
+  required_designations: [],
 };
 
 describe("rowToShiftType", () => {
@@ -144,6 +151,7 @@ describe("rowToShiftType — Property 9: boolean-to-undefined coercion", () => {
     is_general: fc.boolean(),
     wing_name: fc.option(fc.string(), { nil: null }),
     sort_order: fc.integer({ min: 0 }),
+    required_designations: fc.array(fc.constantFrom("JLCSN", "CSN III", "CSN II", "STAFF")),
   });
 
   it("each boolean flag maps to undefined when false, true when true", () => {
@@ -178,7 +186,7 @@ import { rowToEmployee } from "@/lib/db";
 import type { DbEmployee } from "@/lib/db";
 
 const baseEmployeeRow: DbEmployee = {
-  id: 1,
+  id: "emp-1",
   org_id: "org-1",
   name: "Alice Smith",
   designation: "RN",
@@ -195,7 +203,7 @@ describe("rowToEmployee", () => {
   it("maps all fields correctly", () => {
     const result = rowToEmployee(baseEmployeeRow);
 
-    expect(result.id).toBe(1);
+    expect(result.id).toBe("emp-1");
     expect(result.name).toBe("Alice Smith");
     expect(result.designation).toBe("RN");
     expect(result.roles).toEqual(["nurse", "charge"]);
@@ -275,7 +283,7 @@ describe("employeeToRow", () => {
 // Feature: comprehensive-test-suite, Property 8: Employee mapper round-trip
 describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
   const arbDbEmployee = fc.record({
-    id: fc.integer({ min: 1, max: 999999 }),
+    id: fc.uuid(),
     org_id: fc.string({ minLength: 1 }),
     name: fc.string({ minLength: 1 }),
     designation: fc.constantFrom("JLCSN", "CSN III", "CSN II", "STAFF", "—"),

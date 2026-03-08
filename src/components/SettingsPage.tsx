@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+
 import { Organization, Wing, ShiftType } from "@/types";
 import * as db from "@/lib/db";
+import ActiveSessions from "@/components/ActiveSessions";
+import ImpersonationPanel from "@/components/ImpersonationPanel";
+import { usePermissions } from "@/hooks";
+
+
 
 interface SettingsPageProps {
   organization: Organization;
@@ -11,6 +17,7 @@ interface SettingsPageProps {
   onOrgSave: (org: Organization) => void;
   onWingsChange: (wings: Wing[]) => void;
   onShiftTypesChange: (types: ShiftType[]) => void;
+  canManageOrg: boolean;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -359,12 +366,14 @@ function ShiftTypeRow({
   st,
   wings,
   orgId,
+  orgSkillLevels,
   onSaved,
   onDeleted,
 }: {
   st: ShiftType & { isNew?: boolean };
   wings: Wing[];
   orgId: string;
+  orgSkillLevels: string[];
   onSaved: (s: ShiftType) => void;
   onDeleted: (id: number) => void;
 }) {
@@ -380,6 +389,7 @@ function ShiftTypeRow({
     isOrientation: st.isOrientation ?? false,
     isGeneral: st.isGeneral ?? false,
     wingName: st.wingName ?? "",
+    requiredDesignations: st.requiredDesignations ?? [],
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -404,6 +414,7 @@ function ShiftTypeRow({
         isGeneral: form.isGeneral,
         wingName: form.wingName || null,
         sortOrder: st.sortOrder,
+        requiredDesignations: form.requiredDesignations,
       });
       onSaved(saved);
       setExpanded(false);
@@ -568,6 +579,52 @@ function ShiftTypeRow({
             ))}
           </div>
 
+          {/* Required Designations */}
+          <div>
+            <label style={labelStyle}>REQUIRED SKILL LEVELS (leave all unchecked = any qualification)</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
+              {orgSkillLevels.map((desig) => {
+                const checked = form.requiredDesignations.includes(desig);
+                return (
+                  <label
+                    key={desig}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontSize: 13, cursor: "pointer",
+                      padding: "4px 10px",
+                      borderRadius: 20,
+                      border: `1.5px solid ${checked ? "var(--color-accent-start)" : "var(--color-border)"}`,
+                      background: checked ? "#EEF2FF" : "transparent",
+                      transition: "border-color 0.1s, background 0.1s",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      style={{ display: "none" }}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          requiredDesignations: e.target.checked
+                            ? [...p.requiredDesignations, desig]
+                            : p.requiredDesignations.filter((d) => d !== desig),
+                        }))
+                      }
+                    />
+                    <span style={{ fontWeight: checked ? 700 : 500, color: checked ? "var(--color-accent-start)" : "var(--color-text-secondary)" }}>
+                      {desig}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {form.requiredDesignations.length > 0 && (
+              <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>
+                Only {form.requiredDesignations.join(", ")} can be assigned this shift.
+              </p>
+            )}
+          </div>
+
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
@@ -612,11 +669,13 @@ function ShiftTypesSettings({
   shiftTypes,
   wings,
   orgId,
+  orgSkillLevels,
   onChange,
 }: {
   shiftTypes: ShiftType[];
   wings: Wing[];
   orgId: string;
+  orgSkillLevels: string[];
   onChange: (types: ShiftType[]) => void;
 }) {
   const [local, setLocal] = useState<(ShiftType & { isNew?: boolean })[]>(shiftTypes);
@@ -633,13 +692,19 @@ function ShiftTypesSettings({
       text: "#64748B",
       sortOrder: local.length,
       isNew: true,
+      countsTowardDay: false,
+      countsTowardEve: false,
+      countsTowardNight: false,
+      isOrientation: false,
+      isGeneral: true,
+      requiredDesignations: [],
     };
     setLocal((prev) => [...prev, tmp]);
   };
 
   const handleSaved = (saved: ShiftType) => {
     const updated = local.map((s) =>
-      s.label === saved.label || s.id === saved.id ? saved : s
+      s.id === saved.id || (s.isNew && s.label === saved.label) ? saved : s
     );
     setLocal(updated);
     onChange(updated);
@@ -662,6 +727,7 @@ function ShiftTypesSettings({
           st={st}
           wings={wings}
           orgId={orgId}
+          orgSkillLevels={orgSkillLevels}
           onSaved={handleSaved}
           onDeleted={handleDeleted}
         />
@@ -680,6 +746,205 @@ function ShiftTypesSettings({
   );
 }
 
+
+
+// ── String List Editor ────────────────────────────────────────────────────────
+// Tag list with live-preview drag reordering.
+// Items visually shift into place as you drag over them.
+function StringListSettings({
+  label,
+  items,
+  onSave,
+  placeholder,
+}: {
+  label: string;
+  items: string[];
+  onSave: (items: string[]) => Promise<void>;
+  placeholder: string;
+}) {
+  const [local, setLocal] = useState<string[]>(items);
+  const [newItem, setNewItem] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const dragOrigin = useRef<string[]>([]);
+  const dragItem = useRef<string | null>(null);
+  const dropped = useRef(false);
+
+  const isDirty = JSON.stringify(local) !== JSON.stringify(items);
+
+  // ── save ──────────────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(local);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Save error full details:", err);
+      const msg = err && typeof err === "object" && "message" in err 
+        ? (err as any).message 
+        : JSON.stringify(err);
+      setError(msg || "Unknown error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── add ───────────────────────────────────────────────────────────────────
+  const handleAdd = () => {
+    const trimmed = newItem.trim();
+    if (!trimmed || local.includes(trimmed)) return;
+    setLocal((prev) => [...prev, trimmed]);
+    setNewItem("");
+  };
+
+  // ── remove ────────────────────────────────────────────────────────────────
+  const handleRemove = (i: number) => {
+    setLocal((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  // ── drag reorder ──────────────────────────────────────────────────────────
+  const handleDragStart = (_e: React.DragEvent<HTMLSpanElement>, index: number) => {
+    dragOrigin.current = [...local];
+    dragItem.current = local[index];
+    dropped.current = false;
+    setDragging(index);
+  };
+
+  const handleDragEnter = (_e: React.DragEvent<HTMLSpanElement>, targetIndex: number) => {
+    if (dragItem.current === null) return;
+    setLocal((prev) => {
+      const fromIndex = prev.indexOf(dragItem.current!);
+      if (fromIndex === -1 || fromIndex === targetIndex) return prev;
+      const next = [...prev];
+      next.splice(fromIndex, 1);
+      next.splice(targetIndex, 0, dragItem.current!);
+      setDragging(targetIndex);
+      return next;
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLSpanElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLSpanElement>) => {
+    e.preventDefault();
+    dropped.current = true;
+  };
+
+  const handleDragEnd = () => {
+    if (!dropped.current) {
+      setLocal(dragOrigin.current); // cancelled — restore
+    }
+    dragItem.current = null;
+    dragOrigin.current = [];
+    setDragging(null);
+  };
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 0, marginBottom: 12 }}>
+        {label}
+      </p>
+
+      {/* Tag list */}
+      <div
+        style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => { dropped.current = true; }}
+      >
+        {local.map((item, i) => (
+          <span
+            key={item}
+            draggable
+            onDragStart={(e) => handleDragStart(e, i)}
+            onDragEnter={(e) => handleDragEnter(e, i)}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: dragging === i ? "var(--color-accent-light, #EEF2FF)" : "var(--color-border-light)",
+              border: dragging === i ? "1.5px dashed var(--color-accent-start, #6366F1)" : "1.5px solid transparent",
+              borderRadius: 20,
+              padding: "3px 10px 3px 12px", fontSize: 13, fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              cursor: "grab",
+              opacity: dragging === i ? 0.7 : 1,
+              transition: "background 0.1s ease",
+              userSelect: "none",
+            }}
+          >
+            <span style={{ fontSize: 11, color: "var(--color-text-faint, #CBD5E1)", letterSpacing: "-1px", pointerEvents: "none" }}>⠿</span>
+            {item}
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", fontSize: 15, lineHeight: 1, padding: "0 2px" }}
+              title="Remove"
+            >×</button>
+          </span>
+        ))}
+      </div>
+
+      {/* Add new */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+        <input
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          placeholder={placeholder}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newItem.trim()}
+          style={{
+            background: newItem.trim() ? "var(--color-accent-gradient)" : "#ccc",
+            border: "none", color: "#fff", borderRadius: 8,
+            padding: "8px 16px", fontSize: 13, fontWeight: 700,
+            cursor: newItem.trim() ? "pointer" : "not-allowed",
+          }}
+        >+ Add</button>
+      </div>
+
+      {/* Save */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || saving}
+          style={{
+            background: isDirty ? "var(--color-accent-gradient)" : "#ccc",
+            border: "none", color: "#fff", borderRadius: 8,
+            padding: "9px 20px", fontSize: 13, fontWeight: 700,
+            cursor: isDirty ? "pointer" : "not-allowed",
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {saved && <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>Saved!</span>}
+      </div>
+
+      {error && (
+        <div style={{ 
+          marginTop: 12, padding: 12, background: "#FEF2F2", border: "1px solid #FCA5A5", 
+          borderRadius: 8, color: "#B91C1C", fontSize: 13, fontWeight: 500,
+          whiteSpace: "pre-wrap", wordBreak: "break-word"
+        }}>
+          <strong>Save Error:</strong> {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage({
   organization,
@@ -688,25 +953,75 @@ export default function SettingsPage({
   onOrgSave,
   onWingsChange,
   onShiftTypesChange,
+  canManageOrg,
 }: SettingsPageProps) {
+  const { isGridmaster } = usePermissions();
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 900 }}>
-      <Section title="Organization Details">
-        <OrgSettings organization={organization} onSave={onOrgSave} />
+      <Section title="My Active Sessions">
+        <ActiveSessions />
       </Section>
 
-      <Section title="Wings">
-        <WingsSettings wings={wings} orgId={organization.id} onChange={onWingsChange} />
-      </Section>
+      {canManageOrg && (
+        <Section title="Organization Details">
+          <OrgSettings organization={organization} onSave={onOrgSave} />
+        </Section>
+      )}
 
-      <Section title="Shift Types">
-        <ShiftTypesSettings
-          shiftTypes={shiftTypes}
-          wings={wings}
-          orgId={organization.id}
-          onChange={onShiftTypesChange}
-        />
-      </Section>
+      {canManageOrg && (
+        <Section title="Wings">
+          <WingsSettings wings={wings} orgId={organization.id} onChange={onWingsChange} />
+        </Section>
+      )}
+
+      {canManageOrg && (
+        <Section title="Shift Types">
+          <ShiftTypesSettings
+            shiftTypes={shiftTypes}
+            wings={wings}
+            orgId={organization.id}
+            orgSkillLevels={organization.skillLevels}
+            onChange={onShiftTypesChange}
+          />
+        </Section>
+      )}
+
+      {canManageOrg && (
+        <Section title="Skill Levels">
+          <StringListSettings
+            label="Define the skill levels available when adding or editing staff. These also determine the order in which they appear in dropdowns."
+            items={organization.skillLevels}
+            placeholder="e.g. RN"
+            onSave={async (updated) => {
+              const updatedOrg = { ...organization, skillLevels: updated };
+              await db.updateOrganization(updatedOrg);
+              onOrgSave(updatedOrg);
+            }}
+          />
+        </Section>
+      )}
+
+      {canManageOrg && (
+        <Section title="Roles">
+          <StringListSettings
+            label="Define the roles available when adding or editing staff. These also determine the order in which they appear in dropdowns."
+            items={organization.roles}
+            placeholder="e.g. Charge Nurse"
+            onSave={async (updated) => {
+              const updatedOrg = { ...organization, roles: updated };
+              await db.updateOrganization(updatedOrg);
+              onOrgSave(updatedOrg);
+            }}
+          />
+        </Section>
+      )}
+
+      {isGridmaster && (
+        <Section title="Gridmaster Impersonation">
+          <ImpersonationPanel />
+        </Section>
+      )}
     </div>
   );
 }

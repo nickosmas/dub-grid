@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { DESIGNATIONS, ROLES } from "@/lib/constants";
 import { Employee, Wing } from "@/types";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
   wings: Wing[];
+  skillLevels: string[];
+  roles: string[];
   onSave: (updatedEmployee: Employee) => void;
-  onDelete: (empId: number) => void;
+  onDelete: (empId: string) => void;
   onCancel: () => void;
 }
 
@@ -26,6 +27,8 @@ type EditForm = {
 export default function EditEmployeePanel({
   employee,
   wings,
+  skillLevels,
+  roles,
   onSave,
   onDelete,
   onCancel,
@@ -78,7 +81,9 @@ export default function EditEmployeePanel({
     (role: string) =>
       setForm((p) => ({
         ...p,
-        roles: p.roles.includes(role) ? p.roles.filter((r) => r !== role) : [...p.roles, role],
+        roles: p.roles.includes(role)
+          ? p.roles.filter((r) => r !== role)
+          : [...p.roles, role],
       })),
     [],
   );
@@ -131,7 +136,9 @@ export default function EditEmployeePanel({
               <label style={labelStyle}>FULL NAME</label>
               <input
                 value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
                 style={inputStyle}
               />
             </div>
@@ -143,7 +150,9 @@ export default function EditEmployeePanel({
                 min="0"
                 max="1"
                 value={form.fteWeight}
-                onChange={(e) => setForm((p) => ({ ...p, fteWeight: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, fteWeight: e.target.value }))
+                }
                 style={inputStyle}
               />
             </div>
@@ -154,7 +163,9 @@ export default function EditEmployeePanel({
             <label style={labelStyle}>PHONE</label>
             <input
               value={form.phone}
-              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, phone: e.target.value }))
+              }
               placeholder="e.g. (415) 555-0100"
               style={inputStyle}
             />
@@ -164,7 +175,9 @@ export default function EditEmployeePanel({
             <input
               type="email"
               value={form.email}
-              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, email: e.target.value }))
+              }
               placeholder="e.g. name@example.com"
               style={inputStyle}
             />
@@ -173,10 +186,16 @@ export default function EditEmployeePanel({
             <label style={labelStyle}>CONTACT NOTES</label>
             <textarea
               value={form.contactNotes}
-              onChange={(e) => setForm((p) => ({ ...p, contactNotes: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, contactNotes: e.target.value }))
+              }
               placeholder="Emergency contact, preferences, etc."
               rows={2}
-              style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+              style={{
+                ...inputStyle,
+                resize: "vertical",
+                fontFamily: "inherit",
+              }}
             />
           </div>
 
@@ -185,11 +204,15 @@ export default function EditEmployeePanel({
             <label style={labelStyle}>SKILL LEVEL</label>
             <select
               value={form.designation}
-              onChange={(e) => setForm((p) => ({ ...p, designation: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, designation: e.target.value }))
+              }
               style={inputStyle}
             >
-              {DESIGNATIONS.map((d) => (
-                <option key={d} value={d}>{d}</option>
+              {skillLevels.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
               ))}
             </select>
           </div>
@@ -208,9 +231,15 @@ export default function EditEmployeePanel({
                     key={wing.id}
                     onClick={() => toggleWing(wing.name)}
                     style={{
-                      background: active ? wing.colorBg : "var(--color-border-light)",
-                      color: active ? wing.colorText : "var(--color-text-muted)",
-                      border: active ? `1.5px solid ${wing.colorText}40` : "1.5px solid transparent",
+                      background: active
+                        ? wing.colorBg
+                        : "var(--color-border-light)",
+                      color: active
+                        ? wing.colorText
+                        : "var(--color-text-muted)",
+                      border: active
+                        ? `1.5px solid ${wing.colorText}40`
+                        : "1.5px solid transparent",
                       borderRadius: 6,
                       padding: "7px 12px",
                       fontSize: 13,
@@ -228,16 +257,18 @@ export default function EditEmployeePanel({
 
           {/* Roles */}
           <div>
-            <label style={labelStyle}>ROLES / QUALIFICATIONS</label>
+            <label style={labelStyle}>ROLES</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {ROLES.map((role) => {
+              {roles.map((role) => {
                 const active = form.roles.includes(role);
                 return (
                   <button
                     key={role}
                     onClick={() => toggleRole(role)}
                     style={{
-                      background: active ? "var(--color-dark)" : "var(--color-border-light)",
+                      background: active
+                        ? "var(--color-dark)"
+                        : "var(--color-border-light)",
                       color: active ? "#fff" : "var(--color-text-muted)",
                       border: "none",
                       borderRadius: 20,
@@ -271,12 +302,20 @@ export default function EditEmployeePanel({
           <>
             <button
               onClick={handleSave}
-              disabled={!isModified || !form.name.trim() || form.wings.length === 0}
+              disabled={
+                !isModified || !form.name.trim() || form.wings.length === 0
+              }
               style={{
-                background: isModified && form.name.trim() && form.wings.length > 0
-                  ? "var(--color-accent-gradient)" : "#ccc",
-                border: "none", color: "#fff", borderRadius: 8,
-                padding: "9px 20px", fontSize: 13, fontWeight: 700,
+                background:
+                  isModified && form.name.trim() && form.wings.length > 0
+                    ? "var(--color-accent-gradient)"
+                    : "#ccc",
+                border: "none",
+                color: "#fff",
+                borderRadius: 8,
+                padding: "9px 20px",
+                fontSize: 13,
+                fontWeight: 700,
                 cursor: isModified ? "pointer" : "not-allowed",
               }}
             >
@@ -285,9 +324,14 @@ export default function EditEmployeePanel({
             <button
               onClick={onCancel}
               style={{
-                background: "var(--color-border-light)", border: "none", borderRadius: 8,
-                color: "var(--color-text-muted)", fontSize: 13, padding: "9px 16px",
-                cursor: "pointer", fontWeight: 600,
+                background: "var(--color-border-light)",
+                border: "none",
+                borderRadius: 8,
+                color: "var(--color-text-muted)",
+                fontSize: 13,
+                padding: "9px 16px",
+                cursor: "pointer",
+                fontWeight: 600,
               }}
             >
               Cancel
@@ -296,9 +340,14 @@ export default function EditEmployeePanel({
             <button
               onClick={() => setShowDeleteConfirm(true)}
               style={{
-                background: "none", border: "1px solid #FEE2E2", borderRadius: 8,
-                color: "#EF4444", fontSize: 13, padding: "9px 16px",
-                cursor: "pointer", fontWeight: 600,
+                background: "none",
+                border: "1px solid #FEE2E2",
+                borderRadius: 8,
+                color: "#EF4444",
+                fontSize: 13,
+                padding: "9px 16px",
+                cursor: "pointer",
+                fontWeight: 600,
               }}
             >
               Delete Employee
@@ -306,14 +355,26 @@ export default function EditEmployeePanel({
           </>
         ) : (
           <>
-            <span style={{ fontSize: 13, color: "var(--color-text-secondary)", marginRight: 8 }}>
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--color-text-secondary)",
+                marginRight: 8,
+              }}
+            >
               Delete {form.name}? This cannot be undone.
             </span>
             <button
               onClick={() => onDelete(employee.id)}
               style={{
-                background: "#EF4444", border: "none", color: "#fff", borderRadius: 8,
-                padding: "9px 16px", cursor: "pointer", fontWeight: 600, fontSize: 13,
+                background: "#EF4444",
+                border: "none",
+                color: "#fff",
+                borderRadius: 8,
+                padding: "9px 16px",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 13,
               }}
             >
               Delete
@@ -321,9 +382,14 @@ export default function EditEmployeePanel({
             <button
               onClick={() => setShowDeleteConfirm(false)}
               style={{
-                background: "var(--color-border-light)", border: "none", borderRadius: 8,
-                color: "var(--color-text-muted)", padding: "9px 16px",
-                cursor: "pointer", fontWeight: 600, fontSize: 13,
+                background: "var(--color-border-light)",
+                border: "none",
+                borderRadius: 8,
+                color: "var(--color-text-muted)",
+                padding: "9px 16px",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 13,
               }}
             >
               Cancel
