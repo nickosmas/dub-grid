@@ -52,7 +52,11 @@ export default function ActiveSessions() {
   }, []);
 
   if (loading) {
-    return <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Loading sessions...</div>;
+    return (
+      <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+        Loading sessions...
+      </div>
+    );
   }
 
   if (error) {
@@ -60,11 +64,23 @@ export default function ActiveSessions() {
   }
 
   if (sessions.length === 0) {
-    return <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>No active sessions found.</div>;
+    return (
+      <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+        No active sessions found.
+      </div>
+    );
   }
 
   return (
-    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+    <ul
+      style={{
+        listStyle: "none",
+        margin: 0,
+        padding: 0,
+        display: "grid",
+        gap: 10,
+      }}
+    >
       {sessions.map((s) => (
         <li
           key={s.id}
@@ -80,7 +96,13 @@ export default function ActiveSessions() {
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--color-text-secondary)",
+              }}
+            >
               {s.deviceLabel ?? "Unknown device"}
             </span>
             <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
