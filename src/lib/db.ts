@@ -243,7 +243,13 @@ export async function fetchUserOrg(): Promise<Organization | null> {
     .limit(1)
     .single();
 
-  if (error || !data) return null;
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    throw new Error(`fetchUserOrg error: ${error.message} (code: ${error.code})`);
+  }
+  if (!data) return null;
 
   return rowToOrg(data as DbOrganization);
 }
