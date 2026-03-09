@@ -89,6 +89,7 @@ function SchedulerContent() {
   const [regularShifts, setRegularShifts] = useState<RegularShift[]>([]);
   const [regularScheduleEmp, setRegularScheduleEmp] = useState<Employee | null>(null);
   const [isApplyingRegular, setIsApplyingRegular] = useState(false);
+  const staffToolbarRef = useRef<HTMLDivElement>(null);
   const [repeatModalState, setRepeatModalState] = useState<{
     label: string; date: Date; empId: string; empName: string;
   } | null>(null);
@@ -384,11 +385,15 @@ function SchedulerContent() {
         endDate = addDays(weekStart, spanWeeks * 7 - 1);
       }
 
+      // Always fetch fresh regular shifts so we pick up any recently saved templates
+      const freshRegularShifts = await db.fetchRegularShifts(organization.id);
+      setRegularShifts(freshRegularShifts);
+
       const generated = await db.applyRegularSchedules(
         organization.id,
         startDate,
         endDate,
-        regularShifts,
+        freshRegularShifts,
         shifts,
       );
 
@@ -696,7 +701,16 @@ function SchedulerContent() {
         color: "var(--color-text-primary)",
       }}
     >
-      <div className="no-print">
+      <div
+        className="no-print"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          background: "var(--color-bg)",
+          boxShadow: "var(--shadow-raised)",
+        }}
+      >
         <Header
           viewMode={viewMode}
           onViewChange={setViewMode}
@@ -712,30 +726,35 @@ function SchedulerContent() {
             hasChanges={hasUnpublishedChanges}
           />
         )}
+        {viewMode !== "settings" && (
+          <div style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
+            {viewMode === "schedule" && (
+              <Toolbar
+                viewMode={viewMode}
+                weekStart={weekStart}
+                spanWeeks={spanWeeks}
+                activeWing={activeWing}
+                staffSearch={staffSearch}
+                wings={wings}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                onToday={handleToday}
+                onSpanChange={setSpanWeeks}
+                onWingChange={setActiveWing}
+                onStaffSearchChange={setStaffSearch}
+                canEditSchedule={canEditSchedule}
+                isEditMode={isEditMode}
+                onToggleEditMode={() => setIsEditMode((v) => !v)}
+                onApplyRegular={handleApplyRegular}
+                isApplyingRegular={isApplyingRegular}
+              />
+            )}
+            {viewMode === "staff" && <div ref={staffToolbarRef} style={{ paddingBottom: 12 }} />}
+          </div>
+        )}
       </div>
 
       {viewMode !== "settings" && <div style={{ padding: "16px 16px" }}>
-        <div className="no-print">
-          <Toolbar
-            viewMode={viewMode}
-            weekStart={weekStart}
-            spanWeeks={spanWeeks}
-            activeWing={activeWing}
-            staffSearch={staffSearch}
-            wings={wings}
-            onPrev={handlePrev}
-            onNext={handleNext}
-            onToday={handleToday}
-            onSpanChange={setSpanWeeks}
-            onWingChange={setActiveWing}
-            onStaffSearchChange={setStaffSearch}
-            canEditSchedule={canEditSchedule}
-            isEditMode={isEditMode}
-            onToggleEditMode={() => setIsEditMode((v) => !v)}
-            onApplyRegular={handleApplyRegular}
-            isApplyingRegular={isApplyingRegular}
-          />
-        </div>
 
         {viewMode === "schedule" && spanWeeks !== "month" && (
           <div style={{ display: "flex", alignItems: "stretch", gap: 16, width: "100%" }}>
@@ -788,6 +807,7 @@ function SchedulerContent() {
             onAdd={() => setShowAddModal(true)}
             activeWing={activeWing}
             onRegularSchedule={canEditSchedule ? setRegularScheduleEmp : undefined}
+            toolbarSlot={staffToolbarRef}
           />
         )}
       </div>}
