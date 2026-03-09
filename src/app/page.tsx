@@ -252,6 +252,14 @@ export default function RootPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wantsSignIn = params.get("signin") === "1";
+    if (wantsSignIn) {
+      setShowSignIn(true);
+      setReady(true);
+      return;
+    }
+
     const checkSession = async () => {
       try {
         const {
@@ -287,10 +295,6 @@ export default function RootPage() {
         setReady(true);
       }
     };
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("signin") === "1") {
-      setShowSignIn(true);
-    }
     checkSession();
   }, [router]);
 
