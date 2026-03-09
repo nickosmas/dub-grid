@@ -116,10 +116,6 @@ export default function Header({
         justifyContent: "space-between",
         height: 56,
         borderBottom: "1px solid var(--color-border)",
-        boxShadow: "var(--shadow-raised)",
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
       }}
     >
       {/* Logo + Org Anchor — permanent, unbreakable group */}

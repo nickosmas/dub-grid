@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { getInitials } from "@/lib/utils";
 import { Employee, Wing } from "@/types";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
@@ -15,6 +16,7 @@ interface StaffViewProps {
   onAdd: () => void;
   activeWing?: string;
   onRegularSchedule?: (emp: Employee) => void;
+  toolbarSlot?: React.RefObject<HTMLDivElement | null>;
 }
 
 function hashCode(s: string): number {
@@ -35,6 +37,7 @@ export default function StaffView({
   onAdd,
   activeWing = "All",
   onRegularSchedule,
+  toolbarSlot,
 }: StaffViewProps) {
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"name" | "seniority" | "wing">("seniority");
@@ -154,91 +157,101 @@ export default function StaffView({
     return pendingOrder.some((emp, i) => emp.id !== sorted[i]?.id);
   }, [isReordering, pendingOrder, sorted]);
 
+  const [slotReady, setSlotReady] = useState(false);
+  useEffect(() => {
+    if (toolbarSlot?.current) setSlotReady(true);
+  }, [toolbarSlot]);
+
   const gridCols = isReordering
     ? "36px 40px 1fr 220px 120px 160px"
     : "48px 1fr 220px 120px 160px 28px";
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Controls */}
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 8,
-        }}
-      >
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {!isReordering && (
-            <button
-              onClick={onAdd}
-              className="dg-btn dg-btn-primary"
-              style={{ padding: "8px 16px" }}
-            >
-              + Add Staff Members
-            </button>
-          )}
-          {sortBy === "seniority" && (
-            <button
-              onClick={isReordering ? undefined : handleEnterReorder}
-              className={`dg-btn${isReordering ? " active" : ""}`}
-              style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="7 15 12 20 17 15" />
-                <polyline points="7 9 12 4 17 9" />
-              </svg>
-              Edit order
-            </button>
-          )}
-          {isReordering && isDirty && (
-            <button
-              onClick={handleSaveOrder}
-              className="dg-btn dg-btn-primary"
-              style={{ padding: "7px 14px" }}
-            >
-              Save
-            </button>
-          )}
-          {isReordering && (
-            <button
-              onClick={handleCancelReorder}
-              className="dg-btn"
-              style={{ padding: "7px 14px" }}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <label
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "var(--color-text-subtle)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
+  const controls = (
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {!isReordering && (
+          <button
+            onClick={onAdd}
+            className="dg-btn dg-btn-primary"
+            style={{ padding: "8px 16px" }}
           >
-            Sort by
-          </label>
-          <div className="dg-segment">
-            {(["seniority", "name", "wing"] as const).map((option) => (
-              <button
-                key={option}
-                onClick={() => { setSortBy(option); if (isReordering) handleCancelReorder(); }}
-                className={`dg-segment-btn${sortBy === option ? " active" : ""}`}
-                style={{ fontSize: 12 }}
-              >
-                {option === "seniority" ? "Seniority" : option === "name" ? "Name" : "Wings"}
-              </button>
-            ))}
-          </div>
+            + Add Staff Members
+          </button>
+        )}
+        {sortBy === "seniority" && (
+          <button
+            onClick={isReordering ? undefined : handleEnterReorder}
+            className={`dg-btn${isReordering ? " active" : ""}`}
+            style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="7 15 12 20 17 15" />
+              <polyline points="7 9 12 4 17 9" />
+            </svg>
+            Edit order
+          </button>
+        )}
+        {isReordering && isDirty && (
+          <button
+            onClick={handleSaveOrder}
+            className="dg-btn dg-btn-primary"
+            style={{ padding: "7px 14px" }}
+          >
+            Save
+          </button>
+        )}
+        {isReordering && (
+          <button
+            onClick={handleCancelReorder}
+            className="dg-btn"
+            style={{ padding: "7px 14px" }}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <label
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: "var(--color-text-subtle)",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}
+        >
+          Sort by
+        </label>
+        <div className="dg-segment">
+          {(["seniority", "name", "wing"] as const).map((option) => (
+            <button
+              key={option}
+              onClick={() => { setSortBy(option); if (isReordering) handleCancelReorder(); }}
+              className={`dg-segment-btn${sortBy === option ? " active" : ""}`}
+              style={{ fontSize: 12 }}
+            >
+              {option === "seniority" ? "Seniority" : option === "name" ? "Name" : "Wings"}
+            </button>
+          ))}
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {slotReady && toolbarSlot?.current
+        ? createPortal(controls, toolbarSlot.current)
+        : !toolbarSlot && <div style={{ marginBottom: 8 }}>{controls}</div>
+      }
 
       {/* Table */}
       <div

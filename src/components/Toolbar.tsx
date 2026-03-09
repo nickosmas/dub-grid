@@ -61,7 +61,7 @@ export default function Toolbar({
   const wingOptions = [{ name: "All" }, ...wings];
 
   if (viewMode !== "schedule") {
-    return <div style={{ marginBottom: 18 }} />;
+    return null;
   }
 
   return (
@@ -71,7 +71,7 @@ export default function Toolbar({
         alignItems: "center",
         gap: 12,
         flexWrap: "wrap",
-        marginBottom: 18,
+        paddingBottom: 12,
       }}
     >
       {/* ── LEFT ZONE: Contextual controls ── */}
@@ -242,7 +242,7 @@ export default function Toolbar({
               <line x1="3" y1="10" x2="21" y2="10" />
               <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
             </svg>
-            {isApplyingRegular ? "Applying…" : "Apply Regular"}
+            {isApplyingRegular ? "Filling…" : "Auto Fill Shifts"}
           </button>
         )}
 
