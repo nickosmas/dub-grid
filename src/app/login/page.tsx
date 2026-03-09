@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
-import { parseHost } from "@/lib/subdomain";
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { parseHost } from "@/lib/subdomain";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -107,10 +107,8 @@ function DomainSelector() {
   const [error, setError] = useState("");
   const [showHelp, setShowHelp] = useState(false);
 
-  // Determine base domain dynamically if not in env
-  const envBase = process.env.NEXT_PUBLIC_BASE_DOMAIN;
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
-  const baseDomain = envBase || (parsed ? parsed.rootDomain : "localhost");
+  const baseDomain = parsed?.rootDomain ?? process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
   const suffix = `.${baseDomain}`;
 
   function handleContinue(e: React.FormEvent<HTMLFormElement>) {
@@ -386,9 +384,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
   }
 
-  const envBase = process.env.NEXT_PUBLIC_BASE_DOMAIN;
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
-  const baseDomain = envBase || (parsed ? parsed.rootDomain : "localhost");
+  const baseDomain = parsed?.rootDomain ?? process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
 
   return (
     <PageShell>
