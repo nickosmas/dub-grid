@@ -22,6 +22,13 @@ describe("parseHost", () => {
     expect(parsed.rootDomain).toBe("dubgrid.com");
   });
 
+  it("treats www.dubgrid.com as apex with clean rootDomain", () => {
+    const parsed = parseHost("www.dubgrid.com");
+    expect(parsed.subdomain).toBeNull();
+    expect(parsed.rootDomain).toBe("dubgrid.com");
+    expect(isApexHost(parsed)).toBe(true);
+  });
+
   it("treats project.vercel.app as apex", () => {
     const parsed = parseHost("dub-grid.vercel.app");
     expect(parsed.subdomain).toBeNull();

@@ -53,6 +53,17 @@ export function parseHost(hostWithPort: string): ParsedHost {
     }
   }
 
+  // "www" is a canonical alias for the apex, not a tenant subdomain.
+  // e.g. www.dubgrid.com → rootDomain: dubgrid.com, subdomain: null
+  if (labels.length === 3 && labels[0] === "www") {
+    return {
+      subdomain: null,
+      rootDomain: labels.slice(1).join("."),
+      port,
+      hostname,
+    };
+  }
+
   if (labels.length >= 3) {
     return {
       subdomain: labels[0],
