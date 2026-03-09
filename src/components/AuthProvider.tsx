@@ -13,8 +13,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       if (event === "SIGNED_OUT" || !session) {
-        // If not already on the landing page, redirect
-        if (window.location.pathname !== "/") {
+        const path = window.location.pathname;
+        const isPublicRoute =
+          path === "/" ||
+          path === "/login" ||
+          path.startsWith("/login") ||
+          path === "/privacy" ||
+          path === "/terms";
+        if (!isPublicRoute) {
           window.location.replace("/");
         }
       }

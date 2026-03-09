@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
 import { formatDateKey } from "@/lib/utils";
-import { computeDailyCounts, filterAndSortEmployees } from "@/lib/schedule-logic";
+import { computeDailyTallies, filterAndSortEmployees } from "@/lib/schedule-logic";
 import { Employee, ShiftType } from "@/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -86,12 +86,12 @@ describe("Property 10: ShiftMap key format validity", () => {
 
 // ── 7.3 FTE aggregation unit tests ───────────────────────────────────────────
 
-describe("computeDailyCounts", () => {
+describe("computeDailyTallies", () => {
   const date = new Date(2024, 0, 15);
 
   it("returns all zeros when there are no employees", () => {
-    const result = computeDailyCounts([], date, () => null, () => makeShiftType());
-    expect(result).toEqual({ day: 0, eve: 0, night: 0 });
+    const result = computeDailyTallies([], date, () => null, () => makeShiftType(), []);
+    expect(result).toEqual({ day: {}, eve: {}, night: {} });
   });
 
   it("counts day FTE correctly", () => {
@@ -102,53 +102,56 @@ describe("computeDailyCounts", () => {
     const shiftForKey = (empId: string) => (empId === "emp-1" || empId === "emp-2" ? "D" : null);
     const getShiftStyle = () => dayShift;
 
-    const result = computeDailyCounts([emp1, emp2], date, shiftForKey, getShiftStyle);
-    expect(result.day).toBe(2);
-    expect(result.eve).toBe(0);
-    expect(result.night).toBe(0);
+    const result = computeDailyTallies([emp1, emp2], date, shiftForKey, getShiftStyle, ["D"]);
+    expect(result.day["D"]).toBe(2);
+    expect(result.eve).toEqual({});
+    expect(result.night).toEqual({});
   });
 
   it("counts eve FTE correctly", () => {
     const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
     const eveShift = makeShiftType({ label: "E", countsTowardEve: true });
 
-    const result = computeDailyCounts(
+    const result = computeDailyTallies(
       [emp],
       date,
       () => "E",
       () => eveShift,
+      ["E"]
     );
-    expect(result.day).toBe(0);
-    expect(result.eve).toBe(1);
-    expect(result.night).toBe(0);
+    expect(result.day).toEqual({});
+    expect(result.eve["E"]).toBe(1);
+    expect(result.night).toEqual({});
   });
 
   it("counts night FTE correctly", () => {
     const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
     const nightShift = makeShiftType({ label: "N", countsTowardNight: true });
 
-    const result = computeDailyCounts(
+    const result = computeDailyTallies(
       [emp],
       date,
       () => "N",
       () => nightShift,
+      ["N"]
     );
-    expect(result.day).toBe(0);
-    expect(result.eve).toBe(0);
-    expect(result.night).toBe(1);
+    expect(result.day).toEqual({});
+    expect(result.eve).toEqual({});
+    expect(result.night["N"]).toBe(1);
   });
 
   it("preserves fractional fteWeight (0.5)", () => {
     const emp = makeEmployee({ id: "emp-1", fteWeight: 0.5 });
     const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
 
-    const result = computeDailyCounts(
+    const result = computeDailyTallies(
       [emp],
       date,
       () => "D",
       () => dayShift,
+      ["D"]
     );
-    expect(result.day).toBeCloseTo(0.5);
+    expect(result.day["D"]).toBeCloseTo(0.5);
   });
 
   it("sums fractional weights across multiple employees", () => {
@@ -156,25 +159,41 @@ describe("computeDailyCounts", () => {
     const emp2 = makeEmployee({ id: "emp-2", fteWeight: 0.5 });
     const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
 
-    const result = computeDailyCounts(
+    const result = computeDailyTallies(
       [emp1, emp2],
       date,
       () => "D",
       () => dayShift,
+      ["D"]
     );
-    expect(result.day).toBeCloseTo(1.0);
+    expect(result.day["D"]).toBeCloseTo(1.0);
   });
 
   it("employees with no shift assigned do not contribute to counts", () => {
     const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
 
-    const result = computeDailyCounts(
+    const result = computeDailyTallies(
       [emp],
       date,
       () => null,
       () => makeShiftType({ countsTowardDay: true }),
+      ["D"]
     );
-    expect(result).toEqual({ day: 0, eve: 0, night: 0 });
+    expect(result).toEqual({ day: {}, eve: {}, night: {} });
+  });
+
+  it("counts multiple shifts for a single employee (D/E)", () => {
+    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
+    const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
+    const eveShift = makeShiftType({ label: "E", countsTowardEve: true });
+
+    const shiftForKey = () => "D/E";
+    const getShiftStyle = (label: string) => (label === "D" ? dayShift : eveShift);
+
+    const result = computeDailyTallies([emp], date, shiftForKey, getShiftStyle, ["D", "E"]);
+    expect(result.day["D"]).toBe(1);
+    expect(result.eve["E"]).toBe(1);
+    expect(result.night).toEqual({});
   });
 });
 
@@ -228,21 +247,33 @@ describe("Property 11: FTE aggregation correctness across all count types", () =
             return found ?? makeShiftType({ label: type });
           };
 
-          const result = computeDailyCounts(employees, date, shiftForKey, getShiftStyle);
+          const result = computeDailyTallies(
+            employees,
+            date,
+            shiftForKey,
+            getShiftStyle,
+            entries.map((_, i) => `SHIFT_${i}`)
+          );
 
-          // Compute expected values manually
+          // Compute expected values manually (matching the if-else ladder in computeDailyTallies)
           let expectedDay = 0, expectedEve = 0, expectedNight = 0;
           entries.forEach((e, i) => {
             if (e.hasShift) {
-              if (e.countsTowardDay) expectedDay += e.fteWeight;
-              if (e.countsTowardEve) expectedEve += e.fteWeight;
-              if (e.countsTowardNight) expectedNight += e.fteWeight;
+              if (e.countsTowardDay) {
+                expectedDay += e.fteWeight;
+              } else if (e.countsTowardEve) {
+                expectedEve += e.fteWeight;
+              } else if (e.countsTowardNight) {
+                expectedNight += e.fteWeight;
+              }
             }
           });
 
-          expect(result.day).toBeCloseTo(expectedDay, 10);
-          expect(result.eve).toBeCloseTo(expectedEve, 10);
-          expect(result.night).toBeCloseTo(expectedNight, 10);
+          const sumTally = (tally: Record<string, number>) => Object.values(tally).reduce((a, b) => a + b, 0);
+
+          expect(sumTally(result.day)).toBeCloseTo(expectedDay, 10);
+          expect(sumTally(result.eve)).toBeCloseTo(expectedEve, 10);
+          expect(sumTally(result.night)).toBeCloseTo(expectedNight, 10);
         },
       ),
     );

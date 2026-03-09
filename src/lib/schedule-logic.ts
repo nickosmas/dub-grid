@@ -28,20 +28,25 @@ export function computeDailyTallies(
   };
 
   for (const emp of employees) {
-    const typeLabel = shiftForKey(emp.id, date);
-    if (typeLabel && exclusiveLabels.includes(typeLabel)) {
-      const style = getShiftStyle(typeLabel);
+    const combinedLabel = shiftForKey(emp.id, date);
+    if (!combinedLabel) continue;
 
-      const bucket = style.countsTowardDay
-        ? tallies.day
-        : style.countsTowardEve
-          ? tallies.eve
-          : style.countsTowardNight
-            ? tallies.night
-            : null;
+    const labels = combinedLabel.split("/");
+    for (const typeLabel of labels) {
+      if (exclusiveLabels.includes(typeLabel)) {
+        const style = getShiftStyle(typeLabel);
 
-      if (bucket) {
-        bucket[typeLabel] = (bucket[typeLabel] || 0) + emp.fteWeight;
+        const bucket = style.countsTowardDay
+          ? tallies.day
+          : style.countsTowardEve
+            ? tallies.eve
+            : style.countsTowardNight
+              ? tallies.night
+              : null;
+
+        if (bucket) {
+          bucket[typeLabel] = (bucket[typeLabel] || 0) + emp.fteWeight;
+        }
       }
     }
   }

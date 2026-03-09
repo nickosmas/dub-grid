@@ -133,18 +133,23 @@ export default function MonthView({
           >();
 
           filteredEmployees.forEach((emp) => {
-            const shiftLabel = shiftForKey(emp.id, date);
-            if (!shiftLabel || shiftLabel === "X" || shiftLabel === "OFF")
+            const combinedLabel = shiftForKey(emp.id, date);
+            if (!combinedLabel || combinedLabel === "X" || combinedLabel === "OFF")
               return;
-            const style = getShiftStyle(shiftLabel);
-            if (style.countsTowardDay) dayCount += emp.fteWeight;
-            if (style.countsTowardEve) eveCount += emp.fteWeight;
-            if (style.countsTowardNight) nightCount += emp.fteWeight;
-            const primaryWing = emp.wings[0];
-            if (!primaryWing) return;
-            const list = byWing.get(primaryWing) ?? [];
-            list.push({ name: emp.name, shift: shiftLabel, style });
-            byWing.set(primaryWing, list);
+            
+            const shiftLabels = combinedLabel.split("/");
+            shiftLabels.forEach(label => {
+              const style = getShiftStyle(label);
+              if (style.countsTowardDay) dayCount += emp.fteWeight;
+              if (style.countsTowardEve) eveCount += emp.fteWeight;
+              if (style.countsTowardNight) nightCount += emp.fteWeight;
+              
+              const primaryWing = emp.wings[0];
+              if (!primaryWing) return;
+              const list = byWing.get(primaryWing) ?? [];
+              list.push({ name: emp.name, shift: label, style });
+              byWing.set(primaryWing, list);
+            });
           });
 
           byWing.forEach((list) =>
