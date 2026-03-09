@@ -1,17 +1,52 @@
 "use client";
 
-import { useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "sonner";
+import { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+
+interface AuthContextType {
+  user: User | null;
+  signOut: () => Promise<void>;
+  isLoading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
+    // Initial session check
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error("Error checking session:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+
     // Listen for auth state changes
-    // Supabase JS auto-refreshes the token via a background timer.
-    // If it fails (or user signs out), this fires with 'SIGNED_OUT'
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: string, session: any) => {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+
       if (event === "SIGNED_OUT" || !session) {
         const path = window.location.pathname;
         const isPublicRoute =
@@ -31,10 +66,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
-    <>
+    <AuthContext.Provider value={{ user, signOut, isLoading }}>
       <Toaster position="top-center" richColors />
       {children}
-    </>
+    </AuthContext.Provider>
   );
 }
