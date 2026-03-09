@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useRef, useEffect, useState } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
@@ -366,10 +366,14 @@ const SectionBlock = memo(function SectionBlock({
                             return (
                               <div
                                 style={{
+                                  position: "absolute",
+                                  top: "0.625rem",
+                                  right: "0.625rem",
+                                  bottom: "0.625rem",
+                                  left: "0.625rem",
                                   background: style.color,
                                   border: `1px solid ${style.border}`,
                                   borderRadius: 6,
-                                  padding: "3px 7px",
                                   fontSize: 12,
                                   fontWeight: 700,
                                   color: style.text,
@@ -377,6 +381,9 @@ const SectionBlock = memo(function SectionBlock({
                                   opacity: isCross ? 0.35 : 1,
                                   filter: isCross ? "grayscale(0.6)" : "none",
                                   cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
                                 }}
                               >
                                 {label}
@@ -388,16 +395,17 @@ const SectionBlock = memo(function SectionBlock({
                           return (
                             <div
                               style={{
+                                position: "absolute",
+                                top: "0.625rem",
+                                right: "0.625rem",
+                                bottom: "0.625rem",
+                                left: "0.625rem",
                                 display: "flex",
-                                width: "calc(100% - 16px)",
-                                minWidth: 40,
-                                height: 22,
                                 borderRadius: 6,
                                 overflow: "hidden",
                                 border: `1px solid ${firstStyle?.border || "var(--color-border)"}`,
                                 boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                                 cursor: "pointer",
-                                margin: "0 8px",
                               }}
                             >
                               {labels.map((label, li) => {
@@ -687,7 +695,26 @@ export default function ScheduleGrid({
 
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
-  const colWidth = spanWeeks === 2 ? 72 : 84;
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const numDays = allDates.length;
+  const colWidth =
+    containerWidth > 0
+      ? Math.max(50, Math.floor((containerWidth - 220) / numDays))
+      : spanWeeks === 2
+        ? 72
+        : 84;
 
   // For each section, compute which shift labels exclusively belong to it
   // (shift types where wingName matches only this section and no other)
@@ -765,7 +792,7 @@ export default function ScheduleGrid({
   }
 
   return (
-    <div style={{ width: "fit-content", maxWidth: "100%" }}>
+    <div ref={containerRef} style={{ width: "100%", maxWidth: "100%" }}>
       {renderedSections.map((section) => {
         const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
         const rawHomeEmps = filteredEmployees.filter((e) =>

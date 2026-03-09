@@ -13,16 +13,17 @@ export default function ShiftKeyPanel({ shiftTypes }: { shiftTypes: ShiftType[] 
     <div
       style={{
         width: 260,
-        marginTop: 34,
         background: "#fff",
         borderRadius: 12,
         border: "1px solid var(--color-border)",
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
         padding: "14px 14px",
-        position: "sticky",
-        top: 16,
-        maxHeight: "calc(100vh - 32px)",
+        position: "fixed",
+        right: 16,
+        top: 140,
+        maxHeight: "calc(100vh - 156px)",
         overflowY: "auto",
+        zIndex: 10,
       }}
     >
       <div
