@@ -5,14 +5,18 @@ import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { parseHost } from "@/lib/subdomain";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
-  const parsed = parseHost(window.location.host);
-  return parsed.subdomain;
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+  const host = window.location.hostname;
+  if (host === baseDomain) return null;
+  if (host.endsWith(`.${baseDomain}`)) {
+    return host.slice(0, -`.${baseDomain}`.length) || null;
+  }
+  return null;
 }
 
 // ── Shared layout wrapper ──────────────────────────────────────────────────────
@@ -106,9 +110,7 @@ function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
   const [showHelp, setShowHelp] = useState(false);
-
-  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
-  const baseDomain = parsed?.rootDomain ?? process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
   const suffix = `.${baseDomain}`;
 
   function handleContinue(e: React.FormEvent<HTMLFormElement>) {
@@ -338,7 +340,6 @@ function DomainSelector() {
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -350,33 +351,21 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setIsError(false);
 
     try {
-      if (!isSignUp) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
 
-        // Navigate immediately — don't wait for AuthProvider's async chain.
-        // org membership is enforced server-side (middleware + RLS) and by
-        // ProtectedRoute on the /schedule page.
-        window.location.replace("/schedule");
+      // Navigate immediately — don't wait for AuthProvider's async chain.
+      window.location.replace("/schedule");
 
-        // Safety net: if navigation hasn't happened within 8s (e.g. redirect
-        // loop or network issue), reset the button so the user isn't stuck.
-        setTimeout(() => {
-          setLoading(false);
-          setMessage("Navigation timed out. Please try refreshing the page.");
-          setIsError(true);
-        }, 8000);
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setMessage(
-          "Account created! You can now sign in. An administrator must assign you to this organization before you can access the schedule.",
-        );
+      // Safety net: if navigation hasn't happened within 8s
+      setTimeout(() => {
         setLoading(false);
-      }
+        setMessage("Navigation timed out. Please try refreshing the page.");
+        setIsError(true);
+      }, 8000);
     } catch (err: any) {
       setMessage(err.message || "An error occurred");
       setIsError(true);
@@ -384,8 +373,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
   }
 
-  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
-  const baseDomain = parsed?.rootDomain ?? process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
 
   return (
     <PageShell>
@@ -432,7 +420,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             marginBottom: "24px",
           }}
         >
-          {isSignUp ? "Create an account" : "Sign in to your workspace"}
+          Sign in to your workspace
         </h1>
 
         {message && (
@@ -527,7 +515,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <input
               type="password"
               required
-              autoComplete={isSignUp ? "new-password" : "current-password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
@@ -558,7 +546,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            {loading ? "Please wait…" : isSignUp ? "Create Account" : "Sign In"}
+            {loading ? "Please wait…" : "Sign In"}
           </button>
         </form>
 
@@ -571,27 +559,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             gap: "12px",
           }}
         >
-          <div style={{ fontSize: "14px", color: "#6B7280" }}>
-            {isSignUp ? "Already have an account? " : "Need an account? "}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setMessage("");
-                setIsError(false);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#1B3A2D",
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              {isSignUp ? "Sign in" : "Sign up"}
-            </button>
-          </div>
           <button
             type="button"
             onClick={() => {

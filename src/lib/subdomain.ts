@@ -53,10 +53,9 @@ export function parseHost(hostWithPort: string): ParsedHost {
     }
   }
 
-  // "www" and "login" are corporate/platform subdomains, not tenant subdomains.
+  // "www" is a canonical alias for the apex, not a tenant subdomain.
   // e.g. www.dubgrid.com → rootDomain: dubgrid.com, subdomain: null
-  // e.g. login.dubgrid.com → rootDomain: dubgrid.com, subdomain: null
-  if (labels.length === 3 && (labels[0] === "www" || labels[0] === "login")) {
+  if (labels.length === 3 && labels[0] === "www") {
     return {
       subdomain: null,
       rootDomain: labels.slice(1).join("."),
