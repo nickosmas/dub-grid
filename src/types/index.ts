@@ -74,6 +74,8 @@ export interface ScheduleNote {
   empId: string;
   date: string;
   noteType: NoteType;
+  wingName: string | null;
+  status: 'published' | 'draft' | 'draft_deleted';
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;

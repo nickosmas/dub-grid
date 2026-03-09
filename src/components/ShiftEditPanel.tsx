@@ -12,8 +12,8 @@ interface ShiftEditPanelProps {
   onClose: () => void;
   allowShiftEdits?: boolean;
   canEditNotes?: boolean;
-  noteTypes?: NoteType[];
-  onNoteToggle?: (noteType: NoteType, active: boolean) => void;
+  getNoteTypes?: (wingName: string) => NoteType[];
+  onNoteToggle?: (noteType: NoteType, active: boolean, wingName: string) => void;
 }
 
 export default function ShiftEditPanel({
@@ -24,7 +24,7 @@ export default function ShiftEditPanel({
   onClose,
   allowShiftEdits = true,
   canEditNotes = false,
-  noteTypes = [],
+  getNoteTypes,
   onNoteToggle,
 }: ShiftEditPanelProps) {
   // All wing names present in shift types (ordered by first occurrence)
@@ -299,11 +299,11 @@ export default function ShiftEditPanel({
                     { type: "shower" as NoteType, label: "Shower", color: "#1E293B", desc: "Appears as a black dot" },
                   ] as { type: NoteType; label: string; color: string; desc: string }[]
                 ).map(({ type, label, color, desc }) => {
-                  const isActive = noteTypes.includes(type);
+                  const isActive = getNoteTypes ? getNoteTypes(activeTab).includes(type) : false;
                   return (
                     <button
                       key={type}
-                      onClick={() => onNoteToggle?.(type, !isActive)}
+                      onClick={() => onNoteToggle?.(type, !isActive, activeTab)}
                       style={{
                         display: "flex",
                         alignItems: "center",
