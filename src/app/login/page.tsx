@@ -4,19 +4,15 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
 
+import { parseHost } from "@/lib/subdomain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
-  const host = window.location.hostname;
-  if (host === baseDomain) return null;
-  if (host.endsWith(`.${baseDomain}`)) {
-    return host.slice(0, -`.${baseDomain}`.length) || null;
-  }
-  return null;
+  const parsed = parseHost(window.location.host);
+  return parsed.subdomain;
 }
 
 // ── Shared layout wrapper ──────────────────────────────────────────────────────
@@ -110,7 +106,9 @@ function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
   const [showHelp, setShowHelp] = useState(false);
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+  
+  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
+  const baseDomain = parsed?.rootDomain ?? "localhost";
   const suffix = `.${baseDomain}`;
 
   function handleContinue(e: React.FormEvent<HTMLFormElement>) {
@@ -373,7 +371,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
   }
 
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
+  const baseDomain = parsed?.rootDomain ?? "localhost";
 
   return (
     <PageShell>
