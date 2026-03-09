@@ -114,7 +114,6 @@ function SchedulerContent() {
           setEmployees(cached.employees);
           setShifts(cached.shifts);
           setNotes(cached.notes ?? {});
-          setLoading(false);
         }
 
         const org = await db.fetchUserOrg();
@@ -531,28 +530,79 @@ function SchedulerContent() {
           justifyContent: "center",
           minHeight: "100vh",
           flexDirection: "column",
-          gap: 12,
+          gap: 24,
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-          color: "var(--color-text-secondary)",
+          background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+          padding: 24,
+          textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#EF4444" }}>
-          Failed to connect to Supabase
-        </div>
-        <div
-          style={{
-            fontSize: 14,
-            color: "var(--color-text-muted)",
-            maxWidth: 480,
-            textAlign: "center",
+        <div 
+          style={{ 
+            width: 64, 
+            height: 64, 
+            borderRadius: "50%", 
+            background: "#FEF2F2", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            marginBottom: 8
           }}
         >
-          {loadError}
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
         </div>
-        <div style={{ fontSize: 13, color: "var(--color-text-faint)" }}>
-          Ensure <code>.env.local</code> contains valid{" "}
-          <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+        
+        <div style={{ maxWidth: 400 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+            Workspace Setup Required
+          </h1>
+          <p style={{ fontSize: 16, color: "#475569", lineHeight: 1.6, marginBottom: 32 }}>
+            Your account is active, but it looks like your workspace hasn't been initialized yet. 
+            Once your administrator completes the setup, you'll be able to access the schedule.
+          </p>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: "12px 24px",
+                background: "#1B3A2D",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "opacity 0.2s"
+              }}
+            >
+              Check Again
+            </button>
+            <button
+              onClick={() => window.location.href = "mailto:support@dubgrid.com"}
+              style={{
+                padding: "12px 24px",
+                background: "#F1F5F9",
+                color: "#475569",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+            >
+              Contact Support
+            </button>
+          </div>
+        </div>
+
+        {/* Technical details accessible only via hover/inspect for developers */}
+        <div style={{ marginTop: 40, opacity: 0.1, fontSize: 11, color: "var(--color-text-faint)" }}>
+           System status: {loadError}
         </div>
       </div>
     );
