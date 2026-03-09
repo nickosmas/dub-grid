@@ -757,31 +757,29 @@ function SchedulerContent() {
       {viewMode !== "settings" && <div style={{ padding: "16px 16px" }}>
 
         {viewMode === "schedule" && spanWeeks !== "month" && (
-          <div style={{ display: "flex", alignItems: "stretch", gap: 16, width: "100%" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <ScheduleGrid
-                filteredEmployees={visibleScheduleEmployees}
-                allEmployees={employees}
-                week1={week1}
-                week2={week2}
-                spanWeeks={spanWeeks}
-                shiftForKey={shiftForKey}
-                getShiftStyle={getShiftStyle}
-                handleCellClick={handleCellClick}
-                today={today}
-                highlightEmpIds={highlightEmpIds}
-                wings={wings}
-                shiftTypes={shiftTypes}
-                isCellInteractive={isEditMode && canAddNotes}
-                noteTypesForKey={noteTypesForKey}
-                activeWing={activeWing}
-                isEditMode={isEditMode}
-              />
-            </div>
-            <div className="no-print" style={{ width: 260, flexShrink: 0, display: "flex" }}>
-              <ShiftKeyPanel shiftTypes={shiftTypes} />
-            </div>
+          <div style={{ marginRight: 276 }}>
+            <ScheduleGrid
+              filteredEmployees={visibleScheduleEmployees}
+              allEmployees={employees}
+              week1={week1}
+              week2={week2}
+              spanWeeks={spanWeeks}
+              shiftForKey={shiftForKey}
+              getShiftStyle={getShiftStyle}
+              handleCellClick={handleCellClick}
+              today={today}
+              highlightEmpIds={highlightEmpIds}
+              wings={wings}
+              shiftTypes={shiftTypes}
+              isCellInteractive={isEditMode && canAddNotes}
+              noteTypesForKey={noteTypesForKey}
+              activeWing={activeWing}
+              isEditMode={isEditMode}
+            />
           </div>
+        )}
+        {viewMode === "schedule" && spanWeeks !== "month" && (
+          <ShiftKeyPanel shiftTypes={shiftTypes} />
         )}
 
         {viewMode === "schedule" && spanWeeks === "month" && (
