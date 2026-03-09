@@ -100,11 +100,6 @@ export interface DbOrganization {
   employee_count: number | null;
   skill_levels: string[];
   roles: string[];
-  logo_url: string | null;
-  app_name: string | null;
-  meta_description: string | null;
-  theme_config: any;
-  landing_page_config: any;
 }
 
 export interface DbWing {
@@ -180,13 +175,8 @@ export function rowToOrg(row: DbOrganization): Organization {
     address: row.address,
     phone: row.phone,
     employeeCount: row.employee_count,
-    skillLevels: row.skill_levels ?? [],
-    roles: row.roles ?? [],
-    logoUrl: row.logo_url,
-    appName: row.app_name ?? 'DubGrid',
-    metaDescription: row.meta_description ?? 'Smart staff scheduling for care facilities',
-    themeConfig: row.theme_config ?? {},
-    landingPageConfig: row.landing_page_config ?? {},
+    skillLevels: row.skill_levels ?? ['JLCSN', 'CSN III', 'CSN II', 'STAFF', '—'],
+    roles: row.roles ?? ['DCSN', 'DVCSN', 'Supv', 'Mentor', 'CN', 'SC. Mgr.', 'Activity Coordinator', 'SC/Asst/Act/Cor'],
   };
 }
 
@@ -253,17 +243,6 @@ export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<Db
 
 // ── Organization ─────────────────────────────────────────────────────────────
 
-export async function fetchOrgBySlug(slug: string): Promise<Organization | null> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data ? rowToOrg(data as DbOrganization) : null;
-}
-
 export async function fetchUserOrg(): Promise<Organization | null> {
   const { data, error } = await supabase
     .from("organizations")
@@ -294,11 +273,6 @@ export async function updateOrganization(org: Organization): Promise<void> {
       employee_count: org.employeeCount,
       skill_levels: org.skillLevels,
       roles: org.roles,
-      logo_url: org.logoUrl,
-      app_name: org.appName,
-      meta_description: org.metaDescription,
-      theme_config: org.themeConfig,
-      landing_page_config: org.landingPageConfig,
     })
     .eq("id", org.id);
   if (error) throw error;

@@ -6,10 +6,8 @@ import { metadata } from "../app/layout";
 const TAGLINE = "Smart staff scheduling for care facilities";
 
 describe("layout metadata — DubGrid rebrand", () => {
-  it("title (default or template) contains DubGrid", () => {
-    const title = metadata.title as any;
-    const titleStr = typeof title === 'object' ? (title.default || title.template || '') : String(title);
-    expect(titleStr).toContain("DubGrid");
+  it("title contains DubGrid", () => {
+    expect(String(metadata.title)).toContain("DubGrid");
   });
 
   it("description is the DubGrid tagline", () => {

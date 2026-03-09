@@ -2,18 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { OrgLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useLogout, usePermissions } from "@/hooks";
 import { supabase } from "@/lib/supabase";
-
-import { Organization } from "@/types";
 
 export type ViewMode = "schedule" | "staff" | "settings";
 
 interface HeaderProps {
   viewMode: ViewMode;
   onViewChange: (mode: ViewMode) => void;
-  organization?: Organization;
+  orgName?: string;
   availableViewModes?: ViewMode[];
 }
 
@@ -52,12 +50,9 @@ const ROLE_LABELS: Record<string, string> = {
 export default function Header({
   viewMode,
   onViewChange,
-  organization,
+  orgName,
   availableViewModes,
 }: HeaderProps) {
-  const orgName = organization?.name;
-  const appName = organization?.appName ?? "DubGrid";
-  const logoUrl = organization?.logoUrl;
   const router = useRouter();
   const { signOutLocal } = useLogout();
   const { isGridmaster, role } = usePermissions();
@@ -125,9 +120,9 @@ export default function Header({
     >
       {/* Logo + Org Anchor — permanent, unbreakable group */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
-        <OrgLogo logoUrl={logoUrl} size={30} appName={appName} />
-        <DubGridWordmark fontSize={18} color="var(--color-text-primary)" text={appName} />
-        {orgName && appName !== orgName && (
+        <DubGridLogo size={30} />
+        <DubGridWordmark fontSize={18} color="var(--color-text-primary)" />
+        {orgName && (
           <>
             <span style={{ color: "var(--color-border)", fontSize: 18, fontWeight: 300, userSelect: "none" }}>
               |
