@@ -353,22 +353,88 @@ const SectionBlock = memo(function SectionBlock({
                       }}
                     >
                       {shiftType && shiftType !== "OFF" ? (
-                        <div
-                          style={{
-                            background: shiftStyle!.color,
-                            border: `1px solid ${shiftStyle!.border}`,
-                            borderRadius: 6,
-                            padding: "3px 7px",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: shiftStyle!.text,
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                            opacity: isCrossWing ? 0.35 : 1,
-                            filter: isCrossWing ? "grayscale(0.6)" : "none",
-                          }}
-                        >
-                          {shiftType}
-                        </div>
+                        (() => {
+                          const labels = shiftType.split("/");
+                          if (labels.length === 1) {
+                            const label = labels[0];
+                            const style = getShiftStyle(label);
+                            const isCross =
+                              exclusiveLabels.length > 0 &&
+                              !exclusiveLabels.includes(label) &&
+                              label !== "X" &&
+                              style !== null;
+                            return (
+                              <div
+                                style={{
+                                  background: style.color,
+                                  border: `1px solid ${style.border}`,
+                                  borderRadius: 6,
+                                  padding: "3px 7px",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: style.text,
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                  opacity: isCross ? 0.35 : 1,
+                                  filter: isCross ? "grayscale(0.6)" : "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {label}
+                              </div>
+                            );
+                          }
+
+                          const firstStyle = getShiftStyle(labels[0]);
+                          return (
+                            <div
+                              style={{
+                                display: "flex",
+                                width: "calc(100% - 16px)",
+                                minWidth: 40,
+                                height: 22,
+                                borderRadius: 6,
+                                overflow: "hidden",
+                                border: `1px solid ${firstStyle?.border || "var(--color-border)"}`,
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                cursor: "pointer",
+                                margin: "0 8px",
+                              }}
+                            >
+                              {labels.map((label, li) => {
+                                const style = getShiftStyle(label);
+                                const isCross =
+                                  exclusiveLabels.length > 0 &&
+                                  !exclusiveLabels.includes(label) &&
+                                  label !== "X" &&
+                                  style !== null;
+
+                                return (
+                                  <div
+                                    key={li}
+                                    style={{
+                                      flex: 1,
+                                      background: style.color,
+                                      color: style.text,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 10,
+                                      fontWeight: 800,
+                                      opacity: isCross ? 0.35 : 1,
+                                      filter: isCross ? "grayscale(0.6)" : "none",
+                                      borderRight:
+                                        li < labels.length - 1
+                                          ? `1px solid ${style.border}`
+                                          : "none",
+                                    }}
+                                  >
+                                    {label}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()
                       ) : (
                         <div
                           style={{
