@@ -12,7 +12,6 @@ import AddEmployeeModal from "@/components/AddEmployeeModal";
 import PrintLegend from "@/components/PrintLegend";
 import PrintOptionsModal, { PrintConfig } from "@/components/PrintOptionsModal";
 import PrintScheduleView from "@/components/PrintScheduleView";
-import ShiftKeyPanel from "@/components/ShiftKeyPanel";
 import DraftBanner from "@/components/DraftBanner";
 import RegularSchedulePanel from "@/components/RegularSchedulePanel";
 import RepeatModal from "@/components/RepeatModal";
@@ -326,7 +325,6 @@ function SchedulerContent() {
       } else {
         setShift(editPanel.empId, editPanel.date, label);
       }
-      setEditPanel(null);
     },
     [editPanel, shifts, organization, canEditSchedule, setShift],
   );
@@ -718,7 +716,7 @@ function SchedulerContent() {
         <Header
           viewMode={viewMode}
           onViewChange={setViewMode}
-          orgName={organization?.name}
+          organization={organization ?? undefined}
           availableViewModes={availableViewModes}
         />
         {isEditMode && canEditSchedule && viewMode === "schedule" && (
@@ -762,7 +760,7 @@ function SchedulerContent() {
       {viewMode !== "settings" && <div style={{ padding: "16px 16px" }}>
 
         {viewMode === "schedule" && spanWeeks !== "month" && (
-          <div style={{ marginRight: 276 }}>
+          <div>
             <ScheduleGrid
               filteredEmployees={visibleScheduleEmployees}
               allEmployees={employees}
@@ -782,9 +780,6 @@ function SchedulerContent() {
               isEditMode={isEditMode}
             />
           </div>
-        )}
-        {viewMode === "schedule" && spanWeeks !== "month" && (
-          <ShiftKeyPanel shiftTypes={shiftTypes} />
         )}
 
         {viewMode === "schedule" && spanWeeks === "month" && (

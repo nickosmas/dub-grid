@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridLogo, DubGridWordmark, OrgLogo } from "@/components/Logo";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
+import { Organization } from "@/types";
+import * as db from "@/lib/db";
 
 /* ─── Features data ─── */
 const FEATURES = [
@@ -68,8 +70,19 @@ const PAIN_POINTS = [
 export default function RootPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [organization, setOrganization] = useState<Organization | null>(null);
 
   useEffect(() => {
+    const host = window.location.host;
+    const parsed = parseHost(host);
+    
+    // If not on apex, fetch the org for this subdomain
+    if (!isApexHost(parsed) && parsed.subdomain) {
+      db.fetchOrgBySlug(parsed.subdomain)
+        .then(setOrganization)
+        .catch(console.error);
+    }
+
     const params = new URLSearchParams(window.location.search);
     const wantsSignIn = params.get("signin") === "1";
     if (wantsSignIn) {
@@ -83,7 +96,6 @@ export default function RootPage() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
-          const parsed = parseHost(window.location.host);
           if (isApexHost(parsed)) {
             const { data: profile } = await supabase
               .from("profiles")
@@ -115,6 +127,22 @@ export default function RootPage() {
     checkSession();
   }, [router]);
 
+  const appName = organization?.appName ?? "DubGrid";
+  const logoUrl = organization?.logoUrl;
+  
+  const features = organization?.landingPageConfig?.features ?? FEATURES;
+  const painPoints = organization?.landingPageConfig?.painPoints ?? PAIN_POINTS;
+  const heroTitle = organization?.landingPageConfig?.heroTitle ?? (
+    <>
+      Stop scheduling with
+      <br />
+      <span className="hero-strike">spreadsheets</span>
+    </>
+  );
+  const heroSubtitle = organization?.landingPageConfig?.heroSubtitle ?? (
+    `${appName} replaces Google Sheets and Excel with a purpose-built platform for care facility scheduling — faster to use, easier to manage, and impossible to accidentally break.`
+  );
+
   if (!ready) {
     return (
       <div className="loading-screen">
@@ -129,8 +157,8 @@ export default function RootPage() {
       <nav className="nav">
         <div className="nav-inner">
           <div className="nav-brand">
-            <DubGridLogo size={32} color="#1B3A2D" />
-            <DubGridWordmark fontSize={20} color="#1B3A2D" />
+            <OrgLogo logoUrl={logoUrl} size={32} appName={appName} />
+            <DubGridWordmark fontSize={20} color="#1B3A2D" text={appName} />
           </div>
           <Link href="/login" className="btn-signin">
             Sign In
@@ -143,14 +171,10 @@ export default function RootPage() {
         <div className="hero-inner">
           <div className="hero-badge">Staff Scheduling, Reimagined</div>
           <h1 className="hero-title">
-            Stop scheduling with
-            <br />
-            <span className="hero-strike">spreadsheets</span>
+            {heroTitle}
           </h1>
           <p className="hero-subtitle">
-            DubGrid replaces Google Sheets and Excel with a purpose-built
-            platform for care facility scheduling — faster to use, easier to
-            manage, and impossible to accidentally break.
+            {heroSubtitle}
           </p>
           <div className="hero-actions">
             <Link href="/login" className="btn-hero-primary">
@@ -174,15 +198,15 @@ export default function RootPage() {
           <div className="comparison-grid">
             <div className="comparison-col comparison-col--before">
               <div className="comparison-header">❌&ensp;Spreadsheets</div>
-              {PAIN_POINTS.map((p, i) => (
+              {painPoints.map((p, i) => (
                 <div key={i} className="comparison-item">
                   {p.before}
                 </div>
               ))}
             </div>
             <div className="comparison-col comparison-col--after">
-              <div className="comparison-header">✅&ensp;DubGrid</div>
-              {PAIN_POINTS.map((p, i) => (
+              <div className="comparison-header">✅&ensp;{appName}</div>
+              {painPoints.map((p, i) => (
                 <div key={i} className="comparison-item">
                   {p.after}
                 </div>
@@ -204,7 +228,7 @@ export default function RootPage() {
             tool.
           </p>
           <div className="features-grid">
-            {FEATURES.map((f, i) => (
+            {features.map((f, i) => (
               <div key={i} className="feature-card">
                 <span className="feature-icon">{f.icon}</span>
                 <h3 className="feature-title">{f.title}</h3>
@@ -232,11 +256,11 @@ export default function RootPage() {
       <footer className="footer">
         <div className="nav-inner footer-inner">
           <div className="nav-brand" style={{ opacity: 0.6 }}>
-            <DubGridLogo size={24} color="#64748B" />
-            <DubGridWordmark fontSize={16} color="#64748B" />
+            <OrgLogo logoUrl={logoUrl} size={24} appName={appName} />
+            <DubGridWordmark fontSize={16} color="#64748B" text={appName} />
           </div>
           <span className="footer-copy">
-            © {new Date().getFullYear()} DubGrid. All rights reserved.
+            © {new Date().getFullYear()} {appName}. All rights reserved.
           </span>
         </div>
       </footer>

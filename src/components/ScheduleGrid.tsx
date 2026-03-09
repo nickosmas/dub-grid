@@ -49,6 +49,7 @@ interface SectionBlockProps {
   shiftTypes: ShiftType[];
   isCellInteractive: boolean;
   noteTypesForKey?: (empId: string, date: Date, wingName?: string) => NoteType[];
+  onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -66,6 +67,7 @@ const SectionBlock = memo(function SectionBlock({
   shiftTypes,
   isCellInteractive,
   noteTypesForKey,
+  onTooltipChange,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
@@ -353,15 +355,28 @@ const SectionBlock = memo(function SectionBlock({
                         transition: "background 0.1s",
                       }}
                       onMouseEnter={(e) => {
-                        if (!isCellInteractive) return;
-                        e.currentTarget.style.background =
-                          "var(--color-today-bg)";
+                        if (isCellInteractive) {
+                          e.currentTarget.style.background = "var(--color-today-bg)";
+                        }
+                        if (shiftType && shiftType !== "OFF") {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const content = shiftType.includes("/") 
+                            ? shiftType.split("/").map(l => getShiftStyle(l).name).join(" / ")
+                            : getShiftStyle(shiftType).name;
+                          onTooltipChange({
+                            content,
+                            x: rect.left + rect.width / 2,
+                            y: rect.top,
+                          });
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isCellInteractive) return;
-                        e.currentTarget.style.background = isToday
-                          ? "var(--color-today-bg)"
-                          : rowBg;
+                        if (isCellInteractive) {
+                          e.currentTarget.style.background = isToday
+                            ? "var(--color-today-bg)"
+                            : rowBg;
+                        }
+                        onTooltipChange(null);
                       }}
                     >
                       {shiftType && shiftType !== "OFF" ? (
@@ -399,6 +414,44 @@ const SectionBlock = memo(function SectionBlock({
                                 }}
                               >
                                 {label}
+                                {noteTypes.length > 0 && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: 3,
+                                      right: 4,
+                                      display: "flex",
+                                      gap: 2,
+                                    }}
+                                  >
+                                    {noteTypes.includes("readings") && (
+                                      <div
+                                        title="Readings"
+                                        style={{
+                                          width: 6,
+                                          height: 6,
+                                          borderRadius: "50%",
+                                          background: "#EF4444",
+                                          border: "1px solid rgba(255,255,255,0.8)",
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                    )}
+                                    {noteTypes.includes("shower") && (
+                                      <div
+                                        title="Shower"
+                                        style={{
+                                          width: 6,
+                                          height: 6,
+                                          borderRadius: "50%",
+                                          background: "#1E293B",
+                                          border: "1px solid rgba(255,255,255,0.8)",
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           }
@@ -412,100 +465,147 @@ const SectionBlock = memo(function SectionBlock({
                                 right: "0.625rem",
                                 bottom: "0.625rem",
                                 left: "0.625rem",
-                                display: "flex",
-                                borderRadius: 6,
-                                overflow: "hidden",
-                                border: `1px solid ${firstStyle?.border || "var(--color-border)"}`,
-                                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                                cursor: "pointer",
                               }}
                             >
-                              {labels.map((label, li) => {
-                                const style = getShiftStyle(label);
-                                const isCross =
-                                  exclusiveLabels.length > 0 &&
-                                  !exclusiveLabels.includes(label) &&
-                                  label !== "X" &&
-                                  style !== null;
+                              <div
+                                style={{
+                                  display: "flex",
+                                  borderRadius: 6,
+                                  overflow: "hidden",
+                                  border: `1px solid ${firstStyle?.border || "var(--color-border)"}`,
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                  cursor: "pointer",
+                                  width: "100%",
+                                  height: "100%",
+                                }}
+                              >
+                                {labels.map((label, li) => {
+                                  const style = getShiftStyle(label);
+                                  const isCross =
+                                    exclusiveLabels.length > 0 &&
+                                    !exclusiveLabels.includes(label) &&
+                                    label !== "X" &&
+                                    style !== null;
 
-                                return (
-                                  <div
-                                    key={li}
-                                    style={{
-                                      flex: 1,
-                                      background: style.color,
-                                      color: style.text,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: 10,
-                                      fontWeight: 800,
-                                      opacity: isCross ? 0.35 : 1,
-                                      filter: isCross ? "grayscale(0.6)" : "none",
-                                      borderRight:
-                                        li < labels.length - 1
-                                          ? `1px solid ${style.border}`
-                                          : "none",
-                                    }}
-                                  >
-                                    {label}
-                                  </div>
-                                );
-                              })}
+                                  return (
+                                    <div
+                                      key={li}
+                                      style={{
+                                        flex: 1,
+                                        background: style.color,
+                                        color: style.text,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 10,
+                                        fontWeight: 800,
+                                        opacity: isCross ? 0.35 : 1,
+                                        filter: isCross ? "grayscale(0.6)" : "none",
+                                        borderRight:
+                                          li < labels.length - 1
+                                            ? `1px solid ${style.border}`
+                                            : "none",
+                                      }}
+                                    >
+                                      {label}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {noteTypes.length > 0 && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: 3,
+                                    right: 4,
+                                    display: "flex",
+                                    gap: 2,
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  {noteTypes.includes("readings") && (
+                                    <div
+                                      title="Readings"
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        background: "#EF4444",
+                                        border: "1px solid rgba(255,255,255,0.8)",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  )}
+                                  {noteTypes.includes("shower") && (
+                                    <div
+                                      title="Shower"
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        background: "#1E293B",
+                                        border: "1px solid rgba(255,255,255,0.8)",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         })()
                       ) : (
-                        <div
-                          style={{
-                            width: 16,
-                            height: 2,
-                            background:
-                              shiftType === "OFF"
-                                ? "var(--color-border)"
-                                : "var(--color-border-light)",
-                            borderRadius: 2,
-                          }}
-                        />
-                      )}
-
-                      {noteTypes.length > 0 && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 5,
-                            right: 5,
-                            display: "flex",
-                            gap: 2,
-                          }}
-                        >
-                          {noteTypes.includes("readings") && (
+                        <>
+                          <div
+                            style={{
+                              width: 16,
+                              height: 2,
+                              background:
+                                shiftType === "OFF"
+                                  ? "var(--color-border)"
+                                  : "var(--color-border-light)",
+                              borderRadius: 2,
+                            }}
+                          />
+                          {noteTypes.length > 0 && (
                             <div
-                              title="Readings"
                               style={{
-                                width: 7,
-                                height: 7,
-                                borderRadius: "50%",
-                                background: "#EF4444",
-                                border: "1px solid #fff",
-                                flexShrink: 0,
+                                position: "absolute",
+                                top: 5,
+                                right: 5,
+                                display: "flex",
+                                gap: 2,
                               }}
-                            />
+                            >
+                              {noteTypes.includes("readings") && (
+                                <div
+                                  title="Readings"
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: "50%",
+                                    background: "#EF4444",
+                                    border: "1px solid #fff",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
+                              {noteTypes.includes("shower") && (
+                                <div
+                                  title="Shower"
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: "50%",
+                                    background: "#1E293B",
+                                    border: "1px solid #fff",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
+                            </div>
                           )}
-                          {noteTypes.includes("shower") && (
-                            <div
-                              title="Shower"
-                              style={{
-                                width: 7,
-                                height: 7,
-                                borderRadius: "50%",
-                                background: "#1E293B",
-                                border: "1px solid #fff",
-                                flexShrink: 0,
-                              }}
-                            />
-                          )}
-                        </div>
+                        </>
                       )}
                     </div>
                   );
@@ -715,6 +815,7 @@ export default function ScheduleGrid({
   activeWing = "All",
   isEditMode = true,
 }: ScheduleGridProps) {
+  const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   
   const sections = useMemo(() => {
@@ -823,7 +924,52 @@ export default function ScheduleGrid({
   }
 
   return (
-    <div ref={containerRef} style={{ width: "100%", maxWidth: "100%" }}>
+    <div ref={containerRef} style={{ width: "100%", maxWidth: "100%", position: "relative" }}>
+      {tooltip && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltip.x,
+            top: tooltip.y - 8,
+            transform: "translate(-50%, -100%)",
+            background: "#FFFFFF",
+            padding: "8px 14px",
+            borderRadius: "10px",
+            boxShadow: `
+              0 10px 25px -5px rgba(0, 0, 0, 0.1),
+              0 8px 10px -6px rgba(0, 0, 0, 0.1),
+              0 0 0 1px rgba(0,0,0,0.05)
+            `,
+            zIndex: 1000,
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#1E293B",
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            animation: "tooltipFadeIn 0.15s cubic-bezier(0, 0, 0.2, 1)",
+          }}
+        >
+          {tooltip.content}
+          <div
+            style={{
+              position: "absolute",
+              bottom: -4,
+              left: "50%",
+              transform: "translateX(-50%) rotate(45deg)",
+              width: 10,
+              height: 10,
+              background: "#FFFFFF",
+              boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
+            }}
+          />
+          <style>{`
+            @keyframes tooltipFadeIn {
+              from { opacity: 0; transform: translate(-50%, -90%); scale: 0.95; }
+              to { opacity: 1; transform: translate(-50%, -100%); scale: 1; }
+            }
+          `}</style>
+        </div>
+      )}
       {renderedSections.map((section) => {
         const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
         const rawHomeEmps = filteredEmployees.filter((e) =>
@@ -868,6 +1014,7 @@ export default function ScheduleGrid({
             shiftTypes={shiftTypes}
             isCellInteractive={isCellInteractive}
             noteTypesForKey={noteTypesForKey}
+            onTooltipChange={setTooltip}
           />
         );
       })}
