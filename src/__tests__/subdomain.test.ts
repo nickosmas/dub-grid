@@ -16,6 +16,14 @@ describe("parseHost", () => {
     expect(parsed.port).toBe(":3000");
   });
 
+  it("treats login.localhost as apex (reserved)", () => {
+    const parsed = parseHost("login.localhost:3000");
+    expect(parsed.subdomain).toBeNull();
+    expect(parsed.rootDomain).toBe("localhost");
+    expect(parsed.port).toBe(":3000");
+    expect(isApexHost(parsed)).toBe(true);
+  });
+
   it("parses production tenant subdomains", () => {
     const parsed = parseHost("ardenwood.dubgrid.com");
     expect(parsed.subdomain).toBe("ardenwood");

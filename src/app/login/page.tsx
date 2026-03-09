@@ -563,7 +563,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             onClick={() => {
               const { protocol, port } = window.location;
               const portStr = port ? `:${port}` : "";
-              window.location.href = `${protocol}//${baseDomain}${portStr}/login`;
+              const target = `${protocol}//${baseDomain}${portStr}/login`;
+              console.log("[Login] Redirecting to apex:", target);
+              window.location.href = target;
             }}
             style={{
               background: "none",
@@ -590,7 +592,9 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setOrgSlug(getOrgSlug());
+    const slug = getOrgSlug();
+    console.log("[Login] Detected org slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
+    setOrgSlug(slug);
     setMounted(true);
   }, []);
 
