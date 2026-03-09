@@ -58,17 +58,33 @@ export default function ShiftEditPanel({
   const generalShifts = shiftTypes.filter((st) => st.isGeneral && isQualified(st));
 
   function renderShiftButton(s: ShiftType) {
-    const isActive = currentShift === s.label;
+    const currentLabels = currentShift ? currentShift.split("/") : [];
+    const isActive = currentLabels.includes(s.label);
     const disabled = !allowShiftEdits;
+
+    const handleToggle = () => {
+      if (!allowShiftEdits) return;
+      let newLabels: string[];
+      if (isActive) {
+        newLabels = currentLabels.filter(l => l !== s.label);
+      } else {
+        newLabels = [...currentLabels, s.label];
+      }
+      // If "OFF" was there, remove it when adding a real shift
+      newLabels = newLabels.filter(l => l !== "OFF");
+      
+      const newShift = newLabels.length > 0 ? newLabels.join("/") : "OFF";
+      onSelect(newShift);
+    };
 
     return (
       <button
         key={s.label}
-        onClick={() => allowShiftEdits && onSelect(s.label)}
+        onClick={handleToggle}
         disabled={disabled}
         style={{
           background: isActive ? s.color : "#fff",
-          border: `1.5px solid ${isActive ? s.border : "var(--color-border)"}`,
+          border: `1.5px solid ${s.border}`,
           borderRadius: 8,
           padding: "10px",
           cursor: disabled ? "not-allowed" : "pointer",
@@ -79,20 +95,20 @@ export default function ShiftEditPanel({
         }}
         onMouseEnter={(e) => {
           if (!disabled && !isActive) {
-            e.currentTarget.style.borderColor = s.border;
+            e.currentTarget.style.background = `${s.color}15`;
           }
         }}
         onMouseLeave={(e) => {
           if (!disabled && !isActive) {
-            e.currentTarget.style.borderColor = "var(--color-border)";
+            e.currentTarget.style.background = "#fff";
           }
         }}
       >
         <div
           style={{
-            fontWeight: 700,
+            fontWeight: 800,
             fontSize: 13,
-            color: isActive ? s.text : "var(--color-text-secondary)",
+            color: isActive ? s.text : s.border,
           }}
         >
           {s.label}

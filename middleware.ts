@@ -79,6 +79,9 @@ export async function middleware(req: NextRequest) {
   // Public routes — accessible without authentication
   if (
     pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     pathname.startsWith("/api")
   ) {
     return NextResponse.next();

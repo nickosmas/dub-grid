@@ -1,193 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
-
-/* ─── Sign-in modal steps ─── */
-type SignInStep = "domain" | "credentials";
-
-function SignInModal({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-  const [step, setStep] = useState<SignInStep>("domain");
-  const [isApex, setIsApex] = useState(true);
-  const [domain, setDomain] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleDomainSubmit = async (e?: React.SyntheticEvent) => {
-    if (e) e.preventDefault();
-    setLoading(true);
-    setError(null);
-    const slug = domain.trim().toLowerCase();
-    if (!slug) {
-      setError("Please enter your workspace domain.");
-      setLoading(false);
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/validate-domain?slug=${encodeURIComponent(slug)}`,
-      );
-      const json = await res.json();
-      if (json.valid) {
-        const parsed = parseHost(window.location.host);
-        const targetHost = buildSubdomainHost(slug, parsed);
-        const targetUrl = `${window.location.protocol}//${targetHost}/?signin=1`;
-        window.location.assign(targetUrl);
-      } else {
-        setError(
-          "We couldn't find that workspace. Check the domain and try again.",
-        );
-      }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    const { error: authErr } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (authErr) {
-      setError(authErr.message);
-      setLoading(false);
-    } else {
-      router.replace("/schedule");
-    }
-  };
-
-  useEffect(() => {
-    const parsed = parseHost(window.location.host);
-    const onApex = isApexHost(parsed);
-    setIsApex(onApex);
-    if (!onApex && parsed.subdomain) {
-      setDomain(parsed.subdomain);
-      setStep("credentials");
-    }
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose} aria-label="Close">
-          ✕
-        </button>
-        <div className="modal-header">
-          <DubGridLogo size={36} />
-          <DubGridWordmark fontSize={22} />
-        </div>
-
-        {step === "domain" && isApex ? (
-          <div
-            key="domain"
-            className="modal-form"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleDomainSubmit(e);
-              }
-            }}
-          >
-            <p className="modal-subtitle">
-              Enter your workspace domain to get started.
-            </p>
-            <div className="input-group">
-              <label className="input-label">Workspace Domain</label>
-              <div className="domain-input-wrap">
-                <input
-                  type="text"
-                  value={domain}
-                  onChange={(e) =>
-                    setDomain(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))
-                  }
-                  placeholder="your-facility"
-                  className="text-input domain-input"
-                  autoFocus
-                  required
-                />
-                <span className="domain-suffix">.dubgrid.com</span>
-              </div>
-            </div>
-            {error && <div className="form-error">{error}</div>}
-            <button
-              type="button"
-              onClick={handleDomainSubmit}
-              disabled={loading}
-              className="btn-primary"
-            >
-              {loading ? "Checking…" : "Continue"}
-            </button>
-          </div>
-        ) : (
-          <form key="credentials" onSubmit={handleSignIn} className="modal-form">
-            <p className="modal-subtitle">
-              Sign in to <strong>{domain.toLowerCase()}.dubgrid.com</strong>
-            </p>
-            <div className="input-group">
-              <label className="input-label">Email Address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
-                className="text-input"
-                autoFocus
-                required
-              />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="text-input"
-                required
-              />
-            </div>
-            {error && <div className="form-error">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? "Signing in…" : "Sign In"}
-            </button>
-            <button
-              type="button"
-              className="back-link"
-              onClick={() => {
-                if (isApex) {
-                  setStep("domain");
-                  setError(null);
-                } else {
-                  const parsed = parseHost(window.location.host);
-                  const targetUrl = `${window.location.protocol}//${parsed.rootDomain}${parsed.port}/?signin=1`;
-                  window.location.assign(targetUrl);
-                }
-              }}
-            >
-              ← Change workspace
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ─── Features data ─── */
 const FEATURES = [
@@ -249,15 +67,13 @@ const PAIN_POINTS = [
 /* ─── Main Page ─── */
 export default function RootPage() {
   const router = useRouter();
-  const [showSignIn, setShowSignIn] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const wantsSignIn = params.get("signin") === "1";
     if (wantsSignIn) {
-      setShowSignIn(true);
-      setReady(true);
+      router.replace("/login");
       return;
     }
 
@@ -299,9 +115,6 @@ export default function RootPage() {
     checkSession();
   }, [router]);
 
-  const openSignIn = useCallback(() => setShowSignIn(true), []);
-  const closeSignIn = useCallback(() => setShowSignIn(false), []);
-
   if (!ready) {
     return (
       <div className="loading-screen">
@@ -319,9 +132,9 @@ export default function RootPage() {
             <DubGridLogo size={32} color="#1B3A2D" />
             <DubGridWordmark fontSize={20} color="#1B3A2D" />
           </div>
-          <button className="btn-signin" onClick={openSignIn}>
+          <Link href="/login" className="btn-signin">
             Sign In
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -340,9 +153,9 @@ export default function RootPage() {
             manage, and impossible to accidentally break.
           </p>
           <div className="hero-actions">
-            <button className="btn-hero-primary" onClick={openSignIn}>
+            <Link href="/login" className="btn-hero-primary">
               Get Started
-            </button>
+            </Link>
             <a href="#features" className="btn-hero-secondary">
               See How It Works ↓
             </a>
@@ -409,9 +222,9 @@ export default function RootPage() {
           <p className="cta-subtitle">
             Your team deserves a scheduling tool that just works.
           </p>
-          <button className="btn-hero-primary" onClick={openSignIn}>
+          <Link href="/login" className="btn-hero-primary">
             Sign In to Your Workspace
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -427,8 +240,6 @@ export default function RootPage() {
           </span>
         </div>
       </footer>
-
-      {showSignIn && <SignInModal onClose={closeSignIn} />}
 
       {/* ─── Scoped styles ─── */}
       <style>{`
@@ -482,6 +293,7 @@ export default function RootPage() {
           gap: 10px;
         }
         .btn-signin {
+          display: inline-block;
           padding: 8px 20px;
           border-radius: 8px;
           background: #1B3A2D;
@@ -491,6 +303,7 @@ export default function RootPage() {
           border: none;
           cursor: pointer;
           transition: opacity 0.2s;
+          text-decoration: none;
         }
         .btn-signin:hover { opacity: 0.88; }
 
@@ -542,6 +355,7 @@ export default function RootPage() {
           flex-wrap: wrap;
         }
         .btn-hero-primary {
+          display: inline-block;
           padding: 14px 32px;
           border-radius: 10px;
           background: #1B3A2D;
@@ -551,6 +365,7 @@ export default function RootPage() {
           border: none;
           cursor: pointer;
           transition: transform 0.15s, box-shadow 0.15s;
+          text-decoration: none;
         }
         .btn-hero-primary:hover {
           transform: translateY(-1px);
@@ -681,6 +496,7 @@ export default function RootPage() {
         .cta .btn-hero-primary {
           background: #fff;
           color: #0F172A;
+          text-decoration: none;
         }
         .cta .btn-hero-primary:hover {
           box-shadow: 0 6px 24px rgba(255,255,255,0.2);
@@ -701,162 +517,6 @@ export default function RootPage() {
           color: #94A3B8;
         }
 
-        /* ── Sign-in modal ── */
-        .modal-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 200;
-          background: rgba(15, 23, 42, 0.5);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 24px;
-          animation: fadeIn 0.2s ease-out;
-        }
-        .modal-card {
-          position: relative;
-          background: #fff;
-          border-radius: 16px;
-          padding: 40px;
-          width: 100%;
-          max-width: 420px;
-          box-shadow: 0 24px 48px rgba(0,0,0,0.12);
-          animation: slideUp 0.25s ease-out;
-        }
-        .modal-close {
-          position: absolute;
-          top: 16px; right: 16px;
-          background: none;
-          border: none;
-          font-size: 18px;
-          color: #94A3B8;
-          cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 6px;
-          transition: background 0.15s;
-        }
-        .modal-close:hover { background: #F1F5F9; color: #475569; }
-        .modal-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 28px;
-        }
-        .modal-subtitle {
-          font-size: 15px;
-          color: #64748B;
-          margin: 0 0 24px;
-          line-height: 1.5;
-        }
-        .modal-form {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          animation: formEnter 0.22s ease-out;
-        }
-        @keyframes formEnter {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .input-group {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .input-label {
-          font-size: 13px;
-          font-weight: 600;
-          color: #374151;
-        }
-        .text-input {
-          padding: 11px 14px;
-          border-radius: 8px;
-          border: 1px solid #E2E8F0;
-          font-size: 15px;
-          outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          width: 100%;
-        }
-        .text-input:focus {
-          border-color: #1B3A2D;
-          box-shadow: 0 0 0 3px rgba(27,58,45,0.08);
-        }
-        .domain-input-wrap {
-          display: flex;
-          align-items: center;
-          border: 1px solid #E2E8F0;
-          border-radius: 8px;
-          overflow: hidden;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .domain-input-wrap:focus-within {
-          border-color: #1B3A2D;
-          box-shadow: 0 0 0 3px rgba(27,58,45,0.08);
-        }
-        .domain-input {
-          border: none !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          flex: 1;
-        }
-        .domain-suffix {
-          padding: 0 14px;
-          font-size: 14px;
-          color: #94A3B8;
-          font-weight: 500;
-          white-space: nowrap;
-          background: #F8FAFC;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          border-left: 1px solid #E2E8F0;
-        }
-        .btn-primary {
-          padding: 12px;
-          border-radius: 8px;
-          background: #1B3A2D;
-          color: #fff;
-          font-size: 15px;
-          font-weight: 600;
-          border: none;
-          cursor: pointer;
-          transition: opacity 0.2s;
-          margin-top: 4px;
-        }
-        .btn-primary:hover { opacity: 0.88; }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .form-error {
-          color: #DC2626;
-          font-size: 13px;
-          background: #FEF2F2;
-          padding: 10px 14px;
-          border-radius: 8px;
-        }
-        .back-link {
-          background: none;
-          border: none;
-          color: #64748B;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          padding: 0;
-          text-align: center;
-          margin-top: 8px;
-          display: block;
-          width: 100%;
-        }
-        .back-link:hover { color: #0F172A; }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
         /* ── Responsive ── */
         @media (max-width: 768px) {
           .features-grid { grid-template-columns: 1fr; }
@@ -864,7 +524,6 @@ export default function RootPage() {
           .hero { padding: 130px 20px 72px; }
         }
         @media (max-width: 480px) {
-          .modal-card { padding: 28px 24px; }
           .hero-actions { flex-direction: column; align-items: center; }
         }
       `}</style>
