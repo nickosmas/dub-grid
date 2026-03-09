@@ -16,19 +16,12 @@ interface PrintOptionsModalProps {
   onClose: () => void;
 }
 
-const FONT_SIZES = [
-  { label: "Small", value: 8 },
-  { label: "Medium", value: 10 },
-  { label: "Large", value: 12 },
-];
-
 export default function PrintOptionsModal({
   wings,
   currentSpanWeeks,
   onPrint,
   onClose,
 }: PrintOptionsModalProps) {
-  const [fontSize, setFontSize] = useState(10);
   const [selectedWings, setSelectedWings] = useState<string[]>(
     wings.map((w) => w.name),
   );
@@ -49,7 +42,7 @@ export default function PrintOptionsModal({
   }
 
   function handlePrint() {
-    onPrint({ fontSize, selectedWings, spanWeeks });
+    onPrint({ fontSize: 8, selectedWings, spanWeeks });
   }
 
   return (
@@ -121,33 +114,6 @@ export default function PrintOptionsModal({
               Tip: use Small font for month view
             </div>
           )}
-        </div>
-
-        {/* Font Size */}
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--color-text-subtle)",
-              letterSpacing: "0.07em",
-              marginBottom: 8,
-            }}
-          >
-            FONT SIZE
-          </div>
-          <div className="dg-segment" style={{ display: "inline-flex" }}>
-            {FONT_SIZES.map(({ label, value }) => (
-              <button
-                key={value}
-                onClick={() => setFontSize(value)}
-                className={`dg-segment-btn${fontSize === value ? " active" : ""}`}
-                style={{ minWidth: 72 }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Wings */}

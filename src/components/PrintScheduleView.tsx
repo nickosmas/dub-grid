@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Employee, ShiftType, Wing } from "@/types";
 import { addDays, formatDateKey, formatDate } from "@/lib/utils";
 import { DAY_LABELS } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
+import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -58,7 +59,7 @@ function PrintSection({
   );
 
   // em-based name column; day columns fill the rest equally
-  const nameColEm = 13;
+  const nameColEm = 16;
   const gridTemplate = `${nameColEm}em repeat(${dates.length}, 1fr)`;
 
   const rowStyle: React.CSSProperties = {
@@ -70,7 +71,7 @@ function PrintSection({
   const tallyH = `${fontSize * 2.8}px`;
 
   return (
-    <div style={{ marginBottom: "1.4em", breakInside: "avoid" }}>
+    <div style={{ marginBottom: "1.4em" }}>
       <div
         style={{
           fontSize: "1.3em",
@@ -78,6 +79,7 @@ function PrintSection({
           color: "#1E293B",
           marginBottom: "0.5em",
           paddingLeft: "0.3em",
+          breakAfter: "avoid",
         }}
       >
         {sectionName}
@@ -88,7 +90,6 @@ function PrintSection({
           border: "1px solid #CBD5E1",
           borderRadius: 6,
           overflow: "hidden",
-          breakInside: "avoid",
         }}
       >
         {/* Header row */}
@@ -131,6 +132,8 @@ function PrintSection({
                 background: rowBg,
                 borderTop: ri === 0 ? "none" : "1px solid #F1F5F9",
                 alignItems: "stretch",
+                breakInside: "avoid",
+                pageBreakInside: "avoid",
               }}
             >
               {/* Name cell */}
@@ -151,10 +154,12 @@ function PrintSection({
                       style={{
                         fontWeight: 600,
                         color: "#1E293B",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        maxWidth: `${nameColEm - 5}em`,
+                        whiteSpace: "normal",
+                        overflowWrap: "break-word",
+                        lineHeight: 1.05,
+                        fontSize: emp.name.length > 25 ? "0.85em" : emp.name.length > 18 ? "0.95em" : "1em",
+                        display: "block",
+                        maxWidth: `${nameColEm - 4}em`,
                       }}
                     >
                       {emp.name}
@@ -213,7 +218,8 @@ function PrintSection({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      position: "relative",
+                      padding: "0.3em 0.25em",
+                      boxSizing: "border-box",
                       borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #F1F5F9",
                     }}
                   >
@@ -230,11 +236,8 @@ function PrintSection({
                           return (
                             <div
                               style={{
-                                position: "absolute",
-                                top: "0.5em",
-                                right: "0.4em",
-                                bottom: "0.5em",
-                                left: "0.4em",
+                                width: "100%",
+                                height: "100%",
                                 background: style.color,
                                 border: `1px solid ${style.border}`,
                                 borderRadius: 4,
@@ -254,11 +257,8 @@ function PrintSection({
                         return (
                           <div
                             style={{
-                              position: "absolute",
-                              top: "0.5em",
-                              right: "0.4em",
-                              bottom: "0.5em",
-                              left: "0.4em",
+                              width: "100%",
+                              height: "100%",
                               display: "flex",
                               borderRadius: 4,
                               overflow: "hidden",
@@ -518,15 +518,36 @@ export default function PrintScheduleView({
     [shiftTypes],
   );
 
-  // Print trigger + cleanup
-  useEffect(() => {
-    const onAfterPrint = () => onClose();
-    window.addEventListener("afterprint", onAfterPrint);
-    return () => window.removeEventListener("afterprint", onAfterPrint);
-  }, [onClose]);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   function handlePrint() {
-    window.print();
+    const contentEl = contentRef.current;
+    if (!contentEl) return;
+
+    const printWindow = window.open("", "_blank", "toolbar=0,scrollbars=1,status=0");
+    if (!printWindow) return;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>Schedule — ${dateRangeLabel}</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    @page { size: A3 landscape; margin: 0.5in; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; }
+  </style>
+</head><body>${contentEl.outerHTML}</body></html>`);
+
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.addEventListener("afterprint", () => printWindow.close());
+    }, 250);
   }
 
   const legendItems = shiftTypes.filter((s) => !EXCLUDED_LEGEND.has(s.label));
@@ -563,14 +584,23 @@ export default function PrintScheduleView({
         >
           ← Back
         </button>
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#1E293B",
-          }}
-        >
-          Print Preview — {dateRangeLabel}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, lineHeight: 1 }}>
+            <DubGridLogo size={32} color="#0F172A" />
+            <DubGridWordmark fontSize={20} color="#0F172A" />
+          </div>
+          {orgName && (
+            <>
+              <span style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", lineHeight: 1 }}>
+                {orgName}
+              </span>
+            </>
+          )}
+          <span style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#64748B", lineHeight: 1 }}>
+            {dateRangeLabel}
+          </span>
         </div>
         <div
           style={{
@@ -624,23 +654,23 @@ export default function PrintScheduleView({
       >
         {/* Paper simulation on screen */}
         <div
+          ref={contentRef}
           className="print-schedule-content"
           style={{
             background: "#fff",
             fontSize: `${fontSize}px`,
-            fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-            padding: "0.6in",
+            fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif",
+            padding: "0.5in",
             maxWidth: "none",
             boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
             borderRadius: 4,
-            minWidth: "fit-content",
           }}
         >
           {/* Print header */}
           <div
             style={{
               display: "flex",
-              alignItems: "baseline",
+              alignItems: "flex-end",
               justifyContent: "space-between",
               marginBottom: "1.2em",
               paddingBottom: "0.6em",
@@ -648,24 +678,35 @@ export default function PrintScheduleView({
             }}
           >
             <div>
-              {orgName && (
-                <div
-                  style={{
-                    fontSize: "1.8em",
-                    fontWeight: 800,
-                    color: "#0F172A",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {orgName}
+              {/* Logo + Wordmark + Org Name in one line */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6em", marginBottom: "0.7em" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5em", lineHeight: 1 }}>
+                  <DubGridLogo size={24} color="#0F172A" />
+                  <DubGridWordmark fontSize={16} color="#0F172A" />
                 </div>
-              )}
+                
+                {orgName && (
+                  <>
+                    <span style={{ color: "#CBD5E1", fontSize: "1.4em", fontWeight: 300, userSelect: "none", alignSelf: "center", marginTop: "-0.1em" }}>|</span>
+                    <span
+                      style={{
+                        fontSize: "1.4em",
+                        fontWeight: 800,
+                        color: "#0F172A",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {orgName}
+                    </span>
+                  </>
+                )}
+              </div>
+
               <div
                 style={{
-                  fontSize: "1.2em",
+                  fontSize: "1.1em",
                   fontWeight: 600,
                   color: "#64748B",
-                  marginTop: orgName ? "0.2em" : 0,
                 }}
               >
                 Schedule — {dateRangeLabel}

@@ -10,6 +10,8 @@ import SettingsPage from "@/components/SettingsPage";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import PrintLegend from "@/components/PrintLegend";
+import PrintOptionsModal, { PrintConfig } from "@/components/PrintOptionsModal";
+import PrintScheduleView from "@/components/PrintScheduleView";
 import ShiftKeyPanel from "@/components/ShiftKeyPanel";
 import DraftBanner from "@/components/DraftBanner";
 import RegularSchedulePanel from "@/components/RegularSchedulePanel";
@@ -90,6 +92,8 @@ function SchedulerContent() {
   const [regularScheduleEmp, setRegularScheduleEmp] = useState<Employee | null>(null);
   const [isApplyingRegular, setIsApplyingRegular] = useState(false);
   const staffToolbarRef = useRef<HTMLDivElement>(null);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [activePrintConfig, setActivePrintConfig] = useState<PrintConfig | null>(null);
   const [repeatModalState, setRepeatModalState] = useState<{
     label: string; date: Date; empId: string; empName: string;
   } | null>(null);
@@ -747,6 +751,7 @@ function SchedulerContent() {
                 onToggleEditMode={() => setIsEditMode((v) => !v)}
                 onApplyRegular={handleApplyRegular}
                 isApplyingRegular={isApplyingRegular}
+                onPrintOpen={() => setShowPrintOptions(true)}
               />
             )}
             {viewMode === "staff" && <div ref={staffToolbarRef} style={{ paddingBottom: 12 }} />}
@@ -869,6 +874,33 @@ function SchedulerContent() {
       )}
 
       <PrintLegend shiftTypes={shiftTypes} />
+
+      {showPrintOptions && (
+        <PrintOptionsModal
+          wings={wings}
+          currentSpanWeeks={spanWeeks}
+          onPrint={(config) => {
+            setShowPrintOptions(false);
+            setActivePrintConfig(config);
+          }}
+          onClose={() => setShowPrintOptions(false)}
+        />
+      )}
+
+      {activePrintConfig && (
+        <PrintScheduleView
+          orgName={organization?.name}
+          weekStart={spanWeeks === "month" ? monthStart : weekStart}
+          config={activePrintConfig}
+          employees={employees}
+          allEmployees={employees}
+          wings={wings}
+          shiftTypes={shiftTypes}
+          shiftForKey={shiftForKey}
+          getShiftStyle={getShiftStyle}
+          onClose={() => setActivePrintConfig(null)}
+        />
+      )}
     </div>
   );
 }
