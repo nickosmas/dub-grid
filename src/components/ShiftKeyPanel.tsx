@@ -12,8 +12,7 @@ export default function ShiftKeyPanel({ shiftTypes }: { shiftTypes: ShiftType[] 
   return (
     <div
       style={{
-        flex: 1,
-        minWidth: 0,
+        width: 260,
         marginTop: 34,
         background: "#fff",
         borderRadius: 12,

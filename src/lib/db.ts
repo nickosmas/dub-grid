@@ -9,6 +9,9 @@ import {
   ShiftType,
   ScheduleNote,
   NoteType,
+  RegularShift,
+  ShiftSeries,
+  SeriesFrequency,
 } from "@/types";
 
 // ── Optimistic Locking Error ──────────────────────────────────────────────────
@@ -145,6 +148,8 @@ interface DbShift {
   date: string;
   draft_label: string | null;
   published_label: string | null;
+  series_id?: string | null;
+  from_regular?: boolean;
 }
 
 interface DbScheduleNote {
@@ -419,7 +424,7 @@ export async function deleteEmployee(empId: string): Promise<void> {
 export async function fetchShifts(orgId: string, isScheduler: boolean): Promise<ShiftMap> {
   const { data, error } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_label, published_label, employees!inner(org_id)")
+    .select("emp_id, date, draft_label, published_label, series_id, from_regular, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (error) throw error;
   const map: ShiftMap = {};
@@ -431,13 +436,13 @@ export async function fetchShifts(orgId: string, isScheduler: boolean): Promise<
 
     const isDraft = row.draft_label !== null && row.draft_label !== row.published_label;
 
-    // An 'OFF' draft acts as a deletion for a draft, but we only set it to the map if it's not 'OFF'
-    // Actually, if it's OFF, we shouldn't show a shift in the UI.
-    // So if effectiveLabel is null or 'OFF', we leave it absent from the map.
-    // But wait, if it's OFF and isDraft, it means they deleted a published shift and we need to know it's a draft change.
-    // To keep the map correct but identify changes, we'll store OFF as well but let the UI filter it from being shown.
     if (effectiveLabel) {
-      map[`${row.emp_id}_${row.date}`] = { label: effectiveLabel, isDraft };
+      map[`${row.emp_id}_${row.date}`] = {
+        label: effectiveLabel,
+        isDraft,
+        seriesId: row.series_id ?? null,
+        fromRegular: row.from_regular ?? false,
+      };
     }
   }
   return map;
@@ -817,4 +822,320 @@ export async function endImpersonation(sessionId: string): Promise<void> {
     p_session_id: sessionId,
   });
   if (error) throw error;
+}
+
+// ── Regular Shifts ────────────────────────────────────────────────────────────
+
+interface DbRegularShift {
+  id: string;
+  emp_id: string;
+  org_id: string;
+  day_of_week: number;
+  shift_label: string;
+  effective_from: string;
+  effective_until: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToRegularShift(row: DbRegularShift): RegularShift {
+  return {
+    id: row.id,
+    empId: row.emp_id,
+    orgId: row.org_id,
+    dayOfWeek: row.day_of_week,
+    shiftLabel: row.shift_label,
+    effectiveFrom: row.effective_from,
+    effectiveUntil: row.effective_until,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function fetchRegularShifts(orgId: string, empId?: string): Promise<RegularShift[]> {
+  let query = supabase
+    .from("regular_shifts")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("day_of_week");
+  if (empId) query = query.eq("emp_id", empId);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data as DbRegularShift[]).map(rowToRegularShift);
+}
+
+export async function upsertRegularShift(
+  empId: string,
+  orgId: string,
+  dayOfWeek: number,
+  shiftLabel: string,
+  effectiveFrom: string,
+): Promise<void> {
+  // Insert without .select() to avoid RLS RETURNING issues.
+  const { error } = await supabase
+    .from("regular_shifts")
+    .upsert(
+      { emp_id: empId, org_id: orgId, day_of_week: dayOfWeek, shift_label: shiftLabel, effective_from: effectiveFrom },
+      { onConflict: "emp_id,day_of_week,effective_from" },
+    );
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteRegularShift(empId: string, dayOfWeek: number, effectiveFrom: string): Promise<void> {
+  const { error } = await supabase
+    .from("regular_shifts")
+    .delete()
+    .eq("emp_id", empId)
+    .eq("day_of_week", dayOfWeek)
+    .eq("effective_from", effectiveFrom);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Applies regular shift templates to a date range as drafts.
+ * Only fills slots where no shift currently exists (uses ignoreDuplicates).
+ * Returns keys of newly created shifts.
+ */
+export async function applyRegularSchedules(
+  orgId: string,
+  startDate: Date,
+  endDate: Date,
+  regularShifts: RegularShift[],
+  existingShifts: ShiftMap,
+): Promise<{ empId: string; date: string; label: string }[]> {
+  // Group regular shifts by employee
+  const byEmp: Record<string, RegularShift[]> = {};
+  for (const rs of regularShifts) {
+    if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
+    byEmp[rs.empId].push(rs);
+  }
+
+  const toInsert: { emp_id: string; date: string; draft_label: string; org_id: string; from_regular: boolean }[] = [];
+  const generated: { empId: string; date: string; label: string }[] = [];
+
+  const current = new Date(startDate);
+  current.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+
+  while (current <= end) {
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const dateKey = `${y}-${m}-${d}`;
+    const dayOfWeek = current.getDay();
+
+    for (const [empId, shifts] of Object.entries(byEmp)) {
+      const mapKey = `${empId}_${dateKey}`;
+      // Skip if a shift already exists for this slot
+      if (existingShifts[mapKey]) continue;
+
+      const effective_from_cmp = new Date(current);
+      const regular = shifts.find(rs => {
+        const from = new Date(rs.effectiveFrom + 'T00:00:00');
+        const until = rs.effectiveUntil ? new Date(rs.effectiveUntil + 'T00:00:00') : null;
+        return (
+          rs.dayOfWeek === dayOfWeek &&
+          from <= effective_from_cmp &&
+          (!until || until >= effective_from_cmp)
+        );
+      });
+
+      if (regular) {
+        toInsert.push({ emp_id: empId, date: dateKey, draft_label: regular.shiftLabel, org_id: orgId, from_regular: true });
+        generated.push({ empId, date: dateKey, label: regular.shiftLabel });
+      }
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase
+      .from("shifts")
+      .upsert(toInsert, { onConflict: "emp_id,date", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
+  }
+
+  return generated;
+}
+
+// ── Shift Series ──────────────────────────────────────────────────────────────
+
+interface DbShiftSeries {
+  id: string;
+  emp_id: string;
+  org_id: string;
+  shift_label: string;
+  frequency: SeriesFrequency;
+  days_of_week: number[] | null;
+  start_date: string;
+  end_date: string | null;
+  max_occurrences: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToShiftSeries(row: DbShiftSeries): ShiftSeries {
+  return {
+    id: row.id,
+    empId: row.emp_id,
+    orgId: row.org_id,
+    shiftLabel: row.shift_label,
+    frequency: row.frequency,
+    daysOfWeek: row.days_of_week,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    maxOccurrences: row.max_occurrences,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function generateSeriesDates(
+  frequency: SeriesFrequency,
+  daysOfWeek: number[] | null,
+  startDate: string,
+  endDate: string | null,
+  maxOccurrences: number | null,
+): string[] {
+  const dates: string[] = [];
+  const start = new Date(startDate + 'T00:00:00');
+  const end = endDate ? new Date(endDate + 'T00:00:00') : null;
+  const cap = maxOccurrences ?? 730; // Safety cap: 2 years of daily shifts
+
+  const current = new Date(start);
+
+  while (dates.length < cap) {
+    const y = current.getFullYear();
+    const mo = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const dateKey = `${y}-${mo}-${d}`;
+
+    if (end && current > end) break;
+
+    const dayOfWeek = current.getDay();
+
+    let include = false;
+    if (frequency === 'daily') {
+      include = true;
+    } else if (frequency === 'weekly') {
+      include = !daysOfWeek?.length || daysOfWeek.includes(dayOfWeek);
+    } else if (frequency === 'biweekly') {
+      const diffDays = Math.round((current.getTime() - start.getTime()) / 86400000);
+      const weekNum = Math.floor(diffDays / 7);
+      include = weekNum % 2 === 0 && (!daysOfWeek?.length || daysOfWeek.includes(dayOfWeek));
+    }
+
+    if (include) dates.push(dateKey);
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+}
+
+export async function createShiftSeries(
+  empId: string,
+  orgId: string,
+  shiftLabel: string,
+  frequency: SeriesFrequency,
+  daysOfWeek: number[] | null,
+  startDate: string,
+  endDate: string | null,
+  maxOccurrences: number | null,
+): Promise<ShiftSeries> {
+  // Pre-generate the UUID so we can link occurrence rows without needing RETURNING.
+  // This avoids the RLS RETURNING issue where SELECT policy can block the returned row.
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  // 1. Create the series master record (no .select() needed)
+  const { error } = await supabase
+    .from("shift_series")
+    .insert({
+      id,
+      emp_id: empId,
+      org_id: orgId,
+      shift_label: shiftLabel,
+      frequency,
+      days_of_week: daysOfWeek,
+      start_date: startDate,
+      end_date: endDate,
+      max_occurrences: maxOccurrences,
+    });
+  if (error) throw new Error(error.message);
+
+  // 2. Generate and upsert occurrence rows
+  const dates = generateSeriesDates(frequency, daysOfWeek, startDate, endDate, maxOccurrences);
+  if (dates.length > 0) {
+    const rows = dates.map(date => ({
+      emp_id: empId,
+      date,
+      draft_label: shiftLabel,
+      org_id: orgId,
+      series_id: id,
+    }));
+    const { error: insertError } = await supabase
+      .from("shifts")
+      .upsert(rows, { onConflict: "emp_id,date" });
+    if (insertError) throw new Error(insertError.message);
+  }
+
+  // 3. Return a constructed ShiftSeries (no re-fetch needed)
+  return {
+    id,
+    empId,
+    orgId,
+    shiftLabel,
+    frequency,
+    daysOfWeek,
+    startDate,
+    endDate,
+    maxOccurrences,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Updates draft_label for all shifts in a series (bulk edit all).
+ */
+export async function updateSeriesAllShifts(seriesId: string, newLabel: string): Promise<void> {
+  const { error } = await supabase
+    .from("shifts")
+    .update({ draft_label: newLabel })
+    .eq("series_id", seriesId);
+  if (error) throw new Error(error.message);
+
+  const { error: seriesError } = await supabase
+    .from("shift_series")
+    .update({ shift_label: newLabel })
+    .eq("id", seriesId);
+  if (seriesError) throw new Error(seriesError.message);
+}
+
+/**
+ * Deletes all shifts in a series (sets draft_label to 'OFF' for published ones,
+ * hard-deletes pure drafts). Also deletes the series master record.
+ */
+export async function deleteShiftSeries(seriesId: string): Promise<void> {
+  const { error } = await supabase
+    .from("shifts")
+    .update({ draft_label: 'OFF', series_id: null })
+    .eq("series_id", seriesId)
+    .is("published_label", null);
+  if (error) throw new Error(error.message);
+
+  const { error: pubError } = await supabase
+    .from("shifts")
+    .update({ draft_label: 'OFF', series_id: null })
+    .eq("series_id", seriesId)
+    .not("published_label", "is", null);
+  if (pubError) throw new Error(pubError.message);
+
+  const { error: seriesError } = await supabase
+    .from("shift_series")
+    .delete()
+    .eq("id", seriesId);
+  if (seriesError) throw new Error(seriesError.message);
 }

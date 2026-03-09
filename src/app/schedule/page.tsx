@@ -12,6 +12,8 @@ import AddEmployeeModal from "@/components/AddEmployeeModal";
 import PrintLegend from "@/components/PrintLegend";
 import ShiftKeyPanel from "@/components/ShiftKeyPanel";
 import DraftBanner from "@/components/DraftBanner";
+import RegularSchedulePanel from "@/components/RegularSchedulePanel";
+import RepeatModal from "@/components/RepeatModal";
 import { addDays, formatDateKey, getWeekStart } from "@/lib/utils";
 import { filterAndSortEmployees } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
@@ -26,6 +28,9 @@ import {
   Organization,
   Wing,
   NoteType,
+  RegularShift,
+  SeriesFrequency,
+  SeriesScope,
 } from "@/types";
 
 // Cache all schedule data in sessionStorage so tab refreshes are instant.
@@ -81,6 +86,12 @@ function SchedulerContent() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [regularShifts, setRegularShifts] = useState<RegularShift[]>([]);
+  const [regularScheduleEmp, setRegularScheduleEmp] = useState<Employee | null>(null);
+  const [isApplyingRegular, setIsApplyingRegular] = useState(false);
+  const [repeatModalState, setRepeatModalState] = useState<{
+    label: string; date: Date; empId: string; empName: string;
+  } | null>(null);
 
   const hasUnpublishedChanges = useMemo(() => {
     return (
@@ -123,12 +134,13 @@ function SchedulerContent() {
           return;
         }
 
-        const [w, st, emps, shiftData, noteRows] = await Promise.all([
+        const [w, st, emps, shiftData, noteRows, regShifts] = await Promise.all([
           db.fetchWings(org.id),
           db.fetchShiftTypes(org.id),
           db.fetchEmployees(org.id),
           db.fetchShifts(org.id, canEditSchedule),
           db.fetchScheduleNotes(org.id),
+          db.fetchRegularShifts(org.id),
         ]);
         const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
         for (const note of noteRows) {
@@ -144,6 +156,7 @@ function SchedulerContent() {
         setEmployees(emps);
         setShifts(shiftData);
         setNotes(noteMap);
+        setRegularShifts(regShifts);
         writeScheduleCache({
           org,
           wings: w,
@@ -291,13 +304,109 @@ function SchedulerContent() {
   );
 
   const handleShiftSelect = useCallback(
-    (label: string) => {
+    async (label: string, seriesScope?: SeriesScope) => {
       if (!editPanel) return;
-      setShift(editPanel.empId, editPanel.date, label);
+      const key = `${editPanel.empId}_${formatDateKey(editPanel.date)}`;
+      const currentMeta = shifts[key];
+
+      if (seriesScope === 'all' && currentMeta?.seriesId) {
+        // Bulk-update all shifts in the series
+        try {
+          await db.updateSeriesAllShifts(currentMeta.seriesId, label);
+          const shiftData = await db.fetchShifts(organization!.id, canEditSchedule);
+          setShifts(shiftData);
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        setShift(editPanel.empId, editPanel.date, label);
+      }
       setEditPanel(null);
     },
-    [canEditSchedule, editPanel, setShift],
+    [editPanel, shifts, organization, canEditSchedule, setShift],
   );
+
+  const handleMakeRepeating = useCallback(() => {
+    if (!editPanel) return;
+    const currentLabel = shiftForKey(editPanel.empId, editPanel.date);
+    if (!currentLabel || currentLabel === 'OFF') return;
+    setRepeatModalState({
+      label: currentLabel,
+      date: editPanel.date,
+      empId: editPanel.empId,
+      empName: editPanel.empName,
+    });
+  }, [editPanel, shiftForKey]);
+
+  const handleRepeatConfirm = useCallback(
+    async (
+      frequency: SeriesFrequency,
+      daysOfWeek: number[] | null,
+      startDate: string,
+      endDate: string | null,
+      maxOccurrences: number | null,
+    ) => {
+      if (!repeatModalState || !organization) return;
+      try {
+        await db.createShiftSeries(
+          repeatModalState.empId,
+          organization.id,
+          repeatModalState.label,
+          frequency,
+          daysOfWeek,
+          startDate,
+          endDate,
+          maxOccurrences,
+        );
+        const shiftData = await db.fetchShifts(organization.id, canEditSchedule);
+        setShifts(shiftData);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setRepeatModalState(null);
+        setEditPanel(null);
+      }
+    },
+    [repeatModalState, organization, canEditSchedule],
+  );
+
+  const handleApplyRegular = useCallback(async () => {
+    if (!organization) return;
+    setIsApplyingRegular(true);
+    try {
+      let startDate: Date;
+      let endDate: Date;
+      if (spanWeeks === "month") {
+        startDate = new Date(monthStart);
+        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+      } else {
+        startDate = new Date(weekStart);
+        endDate = addDays(weekStart, spanWeeks * 7 - 1);
+      }
+
+      const generated = await db.applyRegularSchedules(
+        organization.id,
+        startDate,
+        endDate,
+        regularShifts,
+        shifts,
+      );
+
+      if (generated.length > 0) {
+        setShifts(prev => {
+          const next = { ...prev };
+          for (const { empId, date, label } of generated) {
+            next[`${empId}_${date}`] = { label, isDraft: true, fromRegular: true };
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsApplyingRegular(false);
+    }
+  }, [organization, spanWeeks, monthStart, weekStart, regularShifts, shifts]);
 
   const handleNoteToggle = useCallback(
     async (noteType: NoteType, active: boolean, wingName: string) => {
@@ -623,30 +732,34 @@ function SchedulerContent() {
             canEditSchedule={canEditSchedule}
             isEditMode={isEditMode}
             onToggleEditMode={() => setIsEditMode((v) => !v)}
+            onApplyRegular={handleApplyRegular}
+            isApplyingRegular={isApplyingRegular}
           />
         </div>
 
         {viewMode === "schedule" && spanWeeks !== "month" && (
           <div style={{ display: "flex", alignItems: "stretch", gap: 16, width: "100%" }}>
-            <ScheduleGrid
-              filteredEmployees={visibleScheduleEmployees}
-              allEmployees={employees}
-              week1={week1}
-              week2={week2}
-              spanWeeks={spanWeeks}
-              shiftForKey={shiftForKey}
-              getShiftStyle={getShiftStyle}
-              handleCellClick={handleCellClick}
-              today={today}
-              highlightEmpIds={highlightEmpIds}
-              wings={wings}
-              shiftTypes={shiftTypes}
-              isCellInteractive={isEditMode && canAddNotes}
-              noteTypesForKey={noteTypesForKey}
-              activeWing={activeWing}
-              isEditMode={isEditMode}
-            />
-            <div className="no-print" style={{ flex: 1, display: "flex" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <ScheduleGrid
+                filteredEmployees={visibleScheduleEmployees}
+                allEmployees={employees}
+                week1={week1}
+                week2={week2}
+                spanWeeks={spanWeeks}
+                shiftForKey={shiftForKey}
+                getShiftStyle={getShiftStyle}
+                handleCellClick={handleCellClick}
+                today={today}
+                highlightEmpIds={highlightEmpIds}
+                wings={wings}
+                shiftTypes={shiftTypes}
+                isCellInteractive={isEditMode && canAddNotes}
+                noteTypesForKey={noteTypesForKey}
+                activeWing={activeWing}
+                isEditMode={isEditMode}
+              />
+            </div>
+            <div className="no-print" style={{ width: 260, flexShrink: 0, display: "flex" }}>
               <ShiftKeyPanel shiftTypes={shiftTypes} />
             </div>
           </div>
@@ -674,6 +787,7 @@ function SchedulerContent() {
             onDelete={handleDeleteEmployee}
             onAdd={() => setShowAddModal(true)}
             activeWing={activeWing}
+            onRegularSchedule={canEditSchedule ? setRegularScheduleEmp : undefined}
           />
         )}
       </div>}
@@ -701,6 +815,28 @@ function SchedulerContent() {
           getNoteTypes={(wingName) => noteTypesForKey(editPanel.empId, editPanel.date, wingName)}
           onNoteToggle={handleNoteToggle}
           onClose={() => setEditPanel(null)}
+          seriesId={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.seriesId}
+          onMakeRepeating={canEditSchedule ? handleMakeRepeating : undefined}
+        />
+      )}
+
+      {regularScheduleEmp && organization && (
+        <RegularSchedulePanel
+          employee={regularScheduleEmp}
+          orgId={organization.id}
+          shiftTypes={shiftTypes}
+          onClose={() => setRegularScheduleEmp(null)}
+        />
+      )}
+
+      {repeatModalState && (
+        <RepeatModal
+          empName={repeatModalState.empName}
+          shiftLabel={repeatModalState.label}
+          startDate={repeatModalState.date}
+          shiftTypes={shiftTypes}
+          onConfirm={handleRepeatConfirm}
+          onClose={() => setRepeatModalState(null)}
         />
       )}
 

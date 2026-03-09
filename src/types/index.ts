@@ -56,7 +56,43 @@ export interface Employee {
   contactNotes: string;
 }
 
-export type ShiftMap = Record<string, { label: string; isDraft: boolean }>;
+export type ShiftMap = Record<string, {
+  label: string;
+  isDraft: boolean;
+  seriesId?: string | null;
+  fromRegular?: boolean;
+}>;
+
+export type SeriesFrequency = 'daily' | 'weekly' | 'biweekly';
+export type SeriesScope = 'this' | 'all';
+
+export interface RegularShift {
+  id: string;
+  empId: string;
+  orgId: string;
+  /** 0 = Sunday, 1 = Monday … 6 = Saturday */
+  dayOfWeek: number;
+  shiftLabel: string;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiftSeries {
+  id: string;
+  empId: string;
+  orgId: string;
+  shiftLabel: string;
+  frequency: SeriesFrequency;
+  /** Day-of-week numbers for weekly/biweekly. Null means every day. */
+  daysOfWeek: number[] | null;
+  startDate: string;
+  endDate: string | null;
+  maxOccurrences: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface EditModalState {
   empId: string;

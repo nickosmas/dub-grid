@@ -2,18 +2,22 @@
 
 import { useState } from "react";
 import { formatDate } from "@/lib/utils";
-import { EditModalState, ShiftType, NoteType } from "@/types";
+import { EditModalState, ShiftType, NoteType, SeriesScope } from "@/types";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
   currentShift: string | null;
   shiftTypes: ShiftType[];
-  onSelect: (label: string) => void;
+  onSelect: (label: string, seriesScope?: SeriesScope) => void;
   onClose: () => void;
   allowShiftEdits?: boolean;
   canEditNotes?: boolean;
   getNoteTypes?: (wingName: string) => NoteType[];
   onNoteToggle?: (noteType: NoteType, active: boolean, wingName: string) => void;
+  /** Series ID if the current shift belongs to a repeating series */
+  seriesId?: string | null;
+  /** Called when the user wants to create a repeating shift for the current selection */
+  onMakeRepeating?: () => void;
 }
 
 export default function ShiftEditPanel({
@@ -26,7 +30,10 @@ export default function ShiftEditPanel({
   canEditNotes = false,
   getNoteTypes,
   onNoteToggle,
+  seriesId,
+  onMakeRepeating,
 }: ShiftEditPanelProps) {
+  const [seriesScope, setSeriesScope] = useState<SeriesScope>('this');
   // All wing names present in shift types (ordered by first occurrence)
   const allWingNames: string[] = [];
   for (const st of shiftTypes) {
@@ -72,9 +79,9 @@ export default function ShiftEditPanel({
       }
       // If "OFF" was there, remove it when adding a real shift
       newLabels = newLabels.filter(l => l !== "OFF");
-      
+
       const newShift = newLabels.length > 0 ? newLabels.join("/") : "OFF";
-      onSelect(newShift);
+      onSelect(newShift, seriesId ? seriesScope : undefined);
     };
 
     return (
@@ -226,6 +233,39 @@ export default function ShiftEditPanel({
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+          {/* Series scope selector — shown when editing a repeating shift */}
+          {allowShiftEdits && seriesId && (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: "10px 12px",
+                background: "#FFFBEB",
+                border: "1px solid #FCD34D",
+                borderRadius: 8,
+              }}
+            >
+              <div style={{ ...sectionLabel, marginBottom: 6, color: "#92400E" }}>
+                Repeating shift — edit scope
+              </div>
+              <div className="dg-segment" style={{ display: "flex" }}>
+                <button
+                  onClick={() => setSeriesScope('this')}
+                  className={`dg-segment-btn${seriesScope === 'this' ? ' active' : ''}`}
+                  style={{ flex: 1, fontSize: 11 }}
+                >
+                  This shift
+                </button>
+                <button
+                  onClick={() => setSeriesScope('all')}
+                  className={`dg-segment-btn${seriesScope === 'all' ? ' active' : ''}`}
+                  style={{ flex: 1, fontSize: 11 }}
+                >
+                  All in series
+                </button>
+              </div>
+            </div>
+          )}
+
           {allowShiftEdits ? (
             <>
               {/* Wing-specific shifts */}
@@ -271,6 +311,34 @@ export default function ShiftEditPanel({
                   }}
                 >
                   No shifts available for this wing.
+                </div>
+              )}
+
+              {/* Make Repeating — only shown when there's a current shift and no series yet */}
+              {currentShift && currentShift !== "OFF" && !seriesId && onMakeRepeating && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={sectionLabel}>Repeating</div>
+                  <button
+                    onClick={onMakeRepeating}
+                    className="dg-btn"
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      padding: "9px 12px",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="17 1 21 5 17 9" />
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                      <polyline points="7 23 3 19 7 15" />
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                    </svg>
+                    Make this a repeating shift…
+                  </button>
                 </div>
               )}
             </>

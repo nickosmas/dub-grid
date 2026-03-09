@@ -26,6 +26,8 @@ interface ToolbarProps {
   canEditSchedule?: boolean;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
+  onApplyRegular?: () => void;
+  isApplyingRegular?: boolean;
 }
 
 export default function Toolbar({
@@ -44,6 +46,8 @@ export default function Toolbar({
   canEditSchedule,
   isEditMode,
   onToggleEditMode,
+  onApplyRegular,
+  isApplyingRegular,
 }: ToolbarProps) {
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
@@ -212,6 +216,35 @@ export default function Toolbar({
           </svg>
           Download
         </button>
+
+        {/* Apply Regular Schedules — shown in edit mode */}
+        {canEditSchedule && isEditMode && onApplyRegular && (
+          <button
+            onClick={onApplyRegular}
+            disabled={isApplyingRegular}
+            className="dg-btn"
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 10,
+              padding: "7px 12px",
+              fontSize: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              opacity: isApplyingRegular ? 0.6 : 1,
+            }}
+            title="Fill empty slots from employees' regular schedule templates"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+            </svg>
+            {isApplyingRegular ? "Applying…" : "Apply Regular"}
+          </button>
+        )}
 
         {/* Edit mode toggle — only for schedulers */}
         {canEditSchedule && onToggleEditMode && (

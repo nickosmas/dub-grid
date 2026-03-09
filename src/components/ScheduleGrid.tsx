@@ -713,16 +713,64 @@ export default function ScheduleGrid({
     [shiftTypes],
   );
 
+  const renderedSections = sections.filter(section => {
+    const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
+    const rawHomeEmps = filteredEmployees.filter((e) => e.wings.includes(section));
+    const homeEmps = isEditMode
+      ? rawHomeEmps
+      : rawHomeEmps.filter((emp) =>
+          allDates.some((date) => {
+            const shift = shiftForKey(emp.id, date);
+            return (
+              shift !== null &&
+              shift !== "OFF" &&
+              (exclusiveLabels.includes(shift) || generalShiftLabels.has(shift))
+            );
+          }),
+        );
+    const guestEmps = allEmployees.filter(
+      (e) =>
+        !e.wings.includes(section) &&
+        allDates.some((date) => {
+          const shift = shiftForKey(e.id, date);
+          return shift !== null && exclusiveLabels.includes(shift);
+        }),
+    );
+    return [...homeEmps, ...guestEmps].length > 0;
+  });
+
+  if (renderedSections.length === 0) {
+    return (
+      <div
+        style={{
+          padding: "40px",
+          textAlign: "center",
+          background: "#fff",
+          borderRadius: 12,
+          border: "1px dashed var(--color-border)",
+          color: "var(--color-text-muted)",
+          marginTop: 34,
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+          No shifts found for this period
+        </div>
+        <div style={{ fontSize: 13 }}>
+          {isEditMode 
+            ? "No employees are assigned to this wing. Add employees in the Staff view."
+            : "No shifts have been published for this period yet."}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: "fit-content", maxWidth: "100%" }}>
-      {sections.map((section) => {
+      {renderedSections.map((section) => {
         const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
         const rawHomeEmps = filteredEmployees.filter((e) =>
           e.wings.includes(section),
         );
-        // In published view (not editing), hide wing-assigned staff who have no
-        // shifts in this wing AND no general shifts during the visible period.
-        // Staff with general shifts always appear.
         const homeEmps = isEditMode
           ? rawHomeEmps
           : rawHomeEmps.filter((emp) =>
