@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useMemo, useRef, useEffect, useState } from "react";
+import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
@@ -698,9 +698,10 @@ export default function ScheduleGrid({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    setContainerWidth(el.getBoundingClientRect().width);
     const ro = new ResizeObserver((entries) => {
       setContainerWidth(entries[0].contentRect.width);
     });
