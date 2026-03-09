@@ -22,8 +22,9 @@ export function parseHost(hostWithPort: string): ParsedHost {
 
   // Local development subdomains like ardenwood.localhost
   if (labels.length === 2 && labels[1] === "localhost") {
+    const isReserved = labels[0] === "www" || labels[0] === "login";
     return {
-      subdomain: labels[0],
+      subdomain: isReserved ? null : labels[0],
       rootDomain: "localhost",
       port,
       hostname,
@@ -56,7 +57,8 @@ export function parseHost(hostWithPort: string): ParsedHost {
   // "www" and "login" are corporate/platform subdomains, not tenant subdomains.
   // e.g. www.dubgrid.com → rootDomain: dubgrid.com, subdomain: null
   // e.g. login.dubgrid.com → rootDomain: dubgrid.com, subdomain: null
-  if (labels.length === 3 && (labels[0] === "www" || labels[0] === "login")) {
+  const isReserved = labels[0] === "www" || labels[0] === "login";
+  if (labels.length === 3 && isReserved) {
     return {
       subdomain: null,
       rootDomain: labels.slice(1).join("."),
