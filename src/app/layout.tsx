@@ -15,10 +15,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "DubGrid",
-    template: "%s | DubGrid",
-  },
+  title: "DubGrid",
   description: "Smart staff scheduling for care facilities",
   openGraph: {
     title: "DubGrid",
