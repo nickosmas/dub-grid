@@ -153,6 +153,8 @@ interface DbScheduleNote {
   emp_id: string;
   date: string;
   note_type: NoteType;
+  wing_name: string | null;
+  status: 'published' | 'draft' | 'draft_deleted';
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -541,6 +543,29 @@ export async function discardScheduleDrafts(
       .or(orClauses);
     if (deleteError) throw deleteError;
   }
+
+  // 4. Handle Schedule Notes Drafts
+  // - Delete notes with status 'draft'
+  // - Revert notes with status 'draft_deleted' to 'published'
+  const { error: noteDeleteError } = await supabase
+    .from("schedule_notes")
+    .delete()
+    .eq("org_id", orgId)
+    .gte("date", startStr)
+    .lte("date", endStr)
+    .eq("status", "draft");
+
+  if (noteDeleteError) throw noteDeleteError;
+
+  const { error: noteRevertError } = await supabase
+    .from("schedule_notes")
+    .update({ status: "published" })
+    .eq("org_id", orgId)
+    .gte("date", startStr)
+    .lte("date", endStr)
+    .eq("status", "draft_deleted");
+
+  if (noteRevertError) throw noteRevertError;
 }
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────
@@ -548,7 +573,7 @@ export async function discardScheduleDrafts(
 export async function fetchScheduleNotes(orgId: string): Promise<ScheduleNote[]> {
   const { data, error } = await supabase
     .from("schedule_notes")
-    .select("id, org_id, emp_id, date, note_type, created_by, created_at, updated_at")
+    .select("id, org_id, emp_id, date, note_type, wing_name, status, created_by, created_at, updated_at")
     .eq("org_id", orgId);
   if (error) throw error;
 
@@ -558,6 +583,8 @@ export async function fetchScheduleNotes(orgId: string): Promise<ScheduleNote[]>
     empId: row.emp_id,
     date: row.date,
     noteType: row.note_type,
+    wingName: row.wing_name,
+    status: row.status,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -569,15 +596,26 @@ export async function upsertScheduleNote(
   empId: string,
   date: string,
   noteType: NoteType,
+  wingName: string,
+  existingStatus?: 'published' | 'draft' | 'draft_deleted',
 ): Promise<void> {
+  let status: 'draft' | 'published' | 'draft_deleted' = 'draft';
+
+  // If we are "adding" a note that was marked for deletion, set it back to published
+  if (existingStatus === 'draft_deleted') {
+    status = 'published';
+  }
+
   const { error } = await supabase.from("schedule_notes").upsert(
     {
       org_id: orgId,
       emp_id: empId,
       date,
       note_type: noteType,
+      wing_name: wingName,
+      status,
     },
-    { onConflict: "emp_id,date,note_type" },
+    { onConflict: "emp_id,date,note_type,wing_name" },
   );
   if (error) throw error;
 }
@@ -586,14 +624,30 @@ export async function deleteScheduleNote(
   empId: string,
   date: string,
   noteType: NoteType,
+  wingName: string,
+  existingStatus?: 'published' | 'draft' | 'draft_deleted',
 ): Promise<void> {
-  const { error } = await supabase
-    .from("schedule_notes")
-    .delete()
-    .eq("emp_id", empId)
-    .eq("date", date)
-    .eq("note_type", noteType);
-  if (error) throw error;
+  if (existingStatus === 'draft') {
+    // If it was a new draft note, just delete it
+    const { error } = await supabase
+      .from("schedule_notes")
+      .delete()
+      .eq("emp_id", empId)
+      .eq("date", date)
+      .eq("note_type", noteType)
+      .eq("wing_name", wingName);
+    if (error) throw error;
+  } else {
+    // If it was already published, mark it as draft_deleted
+    const { error } = await supabase
+      .from("schedule_notes")
+      .update({ status: 'draft_deleted' })
+      .eq("emp_id", empId)
+      .eq("date", date)
+      .eq("note_type", noteType)
+      .eq("wing_name", wingName);
+    if (error) throw error;
+  }
 }
 
 
