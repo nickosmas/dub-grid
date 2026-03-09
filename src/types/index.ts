@@ -13,6 +13,11 @@ export interface Organization {
   skillLevels: string[];
   /** Ordered list of roles for this org. */
   roles: string[];
+  logoUrl?: string | null;
+  appName?: string;
+  metaDescription?: string;
+  themeConfig?: Record<string, any>;
+  landingPageConfig?: Record<string, any>;
 }
 
 export interface Wing {
