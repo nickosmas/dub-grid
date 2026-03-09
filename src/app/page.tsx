@@ -96,6 +96,7 @@ function SignInModal({ onClose }: { onClose: () => void }) {
 
         {step === "domain" && isApex ? (
           <div
+            key="domain"
             className="modal-form"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -134,7 +135,7 @@ function SignInModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSignIn} className="modal-form">
+          <form key="credentials" onSubmit={handleSignIn} className="modal-form">
             <p className="modal-subtitle">
               Sign in to <strong>{domain.toLowerCase()}.dubgrid.com</strong>
             </p>
@@ -752,6 +753,11 @@ export default function RootPage() {
           display: flex;
           flex-direction: column;
           gap: 16px;
+          animation: formEnter 0.22s ease-out;
+        }
+        @keyframes formEnter {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         .input-group {
           display: flex;
