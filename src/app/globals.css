@@ -465,10 +465,12 @@ textarea {
 }
 
 /* ── Print Styles ───────────────────────────────────────── */
+/* NOTE: The custom print view opens in a new window via window.open().
+   These styles are only for the fallback Ctrl+P case on the main page. */
 @media print {
   @page {
     size: A3 landscape;
-    margin: 0.4in;
+    margin: 0.5in;
   }
 
   *,
@@ -478,10 +480,13 @@ textarea {
     print-color-adjust: exact !important;
   }
 
+  html,
   body {
+    overflow: visible !important;
     background: #fff !important;
   }
 
+  /* Fallback: direct Ctrl+P on the main schedule page */
   .no-print {
     display: none !important;
   }
@@ -490,11 +495,5 @@ textarea {
     display: block !important;
     break-before: page;
     page-break-before: always;
-  }
-
-  html,
-  body,
-  #__next {
-    overflow: visible !important;
   }
 }

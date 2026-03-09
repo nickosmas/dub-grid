@@ -148,11 +148,17 @@ const SectionBlock = memo(function SectionBlock({
           >
             <div
               style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 2,
+                background: "var(--color-bg)",
                 padding: "10px 14px",
                 fontSize: 10,
                 fontWeight: 700,
                 color: "var(--color-text-subtle)",
                 letterSpacing: "0.08em",
+                borderRight: "1px solid var(--color-border-light)",
+                boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
               }}
             >
               STAFF NAME
@@ -231,12 +237,18 @@ const SectionBlock = memo(function SectionBlock({
                 {/* Name cell */}
                 <div
                   style={{
+                    position: "sticky",
+                    left: 0,
+                    zIndex: 1,
+                    background: rowBg,
                     padding: "7px 12px 7px 14px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                     gap: 8,
                     minWidth: 0,
+                    borderRight: "1px solid var(--color-border-light)",
+                    boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
@@ -516,6 +528,10 @@ const SectionBlock = memo(function SectionBlock({
                 >
                   <div
                     style={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 1,
+                      background: "#F1F5F9",
                       padding: "6px 14px",
                       fontSize: 10,
                       fontWeight: 700,
@@ -523,6 +539,8 @@ const SectionBlock = memo(function SectionBlock({
                       letterSpacing: "0.05em",
                       display: "flex",
                       alignItems: "center",
+                      borderRight: "1px solid var(--color-border)",
+                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                     }}
                   >
                     TALLY DAY
@@ -567,6 +585,10 @@ const SectionBlock = memo(function SectionBlock({
                 >
                   <div
                     style={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 1,
+                      background: "#F1F5F9",
                       padding: "6px 14px",
                       fontSize: 10,
                       fontWeight: 700,
@@ -574,6 +596,8 @@ const SectionBlock = memo(function SectionBlock({
                       letterSpacing: "0.05em",
                       display: "flex",
                       alignItems: "center",
+                      borderRight: "1px solid var(--color-border)",
+                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                     }}
                   >
                     TALLY EVE
@@ -618,6 +642,10 @@ const SectionBlock = memo(function SectionBlock({
                 >
                   <div
                     style={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 1,
+                      background: "#F1F5F9",
                       padding: "6px 14px",
                       fontSize: 10,
                       fontWeight: 700,
@@ -625,6 +653,8 @@ const SectionBlock = memo(function SectionBlock({
                       letterSpacing: "0.05em",
                       display: "flex",
                       alignItems: "center",
+                      borderRight: "1px solid var(--color-border)",
+                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                     }}
                   >
                     TALLY NIGHT
