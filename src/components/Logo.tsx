@@ -33,39 +33,14 @@ export function DubGridLogo({
   );
 }
 
-export function OrgLogo({
-  logoUrl,
-  size = 48,
-  appName,
-}: {
-  logoUrl?: string | null;
-  size?: number;
-  appName?: string;
-}) {
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt={appName ?? "Logo"}
-        width={size}
-        height={size}
-        style={{ objectFit: "contain" }}
-      />
-    );
-  }
-  return <DubGridLogo size={size} />;
-}
-
 export function DubGridWordmark({
   fontSize = 26,
   color = "#111827",
   className,
-  text,
 }: {
   fontSize?: number;
   color?: string;
   className?: string;
-  text?: string;
 }) {
   return (
     <span
@@ -77,7 +52,7 @@ export function DubGridWordmark({
         letterSpacing: "-0.02em",
       }}
     >
-      {text ?? "dubgrid"}
+      dubgrid
     </span>
   );
 }

@@ -55,16 +55,14 @@ beforeEach(() => {
 });
 
 describe("Header rendering", () => {
-  it('renders orgName with "|" separator when provided and different from appName', () => {
-    const org = { id: "org-1", name: "Acme Corp", appName: "DubGrid", slug: "acme" } as any;
-    render(<Header {...defaultProps} organization={org} />);
-    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
-    expect(screen.getByText("|")).toBeInTheDocument();
+  it('renders orgName with "/" prefix when provided', () => {
+    render(<Header {...defaultProps} orgName="Acme Corp" />);
+    expect(screen.getByText("/ Acme Corp")).toBeInTheDocument();
   });
 
   it("does NOT render org name when omitted", () => {
     render(<Header {...defaultProps} />);
-    expect(screen.queryByText("|")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\//)).not.toBeInTheDocument();
   });
 
   it('renders nav buttons: "Schedule", "Staff", "Settings"', () => {

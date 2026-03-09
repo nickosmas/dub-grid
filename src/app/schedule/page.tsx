@@ -716,7 +716,7 @@ function SchedulerContent() {
         <Header
           viewMode={viewMode}
           onViewChange={setViewMode}
-          organization={organization ?? undefined}
+          orgName={organization?.name}
           availableViewModes={availableViewModes}
         />
         {isEditMode && canEditSchedule && viewMode === "schedule" && (
