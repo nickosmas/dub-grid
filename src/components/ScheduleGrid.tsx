@@ -28,7 +28,7 @@ interface ScheduleGridProps {
   wings: Wing[];
   shiftTypes: ShiftType[];
   isCellInteractive?: boolean;
-  noteTypesForKey?: (empId: string, date: Date) => NoteType[];
+  noteTypesForKey?: (empId: string, date: Date, wingName?: string) => NoteType[];
   activeWing?: string;
   isEditMode?: boolean;
 }
@@ -48,7 +48,7 @@ interface SectionBlockProps {
   highlightEmpIds?: Set<string>;
   shiftTypes: ShiftType[];
   isCellInteractive: boolean;
-  noteTypesForKey?: (empId: string, date: Date) => NoteType[];
+  noteTypesForKey?: (empId: string, date: Date, wingName?: string) => NoteType[];
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -308,7 +308,7 @@ const SectionBlock = memo(function SectionBlock({
                   const isSplit =
                     splitAtIndex !== undefined && di === splitAtIndex;
                   const shiftType = shiftForKey(emp.id, date);
-                  const noteTypes = noteTypesForKey?.(emp.id, date) ?? [];
+                  const noteTypes = noteTypesForKey?.(emp.id, date, sectionName) ?? [];
                   const shiftStyle = shiftType
                     ? getShiftStyle(shiftType)
                     : null;

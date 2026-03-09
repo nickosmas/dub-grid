@@ -39,7 +39,7 @@ type ScheduleCache = {
   shiftTypes: ShiftType[];
   employees: Employee[];
   shifts: ShiftMap;
-  notes: Record<string, NoteType[]>;
+  notes: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]>;
 };
 
 function readScheduleCache(): ScheduleCache | null {
@@ -70,7 +70,7 @@ function SchedulerContent() {
   const [shiftTypes, setShiftTypes] = useState<ShiftType[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<ShiftMap>({});
-  const [notes, setNotes] = useState<Record<string, NoteType[]>>({});
+  const [notes, setNotes] = useState<Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]>>({});
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("schedule");
@@ -83,8 +83,11 @@ function SchedulerContent() {
   const [isEditMode, setIsEditMode] = useState(false);
 
   const hasUnpublishedChanges = useMemo(() => {
-    return Object.values(shifts).some(shift => shift.isDraft);
-  }, [shifts]);
+    return (
+      Object.values(shifts).some(shift => shift.isDraft) ||
+      Object.values(notes).some(noteList => noteList.some(n => n.status !== 'published'))
+    );
+  }, [shifts, notes]);
 
   // Role-based view modes: settings requires admin+, staff requires scheduler+
   const availableViewModes: ViewMode[] = useMemo(() => {
@@ -127,11 +130,13 @@ function SchedulerContent() {
           db.fetchShifts(org.id, canEditSchedule),
           db.fetchScheduleNotes(org.id),
         ]);
-        const noteMap: Record<string, NoteType[]> = {};
+        const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
         for (const note of noteRows) {
-          const key = `${note.empId}_${note.date}`;
+          const key = note.wingName 
+            ? `${note.empId}_${note.date}_${note.wingName}`
+            : `${note.empId}_${note.date}`;
           if (!noteMap[key]) noteMap[key] = [];
-          noteMap[key].push(note.noteType);
+          noteMap[key].push({ type: note.noteType, status: note.status });
         }
         setOrganization(org);
         setWings(w);
@@ -216,8 +221,15 @@ function SchedulerContent() {
   );
 
   const noteTypesForKey = useCallback(
-    (empId: string, date: Date): NoteType[] =>
-      notes[`${empId}_${formatDateKey(date)}`] ?? [],
+    (empId: string, date: Date, wingName?: string): NoteType[] => {
+      const dateKey = formatDateKey(date);
+      const key = wingName ? `${empId}_${dateKey}_${wingName}` : `${empId}_${dateKey}`;
+      const noteList = notes[key] ?? [];
+      // Only return notes that aren't marked as deleted in draft
+      return noteList
+        .filter(n => n.status !== 'draft_deleted')
+        .map(n => n.type);
+    },
     [notes],
   );
 
@@ -288,16 +300,32 @@ function SchedulerContent() {
   );
 
   const handleNoteToggle = useCallback(
-    async (noteType: NoteType, active: boolean) => {
+    async (noteType: NoteType, active: boolean, wingName: string) => {
       if (!organization || !editPanel) return;
       const dateKey = formatDateKey(editPanel.date);
-      const key = `${editPanel.empId}_${dateKey}`;
+      const key = `${editPanel.empId}_${dateKey}_${wingName}`;
 
+      let existingStatus: 'published' | 'draft' | 'draft_deleted' | undefined;
       setNotes((prev) => {
         const existing = prev[key] ?? [];
-        const updated = active
-          ? [...new Set([...existing, noteType])]
-          : existing.filter((t) => t !== noteType);
+        existingStatus = existing.find(n => n.type === noteType)?.status;
+        
+        let updated: { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[];
+        if (active) {
+          // "Adding" or "Restoring"
+          if (existingStatus === 'draft_deleted') {
+            updated = existing.map(n => n.type === noteType ? { ...n, status: 'published' as const } : n);
+          } else {
+            updated = [...existing.filter(n => n.type !== noteType), { type: noteType, status: 'draft' as const }];
+          }
+        } else {
+          // "Deleting" or "Canceling draft"
+          if (existingStatus === 'published') {
+            updated = existing.map(n => n.type === noteType ? { ...n, status: 'draft_deleted' as const } : n);
+          } else {
+            updated = existing.filter(n => n.type !== noteType);
+          }
+        }
         return { ...prev, [key]: updated };
       });
 
@@ -308,9 +336,17 @@ function SchedulerContent() {
             editPanel.empId,
             dateKey,
             noteType,
+            wingName,
+            existingStatus
           );
         } else {
-          await db.deleteScheduleNote(editPanel.empId, dateKey, noteType);
+          await db.deleteScheduleNote(
+            editPanel.empId, 
+            dateKey, 
+            noteType, 
+            wingName,
+            existingStatus
+          );
         }
       } catch (error) {
         console.error(error);
@@ -407,11 +443,13 @@ function SchedulerContent() {
         db.fetchShifts(organization.id, canEditSchedule),
         db.fetchScheduleNotes(organization.id),
       ]);
-      const noteMap: Record<string, NoteType[]> = {};
+      const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
       for (const note of noteRows) {
-        const key = `${note.empId}_${note.date}`;
+        const key = note.wingName 
+          ? `${note.empId}_${note.date}_${note.wingName}`
+          : `${note.empId}_${note.date}`;
         if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push(note.noteType);
+        noteMap[key].push({ type: note.noteType, status: note.status });
       }
       const cached = readScheduleCache();
       if (cached) {
@@ -455,11 +493,13 @@ function SchedulerContent() {
         db.fetchShifts(organization.id, canEditSchedule),
         db.fetchScheduleNotes(organization.id),
       ]);
-      const noteMap: Record<string, NoteType[]> = {};
+      const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
       for (const note of noteRows) {
-        const key = `${note.empId}_${note.date}`;
+        const key = note.wingName 
+          ? `${note.empId}_${note.date}_${note.wingName}`
+          : `${note.empId}_${note.date}`;
         if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push(note.noteType);
+        noteMap[key].push({ type: note.noteType, status: note.status });
       }
       setShifts(shiftData);
       setNotes(noteMap);
@@ -658,7 +698,7 @@ function SchedulerContent() {
           onSelect={handleShiftSelect}
           allowShiftEdits={canEditSchedule}
           canEditNotes={canAddNotes}
-          noteTypes={noteTypesForKey(editPanel.empId, editPanel.date)}
+          getNoteTypes={(wingName) => noteTypesForKey(editPanel.empId, editPanel.date, wingName)}
           onNoteToggle={handleNoteToggle}
           onClose={() => setEditPanel(null)}
         />
