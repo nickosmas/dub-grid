@@ -1,24 +1,28 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Employee, Wing } from "@/types";
+import { Employee, FocusArea, NamedItem } from "@/types";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
-  wings: Wing[];
-  skillLevels: string[];
-  roles: string[];
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  certificationLabel?: string;
+  roles: NamedItem[];
+  roleLabel?: string;
+  focusAreaLabel?: string;
   onSave: (updatedEmployee: Employee) => void;
   onDelete: (empId: string) => void;
+  onBench: (empId: string, note?: string) => void;
+  onActivate: (empId: string) => void;
   onCancel: () => void;
 }
 
 type EditForm = {
   name: string;
-  designation: string;
-  wings: string[];
-  roles: string[];
-  fteWeight: string;
+  certificationId: number | null;
+  focusAreaIds: number[];
+  roleIds: number[];
   phone: string;
   email: string;
   contactNotes: string;
@@ -26,51 +30,55 @@ type EditForm = {
 
 export default function EditEmployeePanel({
   employee,
-  wings,
-  skillLevels,
+  focusAreas,
+  certifications,
+  certificationLabel = "Certification",
   roles,
+  roleLabel = "Roles",
+  focusAreaLabel = "Focus Areas",
   onSave,
   onDelete,
+  onBench,
+  onActivate,
   onCancel,
 }: EditEmployeePanelProps) {
   const [form, setForm] = useState<EditForm>({
     name: employee.name,
-    designation: employee.designation,
-    wings: employee.wings,
-    roles: employee.roles,
-    fteWeight: employee.fteWeight.toString(),
+    certificationId: employee.certificationId,
+    focusAreaIds: employee.focusAreaIds,
+    roleIds: employee.roleIds,
     phone: employee.phone,
     email: employee.email,
     contactNotes: employee.contactNotes,
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBenchConfirm, setShowBenchConfirm] = useState(false);
+  const [benchNote, setBenchNote] = useState(employee.statusNote || "");
 
   const isModified = useMemo(() => {
     return (
       form.name !== employee.name ||
-      form.designation !== employee.designation ||
-      form.fteWeight !== employee.fteWeight.toString() ||
+      form.certificationId !== employee.certificationId ||
       form.phone !== employee.phone ||
       form.email !== employee.email ||
       form.contactNotes !== employee.contactNotes ||
-      form.wings.length !== employee.wings.length ||
-      form.wings.some((w) => !employee.wings.includes(w)) ||
-      form.roles.length !== employee.roles.length ||
-      form.roles.some((r) => !employee.roles.includes(r))
+      form.focusAreaIds.length !== employee.focusAreaIds.length ||
+      form.focusAreaIds.some((id) => !employee.focusAreaIds.includes(id)) ||
+      form.roleIds.length !== employee.roleIds.length ||
+      form.roleIds.some((id) => !employee.roleIds.includes(id))
     );
   }, [form, employee]);
 
   const handleSave = useCallback(() => {
     if (!form.name.trim()) return;
-    if (form.wings.length === 0) return;
+    if (form.focusAreaIds.length === 0) return;
     onSave({
       ...employee,
       name: form.name.trim(),
-      designation: form.designation,
-      wings: form.wings,
-      roles: form.roles,
-      fteWeight: parseFloat(form.fteWeight) || 1.0,
+      certificationId: form.certificationId,
+      focusAreaIds: form.focusAreaIds,
+      roleIds: form.roleIds,
       phone: form.phone.trim(),
       email: form.email.trim(),
       contactNotes: form.contactNotes.trim(),
@@ -78,23 +86,23 @@ export default function EditEmployeePanel({
   }, [form, employee, onSave]);
 
   const toggleRole = useCallback(
-    (role: string) =>
+    (roleId: number) =>
       setForm((p) => ({
         ...p,
-        roles: p.roles.includes(role)
-          ? p.roles.filter((r) => r !== role)
-          : [...p.roles, role],
+        roleIds: p.roleIds.includes(roleId)
+          ? p.roleIds.filter((id) => id !== roleId)
+          : [...p.roleIds, roleId],
       })),
     [],
   );
 
-  const toggleWing = useCallback(
-    (wingName: string) =>
+  const toggleFocusArea = useCallback(
+    (focusAreaId: number) =>
       setForm((p) => ({
         ...p,
-        wings: p.wings.includes(wingName)
-          ? p.wings.filter((w) => w !== wingName)
-          : [...p.wings, wingName],
+        focusAreaIds: p.focusAreaIds.includes(focusAreaId)
+          ? p.focusAreaIds.filter((id) => id !== focusAreaId)
+          : [...p.focusAreaIds, focusAreaId],
       })),
     [],
   );
@@ -108,6 +116,10 @@ export default function EditEmployeePanel({
     marginBottom: 6,
   };
 
+  const isActive = employee.status === "active";
+  const canEdit = employee.status === "active" || employee.status === "benched";
+  const readOnly = !canEdit;
+
   return (
     <div style={{ padding: "20px 24px" }}>
       <div
@@ -115,37 +127,23 @@ export default function EditEmployeePanel({
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: 24,
+          ...(readOnly ? { opacity: 0.6, pointerEvents: "none" } : {}),
         }}
       >
         {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Name + FTE */}
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>FULL NAME</label>
-              <input
-                className="dg-input"
-                value={form.name}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, name: e.target.value }))
-                }
-                placeholder="e.g. Maria S."
-              />
-            </div>
-            <div style={{ width: 80 }}>
-              <label style={labelStyle}>FTE</label>
-              <input
-                className="dg-input"
-                type="number"
-                step="0.1"
-                min="0"
-                max="1"
-                value={form.fteWeight}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, fteWeight: e.target.value }))
-                }
-              />
-            </div>
+          {/* Name */}
+          <div>
+            <label style={labelStyle}>FULL NAME</label>
+            <input
+              className="dg-input"
+              value={form.name}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, name: e.target.value }))
+              }
+              placeholder="e.g. Maria S."
+              readOnly={readOnly}
+            />
           </div>
 
           {/* Contact details */}
@@ -159,6 +157,7 @@ export default function EditEmployeePanel({
                   setForm((p) => ({ ...p, phone: e.target.value }))
                 }
                 placeholder="(415) 555-0100"
+                readOnly={readOnly}
               />
             </div>
             <div>
@@ -171,6 +170,7 @@ export default function EditEmployeePanel({
                   setForm((p) => ({ ...p, email: e.target.value }))
                 }
                 placeholder="name@example.com"
+                readOnly={readOnly}
               />
             </div>
           </div>
@@ -189,21 +189,24 @@ export default function EditEmployeePanel({
                 resize: "vertical",
                 minHeight: 80,
               }}
+              readOnly={readOnly}
             />
           </div>
 
           <div>
-            <label style={labelStyle}>DESIGNATION</label>
+            <label style={labelStyle}>{certificationLabel.toUpperCase()}</label>
             <select
               className="dg-input"
-              value={form.designation}
+              value={form.certificationId ?? ""}
               onChange={(e) =>
-                setForm((p) => ({ ...p, designation: e.target.value }))
+                setForm((p) => ({ ...p, certificationId: e.target.value ? Number(e.target.value) : null }))
               }
+              disabled={readOnly}
             >
-              {skillLevels.map((d) => (
-                <option key={d} value={d}>
-                  {d}
+              <option value="">— None —</option>
+              {certifications.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name}
                 </option>
               ))}
             </select>
@@ -212,35 +215,36 @@ export default function EditEmployeePanel({
 
         {/* Right column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Assigned Wings */}
+          {/* Assigned Focus Areas */}
           <div>
-            <label style={labelStyle}>ASSIGNED WINGS</label>
+            <label style={labelStyle}>ASSIGNED {focusAreaLabel.toUpperCase()}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {wings.map((wing) => {
-                const active = form.wings.includes(wing.name);
+              {focusAreas.map((focusArea) => {
+                const active = form.focusAreaIds.includes(focusArea.id);
                 return (
                   <button
-                    key={wing.id}
-                    onClick={() => toggleWing(wing.name)}
+                    key={focusArea.id}
+                    onClick={() => toggleFocusArea(focusArea.id)}
+                    disabled={readOnly}
                     style={{
                       background: active
-                        ? wing.colorBg
+                        ? focusArea.colorBg
                         : "var(--color-border-light)",
                       color: active
-                        ? wing.colorText
+                        ? focusArea.colorText
                         : "var(--color-text-muted)",
                       border: active
-                        ? `1.5px solid ${wing.colorText}40`
+                        ? `1.5px solid ${focusArea.colorText}40`
                         : "1.5px solid transparent",
                       borderRadius: 20,
                       padding: "5px 14px",
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: "pointer",
+                      cursor: readOnly ? "default" : "pointer",
                       transition: "all 150ms ease",
                     }}
                   >
-                    {wing.name}
+                    {focusArea.name}
                   </button>
                 );
               })}
@@ -249,14 +253,16 @@ export default function EditEmployeePanel({
 
           {/* Roles */}
           <div>
-            <label style={labelStyle}>ROLES</label>
+            <label style={labelStyle}>{roleLabel.toUpperCase()}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {roles.map((role) => {
-                const active = form.roles.includes(role);
+                const active = form.roleIds.includes(role.id);
                 return (
                   <button
-                    key={role}
-                    onClick={() => toggleRole(role)}
+                    key={role.id}
+                    onClick={() => toggleRole(role.id)}
+                    disabled={readOnly}
+                    title={role.name !== role.abbr ? role.name : undefined}
                     style={{
                       background: active
                         ? "var(--color-dark)"
@@ -267,11 +273,11 @@ export default function EditEmployeePanel({
                       padding: "5px 14px",
                       fontSize: 11,
                       fontWeight: 700,
-                      cursor: "pointer",
+                      cursor: readOnly ? "default" : "pointer",
                       transition: "all 150ms ease",
                     }}
                   >
-                    {role}
+                    {role.abbr}
                   </button>
                 );
               })}
@@ -287,65 +293,126 @@ export default function EditEmployeePanel({
           paddingTop: 16,
           borderTop: "1px solid var(--color-border)",
           display: "flex",
+          flexDirection: "column",
           gap: 12,
-          alignItems: "center",
         }}
       >
-        {!showDeleteConfirm ? (
-          <>
-            <button
-              onClick={handleSave}
-              disabled={
-                !isModified || !form.name.trim() || form.wings.length === 0
-              }
-              className="dg-btn dg-btn-primary"
-              style={{ minWidth: 120 }}
-            >
-              Save Changes
-            </button>
-            <button
-              onClick={onCancel}
-              className="dg-btn dg-btn-secondary"
-            >
-              Discard Changes
-            </button>
-            <div style={{ flex: 1 }} />
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="dg-btn dg-btn-ghost"
-              style={{ color: "var(--color-error)", border: "1px solid #FEE2E2" }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
-              </svg>
-              Remove Staff
-            </button>
-          </>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--color-error-bg)", padding: "8px 16px", borderRadius: 8, width: "100%" }}>
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--color-error)",
-                flex: 1,
-              }}
-            >
-              Remove {form.name}? All historical shift data will be preserved but they will no longer appear on the grid.
+        {isActive && showBenchConfirm ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEF3C7", padding: "12px 16px", borderRadius: 8, width: "100%" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
+              Bench {form.name}? They will be removed from the schedule but their data will be preserved.
             </span>
-            <button
-              onClick={() => onDelete(employee.id)}
-              className="dg-btn dg-btn-primary"
-              style={{ background: "var(--color-error)", border: "none" }}
-            >
-              Confirm Removal
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              className="dg-btn dg-btn-secondary"
-            >
-              Cancel
-            </button>
+            <input
+              className="dg-input"
+              value={benchNote}
+              onChange={(e) => setBenchNote(e.target.value)}
+              placeholder="Reason (optional) — e.g. 'On leave until June'"
+              style={{ fontSize: 13 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => { onBench(employee.id, benchNote.trim() || undefined); }}
+                className="dg-btn dg-btn-primary"
+                style={{ background: "#D97706", border: "none", color: "#fff" }}
+              >
+                Confirm Bench
+              </button>
+              <button
+                onClick={() => setShowBenchConfirm(false)}
+                className="dg-btn dg-btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : employee.status !== "terminated" && showDeleteConfirm ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEE2E2", padding: "12px 16px", borderRadius: 8, width: "100%" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#991B1B" }}>
+              Terminate {form.name}? They will be permanently removed from the schedule and staff list. Historical shift data will be preserved.
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => onDelete(employee.id)}
+                className="dg-btn dg-btn-primary"
+                style={{ background: "#DC2626", border: "none", color: "#fff" }}
+              >
+                Confirm Termination
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="dg-btn dg-btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            {canEdit && (
+              <>
+                <button
+                  onClick={handleSave}
+                  disabled={
+                    !isModified || !form.name.trim() || form.focusAreaIds.length === 0
+                  }
+                  className="dg-btn dg-btn-primary"
+                  style={{ minWidth: 120 }}
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={onCancel}
+                  className="dg-btn dg-btn-secondary"
+                >
+                  Discard Changes
+                </button>
+              </>
+            )}
+            {!canEdit && (
+              <button
+                onClick={onCancel}
+                className="dg-btn dg-btn-secondary"
+              >
+                Close
+              </button>
+            )}
+            <div style={{ flex: 1 }} />
+            {(employee.status === "benched" || employee.status === "terminated") && (
+              <button
+                onClick={() => onActivate(employee.id)}
+                className="dg-btn dg-btn-ghost"
+                style={{ color: "#059669", border: "1px solid #D1FAE5" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Activate
+              </button>
+            )}
+            {isActive && (
+              <button
+                onClick={() => setShowBenchConfirm(true)}
+                className="dg-btn dg-btn-ghost"
+                style={{ color: "#D97706", border: "1px solid #FDE68A" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                Bench
+              </button>
+            )}
+            {employee.status !== "terminated" && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="dg-btn dg-btn-ghost"
+                style={{ color: "var(--color-error)", border: "1px solid #FEE2E2" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                Terminate
+              </button>
+            )}
           </div>
         )}
       </div>

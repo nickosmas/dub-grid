@@ -411,6 +411,39 @@ textarea {
   gap: 8px;
 }
 
+/* ── Toast Overrides (Sonner) ───────────────────────────── */
+[data-sonner-toast][data-type="success"] {
+  --normal-bg: #059669 !important;
+  --normal-text: #fff !important;
+  --normal-border: #047857 !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.35) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  --normal-bg: #DC2626 !important;
+  --normal-text: #fff !important;
+  --normal-border: #B91C1C !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35) !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  --normal-bg: #2563EB !important;
+  --normal-text: #fff !important;
+  --normal-border: #1D4ED8 !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35) !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  --normal-bg: #D97706 !important;
+  --normal-text: #fff !important;
+  --normal-border: #B45309 !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.35) !important;
+}
+
 /* ── Spinner ────────────────────────────────────────────── */
 @keyframes dg-spin {
   to {

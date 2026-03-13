@@ -4,7 +4,8 @@ import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
-import { Employee, ShiftType, Wing, NoteType } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, NoteType, IndicatorType, NamedItem } from "@/types";
+import { getCertAbbr, getRoleAbbrs } from "@/lib/utils";
 
 const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
   JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },      // Purple
@@ -14,6 +15,12 @@ const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
 };
 const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#94A3B8" };
 
+function fmt12hShort(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
+}
+
 interface ScheduleGridProps {
   filteredEmployees: Employee[];
   allEmployees: Employee[];
@@ -21,16 +28,24 @@ interface ScheduleGridProps {
   week2: Date[];
   spanWeeks: 1 | 2;
   shiftForKey: (empId: string, date: Date) => string | null;
-  getShiftStyle: (type: string) => ShiftType;
-  handleCellClick: (emp: Employee, date: Date) => void;
+  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  isDraftForKey?: (empId: string, date: Date) => boolean;
+  /** Pass focusAreaId for context-aware label resolution */
+  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
   today: Date;
   highlightEmpIds?: Set<string>;
-  wings: Wing[];
-  shiftTypes: ShiftType[];
+  focusAreas: FocusArea[];
+  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
-  noteTypesForKey?: (empId: string, date: Date, wingName?: string) => NoteType[];
-  activeWing?: string;
+  noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
+  activeFocusArea?: number | null;
+  certifications?: NamedItem[];
+  companyRoles?: NamedItem[];
   isEditMode?: boolean;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
 }
 
 
@@ -41,15 +56,24 @@ interface SectionBlockProps {
   weekDates: Date[];
   todayKey: string;
   shiftForKey: (empId: string, date: Date) => string | null;
-  getShiftStyle: (type: string) => ShiftType;
-  handleCellClick: (emp: Employee, date: Date) => void;
+  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  isDraftForKey?: (empId: string, date: Date) => boolean;
+  /** Pass focusAreaId for context-aware label resolution */
+  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
   colWidth: number;
   splitAtIndex?: number;
   highlightEmpIds?: Set<string>;
-  shiftTypes: ShiftType[];
+  focusAreas: FocusArea[];
+  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
-  noteTypesForKey?: (empId: string, date: Date, wingName?: string) => NoteType[];
+  noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
   onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  certifications: NamedItem[];
+  companyRoles: NamedItem[];
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -59,29 +83,81 @@ const SectionBlock = memo(function SectionBlock({
   weekDates,
   todayKey,
   shiftForKey,
+  shiftCodeIdsForKey,
+  isDraftForKey,
   getShiftStyle,
   handleCellClick,
   colWidth,
   splitAtIndex,
   highlightEmpIds,
-  shiftTypes,
+  focusAreas,
+  shiftCodes,
+  shiftCategories,
+  indicatorTypes,
   isCellInteractive,
   noteTypesForKey,
   onTooltipChange,
+  getCustomShiftTimes,
+  certifications,
+  companyRoles,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
+
+  // Bind focus-area context so all label lookups within this section
+  // resolve the focus-area-specific shift definition first, falling back
+  // to the general definition.
+  const contextualGetShiftStyle = useMemo(
+    () => (label: string) => getShiftStyle(label, sectionName),
+    [getShiftStyle, sectionName],
+  );
+
+  // Look up shift codes by ID so cross-focus-area shifts render in their own color
+  const shiftCodeById = useMemo(() => {
+    const map = new Map<number, ShiftCode>();
+    for (const sc of shiftCodes) map.set(sc.id, sc);
+    return map;
+  }, [shiftCodes]);
+
+  const getStyleByIdOrLabel = useMemo(
+    () => (label: string, codeId?: number): ShiftCode => {
+      if (codeId != null) {
+        const byId = shiftCodeById.get(codeId);
+        if (byId) return byId;
+      }
+      return contextualGetShiftStyle(label);
+    },
+    [shiftCodeById, contextualGetShiftStyle],
+  );
+
+  // Only count home employees (those assigned to this section) in tallies.
+  // Guest employees are displayed in the grid but excluded from section counts.
+  const sectionFocusArea = focusAreas.find((fa) => fa.name === sectionName);
+  const homeEmployees = useMemo(
+    () => sectionFocusArea ? employees.filter((e) => e.focusAreaIds.includes(sectionFocusArea.id)) : [],
+    [employees, sectionFocusArea],
+  );
+
+  // Set of shift code IDs that belong to this section's focus area
+  const sectionCodeIds = useMemo(() => {
+    if (!sectionFocusArea) return new Set<number>();
+    return new Set(
+      shiftCodes.filter((sc) => sc.focusAreaId === sectionFocusArea.id).map((sc) => sc.id),
+    );
+  }, [shiftCodes, sectionFocusArea]);
+
+  const shiftCodeIdsForKeyFn = shiftCodeIdsForKey ?? (() => []);
 
   const dailyTallies = useMemo(() => {
     return weekDates.map((date) =>
       computeDailyTallies(
-        employees,
+        homeEmployees,
         date,
-        shiftForKey,
-        getShiftStyle,
-        exclusiveLabels,
+        shiftCodeIdsForKeyFn,
+        shiftCodeById,
+        sectionCodeIds,
       ),
     );
-  }, [weekDates, employees, shiftForKey, getShiftStyle, exclusiveLabels]);
+  }, [weekDates, homeEmployees, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds]);
 
   const renderTally = (tally: Tally) => {
     const entries = Object.entries(tally);
@@ -97,15 +173,45 @@ const SectionBlock = memo(function SectionBlock({
     );
   };
 
-  // Compute which count rows to show based on shift types for this wing
-  const sectionShiftTypes = shiftTypes.filter(
-    (st) => st.wingName === sectionName,
-  );
-  const showDayCount = sectionShiftTypes.some((st) => st.countsTowardDay);
-  const showEveCount = sectionShiftTypes.some((st) => st.countsTowardEve);
-  const showNightCount = sectionShiftTypes.some((st) => st.countsTowardNight);
+  // For cross-focus-area pill detection: map label → home focus area name for
+  // labels that belong to another area but NOT this one (or globally).
+  const foreignLabelHomeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const st of shiftCodes) {
+      if (st.focusAreaId == null) continue; // global — never foreign
+      const sectionWing = focusAreas.find((w) => w.name === sectionName);
+      if (sectionWing && st.focusAreaId === sectionWing.id) continue; // belongs here
+      // Belongs to another area — check if there's a local or global definition
+      const hasLocalOrGeneral = shiftCodes.some((s) => {
+        if (s.label !== st.label) return false;
+        return s.focusAreaId == null || (sectionWing != null && s.focusAreaId === sectionWing.id);
+      });
+      if (!hasLocalOrGeneral) {
+        const homeWing = focusAreas.find((w) => st.focusAreaId === w.id);
+        if (homeWing) map.set(st.label, homeWing.name);
+      }
+    }
+    return map;
+  }, [shiftCodes, sectionName, focusAreas]);
 
-  const gridTemplate = `220px repeat(${weekDates.length}, ${colWidth}px)`;
+  // Determine which tally rows to render from the actual dailyTallies data.
+  // This ensures tallies always show when categorized shifts exist.
+  const tallyRows = useMemo(() => {
+    const allCatIds = new Set<number>();
+    for (const dayTally of dailyTallies) {
+      for (const catId of Object.keys(dayTally).map(Number)) {
+        allCatIds.add(catId);
+      }
+    }
+    if (allCatIds.size === 0) return [];
+
+    return shiftCategories
+      .filter((cat) => allCatIds.has(cat.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((cat) => ({ id: cat.id, name: cat.name }));
+  }, [dailyTallies, shiftCategories]);
+
+  const gridTemplate = `220px repeat(${weekDates.length}, minmax(${colWidth}px, 1fr))`;
 
   const rowGrid: React.CSSProperties = {
     display: "grid",
@@ -220,8 +326,9 @@ const SectionBlock = memo(function SectionBlock({
                 ? highlightEmpIds.has(emp.id)
                 : true;
             const rowBg = ri % 2 === 0 ? "#fff" : "var(--color-row-alt)";
+            const certAbbr = getCertAbbr(emp.certificationId, certifications);
             const dc =
-              DESIGNATION_COLORS[emp.designation] ?? DEFAULT_DESIG_COLOR;
+              DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
             return (
               <div
@@ -267,23 +374,8 @@ const SectionBlock = memo(function SectionBlock({
                       >
                         {emp.name}
                       </span>
-                      {emp.fteWeight < 1 && (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            background: "var(--color-border-light)",
-                            color: "var(--color-text-muted)",
-                            padding: "1px 4px",
-                            borderRadius: 4,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {emp.fteWeight}
-                        </span>
-                      )}
                     </div>
-                    {emp.roles.length > 0 && (
+                    {emp.roleIds.length > 0 && (
                       <div
                         style={{
                           fontSize: 10,
@@ -292,11 +384,11 @@ const SectionBlock = memo(function SectionBlock({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {emp.roles.join(", ")}
+                        {getRoleAbbrs(emp.roleIds, companyRoles).join(", ")}
                       </div>
                     )}
                   </div>
-                  {emp.designation && emp.designation !== "—" && (
+                  {emp.certificationId != null && (
                     <span
                       style={{
                         fontSize: 10,
@@ -310,7 +402,7 @@ const SectionBlock = memo(function SectionBlock({
                         letterSpacing: "0.01em",
                       }}
                     >
-                      {emp.designation}
+                      {certAbbr}
                     </span>
                   )}
                 </div>
@@ -321,23 +413,17 @@ const SectionBlock = memo(function SectionBlock({
                   const isToday = dateKey === todayKey;
                   const isSplit =
                     splitAtIndex !== undefined && di === splitAtIndex;
-                  const shiftType = shiftForKey(emp.id, date);
-                  const noteTypes = noteTypesForKey?.(emp.id, date, sectionName) ?? [];
-                  const shiftStyle = shiftType
-                    ? getShiftStyle(shiftType)
-                    : null;
-                  const isCrossWing = shiftType
-                    ? exclusiveLabels.length > 0 &&
-                      !exclusiveLabels.includes(shiftType) &&
-                      shiftType !== "X" &&
-                      shiftStyle !== null
-                    : false;
+                  const shiftCode = shiftForKey(emp.id, date);
+                  const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                  const isDraft = isDraftForKey?.(emp.id, date) ?? false;
+                  const noteTypes = noteTypesForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
+                  const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
 
                   return (
                     <div
                       key={dateKey}
                       onClick={() => {
-                        if (isCellInteractive) handleCellClick(emp, date);
+                        if (isCellInteractive) handleCellClick(emp, date, sectionName);
                       }}
                       style={{
                         height: 48,
@@ -358,11 +444,20 @@ const SectionBlock = memo(function SectionBlock({
                         if (isCellInteractive) {
                           e.currentTarget.style.background = "var(--color-today-bg)";
                         }
-                        if (shiftType && shiftType !== "OFF") {
+                        if (shiftCode && shiftCode !== "OFF") {
                           const rect = e.currentTarget.getBoundingClientRect();
-                          const content = shiftType.includes("/") 
-                            ? shiftType.split("/").map(l => getShiftStyle(l).name).join(" / ")
-                            : getShiftStyle(shiftType).name;
+                          const content = shiftCode.split("/").map((l, li) => {
+                            const style = getStyleByIdOrLabel(l, cellCodeIds[li]);
+                            // Check if this specific shift code belongs to a different focus area
+                            const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                            const isForeign = codeEntry?.focusAreaId != null
+                              && sectionFocusArea != null
+                              && codeEntry.focusAreaId !== sectionFocusArea.id;
+                            const homeFa = isForeign
+                              ? focusAreas.find(fa => fa.id === codeEntry!.focusAreaId)?.name
+                              : foreignLabelHomeMap.get(l);
+                            return homeFa ? `${style.name} (${homeFa})` : style.name;
+                          }).join(" / ");
                           onTooltipChange({
                             content,
                             x: rect.left + rect.width / 2,
@@ -379,84 +474,82 @@ const SectionBlock = memo(function SectionBlock({
                         onTooltipChange(null);
                       }}
                     >
-                      {shiftType && shiftType !== "OFF" ? (
+                      {shiftCode && shiftCode !== "OFF" ? (
                         (() => {
-                          const labels = shiftType.split("/");
+                          const labels = shiftCode.split("/");
                           if (labels.length === 1) {
                             const label = labels[0];
-                            const style = getShiftStyle(label);
-                            const isCross =
-                              exclusiveLabels.length > 0 &&
-                              !exclusiveLabels.includes(label) &&
-                              label !== "X" &&
-                              style !== null;
+                            const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
+                            const codeEntry0 = cellCodeIds[0] != null ? shiftCodeById.get(cellCodeIds[0]) : undefined;
+                            const isCross = label !== "X" && codeEntry0?.focusAreaId != null
+                              && sectionFocusArea != null
+                              && codeEntry0.focusAreaId !== sectionFocusArea.id;
                             return (
                               <div
                                 style={{
                                   position: "absolute",
-                                  top: "0.625rem",
+                                  top: customTimes ? "4px" : "0.625rem",
                                   right: "0.625rem",
-                                  bottom: "0.625rem",
+                                  bottom: customTimes ? "4px" : "0.625rem",
                                   left: "0.625rem",
                                   background: style.color,
-                                  border: `1px solid ${style.border}`,
+                                  border: `1.5px ${isDraft ? "dashed" : "solid"} ${style.border}`,
                                   borderRadius: 6,
-                                  fontSize: 12,
-                                  fontWeight: 700,
                                   color: style.text,
-                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                                  opacity: isCross ? 0.35 : 1,
-                                  filter: isCross ? "grayscale(0.6)" : "none",
+                                  boxShadow: "none",
                                   cursor: "pointer",
                                   display: "flex",
+                                  flexDirection: "column",
                                   alignItems: "center",
                                   justifyContent: "center",
+                                  overflow: "hidden",
+                                  opacity: isCross ? 0.7 : 1,
                                 }}
                               >
-                                {label}
+                                <span style={{ fontSize: 12, fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                                {customTimes && (
+                                  <span style={{
+                                    fontSize: 9,
+                                    fontWeight: 500,
+                                    lineHeight: 1,
+                                    marginTop: 4,
+                                    opacity: 0.7,
+                                    letterSpacing: "0.02em",
+                                  }}>
+                                    {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
+                                  </span>
+                                )}
                                 {noteTypes.length > 0 && (
                                   <div
                                     style={{
                                       position: "absolute",
-                                      top: 3,
+                                      bottom: 3,
                                       right: 4,
                                       display: "flex",
                                       gap: 2,
                                     }}
                                   >
-                                    {noteTypes.includes("readings") && (
+                                    {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
                                       <div
-                                        title="Readings"
+                                        key={ind.name}
+                                        title={ind.name}
                                         style={{
-                                          width: 6,
-                                          height: 6,
+                                          width: 5,
+                                          height: 5,
                                           borderRadius: "50%",
-                                          background: "#EF4444",
-                                          border: "1px solid rgba(255,255,255,0.8)",
+                                          background: ind.color,
+                                          border: "1px solid rgba(255,255,255,0.85)",
                                           flexShrink: 0,
                                         }}
                                       />
-                                    )}
-                                    {noteTypes.includes("shower") && (
-                                      <div
-                                        title="Shower"
-                                        style={{
-                                          width: 6,
-                                          height: 6,
-                                          borderRadius: "50%",
-                                          background: "#1E293B",
-                                          border: "1px solid rgba(255,255,255,0.8)",
-                                          flexShrink: 0,
-                                        }}
-                                      />
-                                    )}
+                                    ))}
                                   </div>
                                 )}
                               </div>
                             );
                           }
 
-                          const firstStyle = getShiftStyle(labels[0]);
+                          const firstStyle = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
                           return (
                             <div
                               style={{
@@ -472,39 +565,38 @@ const SectionBlock = memo(function SectionBlock({
                                   display: "flex",
                                   borderRadius: 6,
                                   overflow: "hidden",
-                                  border: `1px solid ${firstStyle?.border || "var(--color-border)"}`,
-                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                  border: `1.5px ${isDraft ? "dashed" : "solid"} ${firstStyle?.border || "var(--color-border)"}`,
+                                  boxShadow: "none",
                                   cursor: "pointer",
                                   width: "100%",
                                   height: "100%",
                                 }}
                               >
                                 {labels.map((label, li) => {
-                                  const style = getShiftStyle(label);
-                                  const isCross =
-                                    exclusiveLabels.length > 0 &&
-                                    !exclusiveLabels.includes(label) &&
-                                    label !== "X" &&
-                                    style !== null;
+                                  const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
+                                  const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                                  const isCross = label !== "X"
+                                    && codeEntryLi?.focusAreaId != null
+                                    && sectionFocusArea != null
+                                    && codeEntryLi.focusAreaId !== sectionFocusArea.id;
 
                                   return (
                                     <div
                                       key={li}
                                       style={{
                                         flex: 1,
-                                        background: style.color,
-                                        color: style.text,
+                                        background: isCross ? "#ffffff" : style.color,
+                                        color: isCross ? style.color : style.text,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         fontSize: 10,
                                         fontWeight: 800,
-                                        opacity: isCross ? 0.35 : 1,
-                                        filter: isCross ? "grayscale(0.6)" : "none",
                                         borderRight:
                                           li < labels.length - 1
                                             ? `1px solid ${style.border}`
                                             : "none",
+                                        position: "relative",
                                       }}
                                     >
                                       {label}
@@ -523,32 +615,20 @@ const SectionBlock = memo(function SectionBlock({
                                     zIndex: 1,
                                   }}
                                 >
-                                  {noteTypes.includes("readings") && (
+                                  {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
                                     <div
-                                      title="Readings"
+                                      key={ind.name}
+                                      title={ind.name}
                                       style={{
                                         width: 6,
                                         height: 6,
                                         borderRadius: "50%",
-                                        background: "#EF4444",
+                                        background: ind.color,
                                         border: "1px solid rgba(255,255,255,0.8)",
                                         flexShrink: 0,
                                       }}
                                     />
-                                  )}
-                                  {noteTypes.includes("shower") && (
-                                    <div
-                                      title="Shower"
-                                      style={{
-                                        width: 6,
-                                        height: 6,
-                                        borderRadius: "50%",
-                                        background: "#1E293B",
-                                        border: "1px solid rgba(255,255,255,0.8)",
-                                        flexShrink: 0,
-                                      }}
-                                    />
-                                  )}
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -561,7 +641,7 @@ const SectionBlock = memo(function SectionBlock({
                               width: 16,
                               height: 2,
                               background:
-                                shiftType === "OFF"
+                                shiftCode === "OFF"
                                   ? "var(--color-border)"
                                   : "var(--color-border-light)",
                               borderRadius: 2,
@@ -577,32 +657,20 @@ const SectionBlock = memo(function SectionBlock({
                                 gap: 2,
                               }}
                             >
-                              {noteTypes.includes("readings") && (
+                              {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
                                 <div
-                                  title="Readings"
+                                  key={ind.name}
+                                  title={ind.name}
                                   style={{
                                     width: 7,
                                     height: 7,
                                     borderRadius: "50%",
-                                    background: "#EF4444",
+                                    background: ind.color,
                                     border: "1px solid #fff",
                                     flexShrink: 0,
                                   }}
                                 />
-                              )}
-                              {noteTypes.includes("shower") && (
-                                <div
-                                  title="Shower"
-                                  style={{
-                                    width: 7,
-                                    height: 7,
-                                    borderRadius: "50%",
-                                    background: "#1E293B",
-                                    border: "1px solid #fff",
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              )}
+                              ))}
                             </div>
                           )}
                         </>
@@ -614,183 +682,65 @@ const SectionBlock = memo(function SectionBlock({
             );
           })}
 
-          {/* Count rows */}
-          {(showDayCount || showEveCount || showNightCount) && (
-            <>
-              {showDayCount && (
-                <div
-                  style={{
-                    ...rowGrid,
-                    borderTop: "2px solid var(--color-dark)",
-                    background: "#F1F5F9",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
+          {/* Count rows — one per active tally category for this section */}
+          {tallyRows.map((row, ci) => (
+            <div
+              key={row.id}
+              style={{
+                ...rowGrid,
+                borderTop: ci === 0 ? "2px solid var(--color-dark)" : undefined,
+                background: "#fff",
+                borderBottom: "1px solid var(--color-border)",
+              }}
+            >
+              <div
+                style={{
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 1,
+                  background: "#fff",
+                  padding: "6px 14px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--color-text-secondary)",
+                  letterSpacing: "0.05em",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRight: "1px solid var(--color-border)",
+                  boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
+                }}
+              >
+                {row.name}
+              </div>
+              {dailyTallies.map((tallies, i) => {
+                const tally = tallies[row.id] ?? {};
+                const hasCount = Object.keys(tally).length > 0;
+                return (
                   <div
+                    key={i}
                     style={{
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 1,
-                      background: "#F1F5F9",
-                      padding: "6px 14px",
+                      textAlign: "center",
+                      padding: "8px 4px",
+                      borderLeft:
+                        splitAtIndex !== undefined && i === splitAtIndex
+                          ? "2px solid var(--color-dark)"
+                          : "1px solid var(--color-border)",
                       fontSize: 10,
+                      lineHeight: 1.3,
                       fontWeight: 700,
-                      color: "var(--color-text-secondary)",
-                      letterSpacing: "0.05em",
+                      color: hasCount ? "var(--color-text-secondary)" : "var(--color-text-faint)",
                       display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
-                      borderRight: "1px solid var(--color-border)",
-                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
+                      justifyContent: "center",
                     }}
                   >
-                    TALLY DAY
+                    {renderTally(tally)}
                   </div>
-                  {dailyTallies.map((tallies, i) => {
-                    const hasCount = Object.keys(tallies.day).length > 0;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          textAlign: "center",
-                          padding: "8px 4px",
-                          borderLeft:
-                            splitAtIndex !== undefined && i === splitAtIndex
-                              ? "2px solid var(--color-dark)"
-                              : "1px solid var(--color-border)",
-                          fontSize: 10,
-                          lineHeight: 1.3,
-                          fontWeight: 700,
-                          color: hasCount
-                            ? "#1E3A8A"
-                            : "var(--color-text-faint)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {renderTally(tallies.day)}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {showEveCount && (
-                <div
-                  style={{
-                    ...rowGrid,
-                    background: "#F1F5F9",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 1,
-                      background: "#F1F5F9",
-                      padding: "6px 14px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "var(--color-text-secondary)",
-                      letterSpacing: "0.05em",
-                      display: "flex",
-                      alignItems: "center",
-                      borderRight: "1px solid var(--color-border)",
-                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-                    }}
-                  >
-                    TALLY EVE
-                  </div>
-                  {dailyTallies.map((tallies, i) => {
-                    const hasCount = Object.keys(tallies.eve).length > 0;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          textAlign: "center",
-                          padding: "8px 4px",
-                          borderLeft:
-                            splitAtIndex !== undefined && i === splitAtIndex
-                              ? "2px solid var(--color-dark)"
-                              : "1px solid var(--color-border)",
-                          fontSize: 10,
-                          lineHeight: 1.3,
-                          fontWeight: 700,
-                          color: hasCount
-                            ? "#9A3412"
-                            : "var(--color-text-faint)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {renderTally(tallies.eve)}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {showNightCount && (
-                <div
-                  style={{
-                    ...rowGrid,
-                    background: "#F1F5F9",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 1,
-                      background: "#F1F5F9",
-                      padding: "6px 14px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "var(--color-text-secondary)",
-                      letterSpacing: "0.05em",
-                      display: "flex",
-                      alignItems: "center",
-                      borderRight: "1px solid var(--color-border)",
-                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-                    }}
-                  >
-                    TALLY NIGHT
-                  </div>
-                  {dailyTallies.map((tallies, i) => {
-                    const hasCount = Object.keys(tallies.night).length > 0;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          textAlign: "center",
-                          padding: "8px 4px",
-                          borderLeft:
-                            splitAtIndex !== undefined && i === splitAtIndex
-                              ? "2px solid var(--color-dark)"
-                              : "1px solid var(--color-border)",
-                          fontSize: 10,
-                          lineHeight: 1.3,
-                          fontWeight: 700,
-                          color: hasCount
-                            ? "#5B21B6"
-                            : "var(--color-text-faint)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {renderTally(tallies.night)}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -804,25 +754,33 @@ export default function ScheduleGrid({
   week2,
   spanWeeks,
   shiftForKey,
+  shiftCodeIdsForKey,
+  isDraftForKey,
   getShiftStyle,
   handleCellClick,
   today,
   highlightEmpIds,
-  wings,
-  shiftTypes,
+  focusAreas,
+  shiftCodes,
+  shiftCategories,
+  indicatorTypes = [],
   isCellInteractive = true,
   noteTypesForKey,
-  activeWing = "All",
+  activeFocusArea = null,
+  certifications = [],
+  companyRoles = [],
   isEditMode = true,
+  getCustomShiftTimes,
 }: ScheduleGridProps) {
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
-  
+
   const sections = useMemo(() => {
-    const allNames = wings.map((w) => w.name);
-    if (activeWing === "All") return allNames;
-    return allNames.filter((name) => name === activeWing);
-  }, [wings, activeWing]);
+    const allNames = focusAreas.map((w) => w.name);
+    if (activeFocusArea == null) return allNames;
+    const activeFA = focusAreas.find((fa) => fa.id === activeFocusArea);
+    return activeFA ? allNames.filter((name) => name === activeFA.name) : allNames;
+  }, [focusAreas, activeFocusArea]);
 
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
@@ -848,33 +806,40 @@ export default function ScheduleGrid({
         ? 72
         : 84;
 
-  // For each section, compute which shift labels exclusively belong to it
-  // (shift types where wingName matches only this section and no other)
+  // Build a name→id map for fast focus area lookups
+  const focusAreaIdByName = useMemo(
+    () => Object.fromEntries(focusAreas.map((w) => [w.name, w.id])),
+    [focusAreas],
+  );
+
+  // For each section, compute which shift labels belong to it
   const exclusiveLabelsPerSection = useMemo(() => {
     return Object.fromEntries(
       sections.map((section) => {
-        const labels = shiftTypes
-          .filter((st) => st.wingName === section)
+        const focusAreaId = focusAreaIdByName[section];
+        const labels = shiftCodes
+          .filter((st) => focusAreaId != null && st.focusAreaId === focusAreaId)
           .map((st) => st.label);
         return [section, labels];
       }),
     );
-  }, [sections, shiftTypes]);
+  }, [sections, shiftCodes, focusAreaIdByName]);
 
-  // Shift labels that are "general" — not tied to any specific wing
+  // Shift labels that are "general" — not focus-area-specific
   const generalShiftLabels = useMemo(
     () =>
       new Set(
-        shiftTypes
-          .filter((st) => st.isGeneral || !st.wingName)
+        shiftCodes
+          .filter((st) => st.isGeneral || st.focusAreaId == null)
           .map((st) => st.label),
       ),
-    [shiftTypes],
+    [shiftCodes],
   );
 
   const renderedSections = sections.filter(section => {
     const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
-    const rawHomeEmps = filteredEmployees.filter((e) => e.wings.includes(section));
+    const sectionId = focusAreaIdByName[section];
+    const rawHomeEmps = filteredEmployees.filter((e) => sectionId != null && e.focusAreaIds.includes(sectionId));
     const homeEmps = isEditMode
       ? rawHomeEmps
       : rawHomeEmps.filter((emp) =>
@@ -889,7 +854,7 @@ export default function ScheduleGrid({
         );
     const guestEmps = allEmployees.filter(
       (e) =>
-        !e.wings.includes(section) &&
+        (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
         allDates.some((date) => {
           const shift = shiftForKey(e.id, date);
           return shift !== null && exclusiveLabels.includes(shift);
@@ -898,82 +863,81 @@ export default function ScheduleGrid({
     return [...homeEmps, ...guestEmps].length > 0;
   });
 
-  if (renderedSections.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "40px",
-          textAlign: "center",
-          background: "#fff",
-          borderRadius: 12,
-          border: "1px dashed var(--color-border)",
-          color: "var(--color-text-muted)",
-          marginTop: 34,
-        }}
-      >
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
-          No shifts found for this period
-        </div>
-        <div style={{ fontSize: 13 }}>
-          {isEditMode 
-            ? "No employees are assigned to this wing. Add employees in the Staff view."
-            : "No shifts have been published for this period yet."}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div ref={containerRef} style={{ width: "100%", maxWidth: "100%", position: "relative" }}>
-      {tooltip && (
+      {renderedSections.length === 0 ? (
         <div
           style={{
-            position: "fixed",
-            left: tooltip.x,
-            top: tooltip.y - 8,
-            transform: "translate(-50%, -100%)",
-            background: "#FFFFFF",
-            padding: "8px 14px",
-            borderRadius: "10px",
-            boxShadow: `
-              0 10px 25px -5px rgba(0, 0, 0, 0.1),
-              0 8px 10px -6px rgba(0, 0, 0, 0.1),
-              0 0 0 1px rgba(0,0,0,0.05)
-            `,
-            zIndex: 1000,
-            fontSize: "13px",
-            fontWeight: 700,
-            color: "#1E293B",
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            animation: "tooltipFadeIn 0.15s cubic-bezier(0, 0, 0.2, 1)",
+            padding: "40px",
+            textAlign: "center",
+            background: "#fff",
+            borderRadius: 12,
+            border: "1px dashed var(--color-border)",
+            color: "var(--color-text-muted)",
+            marginTop: 34,
           }}
         >
-          {tooltip.content}
-          <div
-            style={{
-              position: "absolute",
-              bottom: -4,
-              left: "50%",
-              transform: "translateX(-50%) rotate(45deg)",
-              width: 10,
-              height: 10,
-              background: "#FFFFFF",
-              boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
-            }}
-          />
-          <style>{`
-            @keyframes tooltipFadeIn {
-              from { opacity: 0; transform: translate(-50%, -90%); scale: 0.95; }
-              to { opacity: 1; transform: translate(-50%, -100%); scale: 1; }
-            }
-          `}</style>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+            No shifts found for this period
+          </div>
+          <div style={{ fontSize: 13 }}>
+            {isEditMode
+              ? "No employees are assigned to this focus area. Add employees in the Staff view."
+              : "No shifts have been published for this period yet."}
+          </div>
         </div>
-      )}
-      {renderedSections.map((section) => {
+      ) : (
+        <>
+          {tooltip && (
+            <div
+              style={{
+                position: "fixed",
+                left: tooltip.x,
+                top: tooltip.y - 8,
+                transform: "translate(-50%, -100%)",
+                background: "#FFFFFF",
+                padding: "8px 14px",
+                borderRadius: "10px",
+                boxShadow: `
+                  0 10px 25px -5px rgba(0, 0, 0, 0.1),
+                  0 8px 10px -6px rgba(0, 0, 0, 0.1),
+                  0 0 0 1px rgba(0,0,0,0.05)
+                `,
+                zIndex: 1000,
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#1E293B",
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+                animation: "tooltipFadeIn 0.15s cubic-bezier(0, 0, 0.2, 1)",
+              }}
+            >
+              {tooltip.content}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: -4,
+                  left: "50%",
+                  transform: "translateX(-50%) rotate(45deg)",
+                  width: 10,
+                  height: 10,
+                  background: "#FFFFFF",
+                  boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
+                }}
+              />
+              <style>{`
+                @keyframes tooltipFadeIn {
+                  from { opacity: 0; transform: translate(-50%, -90%); scale: 0.95; }
+                  to { opacity: 1; transform: translate(-50%, -100%); scale: 1; }
+                }
+              `}</style>
+            </div>
+          )}
+          {renderedSections.map((section) => {
         const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
+        const sectionId = focusAreaIdByName[section];
         const rawHomeEmps = filteredEmployees.filter((e) =>
-          e.wings.includes(section),
+          sectionId != null && e.focusAreaIds.includes(sectionId),
         );
         const homeEmps = isEditMode
           ? rawHomeEmps
@@ -990,7 +954,7 @@ export default function ScheduleGrid({
             );
         const guestEmps = allEmployees.filter(
           (e) =>
-            !e.wings.includes(section) &&
+            (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
             allDates.some((date) => {
               const shift = shiftForKey(e.id, date);
               return shift !== null && exclusiveLabels.includes(shift);
@@ -1006,18 +970,28 @@ export default function ScheduleGrid({
             weekDates={allDates}
             todayKey={todayKey}
             shiftForKey={shiftForKey}
+            shiftCodeIdsForKey={shiftCodeIdsForKey}
+            isDraftForKey={isDraftForKey}
             getShiftStyle={getShiftStyle}
             handleCellClick={handleCellClick}
             colWidth={colWidth}
             splitAtIndex={splitAtIndex}
             highlightEmpIds={highlightEmpIds}
-            shiftTypes={shiftTypes}
+            focusAreas={focusAreas}
+            shiftCodes={shiftCodes}
+            shiftCategories={shiftCategories}
+            indicatorTypes={indicatorTypes}
             isCellInteractive={isCellInteractive}
             noteTypesForKey={noteTypesForKey}
             onTooltipChange={setTooltip}
+            getCustomShiftTimes={getCustomShiftTimes}
+            certifications={certifications}
+            companyRoles={companyRoles}
           />
         );
       })}
+        </>
+      )}
     </div>
   );
 }

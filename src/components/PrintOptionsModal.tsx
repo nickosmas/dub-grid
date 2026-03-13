@@ -1,48 +1,50 @@
 "use client";
 
 import { useState } from "react";
-import { Wing } from "@/types";
+import { FocusArea } from "@/types";
 
 export interface PrintConfig {
   fontSize: number;
-  selectedWings: string[]; // empty = all wings
+  selectedFocusAreas: string[]; // empty = all focus areas
   spanWeeks: 1 | 2 | "month";
 }
 
 interface PrintOptionsModalProps {
-  wings: Wing[];
+  focusAreas: FocusArea[];
   currentSpanWeeks: 1 | 2 | "month";
   onPrint: (config: PrintConfig) => void;
   onClose: () => void;
+  focusAreaLabel?: string;
 }
 
 export default function PrintOptionsModal({
-  wings,
+  focusAreas,
   currentSpanWeeks,
   onPrint,
   onClose,
+  focusAreaLabel = "Focus Areas",
 }: PrintOptionsModalProps) {
-  const [selectedWings, setSelectedWings] = useState<string[]>(
-    wings.map((w) => w.name),
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>(
+    focusAreas.map((w) => w.name),
   );
   const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(
     currentSpanWeeks,
   );
 
-  const allSelected = selectedWings.length === wings.length;
+  const allSelected = selectedFocusAreas.length === focusAreas.length;
 
-  function toggleWing(name: string) {
-    setSelectedWings((prev) =>
+  function toggleFocusArea(name: string) {
+    setSelectedFocusAreas((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
     );
   }
 
   function toggleAll() {
-    setSelectedWings(allSelected ? [] : wings.map((w) => w.name));
+    setSelectedFocusAreas(allSelected ? [] : focusAreas.map((w) => w.name));
   }
 
   function handlePrint() {
-    onPrint({ fontSize: 8, selectedWings, spanWeeks });
+    onPrint({ fontSize: 8, selectedFocusAreas, spanWeeks });
   }
 
   return (
@@ -116,8 +118,8 @@ export default function PrintOptionsModal({
           )}
         </div>
 
-        {/* Wings */}
-        {wings.length > 0 && (
+        {/* Focus Areas */}
+        {focusAreas.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
@@ -128,7 +130,7 @@ export default function PrintOptionsModal({
                 marginBottom: 8,
               }}
             >
-              WINGS
+              {focusAreaLabel.toUpperCase()}
             </div>
             <div
               style={{
@@ -158,10 +160,10 @@ export default function PrintOptionsModal({
                   onChange={toggleAll}
                   style={{ accentColor: "#0F172A", width: 14, height: 14 }}
                 />
-                All Wings
+                All Focus Areas
               </label>
-              {/* Individual wings */}
-              {wings.map((w, i) => (
+              {/* Individual focus areas */}
+              {focusAreas.map((w, i) => (
                 <label
                   key={w.name}
                   style={{
@@ -171,7 +173,7 @@ export default function PrintOptionsModal({
                     padding: "9px 14px",
                     cursor: "pointer",
                     borderBottom:
-                      i < wings.length - 1
+                      i < focusAreas.length - 1
                         ? "1px solid var(--color-border-light)"
                         : "none",
                     fontSize: 13,
@@ -180,8 +182,8 @@ export default function PrintOptionsModal({
                 >
                   <input
                     type="checkbox"
-                    checked={selectedWings.includes(w.name)}
-                    onChange={() => toggleWing(w.name)}
+                    checked={selectedFocusAreas.includes(w.name)}
+                    onChange={() => toggleFocusArea(w.name)}
                     style={{ accentColor: "#0F172A", width: 14, height: 14 }}
                   />
                   {w.name}
@@ -200,7 +202,7 @@ export default function PrintOptionsModal({
           </button>
           <button
             onClick={handlePrint}
-            disabled={selectedWings.length === 0}
+            disabled={selectedFocusAreas.length === 0}
             className="dg-btn dg-btn-primary"
           >
             <svg

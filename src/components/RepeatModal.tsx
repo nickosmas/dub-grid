@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SeriesFrequency, ShiftType } from "@/types";
+import { SeriesFrequency, ShiftCode } from "@/types";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -10,7 +10,7 @@ interface RepeatModalProps {
   empName: string;
   shiftLabel: string;
   startDate: Date;
-  shiftTypes: ShiftType[];
+  shiftCodes: ShiftCode[];
   onConfirm: (
     frequency: SeriesFrequency,
     daysOfWeek: number[] | null,
@@ -34,7 +34,7 @@ export default function RepeatModal({
   empName,
   shiftLabel,
   startDate,
-  shiftTypes,
+  shiftCodes,
   onConfirm,
   onClose,
 }: RepeatModalProps) {
@@ -45,7 +45,7 @@ export default function RepeatModal({
   const [endDate, setEndDate] = useState<string>('');
   const [afterN, setAfterN] = useState<number>(10);
 
-  const shiftType = shiftTypes.find(st => st.label === shiftLabel);
+  const shiftCode = shiftCodes.find(st => st.label === shiftLabel);
 
   function toggleDay(day: number) {
     setDaysOfWeek(prev =>
@@ -107,12 +107,12 @@ export default function RepeatModal({
             </div>
             <div style={{ fontSize: 12, color: "var(--color-text-subtle)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
               {empName}
-              {shiftType && (
+              {shiftCode && (
                 <span
                   style={{
-                    background: shiftType.color,
-                    color: shiftType.text,
-                    border: `1px solid ${shiftType.border}`,
+                    background: shiftCode.color,
+                    color: shiftCode.text,
+                    border: `1px solid ${shiftCode.border}`,
                     borderRadius: 6,
                     padding: "1px 7px",
                     fontSize: 11,

@@ -10,9 +10,9 @@ import * as fc from "fast-check";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type OrgRole = "admin" | "scheduler" | "supervisor" | "user";
+type CompanyRole = "admin" | "scheduler" | "supervisor" | "user";
 type PromotableRole = "admin" | "gridmaster";
-type AllRoles = OrgRole | "gridmaster";
+type AllRoles = CompanyRole | "gridmaster";
 
 interface RoleChangeResult {
   status: "success" | "already_applied";
@@ -164,10 +164,10 @@ function createMockRoleChangeSystem() {
 // ── Arbitraries ───────────────────────────────────────────────────────────────
 
 const arbUuid = fc.uuid();
-const arbOrgRole = fc.constantFrom<OrgRole>("admin", "scheduler", "supervisor", "user");
+const arbCompanyRole = fc.constantFrom<CompanyRole>("admin", "scheduler", "supervisor", "user");
 const arbIdempotencyKey = fc.uuid();
 const arbPromotableRole = fc.constantFrom<PromotableRole>("admin", "gridmaster");
-const arbNonPromotableRole = fc.constantFrom<OrgRole>("scheduler", "supervisor", "user");
+const arbNonPromotableRole = fc.constantFrom<CompanyRole>("scheduler", "supervisor", "user");
 const arbAllRoles = fc.constantFrom<AllRoles>("admin", "scheduler", "supervisor", "user", "gridmaster");
 
 // ── Property Tests ────────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -226,8 +226,8 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
-          arbOrgRole,
+          arbCompanyRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, initialRole, newRole, changedById, idempotencyKey) => {
@@ -269,8 +269,8 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
-          arbOrgRole,
+          arbCompanyRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           arbIdempotencyKey,
@@ -311,8 +311,8 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          arbOrgRole,
-          arbOrgRole,
+          arbCompanyRole,
+          arbCompanyRole,
           arbUuid,
           arbUuid,
           arbIdempotencyKey,
@@ -355,7 +355,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           fc.integer({ min: 2, max: 5 }),
@@ -404,7 +404,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -434,7 +434,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -462,8 +462,8 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
-          arbOrgRole,
+          arbCompanyRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, initialRole, newRole, changedById, idempotencyKey) => {
@@ -495,7 +495,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -523,7 +523,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           fc.integer({ min: 2, max: 10 }),
@@ -563,7 +563,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          fc.array(fc.tuple(arbOrgRole, arbUuid, arbIdempotencyKey), { minLength: 1, maxLength: 5 }),
+          fc.array(fc.tuple(arbCompanyRole, arbUuid, arbIdempotencyKey), { minLength: 1, maxLength: 5 }),
           (targetUserId, roleChanges) => {
             // Ensure all idempotency keys are unique
             const keys = roleChanges.map(([, , key]) => key);
@@ -603,7 +603,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          fc.array(arbOrgRole, { minLength: 2, maxLength: 5 }),
+          fc.array(arbCompanyRole, { minLength: 2, maxLength: 5 }),
           arbUuid,
           fc.array(arbIdempotencyKey, { minLength: 4, maxLength: 4 }),
           (targetUserId, roles, changedById, keys) => {
@@ -616,7 +616,7 @@ describe("RBAC Property Tests", () => {
             mockSystem.setUserRole(targetUserId, roles[0]);
 
             // Perform sequential role changes and track expected transitions
-            const expectedTransitions: Array<{ from: OrgRole; to: OrgRole; key: string }> = [];
+            const expectedTransitions: Array<{ from: CompanyRole; to: CompanyRole; key: string }> = [];
             let currentRole = roles[0];
 
             for (let i = 1; i < roles.length && i <= keys.length; i++) {
@@ -662,7 +662,7 @@ describe("RBAC Property Tests", () => {
     /**
      * **Validates: Requirements 1.4**
      *
-     * For any user with org_role='admin', attempting to change another user's role
+     * For any user with company_role='admin', attempting to change another user's role
      * to 'admin' or 'gridmaster' via change_user_role RPC should raise an exception
      * and leave the target user's role unchanged.
      */
@@ -678,7 +678,7 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbIdempotencyKey,
           (targetUserId, adminCallerId, initialRole, idempotencyKey) => {
             mockSystem.reset();
@@ -712,7 +712,7 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbIdempotencyKey,
           (targetUserId, adminCallerId, initialRole, idempotencyKey) => {
             mockSystem.reset();
@@ -746,7 +746,7 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbPromotableRole,
           arbIdempotencyKey,
           (targetUserId, adminCallerId, initialRole, promotableRole, idempotencyKey) => {
@@ -792,7 +792,7 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbAllRoles,
           arbIdempotencyKey,
           (targetUserId, gridmasterCallerId, initialRole, newRole, idempotencyKey) => {
@@ -825,7 +825,7 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbNonPromotableRole,
           arbIdempotencyKey,
           (targetUserId, adminCallerId, initialRole, newRole, idempotencyKey) => {
@@ -900,10 +900,10 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
-          arbOrgRole,
+          arbCompanyRole,
           (targetUserId, newRole, changedById, idempotencyKey, attemptedNewRole) => {
             mockSystem.reset();
 
@@ -936,7 +936,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -969,10 +969,10 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           (targetUserId, newRole, changedById, idempotencyKey, attemptedNewRole, attemptedNewTargetId) => {
             mockSystem.reset();
@@ -1018,7 +1018,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -1062,7 +1062,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          fc.array(fc.tuple(arbOrgRole, arbUuid, arbIdempotencyKey), { minLength: 2, maxLength: 5 }),
+          fc.array(fc.tuple(arbCompanyRole, arbUuid, arbIdempotencyKey), { minLength: 2, maxLength: 5 }),
           (targetUserId, roleChanges) => {
             // Ensure all idempotency keys are unique
             const keys = roleChanges.map(([, , key]) => key);
@@ -1122,7 +1122,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -1145,7 +1145,7 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          arbOrgRole,
+          arbCompanyRole,
           arbUuid,
           arbIdempotencyKey,
           (targetUserId, newRole, changedById, idempotencyKey) => {
@@ -1177,13 +1177,13 @@ describe("RBAC Property Tests", () => {
       session_id: string;
       gridmaster_id: string;
       target_user_id: string;
-      target_org_id: string;
+      target_company_id: string;
       expires_at: Date;
       created_at: Date;
     }
 
     const impersonationSessions: ImpersonationSession[] = [];
-    const userProfiles: Map<string, { org_id: string; platform_role: string }> = new Map();
+    const userProfiles: Map<string, { company_id: string; platform_role: string }> = new Map();
     const callerPlatformRoles: Map<string, string> = new Map();
 
     class NotGridmasterError extends Error {
@@ -1221,18 +1221,18 @@ describe("RBAC Property Tests", () => {
     function startImpersonation(
       callerId: string,
       targetUserId: string
-    ): { session_id: string; expires_at: Date; target_org_id: string } {
+    ): { session_id: string; expires_at: Date; target_company_id: string } {
       // 1. Verify caller is gridmaster
       if (!isGridmaster(callerId)) {
         throw new NotGridmasterError("Only gridmaster can impersonate users");
       }
 
-      // 2. Get target user's org_id
+      // 2. Get target user's company_id
       const targetProfile = userProfiles.get(targetUserId);
       if (!targetProfile) {
         throw new UserNotFoundError("Target user not found");
       }
-      const targetOrgId = targetProfile.org_id;
+      const targetCompanyId = targetProfile.company_id;
 
       // 3. Check for existing active session (UNIQUE constraint)
       const existingSession = impersonationSessions.find(
@@ -1253,7 +1253,7 @@ describe("RBAC Property Tests", () => {
         session_id: sessionId,
         gridmaster_id: callerId,
         target_user_id: targetUserId,
-        target_org_id: targetOrgId,
+        target_company_id: targetCompanyId,
         expires_at: expiresAt,
         created_at: now,
       };
@@ -1263,7 +1263,7 @@ describe("RBAC Property Tests", () => {
       return {
         session_id: sessionId,
         expires_at: expiresAt,
-        target_org_id: targetOrgId,
+        target_company_id: targetCompanyId,
       };
     }
 
@@ -1287,8 +1287,8 @@ describe("RBAC Property Tests", () => {
       isGridmaster,
       setCallerPlatformRole: (userId: string, role: string) =>
         callerPlatformRoles.set(userId, role),
-      setUserProfile: (userId: string, orgId: string, platformRole: string = "none") =>
-        userProfiles.set(userId, { org_id: orgId, platform_role: platformRole }),
+      setUserProfile: (userId: string, companyId: string, platformRole: string = "none") =>
+        userProfiles.set(userId, { company_id: companyId, platform_role: platformRole }),
       getSessions: () => [...impersonationSessions],
       getSessionByTargetUser: (gridmasterId: string, targetUserId: string) =>
         impersonationSessions.find(
@@ -1311,7 +1311,7 @@ describe("RBAC Property Tests", () => {
      *
      * For any Gridmaster user calling start_impersonation with a valid target user ID,
      * an impersonation_sessions record should be created with a unique session_id
-     * and the correct target_org_id.
+     * and the correct target_company_id.
      */
 
     let mockSystem: ReturnType<typeof createMockImpersonationSystem>;
@@ -1326,14 +1326,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // Create impersonation session
             const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1348,26 +1348,26 @@ describe("RBAC Property Tests", () => {
       );
     });
 
-    it("impersonation session has correct target_org_id", () => {
+    it("impersonation session has correct target_company_id", () => {
       fc.assert(
         fc.property(
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with specific org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // Create impersonation session
             const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
 
-            // Verify target_org_id matches the target user's org
-            expect(result.target_org_id).toBe(targetOrgId);
+            // Verify target_company_id matches the target user's org
+            expect(result.target_company_id).toBe(targetCompanyId);
           }
         ),
         { numRuns: 100 }
@@ -1390,8 +1390,8 @@ describe("RBAC Property Tests", () => {
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target users with their orgs
-            for (const [targetUserId, targetOrgId] of targetUsers) {
-              mockSystem.setUserProfile(targetUserId, targetOrgId);
+            for (const [targetUserId, targetCompanyId] of targetUsers) {
+              mockSystem.setUserProfile(targetUserId, targetCompanyId);
             }
 
             // Create impersonation sessions for each target user
@@ -1415,15 +1415,15 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          arbOrgRole,
-          (callerId, targetUserId, targetOrgId, callerRole) => {
+          arbCompanyRole,
+          (callerId, targetUserId, targetCompanyId, callerRole) => {
             mockSystem.reset();
 
             // Set up non-gridmaster caller (any org role)
             mockSystem.setCallerPlatformRole(callerId, callerRole);
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // Attempt to create impersonation session should throw
             expect(() =>
@@ -1441,14 +1441,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // Create impersonation session
             const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1459,7 +1459,7 @@ describe("RBAC Property Tests", () => {
             expect(sessions[0].session_id).toBe(result.session_id);
             expect(sessions[0].gridmaster_id).toBe(gridmasterId);
             expect(sessions[0].target_user_id).toBe(targetUserId);
-            expect(sessions[0].target_org_id).toBe(targetOrgId);
+            expect(sessions[0].target_company_id).toBe(targetCompanyId);
           }
         ),
         { numRuns: 100 }
@@ -1472,14 +1472,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // Capture time before creating session
             const beforeCreation = new Date();
@@ -1508,14 +1508,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (callerId, targetUserId, targetOrgId) => {
+          (callerId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up non-gridmaster caller
             mockSystem.setCallerPlatformRole(callerId, "none");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // Verify error message
             expect(() =>
@@ -1549,14 +1549,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // First impersonation session should succeed
             const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1578,14 +1578,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // First impersonation session
             mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1613,7 +1613,7 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmaster1Id, gridmaster2Id, targetUserId, targetOrgId) => {
+          (gridmaster1Id, gridmaster2Id, targetUserId, targetCompanyId) => {
             // Ensure gridmasters are different
             fc.pre(gridmaster1Id !== gridmaster2Id);
 
@@ -1624,7 +1624,7 @@ describe("RBAC Property Tests", () => {
             mockSystem.setCallerPlatformRole(gridmaster2Id, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // First gridmaster creates session
             const result1 = mockSystem.startImpersonation(gridmaster1Id, targetUserId);
@@ -1659,8 +1659,8 @@ describe("RBAC Property Tests", () => {
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target users with their orgs
-            for (const [targetUserId, targetOrgId] of targetUsers) {
-              mockSystem.setUserProfile(targetUserId, targetOrgId);
+            for (const [targetUserId, targetCompanyId] of targetUsers) {
+              mockSystem.setUserProfile(targetUserId, targetCompanyId);
             }
 
             // Create impersonation sessions for each target user
@@ -1684,14 +1684,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // First impersonation session
             mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1712,14 +1712,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // First impersonation session
             const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1747,14 +1747,14 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
+          (gridmasterId, targetUserId, targetCompanyId) => {
             mockSystem.reset();
 
             // Set up gridmaster caller
             mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
             // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+            mockSystem.setUserProfile(targetUserId, targetCompanyId);
 
             // First impersonation session
             const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
@@ -1775,7 +1775,7 @@ describe("RBAC Property Tests", () => {
             expect(sessionAfter!.session_id).toBe(sessionBefore!.session_id);
             expect(sessionAfter!.gridmaster_id).toBe(sessionBefore!.gridmaster_id);
             expect(sessionAfter!.target_user_id).toBe(sessionBefore!.target_user_id);
-            expect(sessionAfter!.target_org_id).toBe(sessionBefore!.target_org_id);
+            expect(sessionAfter!.target_company_id).toBe(sessionBefore!.target_company_id);
             expect(sessionAfter!.expires_at.getTime()).toBe(sessionBefore!.expires_at.getTime());
           }
         ),
@@ -1798,7 +1798,7 @@ describe("RBAC Property Tests", () => {
 
     interface Invitation {
       id: string;
-      org_id: string;
+      company_id: string;
       invited_by: string;
       email: string;
       role_to_assign: InvitableRole;
@@ -1810,8 +1810,8 @@ describe("RBAC Property Tests", () => {
     }
 
     const invitations: Invitation[] = [];
-    const callerRoles: Map<string, OrgRole> = new Map();
-    const callerOrgIds: Map<string, string> = new Map();
+    const callerRoles: Map<string, CompanyRole> = new Map();
+    const callerCompanyIds: Map<string, string> = new Map();
 
     class InvalidRoleError extends Error {
       constructor(message: string) {
@@ -1844,7 +1844,7 @@ describe("RBAC Property Tests", () => {
       callerId: string,
       email: string,
       roleToAssign: string,
-      orgId: string
+      companyId: string
     ): { token: string; expires_at: Date; role_to_assign: string } {
       // 1. Verify caller is admin
       const callerRole = callerRoles.get(callerId);
@@ -1853,8 +1853,8 @@ describe("RBAC Property Tests", () => {
       }
 
       // 2. Verify caller belongs to the org
-      const callerOrgId = callerOrgIds.get(callerId);
-      if (callerOrgId !== orgId) {
+      const callerCompanyId = callerCompanyIds.get(callerId);
+      if (callerCompanyId !== companyId) {
         throw new InsufficientPermissionError("Cannot send invitations for other organizations");
       }
 
@@ -1875,7 +1875,7 @@ describe("RBAC Property Tests", () => {
 
       const invitation: Invitation = {
         id,
-        org_id: orgId,
+        company_id: companyId,
         invited_by: callerId,
         email: email.toLowerCase(),
         role_to_assign: roleToAssign,
@@ -1898,14 +1898,14 @@ describe("RBAC Property Tests", () => {
     return {
       sendInvitation,
       isValidInvitableRole,
-      setCallerRole: (userId: string, role: OrgRole) => callerRoles.set(userId, role),
-      setCallerOrgId: (userId: string, orgId: string) => callerOrgIds.set(userId, orgId),
+      setCallerRole: (userId: string, role: CompanyRole) => callerRoles.set(userId, role),
+      setCallerCompanyId: (userId: string, companyId: string) => callerCompanyIds.set(userId, companyId),
       getInvitations: () => [...invitations],
       getInvitationByToken: (token: string) => invitations.find((i) => i.token === token),
       reset: () => {
         invitations.length = 0;
         callerRoles.clear();
-        callerOrgIds.clear();
+        callerCompanyIds.clear();
       },
       InvalidRoleError,
       InsufficientPermissionError,
@@ -1938,15 +1938,15 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbEmail,
-          (adminId, orgId, email) => {
+          (adminId, companyId, email) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Create invitation with scheduler role
-            const result = mockSystem.sendInvitation(adminId, email, "scheduler", orgId);
+            const result = mockSystem.sendInvitation(adminId, email, "scheduler", companyId);
 
             // Verify invitation was created successfully
             expect(result.token).toBeDefined();
@@ -1963,15 +1963,15 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbEmail,
-          (adminId, orgId, email) => {
+          (adminId, companyId, email) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Create invitation with supervisor role
-            const result = mockSystem.sendInvitation(adminId, email, "supervisor", orgId);
+            const result = mockSystem.sendInvitation(adminId, email, "supervisor", companyId);
 
             // Verify invitation was created successfully
             expect(result.token).toBeDefined();
@@ -1988,15 +1988,15 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbEmail,
-          (adminId, orgId, email) => {
+          (adminId, companyId, email) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Create invitation with user role
-            const result = mockSystem.sendInvitation(adminId, email, "user", orgId);
+            const result = mockSystem.sendInvitation(adminId, email, "user", companyId);
 
             // Verify invitation was created successfully
             expect(result.token).toBeDefined();
@@ -2013,16 +2013,16 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbEmail,
-          (adminId, orgId, email) => {
+          (adminId, companyId, email) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Attempt to create invitation with admin role should throw
             expect(() =>
-              mockSystem.sendInvitation(adminId, email, "admin", orgId)
+              mockSystem.sendInvitation(adminId, email, "admin", companyId)
             ).toThrow(mockSystem.InvalidRoleError);
 
             // Verify no invitation was created
@@ -2039,16 +2039,16 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbEmail,
-          (adminId, orgId, email) => {
+          (adminId, companyId, email) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Attempt to create invitation with gridmaster role should throw
             expect(() =>
-              mockSystem.sendInvitation(adminId, email, "gridmaster", orgId)
+              mockSystem.sendInvitation(adminId, email, "gridmaster", companyId)
             ).toThrow(mockSystem.InvalidRoleError);
 
             // Verify no invitation was created
@@ -2066,15 +2066,15 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbEmail,
           arbInvitableRole,
-          (adminId, orgId, email, role) => {
+          (adminId, companyId, email, role) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Create invitation with the specified valid role
-            const result = mockSystem.sendInvitation(adminId, email, role, orgId);
+            const result = mockSystem.sendInvitation(adminId, email, role, companyId);
 
             // Verify the role_to_assign matches what was requested
             expect(result.role_to_assign).toBe(role);
@@ -2096,21 +2096,21 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbEmail,
           arbRestrictedRole,
-          (adminId, orgId, email, restrictedRole) => {
+          (adminId, companyId, email, restrictedRole) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Attempt to create invitation with restricted role should throw
             expect(() =>
-              mockSystem.sendInvitation(adminId, email, restrictedRole, orgId)
+              mockSystem.sendInvitation(adminId, email, restrictedRole, companyId)
             ).toThrow(mockSystem.InvalidRoleError);
 
             // Verify error message mentions the invalid role
             try {
-              mockSystem.sendInvitation(adminId, email, restrictedRole, orgId);
+              mockSystem.sendInvitation(adminId, email, restrictedRole, companyId);
             } catch (e) {
               expect((e as Error).message).toContain(restrictedRole);
               expect((e as Error).message).toContain("scheduler, supervisor, user");
@@ -2128,24 +2128,24 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbEmail,
           fc.oneof(arbInvitableRole, arbRestrictedRole),
-          (adminId, orgId, email, role) => {
+          (adminId, companyId, email, role) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             const isValidRole = ["scheduler", "supervisor", "user"].includes(role);
 
             if (isValidRole) {
               // Valid roles should succeed
-              const result = mockSystem.sendInvitation(adminId, email, role, orgId);
+              const result = mockSystem.sendInvitation(adminId, email, role, companyId);
               expect(result.token).toBeDefined();
               expect(result.role_to_assign).toBe(role);
             } else {
               // Invalid roles should fail
               expect(() =>
-                mockSystem.sendInvitation(adminId, email, role, orgId)
+                mockSystem.sendInvitation(adminId, email, role, companyId)
               ).toThrow(mockSystem.InvalidRoleError);
             }
           }
@@ -2160,7 +2160,7 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           fc.array(fc.tuple(arbEmail, arbInvitableRole), { minLength: 1, maxLength: 5 }),
-          (adminId, orgId, emailRolePairs) => {
+          (adminId, companyId, emailRolePairs) => {
             // Ensure all emails are unique
             const emails = emailRolePairs.map(([email]) => email.toLowerCase());
             fc.pre(new Set(emails).size === emails.length);
@@ -2169,11 +2169,11 @@ describe("RBAC Property Tests", () => {
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Create invitations for each email/role pair
             for (const [email, role] of emailRolePairs) {
-              const result = mockSystem.sendInvitation(adminId, email, role, orgId);
+              const result = mockSystem.sendInvitation(adminId, email, role, companyId);
               expect(result.token).toBeDefined();
               expect(result.role_to_assign).toBe(role);
             }
@@ -2201,19 +2201,19 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbEmail,
           arbRestrictedRole,
-          (adminId, orgId, email, restrictedRole) => {
+          (adminId, companyId, email, restrictedRole) => {
             mockSystem.reset();
 
             // Set up admin caller
             mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+            mockSystem.setCallerCompanyId(adminId, companyId);
 
             // Capture invitation count before attempt
             const countBefore = mockSystem.getInvitations().length;
 
             // Attempt to create invitation with restricted role
             try {
-              mockSystem.sendInvitation(adminId, email, restrictedRole, orgId);
+              mockSystem.sendInvitation(adminId, email, restrictedRole, companyId);
             } catch (e) {
               // Expected to throw
             }
@@ -2669,8 +2669,8 @@ interface MockSession {
   user: {
     app_metadata: {
       platform_role?: string;
-      org_role?: string;
-      org_id?: string;
+      company_role?: string;
+      company_id?: string;
     };
   };
 }
@@ -2689,34 +2689,34 @@ const ROLE_LEVEL: Record<string, number> = {
 
 interface Permissions {
   role: string;
-  orgId: string | null;
+  companyId: string | null;
   level: number;
   isGridmaster: boolean;
-  canManageOrg: boolean;
-  canEditSchedule: boolean;
-  canAddNotes: boolean;
-  canRead: boolean;
+  canManageCompany: boolean;
+  canEditShifts: boolean;
+  canEditNotes: boolean;
+  canViewSchedule: boolean;
   atLeast: (role: string) => boolean;
 }
 
 function getPermissionsFromSession(session: MockSession | null): Permissions {
   const claims = session?.user?.app_metadata ?? {};
-  const role = (claims.org_role as string) ?? "user";
+  const role = (claims.company_role as string) ?? "user";
   const platformRole = claims.platform_role as string;
-  const orgId = (claims.org_id as string) ?? null;
+  const companyId = (claims.company_id as string) ?? null;
 
   const effectiveRole = platformRole === "gridmaster" ? "gridmaster" : role;
   const level = ROLE_LEVEL[effectiveRole] ?? 0;
 
   return {
     role: effectiveRole,
-    orgId,
+    companyId,
     level,
     isGridmaster: level >= 4,
-    canManageOrg: level >= 3,
-    canEditSchedule: level >= 2,
-    canAddNotes: level >= 1,
-    canRead: level >= 0,
+    canManageCompany: level >= 3,
+    canEditShifts: level >= 2,
+    canEditNotes: level >= 1,
+    canViewSchedule: level >= 0,
     atLeast: (r: string) => level >= (ROLE_LEVEL[r] ?? 0),
   };
 }
@@ -2724,8 +2724,8 @@ function getPermissionsFromSession(session: MockSession | null): Permissions {
 // ── Arbitraries for Property 24 ───────────────────────────────────────────────
 
 const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-const arbOrgRoleForPermissions = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
-const arbOrgId = fc.oneof(fc.uuid(), fc.constant(undefined));
+const arbCompanyRoleForPermissions = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+const arbCompanyId = fc.oneof(fc.uuid(), fc.constant(undefined));
 const arbRoleForAtLeast = fc.constantFrom("gridmaster", "admin", "scheduler", "supervisor", "user");
 
 /**
@@ -2735,8 +2735,8 @@ const arbMockSession = fc.record({
   user: fc.record({
     app_metadata: fc.record({
       platform_role: arbPlatformRole,
-      org_role: arbOrgRoleForPermissions,
-      org_id: arbOrgId,
+      company_role: arbCompanyRoleForPermissions,
+      company_id: arbCompanyId,
     }),
   }),
 });
@@ -2745,9 +2745,9 @@ describe("Property 24: usePermissions Hook Correctness", () => {
   /**
    * **Validates: Requirements 9.2, 9.3**
    *
-   * For any JWT claims containing platform_role and org_role, the usePermissions hook
-   * should return correct boolean values for isGridmaster, canManageOrg, canEditSchedule,
-   * canAddNotes based on the role hierarchy, and atLeast(role) should return true if and
+   * For any JWT claims containing platform_role and company_role, the usePermissions hook
+   * should return correct boolean values for isGridmaster, canManageCompany, canEditShifts,
+   * canEditNotes based on the role hierarchy, and atLeast(role) should return true if and
    * only if the user's level is >= the specified role's level.
    *
    * Role hierarchy:
@@ -2771,52 +2771,52 @@ describe("Property 24: usePermissions Hook Correctness", () => {
     );
   });
 
-  it("canManageOrg is true if and only if level >= 3", () => {
+  it("canManageCompany is true if and only if level >= 3", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canManageOrg should be true when level >= 3 (admin or gridmaster)
+        // canManageCompany should be true when level >= 3 (admin or gridmaster)
         const expectedCanManageOrg = permissions.level >= 3;
-        expect(permissions.canManageOrg).toBe(expectedCanManageOrg);
+        expect(permissions.canManageCompany).toBe(expectedCanManageOrg);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("canEditSchedule is true if and only if level >= 2", () => {
+  it("canEditShifts is true if and only if level >= 2", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canEditSchedule should be true when level >= 2 (scheduler, admin, or gridmaster)
+        // canEditShifts should be true when level >= 2 (scheduler, admin, or gridmaster)
         const expectedCanEditSchedule = permissions.level >= 2;
-        expect(permissions.canEditSchedule).toBe(expectedCanEditSchedule);
+        expect(permissions.canEditShifts).toBe(expectedCanEditSchedule);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("canAddNotes is true if and only if level >= 1", () => {
+  it("canEditNotes is true if and only if level >= 1", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canAddNotes should be true when level >= 1 (supervisor, scheduler, admin, or gridmaster)
+        // canEditNotes should be true when level >= 1 (supervisor, scheduler, admin, or gridmaster)
         const expectedCanAddNotes = permissions.level >= 1;
-        expect(permissions.canAddNotes).toBe(expectedCanAddNotes);
+        expect(permissions.canEditNotes).toBe(expectedCanAddNotes);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("canRead is always true (level >= 0)", () => {
+  it("canViewSchedule is always true (level >= 0)", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canRead should always be true since all roles have level >= 0
-        expect(permissions.canRead).toBe(true);
+        // canViewSchedule should always be true since all roles have level >= 0
+        expect(permissions.canViewSchedule).toBe(true);
       }),
       { numRuns: 100 }
     );
@@ -2836,15 +2836,15 @@ describe("Property 24: usePermissions Hook Correctness", () => {
     );
   });
 
-  it("platform_role=gridmaster overrides org_role to give level 4", () => {
+  it("platform_role=gridmaster overrides company_role to give level 4", () => {
     fc.assert(
-      fc.property(arbOrgRoleForPermissions, arbOrgId, (orgRole, orgId) => {
+      fc.property(arbCompanyRoleForPermissions, arbCompanyId, (companyRole, companyId) => {
         const session: MockSession = {
           user: {
             app_metadata: {
               platform_role: "gridmaster",
-              org_role: orgRole,
-              org_id: orgId,
+              company_role: companyRole,
+              company_id: companyId,
             },
           },
         };
@@ -2855,36 +2855,36 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.role).toBe("gridmaster");
         expect(permissions.level).toBe(4);
         expect(permissions.isGridmaster).toBe(true);
-        expect(permissions.canManageOrg).toBe(true);
-        expect(permissions.canEditSchedule).toBe(true);
-        expect(permissions.canAddNotes).toBe(true);
+        expect(permissions.canManageCompany).toBe(true);
+        expect(permissions.canEditShifts).toBe(true);
+        expect(permissions.canEditNotes).toBe(true);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("non-gridmaster platform_role uses org_role for level calculation", () => {
+  it("non-gridmaster platform_role uses company_role for level calculation", () => {
     fc.assert(
       fc.property(
         fc.constantFrom("none", undefined),
         fc.constantFrom("admin", "scheduler", "supervisor", "user"),
-        arbOrgId,
-        (platformRole, orgRole, orgId) => {
+        arbCompanyId,
+        (platformRole, companyRole, companyId) => {
           const session: MockSession = {
             user: {
               app_metadata: {
                 platform_role: platformRole,
-                org_role: orgRole,
-                org_id: orgId,
+                company_role: companyRole,
+                company_id: companyId,
               },
             },
           };
 
           const permissions = getPermissionsFromSession(session);
-          const expectedLevel = ROLE_LEVEL[orgRole] ?? 0;
+          const expectedLevel = ROLE_LEVEL[companyRole] ?? 0;
 
-          // When platform_role is not gridmaster, org_role determines the level
-          expect(permissions.role).toBe(orgRole);
+          // When platform_role is not gridmaster, company_role determines the level
+          expect(permissions.role).toBe(companyRole);
           expect(permissions.level).toBe(expectedLevel);
         }
       ),
@@ -2901,34 +2901,34 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.role).toBe("user");
         expect(permissions.level).toBe(0);
         expect(permissions.isGridmaster).toBe(false);
-        expect(permissions.canManageOrg).toBe(false);
-        expect(permissions.canEditSchedule).toBe(false);
-        expect(permissions.canAddNotes).toBe(false);
-        expect(permissions.canRead).toBe(true);
+        expect(permissions.canManageCompany).toBe(false);
+        expect(permissions.canEditShifts).toBe(false);
+        expect(permissions.canEditNotes).toBe(false);
+        expect(permissions.canViewSchedule).toBe(true);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("missing org_role defaults to user level", () => {
+  it("missing company_role defaults to user level", () => {
     fc.assert(
       fc.property(
         fc.constantFrom("none", undefined),
-        arbOrgId,
-        (platformRole, orgId) => {
+        arbCompanyId,
+        (platformRole, companyId) => {
           const session: MockSession = {
             user: {
               app_metadata: {
                 platform_role: platformRole,
-                org_id: orgId,
-                // org_role is undefined
+                company_id: companyId,
+                // company_role is undefined
               },
             },
           };
 
           const permissions = getPermissionsFromSession(session);
 
-          // Missing org_role should default to "user"
+          // Missing company_role should default to "user"
           expect(permissions.role).toBe("user");
           expect(permissions.level).toBe(0);
         }
@@ -2937,13 +2937,13 @@ describe("Property 24: usePermissions Hook Correctness", () => {
     );
   });
 
-  it("orgId is correctly extracted from claims", () => {
+  it("companyId is correctly extracted from claims", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
-        const expectedOrgId = session.user.app_metadata.org_id ?? null;
+        const expectedCompanyId = session.user.app_metadata.company_id ?? null;
 
-        expect(permissions.orgId).toBe(expectedOrgId);
+        expect(permissions.companyId).toBe(expectedCompanyId);
       }),
       { numRuns: 100 }
     );
@@ -2956,10 +2956,10 @@ describe("Property 24: usePermissions Hook Correctness", () => {
 
         // All boolean helpers should be consistent with the level
         expect(permissions.isGridmaster).toBe(permissions.level >= 4);
-        expect(permissions.canManageOrg).toBe(permissions.level >= 3);
-        expect(permissions.canEditSchedule).toBe(permissions.level >= 2);
-        expect(permissions.canAddNotes).toBe(permissions.level >= 1);
-        expect(permissions.canRead).toBe(permissions.level >= 0);
+        expect(permissions.canManageCompany).toBe(permissions.level >= 3);
+        expect(permissions.canEditShifts).toBe(permissions.level >= 2);
+        expect(permissions.canEditNotes).toBe(permissions.level >= 1);
+        expect(permissions.canViewSchedule).toBe(permissions.level >= 0);
       }),
       { numRuns: 100 }
     );
@@ -3010,25 +3010,25 @@ describe("Property 24: usePermissions Hook Correctness", () => {
 
         // If a higher permission is true, all lower permissions must also be true
         if (permissions.isGridmaster) {
-          expect(permissions.canManageOrg).toBe(true);
-          expect(permissions.canEditSchedule).toBe(true);
-          expect(permissions.canAddNotes).toBe(true);
-          expect(permissions.canRead).toBe(true);
+          expect(permissions.canManageCompany).toBe(true);
+          expect(permissions.canEditShifts).toBe(true);
+          expect(permissions.canEditNotes).toBe(true);
+          expect(permissions.canViewSchedule).toBe(true);
         }
 
-        if (permissions.canManageOrg) {
-          expect(permissions.canEditSchedule).toBe(true);
-          expect(permissions.canAddNotes).toBe(true);
-          expect(permissions.canRead).toBe(true);
+        if (permissions.canManageCompany) {
+          expect(permissions.canEditShifts).toBe(true);
+          expect(permissions.canEditNotes).toBe(true);
+          expect(permissions.canViewSchedule).toBe(true);
         }
 
-        if (permissions.canEditSchedule) {
-          expect(permissions.canAddNotes).toBe(true);
-          expect(permissions.canRead).toBe(true);
+        if (permissions.canEditShifts) {
+          expect(permissions.canEditNotes).toBe(true);
+          expect(permissions.canViewSchedule).toBe(true);
         }
 
-        if (permissions.canAddNotes) {
-          expect(permissions.canRead).toBe(true);
+        if (permissions.canEditNotes) {
+          expect(permissions.canViewSchedule).toBe(true);
         }
       }),
       { numRuns: 100 }
@@ -3197,8 +3197,8 @@ describe("Property 27: Middleware Route Protection", () => {
 
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-  const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
-  const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
+  const arbCompanyRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+  const arbCompanyId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for settings paths
   const arbSettingsPath = fc.oneof(
@@ -3232,18 +3232,18 @@ describe("Property 27: Middleware Route Protection", () => {
   // Arbitrary for JWT claims
   const arbJWTClaims = fc.record({
     platform_role: arbPlatformRole,
-    org_role: arbOrgRole,
-    org_id: arbOrgId,
+    company_role: arbCompanyRole,
+    company_id: arbCompanyId,
   });
 
   describe("calculateEffectiveRole helper function", () => {
     it("returns 'gridmaster' when platform_role is 'gridmaster'", () => {
       fc.assert(
-        fc.property(arbOrgRole, arbOrgId, (orgRole, orgId) => {
+        fc.property(arbCompanyRole, arbCompanyId, (companyRole, companyId) => {
           const claims = {
             platform_role: "gridmaster",
-            org_role: orgRole,
-            org_id: orgId,
+            company_role: companyRole,
+            company_id: companyId,
           };
 
           const effectiveRole = calculateEffectiveRole(claims);
@@ -3253,37 +3253,37 @@ describe("Property 27: Middleware Route Protection", () => {
       );
     });
 
-    it("returns org_role when platform_role is not 'gridmaster'", () => {
+    it("returns company_role when platform_role is not 'gridmaster'", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
           fc.constantFrom("admin", "scheduler", "supervisor", "user"),
-          arbOrgId,
-          (platformRole, orgRole, orgId) => {
+          arbCompanyId,
+          (platformRole, companyRole, companyId) => {
             const claims = {
               platform_role: platformRole,
-              org_role: orgRole,
-              org_id: orgId,
+              company_role: companyRole,
+              company_id: companyId,
             };
 
             const effectiveRole = calculateEffectiveRole(claims);
-            expect(effectiveRole).toBe(orgRole);
+            expect(effectiveRole).toBe(companyRole);
           }
         ),
         { numRuns: 100 }
       );
     });
 
-    it("defaults to 'user' when org_role is undefined and platform_role is not 'gridmaster'", () => {
+    it("defaults to 'user' when company_role is undefined and platform_role is not 'gridmaster'", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
-          arbOrgId,
-          (platformRole, orgId) => {
+          arbCompanyId,
+          (platformRole, companyId) => {
             const claims = {
               platform_role: platformRole,
-              org_role: undefined,
-              org_id: orgId,
+              company_role: undefined,
+              company_id: companyId,
             };
 
             const effectiveRole = calculateEffectiveRole(claims);
@@ -3333,11 +3333,11 @@ describe("Property 27: Middleware Route Protection", () => {
         fc.property(
           fc.constantFrom("scheduler", "supervisor", "user"),
           arbSettingsPath,
-          (orgRole, settingsPath) => {
+          (companyRole, settingsPath) => {
             const claims = {
               platform_role: "none" as const,
-              org_role: orgRole,
-              org_id: "test-org-id",
+              company_role: companyRole,
+              company_id: "test-company-id",
             };
 
             const effectiveRole = calculateEffectiveRole(claims);
@@ -3361,11 +3361,11 @@ describe("Property 27: Middleware Route Protection", () => {
           fc.constantFrom("admin", "gridmaster"),
           arbSettingsPath,
           (role, settingsPath) => {
-            // For admin, use org_role; for gridmaster, use platform_role
+            // For admin, use company_role; for gridmaster, use platform_role
             const claims =
               role === "gridmaster"
-                ? { platform_role: "gridmaster", org_role: undefined, org_id: "test-org-id" }
-                : { platform_role: "none", org_role: "admin", org_id: "test-org-id" };
+                ? { platform_role: "gridmaster", company_role: undefined, company_id: "test-company-id" }
+                : { platform_role: "none", company_role: "admin", company_id: "test-company-id" };
 
             const effectiveRole = calculateEffectiveRole(claims);
             const level = getRoleLevel(effectiveRole);
@@ -3384,11 +3384,11 @@ describe("Property 27: Middleware Route Protection", () => {
 
     it("gridmaster can always access /settings routes", () => {
       fc.assert(
-        fc.property(arbOrgRole, arbSettingsPath, (orgRole, settingsPath) => {
+        fc.property(arbCompanyRole, arbSettingsPath, (companyRole, settingsPath) => {
           const claims = {
             platform_role: "gridmaster",
-            org_role: orgRole,
-            org_id: "test-org-id",
+            company_role: companyRole,
+            company_id: "test-company-id",
           };
 
           const effectiveRole = calculateEffectiveRole(claims);
@@ -3412,11 +3412,11 @@ describe("Property 27: Middleware Route Protection", () => {
         fc.property(
           fc.constantFrom("supervisor", "user"),
           arbSchedulePath,
-          (orgRole, schedulePath) => {
+          (companyRole, schedulePath) => {
             const claims = {
               platform_role: "none" as const,
-              org_role: orgRole,
-              org_id: "test-org-id",
+              company_role: companyRole,
+              company_id: "test-company-id",
             };
 
             const effectiveRole = calculateEffectiveRole(claims);
@@ -3443,8 +3443,8 @@ describe("Property 27: Middleware Route Protection", () => {
             // Build claims based on role
             const claims =
               role === "gridmaster"
-                ? { platform_role: "gridmaster", org_role: undefined, org_id: "test-org-id" }
-                : { platform_role: "none", org_role: role, org_id: "test-org-id" };
+                ? { platform_role: "gridmaster", company_role: undefined, company_id: "test-company-id" }
+                : { platform_role: "none", company_role: role, company_id: "test-company-id" };
 
             const effectiveRole = calculateEffectiveRole(claims);
             const level = getRoleLevel(effectiveRole);
@@ -3463,11 +3463,11 @@ describe("Property 27: Middleware Route Protection", () => {
 
     it("gridmaster can always access /schedule routes", () => {
       fc.assert(
-        fc.property(arbOrgRole, arbSchedulePath, (orgRole, schedulePath) => {
+        fc.property(arbCompanyRole, arbSchedulePath, (companyRole, schedulePath) => {
           const claims = {
             platform_role: "gridmaster",
-            org_role: orgRole,
-            org_id: "test-org-id",
+            company_role: companyRole,
+            company_id: "test-company-id",
           };
 
           const effectiveRole = calculateEffectiveRole(claims);
@@ -3619,15 +3619,15 @@ describe("Property 27: Middleware Route Protection", () => {
  */
 function simulateHeaderInjection(claims: {
   platform_role?: string;
-  org_role?: string;
-  org_id?: string | undefined;
-}): { role: string; orgId: string } {
+  company_role?: string;
+  company_id?: string | undefined;
+}): { role: string; companyId: string } {
   const effectiveRole = calculateEffectiveRole(claims);
-  const orgId = claims.org_id ?? "";
+  const companyId = claims.company_id ?? "";
 
   return {
     role: effectiveRole,
-    orgId: orgId,
+    companyId: companyId,
   };
 }
 
@@ -3636,20 +3636,20 @@ describe("Property 28: Middleware Header Injection", () => {
    * **Validates: Requirements 11.5**
    *
    * For any authenticated request that passes middleware validation,
-   * the response should include x-dubgrid-role and x-dubgrid-org-id headers
+   * the response should include x-dubgrid-role and x-dubgrid-company-id headers
    * with the correct values from the JWT claims.
    */
 
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-  const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
-  const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
+  const arbCompanyRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+  const arbCompanyId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for JWT claims
   const arbJWTClaims = fc.record({
     platform_role: arbPlatformRole,
-    org_role: arbOrgRole,
-    org_id: arbOrgId,
+    company_role: arbCompanyRole,
+    company_id: arbCompanyId,
   });
 
   describe("x-dubgrid-role header injection", () => {
@@ -3667,11 +3667,11 @@ describe("Property 28: Middleware Header Injection", () => {
 
     it("header is 'gridmaster' when platform_role is 'gridmaster'", () => {
       fc.assert(
-        fc.property(arbOrgRole, arbOrgId, (orgRole, orgId) => {
+        fc.property(arbCompanyRole, arbCompanyId, (companyRole, companyId) => {
           const claims = {
             platform_role: "gridmaster",
-            org_role: orgRole,
-            org_id: orgId,
+            company_role: companyRole,
+            company_id: companyId,
           };
 
           const headers = simulateHeaderInjection(claims);
@@ -3681,37 +3681,37 @@ describe("Property 28: Middleware Header Injection", () => {
       );
     });
 
-    it("header matches org_role when platform_role is not 'gridmaster'", () => {
+    it("header matches company_role when platform_role is not 'gridmaster'", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
           fc.constantFrom("admin", "scheduler", "supervisor", "user"),
-          arbOrgId,
-          (platformRole, orgRole, orgId) => {
+          arbCompanyId,
+          (platformRole, companyRole, companyId) => {
             const claims = {
               platform_role: platformRole,
-              org_role: orgRole,
-              org_id: orgId,
+              company_role: companyRole,
+              company_id: companyId,
             };
 
             const headers = simulateHeaderInjection(claims);
-            expect(headers.role).toBe(orgRole);
+            expect(headers.role).toBe(companyRole);
           }
         ),
         { numRuns: 100 }
       );
     });
 
-    it("header defaults to 'user' when org_role is undefined and platform_role is not 'gridmaster'", () => {
+    it("header defaults to 'user' when company_role is undefined and platform_role is not 'gridmaster'", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
-          arbOrgId,
-          (platformRole, orgId) => {
+          arbCompanyId,
+          (platformRole, companyId) => {
             const claims = {
               platform_role: platformRole,
-              org_role: undefined,
-              org_id: orgId,
+              company_role: undefined,
+              company_id: companyId,
             };
 
             const headers = simulateHeaderInjection(claims);
@@ -3723,50 +3723,50 @@ describe("Property 28: Middleware Header Injection", () => {
     });
   });
 
-  describe("x-dubgrid-org-id header injection", () => {
-    it("header contains the org_id from claims when present", () => {
+  describe("x-dubgrid-company-id header injection", () => {
+    it("header contains the company_id from claims when present", () => {
       fc.assert(
-        fc.property(arbPlatformRole, arbOrgRole, fc.uuid(), (platformRole, orgRole, orgId) => {
+        fc.property(arbPlatformRole, arbCompanyRole, fc.uuid(), (platformRole, companyRole, companyId) => {
           const claims = {
             platform_role: platformRole,
-            org_role: orgRole,
-            org_id: orgId,
+            company_role: companyRole,
+            company_id: companyId,
           };
 
           const headers = simulateHeaderInjection(claims);
-          expect(headers.orgId).toBe(orgId);
+          expect(headers.companyId).toBe(companyId);
         }),
         { numRuns: 100 }
       );
     });
 
-    it("header is empty string when org_id is null", () => {
+    it("header is empty string when company_id is null", () => {
       fc.assert(
-        fc.property(arbPlatformRole, arbOrgRole, (platformRole, orgRole) => {
+        fc.property(arbPlatformRole, arbCompanyRole, (platformRole, companyRole) => {
           const claims = {
             platform_role: platformRole,
-            org_role: orgRole,
-            org_id: undefined,
+            company_role: companyRole,
+            company_id: undefined,
           };
 
           const headers = simulateHeaderInjection(claims);
-          expect(headers.orgId).toBe("");
+          expect(headers.companyId).toBe("");
         }),
         { numRuns: 100 }
       );
     });
 
-    it("header is empty string when org_id is undefined", () => {
+    it("header is empty string when company_id is undefined", () => {
       fc.assert(
-        fc.property(arbPlatformRole, arbOrgRole, (platformRole, orgRole) => {
+        fc.property(arbPlatformRole, arbCompanyRole, (platformRole, companyRole) => {
           const claims = {
             platform_role: platformRole,
-            org_role: orgRole,
-            org_id: undefined,
+            company_role: companyRole,
+            company_id: undefined,
           };
 
           const headers = simulateHeaderInjection(claims);
-          expect(headers.orgId).toBe("");
+          expect(headers.companyId).toBe("");
         }),
         { numRuns: 100 }
       );
@@ -3778,24 +3778,24 @@ describe("Property 28: Middleware Header Injection", () => {
       fc.assert(
         fc.property(arbJWTClaims, (claims) => {
           const expectedEffectiveRole = calculateEffectiveRole(claims);
-          const expectedOrgId = claims.org_id ?? "";
+          const expectedCompanyId = claims.company_id ?? "";
 
           const headers = simulateHeaderInjection(claims);
 
           expect(headers.role).toBe(expectedEffectiveRole);
-          expect(headers.orgId).toBe(expectedOrgId);
+          expect(headers.companyId).toBe(expectedCompanyId);
         }),
         { numRuns: 100 }
       );
     });
 
-    it("gridmaster users have correct headers regardless of org_id", () => {
+    it("gridmaster users have correct headers regardless of company_id", () => {
       fc.assert(
-        fc.property(arbOrgRole, arbOrgId, (orgRole, orgId) => {
+        fc.property(arbCompanyRole, arbCompanyId, (companyRole, companyId) => {
           const claims = {
             platform_role: "gridmaster",
-            org_role: orgRole,
-            org_id: orgId,
+            company_role: companyRole,
+            company_id: companyId,
           };
 
           const headers = simulateHeaderInjection(claims);
@@ -3803,31 +3803,31 @@ describe("Property 28: Middleware Header Injection", () => {
           // Role should always be gridmaster
           expect(headers.role).toBe("gridmaster");
           // Org ID should be the value or empty string
-          expect(headers.orgId).toBe(orgId ?? "");
+          expect(headers.companyId).toBe(companyId ?? "");
         }),
         { numRuns: 100 }
       );
     });
 
-    it("tenant users have correct headers based on org_role and org_id", () => {
+    it("tenant users have correct headers based on company_role and company_id", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
           fc.constantFrom("admin", "scheduler", "supervisor", "user"),
           fc.uuid(),
-          (platformRole, orgRole, orgId) => {
+          (platformRole, companyRole, companyId) => {
             const claims = {
               platform_role: platformRole,
-              org_role: orgRole,
-              org_id: orgId,
+              company_role: companyRole,
+              company_id: companyId,
             };
 
             const headers = simulateHeaderInjection(claims);
 
-            // Role should match org_role
-            expect(headers.role).toBe(orgRole);
+            // Role should match company_role
+            expect(headers.role).toBe(companyRole);
             // Org ID should be the provided value
-            expect(headers.orgId).toBe(orgId);
+            expect(headers.companyId).toBe(companyId);
           }
         ),
         { numRuns: 100 }
@@ -3862,7 +3862,7 @@ describe("Property 28: Middleware Header Injection", () => {
 function createMockShiftUpdateSystem() {
   interface ShiftV2 {
     id: string;
-    orgId: string;
+    companyId: string;
     userId: string;
     empId: string | null;
     shiftDate: string;
@@ -4000,13 +4000,13 @@ describe("Property 6: Shift Version Increment", () => {
         arbTime,
         arbVersion,
         arbEmpId,
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, initialVersion, newEmpId) => {
+        (shiftId, companyId, userId, shiftDate, startTime, endTime, initialVersion, newEmpId) => {
           mockSystem.reset();
 
           // Create initial shift
           const initialShift = mockSystem.createShift({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -4047,13 +4047,13 @@ describe("Property 6: Shift Version Increment", () => {
         arbTime,
         arbTime,
         fc.integer({ min: 2, max: 10 }),
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, updateCount) => {
+        (shiftId, companyId, userId, shiftDate, startTime, endTime, updateCount) => {
           mockSystem.reset();
 
           // Create initial shift with version 0
           mockSystem.createShift({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -4101,13 +4101,13 @@ describe("Property 6: Shift Version Increment", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, initialVersion, newDate, newStart, newEnd) => {
+        (shiftId, companyId, userId, shiftDate, startTime, endTime, initialVersion, newDate, newStart, newEnd) => {
           mockSystem.reset();
 
           // Create initial shift
           mockSystem.createShift({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -4149,13 +4149,13 @@ describe("Property 6: Shift Version Increment", () => {
         arbTime,
         arbVersion,
         fc.integer({ min: 1, max: 100 }),
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, actualVersion, versionOffset) => {
+        (shiftId, companyId, userId, shiftDate, startTime, endTime, actualVersion, versionOffset) => {
           mockSystem.reset();
 
           // Create initial shift
           mockSystem.createShift({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -4193,13 +4193,13 @@ describe("Property 6: Shift Version Increment", () => {
         arbTime,
         arbTime,
         arbVersion,
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, actualVersion) => {
+        (shiftId, companyId, userId, shiftDate, startTime, endTime, actualVersion) => {
           mockSystem.reset();
 
           // Create initial shift
           mockSystem.createShift({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -4241,13 +4241,13 @@ describe("Property 6: Shift Version Increment", () => {
         arbTime,
         arbTime,
         arbVersion,
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, initialVersion) => {
+        (shiftId, companyId, userId, shiftDate, startTime, endTime, initialVersion) => {
           mockSystem.reset();
 
           // Create initial shift
           mockSystem.createShift({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -4290,7 +4290,7 @@ describe("Property 6: Shift Version Increment", () => {
 function createMockShiftInsertSystem() {
   interface ShiftV2 {
     id: string;
-    orgId: string;
+    companyId: string;
     userId: string;
     empId: string | null;
     shiftDate: string;
@@ -4304,7 +4304,7 @@ function createMockShiftInsertSystem() {
   }
 
   interface ShiftV2Insert {
-    orgId: string;
+    companyId: string;
     userId: string;
     empId?: string | null;
     shiftDate: string;
@@ -4316,14 +4316,14 @@ function createMockShiftInsertSystem() {
 
   // In-memory state to simulate database
   const shifts: Map<string, ShiftV2> = new Map();
-  // Track (org_id, idempotency_key) pairs for uniqueness constraint
+  // Track (company_id, idempotency_key) pairs for uniqueness constraint
   const idempotencyIndex: Set<string> = new Set();
 
   /**
    * Creates a composite key for the idempotency index.
    */
-  function makeIdempotencyKey(orgId: string, idempotencyKey: string): string {
-    return `${orgId}:${idempotencyKey}`;
+  function makeIdempotencyKey(companyId: string, idempotencyKey: string): string {
+    return `${companyId}:${idempotencyKey}`;
   }
 
   /**
@@ -4338,7 +4338,7 @@ function createMockShiftInsertSystem() {
 
     // Check for duplicate idempotency key (only if key is provided)
     if (idempotencyKey !== null) {
-      const compositeKey = makeIdempotencyKey(shift.orgId, idempotencyKey);
+      const compositeKey = makeIdempotencyKey(shift.companyId, idempotencyKey);
       if (idempotencyIndex.has(compositeKey)) {
         // Silently ignore duplicate - ON CONFLICT DO NOTHING
         return null;
@@ -4351,7 +4351,7 @@ function createMockShiftInsertSystem() {
     const now = new Date().toISOString();
     const newShift: ShiftV2 = {
       id: crypto.randomUUID(),
-      orgId: shift.orgId,
+      companyId: shift.companyId,
       userId: shift.userId,
       empId: shift.empId ?? null,
       shiftDate: shift.shiftDate,
@@ -4376,18 +4376,18 @@ function createMockShiftInsertSystem() {
   }
 
   /**
-   * Gets shifts by org_id.
+   * Gets shifts by company_id.
    */
-  function getShiftsByOrg(orgId: string): ShiftV2[] {
-    return Array.from(shifts.values()).filter(s => s.orgId === orgId);
+  function getShiftsByOrg(companyId: string): ShiftV2[] {
+    return Array.from(shifts.values()).filter(s => s.companyId === companyId);
   }
 
   /**
    * Gets a shift by idempotency key within an org.
    */
-  function getShiftByIdempotencyKey(orgId: string, idempotencyKey: string): ShiftV2 | undefined {
+  function getShiftByIdempotencyKey(companyId: string, idempotencyKey: string): ShiftV2 | undefined {
     return Array.from(shifts.values()).find(
-      s => s.orgId === orgId && s.idempotencyKey === idempotencyKey
+      s => s.companyId === companyId && s.idempotencyKey === idempotencyKey
     );
   }
 
@@ -4407,7 +4407,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
   /**
    * **Validates: Requirements 3.5, 7.2, 7.3**
    *
-   * For any two shift insert operations with the same org_id and idempotency_key,
+   * For any two shift insert operations with the same company_id and idempotency_key,
    * the second insert should be silently ignored (no error, no duplicate row created).
    */
 
@@ -4417,7 +4417,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
     mockSystem = createMockShiftInsertSystem();
   });
 
-  it("second insert with same org_id and idempotency_key returns null", () => {
+  it("second insert with same company_id and idempotency_key returns null", () => {
     fc.assert(
       fc.property(
         arbUuid,
@@ -4426,12 +4426,12 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (orgId, userId, idempotencyKey, shiftDate, startTime, endTime) => {
+        (companyId, userId, idempotencyKey, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // First insert should succeed
           const firstResult = mockSystem.insertShiftV2({
-            orgId,
+            companyId,
             userId,
             shiftDate,
             startTime,
@@ -4441,9 +4441,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           });
           expect(firstResult).not.toBeNull();
 
-          // Second insert with same org_id and idempotency_key should return null
+          // Second insert with same company_id and idempotency_key should return null
           const secondResult = mockSystem.insertShiftV2({
-            orgId,
+            companyId,
             userId,
             shiftDate,
             startTime,
@@ -4468,12 +4468,12 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbTime,
         arbTime,
         fc.integer({ min: 2, max: 10 }),
-        (orgId, userId, idempotencyKey, shiftDate, startTime, endTime, attemptCount) => {
+        (companyId, userId, idempotencyKey, shiftDate, startTime, endTime, attemptCount) => {
           mockSystem.reset();
 
           // First insert
           mockSystem.insertShiftV2({
-            orgId,
+            companyId,
             userId,
             shiftDate,
             startTime,
@@ -4485,7 +4485,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // Multiple duplicate attempts
           for (let i = 1; i < attemptCount; i++) {
             mockSystem.insertShiftV2({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -4496,7 +4496,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           }
 
           // Should only have one shift
-          const shifts = mockSystem.getShiftsByOrg(orgId);
+          const shifts = mockSystem.getShiftsByOrg(companyId);
           expect(shifts).toHaveLength(1);
         }
       ),
@@ -4513,12 +4513,12 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (orgId, userId, idempotencyKey, shiftDate, startTime, endTime) => {
+        (companyId, userId, idempotencyKey, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // First insert
           mockSystem.insertShiftV2({
-            orgId,
+            companyId,
             userId,
             shiftDate,
             startTime,
@@ -4530,7 +4530,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // Second insert should not throw
           expect(() =>
             mockSystem.insertShiftV2({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -4563,7 +4563,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
 
           // Insert in org1
           const result1 = mockSystem.insertShiftV2({
-            orgId: org1Id,
+            companyId: org1Id,
             userId,
             shiftDate,
             startTime,
@@ -4575,7 +4575,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
 
           // Insert in org2 with same idempotency_key should succeed
           const result2 = mockSystem.insertShiftV2({
-            orgId: org2Id,
+            companyId: org2Id,
             userId,
             shiftDate,
             startTime,
@@ -4603,7 +4603,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (orgId, userId, idempotencyKeys, shiftDate, startTime, endTime) => {
+        (companyId, userId, idempotencyKeys, shiftDate, startTime, endTime) => {
           // Ensure all keys are unique
           fc.pre(new Set(idempotencyKeys).size === idempotencyKeys.length);
 
@@ -4612,7 +4612,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // Insert shifts with different idempotency keys
           for (const key of idempotencyKeys) {
             const result = mockSystem.insertShiftV2({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -4624,7 +4624,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           }
 
           // All shifts should exist
-          const shifts = mockSystem.getShiftsByOrg(orgId);
+          const shifts = mockSystem.getShiftsByOrg(companyId);
           expect(shifts).toHaveLength(idempotencyKeys.length);
         }
       ),
@@ -4641,13 +4641,13 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbTime,
         arbTime,
         fc.integer({ min: 2, max: 5 }),
-        (orgId, userId, shiftDate, startTime, endTime, insertCount) => {
+        (companyId, userId, shiftDate, startTime, endTime, insertCount) => {
           mockSystem.reset();
 
           // Insert multiple shifts with null idempotency_key
           for (let i = 0; i < insertCount; i++) {
             const result = mockSystem.insertShiftV2({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -4659,7 +4659,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           }
 
           // All shifts should exist
-          const shifts = mockSystem.getShiftsByOrg(orgId);
+          const shifts = mockSystem.getShiftsByOrg(companyId);
           expect(shifts).toHaveLength(insertCount);
         }
       ),
@@ -4679,12 +4679,12 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (orgId, userId, idempotencyKey, date1, start1, end1, date2, start2, end2) => {
+        (companyId, userId, idempotencyKey, date1, start1, end1, date2, start2, end2) => {
           mockSystem.reset();
 
           // First insert with original data
           const firstResult = mockSystem.insertShiftV2({
-            orgId,
+            companyId,
             userId,
             shiftDate: date1,
             startTime: start1,
@@ -4696,7 +4696,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
 
           // Second insert with different data but same idempotency_key
           mockSystem.insertShiftV2({
-            orgId,
+            companyId,
             userId,
             shiftDate: date2,
             startTime: start2,
@@ -4706,7 +4706,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           });
 
           // Original shift data should be preserved
-          const shift = mockSystem.getShiftByIdempotencyKey(orgId, idempotencyKey);
+          const shift = mockSystem.getShiftByIdempotencyKey(companyId, idempotencyKey);
           expect(shift).toBeDefined();
           expect(shift?.shiftDate).toBe(date1);
           expect(shift?.startTime).toBe(start1);
@@ -4726,16 +4726,16 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (orgIds, userId, idempotencyKey, shiftDate, startTime, endTime) => {
+        (companyIds, userId, idempotencyKey, shiftDate, startTime, endTime) => {
           // Ensure all org IDs are unique
-          fc.pre(new Set(orgIds).size === orgIds.length);
+          fc.pre(new Set(companyIds).size === companyIds.length);
 
           mockSystem.reset();
 
           // Insert with same idempotency_key in each org
-          for (const orgId of orgIds) {
+          for (const companyId of companyIds) {
             const result = mockSystem.insertShiftV2({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -4747,13 +4747,13 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           }
 
           // Each org should have exactly one shift
-          for (const orgId of orgIds) {
-            const shifts = mockSystem.getShiftsByOrg(orgId);
+          for (const companyId of companyIds) {
+            const shifts = mockSystem.getShiftsByOrg(companyId);
             expect(shifts).toHaveLength(1);
           }
 
           // Total shifts should equal number of orgs
-          expect(mockSystem.getAllShifts()).toHaveLength(orgIds.length);
+          expect(mockSystem.getAllShifts()).toHaveLength(companyIds.length);
         }
       ),
       { numRuns: 100 }
@@ -4771,7 +4771,7 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
 function createMockShiftRLSSystem() {
   interface ShiftV2 {
     id: string;
-    orgId: string;
+    companyId: string;
     userId: string;
     empId: string | null;
     shiftDate: string;
@@ -4785,7 +4785,7 @@ function createMockShiftRLSSystem() {
   }
 
   interface ShiftV2Insert {
-    orgId: string;
+    companyId: string;
     userId: string;
     empId?: string | null;
     shiftDate: string;
@@ -4802,8 +4802,8 @@ function createMockShiftRLSSystem() {
     endTime?: string;
   }
 
-  type OrgRole = "admin" | "scheduler" | "supervisor" | "user";
-  type AllRoles = OrgRole | "gridmaster";
+  type CompanyRole = "admin" | "scheduler" | "supervisor" | "user";
+  type AllRoles = CompanyRole | "gridmaster";
 
   // Role hierarchy levels
   const ROLE_LEVEL: Record<AllRoles, number> = {
@@ -4820,7 +4820,7 @@ function createMockShiftRLSSystem() {
 
   // Current authenticated user context
   let currentAuthUid: string | null = null;
-  let currentUserOrgId: string | null = null;
+  let currentUserCompanyId: string | null = null;
   let currentUserRole: AllRoles = "user";
 
   /**
@@ -4828,11 +4828,11 @@ function createMockShiftRLSSystem() {
    */
   function setAuthContext(
     userId: string | null,
-    orgId: string | null,
+    companyId: string | null,
     role: AllRoles
   ) {
     currentAuthUid = userId;
-    currentUserOrgId = orgId;
+    currentUserCompanyId = companyId;
     currentUserRole = role;
   }
 
@@ -4853,8 +4853,8 @@ function createMockShiftRLSSystem() {
   /**
    * Creates a composite key for the idempotency index.
    */
-  function makeIdempotencyKey(orgId: string, idempotencyKey: string): string {
-    return `${orgId}:${idempotencyKey}`;
+  function makeIdempotencyKey(companyId: string, idempotencyKey: string): string {
+    return `${companyId}:${idempotencyKey}`;
   }
 
   /**
@@ -4863,7 +4863,7 @@ function createMockShiftRLSSystem() {
   function createShiftAdmin(shift: ShiftV2): ShiftV2 {
     shifts.set(shift.id, { ...shift });
     if (shift.idempotencyKey) {
-      idempotencyIndex.add(makeIdempotencyKey(shift.orgId, shift.idempotencyKey));
+      idempotencyIndex.add(makeIdempotencyKey(shift.companyId, shift.idempotencyKey));
     }
     return shift;
   }
@@ -4872,7 +4872,7 @@ function createMockShiftRLSSystem() {
    * Simulates SELECT on shifts_v2 with RLS enforcement.
    * RLS Policy: SELECT for org members (user_id in same org) OR gridmaster
    */
-  function selectShifts(filters?: { orgId?: string; id?: string }): ShiftV2[] {
+  function selectShifts(filters?: { companyId?: string; id?: string }): ShiftV2[] {
     if (!currentAuthUid) {
       // No authenticated user - return empty
       return [];
@@ -4883,13 +4883,13 @@ function createMockShiftRLSSystem() {
     // Apply RLS policy
     if (!isGridmaster()) {
       // Non-gridmaster can only see shifts in their org
-      result = result.filter((s) => s.orgId === currentUserOrgId);
+      result = result.filter((s) => s.companyId === currentUserCompanyId);
     }
 
     // Apply additional filters
     if (filters) {
-      if (filters.orgId) {
-        result = result.filter((s) => s.orgId === filters.orgId);
+      if (filters.companyId) {
+        result = result.filter((s) => s.companyId === filters.companyId);
       }
       if (filters.id) {
         result = result.filter((s) => s.id === filters.id);
@@ -4918,7 +4918,7 @@ function createMockShiftRLSSystem() {
           "INSERT operation rejected by RLS policy: requires scheduler role or above"
         );
       }
-      if (shift.orgId !== currentUserOrgId) {
+      if (shift.companyId !== currentUserCompanyId) {
         throw new RLSPolicyViolationError(
           "INSERT operation rejected by RLS policy: cannot insert shifts in other orgs"
         );
@@ -4928,12 +4928,12 @@ function createMockShiftRLSSystem() {
     // Check idempotency constraint
     const idempotencyKey = shift.idempotencyKey ?? null;
     if (idempotencyKey !== null) {
-      const compositeKey = makeIdempotencyKey(shift.orgId, idempotencyKey);
+      const compositeKey = makeIdempotencyKey(shift.companyId, idempotencyKey);
       if (idempotencyIndex.has(compositeKey)) {
         // Silently ignore duplicate - ON CONFLICT DO NOTHING
         return shifts.get(
           Array.from(shifts.values()).find(
-            (s) => s.orgId === shift.orgId && s.idempotencyKey === idempotencyKey
+            (s) => s.companyId === shift.companyId && s.idempotencyKey === idempotencyKey
           )!.id
         )!;
       }
@@ -4944,7 +4944,7 @@ function createMockShiftRLSSystem() {
     const now = new Date().toISOString();
     const newShift: ShiftV2 = {
       id: crypto.randomUUID(),
-      orgId: shift.orgId,
+      companyId: shift.companyId,
       userId: shift.userId,
       empId: shift.empId ?? null,
       shiftDate: shift.shiftDate,
@@ -4985,7 +4985,7 @@ function createMockShiftRLSSystem() {
           "UPDATE operation rejected by RLS policy: requires scheduler role or above"
         );
       }
-      if (shift.orgId !== currentUserOrgId) {
+      if (shift.companyId !== currentUserCompanyId) {
         throw new RLSPolicyViolationError(
           "UPDATE operation rejected by RLS policy: cannot update shifts in other orgs"
         );
@@ -5028,7 +5028,7 @@ function createMockShiftRLSSystem() {
           "DELETE operation rejected by RLS policy: requires scheduler role or above"
         );
       }
-      if (shift.orgId !== currentUserOrgId) {
+      if (shift.companyId !== currentUserCompanyId) {
         throw new RLSPolicyViolationError(
           "DELETE operation rejected by RLS policy: cannot delete shifts in other orgs"
         );
@@ -5037,7 +5037,7 @@ function createMockShiftRLSSystem() {
 
     // Remove from idempotency index if applicable
     if (shift.idempotencyKey) {
-      idempotencyIndex.delete(makeIdempotencyKey(shift.orgId, shift.idempotencyKey));
+      idempotencyIndex.delete(makeIdempotencyKey(shift.companyId, shift.idempotencyKey));
     }
 
     shifts.delete(shiftId);
@@ -5063,7 +5063,7 @@ function createMockShiftRLSSystem() {
       shifts.clear();
       idempotencyIndex.clear();
       currentAuthUid = null;
-      currentUserOrgId = null;
+      currentUserCompanyId = null;
       currentUserRole = "user";
     },
   };
@@ -5104,16 +5104,16 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Attempt to insert shift should throw RLS violation
           expect(() =>
             mockSystem.insertShift({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -5137,13 +5137,13 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, shiftId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Create a shift (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -5157,7 +5157,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Attempt to update shift should throw RLS violation
           expect(() =>
@@ -5179,13 +5179,13 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, shiftId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Create a shift (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -5199,7 +5199,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Attempt to delete shift should throw RLS violation
           expect(() =>
@@ -5221,13 +5221,13 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, shiftId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Create a shift (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -5241,7 +5241,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with role below scheduler in the same org
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // SELECT should succeed
           const shifts = mockSystem.selectShifts();
@@ -5262,15 +5262,15 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Set up user with scheduler or admin role
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // INSERT should succeed
           const insertedShift = mockSystem.insertShift({
-            orgId,
+            companyId,
             userId,
             shiftDate,
             startTime,
@@ -5278,7 +5278,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
             createdBy: userId,
           });
           expect(insertedShift).toBeDefined();
-          expect(insertedShift.orgId).toBe(orgId);
+          expect(insertedShift.companyId).toBe(companyId);
 
           // SELECT should succeed
           const selectedShifts = mockSystem.selectShifts();
@@ -5309,7 +5309,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (gridmasterId, targetOrgId, targetUserId, shiftDate, startTime, endTime) => {
+        (gridmasterId, targetCompanyId, targetUserId, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Set up gridmaster (no org affiliation)
@@ -5317,7 +5317,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
 
           // INSERT should succeed in any org
           const insertedShift = mockSystem.insertShift({
-            orgId: targetOrgId,
+            companyId: targetCompanyId,
             userId: targetUserId,
             shiftDate,
             startTime,
@@ -5325,7 +5325,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
             createdBy: gridmasterId,
           });
           expect(insertedShift).toBeDefined();
-          expect(insertedShift.orgId).toBe(targetOrgId);
+          expect(insertedShift.companyId).toBe(targetCompanyId);
 
           // SELECT should succeed
           const selectedShifts = mockSystem.selectShifts();
@@ -5355,16 +5355,16 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, userOrgId, otherOrgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, userCompanyId, otherCompanyId, shiftId, role, shiftDate, startTime, endTime) => {
           // Ensure orgs are different
-          fc.pre(userOrgId !== otherOrgId);
+          fc.pre(userCompanyId !== otherCompanyId);
 
           mockSystem.reset();
 
           // Create a shift in a different org (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId: otherOrgId,
+            companyId: otherCompanyId,
             userId: "other-user",
             empId: null,
             shiftDate,
@@ -5378,7 +5378,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user in their own org
-          mockSystem.setAuthContext(userId, userOrgId, role);
+          mockSystem.setAuthContext(userId, userCompanyId, role);
 
           if (role === "gridmaster") {
             // Gridmaster CAN see shifts from other orgs
@@ -5405,19 +5405,19 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, userOrgId, otherOrgId, role, shiftDate, startTime, endTime) => {
+        (userId, userCompanyId, otherCompanyId, role, shiftDate, startTime, endTime) => {
           // Ensure orgs are different
-          fc.pre(userOrgId !== otherOrgId);
+          fc.pre(userCompanyId !== otherCompanyId);
 
           mockSystem.reset();
 
           // Set up user with scheduler/admin role in their org
-          mockSystem.setAuthContext(userId, userOrgId, role);
+          mockSystem.setAuthContext(userId, userCompanyId, role);
 
           // Attempt to insert shift in other org should throw RLS violation
           expect(() =>
             mockSystem.insertShift({
-              orgId: otherOrgId,
+              companyId: otherCompanyId,
               userId,
               shiftDate,
               startTime,
@@ -5442,16 +5442,16 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, userOrgId, otherOrgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, userCompanyId, otherCompanyId, shiftId, role, shiftDate, startTime, endTime) => {
           // Ensure orgs are different
-          fc.pre(userOrgId !== otherOrgId);
+          fc.pre(userCompanyId !== otherCompanyId);
 
           mockSystem.reset();
 
           // Create a shift in other org (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId: otherOrgId,
+            companyId: otherCompanyId,
             userId: "other-user",
             empId: null,
             shiftDate,
@@ -5465,7 +5465,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with scheduler/admin role in their org
-          mockSystem.setAuthContext(userId, userOrgId, role);
+          mockSystem.setAuthContext(userId, userCompanyId, role);
 
           // Attempt to update shift in other org should throw RLS violation
           expect(() =>
@@ -5488,16 +5488,16 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, userOrgId, otherOrgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, userCompanyId, otherCompanyId, shiftId, role, shiftDate, startTime, endTime) => {
           // Ensure orgs are different
-          fc.pre(userOrgId !== otherOrgId);
+          fc.pre(userCompanyId !== otherCompanyId);
 
           mockSystem.reset();
 
           // Create a shift in other org (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId: otherOrgId,
+            companyId: otherCompanyId,
             userId: "other-user",
             empId: null,
             shiftDate,
@@ -5511,7 +5511,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with scheduler/admin role in their org
-          mockSystem.setAuthContext(userId, userOrgId, role);
+          mockSystem.setAuthContext(userId, userCompanyId, role);
 
           // Attempt to delete shift in other org should throw RLS violation
           expect(() =>
@@ -5533,13 +5533,13 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, shiftId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Create a shift (admin operation)
           const originalShift = mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -5553,7 +5553,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Attempt update (should fail)
           try {
@@ -5590,16 +5590,16 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Verify error message mentions RLS policy
           expect(() =>
             mockSystem.insertShift({
-              orgId,
+              companyId,
               userId,
               shiftDate,
               startTime,
@@ -5623,13 +5623,13 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, shiftId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Create a shift (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -5643,7 +5643,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Verify error message mentions RLS policy
           expect(() =>
@@ -5665,13 +5665,13 @@ describe("Property 21: Shift RLS Enforcement", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (userId, orgId, shiftId, role, shiftDate, startTime, endTime) => {
+        (userId, companyId, shiftId, role, shiftDate, startTime, endTime) => {
           mockSystem.reset();
 
           // Create a shift (admin operation)
           mockSystem.createShiftAdmin({
             id: shiftId,
-            orgId,
+            companyId,
             userId,
             empId: null,
             shiftDate,
@@ -5685,7 +5685,7 @@ describe("Property 21: Shift RLS Enforcement", () => {
           });
 
           // Set up user with role below scheduler
-          mockSystem.setAuthContext(userId, orgId, role);
+          mockSystem.setAuthContext(userId, companyId, role);
 
           // Verify error message mentions RLS policy
           expect(() =>

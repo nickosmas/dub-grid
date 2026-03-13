@@ -9,7 +9,7 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function getOrgSlug(): string | null {
+function getCompanySlug(): string | null {
   if (typeof window === "undefined") return null;
   const parsed = parseHost(window.location.host);
   return parsed.subdomain;
@@ -307,7 +307,7 @@ function DomainSelector() {
             >
               Your subdomain is the first part of your workspace URL (e.g.{" "}
               <strong>yourcompany</strong>.{baseDomain}). If you don&apos;t know
-              it, contact your organization administrator.
+              it, contact your company administrator.
             </p>
             <button
               type="button"
@@ -333,9 +333,208 @@ function DomainSelector() {
   );
 }
 
-// ── Step 2: Email + password (org subdomain) ───────────────────────────────────
+// ── Gridmaster login (gridmaster subdomain) ─────────────────────────────────
 
-function OrgLogin({ orgSlug }: { orgSlug: string }) {
+function GridmasterLogin() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+
+      window.location.replace("/admin");
+
+      setTimeout(() => {
+        setLoading(false);
+        setMessage("Navigation timed out. Please try refreshing the page.");
+      }, 8000);
+    } catch (err: any) {
+      setMessage(err.message || "An error occurred");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0F172A",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        padding: "24px 16px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "400px",
+          padding: "40px 36px 36px",
+          background: "#1E293B",
+          borderRadius: "14px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+          border: "1px solid #334155",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "28px",
+          }}
+        >
+          <DubGridLogo size={48} color="#F8FAFC" />
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "#64748B",
+            }}
+          >
+            Gridmaster Portal
+          </span>
+        </div>
+
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 700,
+            color: "#F8FAFC",
+            textAlign: "center",
+            marginBottom: "24px",
+          }}
+        >
+          Platform Admin Sign In
+        </h1>
+
+        {message && (
+          <div
+            style={{
+              padding: "12px",
+              background: "#7F1D1D",
+              color: "#FECACA",
+              borderRadius: "8px",
+              fontSize: "14px",
+              marginBottom: "16px",
+              border: "1px solid #991B1B",
+            }}
+          >
+            {message}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color: "#94A3B8",
+              }}
+            >
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "11px 13px",
+                border: "1px solid #334155",
+                borderRadius: "8px",
+                fontSize: "15px",
+                background: "#0F172A",
+                color: "#F8FAFC",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color: "#94A3B8",
+              }}
+            >
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "11px 13px",
+                border: "1px solid #334155",
+                borderRadius: "8px",
+                fontSize: "15px",
+                background: "#0F172A",
+                color: "#F8FAFC",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              marginTop: "4px",
+              width: "100%",
+              padding: "13px",
+              background: loading ? "#475569" : "#2563EB",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "15px",
+              fontWeight: 600,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            {loading ? "Authenticating…" : "Access Portal"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 2: Email + password (company subdomain) ────────────────────────────────
+
+function CompanyLogin({ companySlug }: { companySlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -391,7 +590,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           <DubGridWordmark />
         </div>
 
-        {/* Org badge */}
+        {/* Company badge */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <span
             style={{
@@ -406,7 +605,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               letterSpacing: "0.01em",
             }}
           >
-            {orgSlug}.{baseDomain}
+            {companySlug}.{baseDomain}
           </span>
         </div>
 
@@ -588,13 +787,13 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-  const [orgSlug, setOrgSlug] = useState<string | null>(null);
+  const [companySlug, setCompanySlug] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const slug = getOrgSlug();
-    console.log("[Login] Detected org slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
-    setOrgSlug(slug);
+    const slug = getCompanySlug();
+    console.log("[Login] Detected company slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
+    setCompanySlug(slug);
     setMounted(true);
   }, []);
 
@@ -603,7 +802,13 @@ export default function LoginPage() {
 
   return (
     <PublicRoute>
-      {orgSlug ? <OrgLogin orgSlug={orgSlug} /> : <DomainSelector />}
+      {companySlug === "gridmaster" ? (
+        <GridmasterLogin />
+      ) : companySlug ? (
+        <CompanyLogin companySlug={companySlug} />
+      ) : (
+        <DomainSelector />
+      )}
     </PublicRoute>
   );
 }

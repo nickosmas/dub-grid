@@ -1,20 +1,24 @@
--- Migration: 026_draft_shifts.sql
--- Purpose: Add drafting/publishing capability to shifts. Replaces `shift_label` with `draft_label` and `published_label`.
+-- Migration: 027_draft_shifts.sql
+-- Purpose: Add drafting/publishing capability to shifts.
+-- Note: Migration 026 already renamed shift_label → draft_label, so this
+-- only ensures columns exist and handles any remaining backfill.
 
--- 1. Add new columns
-ALTER TABLE public.shifts 
+-- 1. Ensure columns exist (idempotent)
+ALTER TABLE public.shifts
   ADD COLUMN IF NOT EXISTS draft_label TEXT,
   ADD COLUMN IF NOT EXISTS published_label TEXT;
 
--- 2. Migrate existing data: All existing shifts become BOTH published and drafts
-UPDATE public.shifts 
-SET 
-  draft_label = shift_label,
-  published_label = shift_label
-WHERE shift_label IS NOT NULL;
-
--- 3. Drop old column
-ALTER TABLE public.shifts DROP COLUMN IF EXISTS shift_label;
+-- 2. Backfill only if shift_label still exists (026 may have already renamed it)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'shifts' AND column_name = 'shift_label'
+  ) THEN
+    EXECUTE 'UPDATE public.shifts SET draft_label = shift_label, published_label = shift_label WHERE shift_label IS NOT NULL';
+    EXECUTE 'ALTER TABLE public.shifts DROP COLUMN shift_label';
+  END IF;
+END $$;
 
 -- 4. Create the publish RPC
 -- This takes all drafts for an org within a date range and publishes them.

@@ -1,29 +1,67 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatDate } from "@/lib/utils";
-import { EditModalState, ShiftType, NoteType, SeriesScope } from "@/types";
+import { formatDate, getCertName } from "@/lib/utils";
+import { EditModalState, ShiftCode, NoteType, IndicatorType, SeriesScope, FocusArea, NamedItem } from "@/types";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
   currentShift: string | null;
-  shiftTypes: ShiftType[];
-  onSelect: (label: string, seriesScope?: SeriesScope) => void;
+  currentShiftCodeIds?: number[];
+  shiftCodes: ShiftCode[];
+  indicatorTypes?: IndicatorType[];
+  onSelect: (label: string, shiftCodeIds: number[], seriesScope?: SeriesScope) => void;
   onClose: () => void;
   allowShiftEdits?: boolean;
   canEditNotes?: boolean;
-  getNoteTypes?: (wingName: string) => NoteType[];
-  onNoteToggle?: (noteType: NoteType, active: boolean, wingName: string) => void;
+  getNoteTypes?: (focusAreaId: number) => NoteType[];
+  onNoteToggle?: (noteType: NoteType, active: boolean, focusAreaId: number) => void;
   /** Series ID if the current shift belongs to a repeating series */
   seriesId?: string | null;
   /** Called when the user wants to create a repeating shift for the current selection */
   onMakeRepeating?: () => void;
+  /** Current custom start time override for this shift (e.g. "07:30") */
+  customStartTime?: string | null;
+  /** Current custom end time override for this shift (e.g. "15:30") */
+  customEndTime?: string | null;
+  /** Called when user changes the custom time override */
+  onCustomTimeChange?: (start: string | null, end: string | null) => void;
+  /** All focus areas — used to resolve focusAreaId to names */
+  focusAreas?: FocusArea[];
+  /** All certifications — used to resolve certificationId to names */
+  certifications?: NamedItem[];
 }
+
+// ── Time helpers ────────────────────────────────────────────────────────────
+function parseTo12h(time24: string | null | undefined): { hour: string; minute: string; period: "AM" | "PM" } {
+  if (!time24) return { hour: "", minute: "00", period: "AM" };
+  const [h, m] = time24.split(":").map(Number);
+  const period: "AM" | "PM" = h >= 12 ? "PM" : "AM";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return { hour: String(hour12), minute: String(m).padStart(2, "0"), period };
+}
+
+function to24h(hour: string, minute: string, period: "AM" | "PM"): string | null {
+  const h = parseInt(hour, 10);
+  const m = parseInt(minute, 10);
+  if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) return null;
+  const h24 = period === "AM" ? (h === 12 ? 0 : h) : h === 12 ? 12 : h + 12;
+  return `${String(h24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function fmt12h(time24: string | null | undefined): string {
+  if (!time24) return "";
+  const { hour, minute, period } = parseTo12h(time24);
+  return `${hour}:${minute} ${period}`;
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftEditPanel({
   modal,
   currentShift,
-  shiftTypes,
+  currentShiftCodeIds = [],
+  shiftCodes,
+  indicatorTypes = [],
   onSelect,
   onClose,
   allowShiftEdits = true,
@@ -32,23 +70,44 @@ export default function ShiftEditPanel({
   onNoteToggle,
   seriesId,
   onMakeRepeating,
+  customStartTime,
+  customEndTime,
+  onCustomTimeChange,
+  focusAreas = [],
+  certifications = [],
 }: ShiftEditPanelProps) {
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
 
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
 
+  // Custom time state (12-hour format)
+  const [showCustomTime, setShowCustomTime] = useState(!!(customStartTime || customEndTime));
+  const [startH, setStartH] = useState(() => parseTo12h(customStartTime).hour);
+  const [startM, setStartM] = useState(() => parseTo12h(customStartTime).minute);
+  const [startP, setStartP] = useState<"AM" | "PM">(() => parseTo12h(customStartTime).period);
+  const [endH, setEndH] = useState(() => parseTo12h(customEndTime).hour);
+  const [endM, setEndM] = useState(() => parseTo12h(customEndTime).minute);
+  const [endP, setEndP] = useState<"AM" | "PM">(() => parseTo12h(customEndTime).period);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  function commitCustomTime(sh: string, sm: string, sp: "AM" | "PM", eh: string, em: string, ep: "AM" | "PM") {
+    const start = to24h(sh, sm, sp);
+    const end = to24h(eh, em, ep);
+    onCustomTimeChange?.(start, end);
+  }
+
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
-  const [initialNotesByWing] = useState<Record<string, NoteType[]>>(() => {
+  const [initialShiftCodeIds] = useState(() => [...currentShiftCodeIds]);
+  const [initialNotesByFocusArea] = useState<Record<number, NoteType[]>>(() => {
     if (!getNoteTypes) return {};
-    const wings = new Set<string>(modal.empWings);
-    for (const st of shiftTypes) {
-      if (st.wingName) wings.add(st.wingName);
+    const focusAreaIds = new Set<number>(modal.empFocusAreaIds);
+    for (const st of shiftCodes) {
+      if (st.focusAreaId != null) focusAreaIds.add(st.focusAreaId);
     }
-    const record: Record<string, NoteType[]> = {};
-    for (const wing of wings) {
-      record[wing] = [...getNoteTypes(wing)];
+    const record: Record<number, NoteType[]> = {};
+    for (const faId of focusAreaIds) {
+      record[faId] = [...getNoteTypes(faId)];
     }
     return record;
   });
@@ -57,8 +116,8 @@ export default function ShiftEditPanel({
   const hasShiftEdit = currentShift !== initialShift;
   const hasNoteEdit = (() => {
     if (!getNoteTypes) return false;
-    for (const [wing, initTypes] of Object.entries(initialNotesByWing)) {
-      const curTypes = getNoteTypes(wing);
+    for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
+      const curTypes = getNoteTypes(Number(faIdStr));
       if (curTypes.length !== initTypes.length) return true;
       if (curTypes.some((t) => !initTypes.includes(t))) return true;
     }
@@ -69,17 +128,18 @@ export default function ShiftEditPanel({
   function handleUndo() {
     // Revert shift if it changed
     if (currentShift !== initialShift) {
-      onSelect(initialShift ?? "OFF");
+      onSelect(initialShift ?? "OFF", initialShiftCodeIds);
     }
-    // Revert notes for each wing
+    // Revert notes for each focus area
     if (getNoteTypes) {
-      for (const [wing, initTypes] of Object.entries(initialNotesByWing)) {
-        const curTypes = getNoteTypes(wing);
+      for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
+        const faId = Number(faIdStr);
+        const curTypes = getNoteTypes(faId);
         for (const type of initTypes) {
-          if (!curTypes.includes(type)) onNoteToggle?.(type, true, wing);
+          if (!curTypes.includes(type)) onNoteToggle?.(type, true, faId);
         }
         for (const type of curTypes) {
-          if (!initTypes.includes(type)) onNoteToggle?.(type, false, wing);
+          if (!initTypes.includes(type)) onNoteToggle?.(type, false, faId);
         }
       }
     }
@@ -93,38 +153,57 @@ export default function ShiftEditPanel({
     }
   }, [currentShift]);
 
-  // Wing tab setup
-  const allWingNames: string[] = [];
-  for (const st of shiftTypes) {
-    if (st.wingName && !allWingNames.includes(st.wingName)) {
-      allWingNames.push(st.wingName);
-    }
-  }
-  const tabs: string[] = [
-    ...modal.empWings,
-    ...allWingNames.filter((w) => !modal.empWings.includes(w)),
-  ];
-  const [activeTab, setActiveTab] = useState<string>(
-    modal.empWings[0] || tabs[0] || "",
-  );
+  // activeTab is internal-only (no visible tab bar); used for single-shift indicator context.
+  const primaryFocusAreaId = modal.empFocusAreaIds[0] ?? 0;
+  const [activeTab] = useState<number>(primaryFocusAreaId);
+
+  // Picker tab: default to the section the cell was clicked in, then current shift's area, then primary
+  const [pickerTab, setPickerTab] = useState<number>(() => {
+    if (modal.activeFocusAreaId != null) return modal.activeFocusAreaId;
+    const shiftFa = currentShiftCodeIds.length
+      ? shiftCodes.find((s) => s.id === currentShiftCodeIds[0])?.focusAreaId
+      : null;
+    return shiftFa ?? modal.empFocusAreaIds[0] ?? 0;
+  });
 
   const currentLabels = currentShift
     ? currentShift.split("/").filter((l) => l !== "OFF")
     : [];
 
-  function isQualified(s: ShiftType) {
+  function isQualified(s: ShiftCode) {
     return (
-      !s.requiredDesignations?.length ||
-      s.requiredDesignations.includes(modal.empDesignation)
+      !s.requiredCertificationIds?.length ||
+      (modal.empCertificationId != null && s.requiredCertificationIds.includes(modal.empCertificationId))
     );
   }
 
-  const wingShifts = shiftTypes.filter(
-    (st) => st.wingName === activeTab && isQualified(st),
-  );
-  const generalShifts = shiftTypes.filter(
-    (st) => st.isGeneral && isQualified(st),
-  );
+  // Shifts for a given focus area name (resolved via focusAreaId)
+  function getShiftsForFocusArea(faName: string): ShiftCode[] {
+    const faId = focusAreas.find((fa) => fa.name === faName)?.id;
+    if (faId == null) return [];
+    return shiftCodes.filter(
+      (st) => !st.isGeneral && st.focusAreaId === faId && isQualified(st),
+    );
+  }
+
+
+  // All focus areas that have shift codes, home areas first, then others
+  const allPickerAreas = [
+    ...focusAreas.filter(
+      (fa) =>
+        modal.empFocusAreaIds.includes(fa.id) &&
+        shiftCodes.some((st) => !st.isGeneral && st.focusAreaId === fa.id && isQualified(st)),
+    ),
+    ...focusAreas.filter(
+      (fa) =>
+        !modal.empFocusAreaIds.includes(fa.id) &&
+        shiftCodes.some((st) => !st.isGeneral && st.focusAreaId === fa.id && isQualified(st)),
+    ),
+  ];
+
+  // Split general shifts into non-off-day (general) and off-day groups
+  const generalNonOffShifts = shiftCodes.filter((st) => st.isGeneral && !st.isOffDay && isQualified(st));
+  const offDayShifts = shiftCodes.filter((st) => st.isOffDay && isQualified(st));
 
   const sectionLabel: React.CSSProperties = {
     marginBottom: 8,
@@ -135,9 +214,13 @@ export default function ShiftEditPanel({
     letterSpacing: "0.06em",
   };
 
-  function getShiftTypeStyle(label: string) {
+  function getShiftCodeStyle(label: string, codeId?: number) {
+    if (codeId != null) {
+      const byId = shiftCodes.find((st) => st.id === codeId);
+      if (byId) return byId;
+    }
     return (
-      shiftTypes.find((st) => st.label === label) ?? {
+      shiftCodes.find((st) => st.label === label) ?? {
         color: "#F8FAFC",
         border: "#CBD5E1",
         text: "#64748B",
@@ -147,6 +230,8 @@ export default function ShiftEditPanel({
 
   function renderNoteDots(noteTypes: NoteType[], side: "left" | "right" = "right") {
     if (noteTypes.length === 0) return null;
+    const activeDots = indicatorTypes.filter((ind) => noteTypes.includes(ind.name));
+    if (activeDots.length === 0) return null;
     return (
       <div
         style={{
@@ -157,30 +242,20 @@ export default function ShiftEditPanel({
           gap: 3,
         }}
       >
-        {noteTypes.includes("readings") && (
+        {activeDots.map((ind) => (
           <div
+            key={ind.name}
+            title={ind.name}
             style={{
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: "#EF4444",
+              background: ind.color,
               border: "1px solid rgba(255,255,255,0.8)",
               flexShrink: 0,
             }}
           />
-        )}
-        {noteTypes.includes("shower") && (
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#1E293B",
-              border: "1px solid rgba(255,255,255,0.8)",
-              flexShrink: 0,
-            }}
-          />
-        )}
+        ))}
       </div>
     );
   }
@@ -191,8 +266,11 @@ export default function ShiftEditPanel({
 
     if (currentLabels.length === 1) {
       const label = currentLabels[0];
-      const s = getShiftTypeStyle(label);
-      const fullName = (s as ShiftType).name && (s as ShiftType).name !== label ? (s as ShiftType).name : null;
+      const s = getShiftCodeStyle(label, currentShiftCodeIds[0]);
+      const fullName = (s as ShiftCode).name && (s as ShiftCode).name !== label ? (s as ShiftCode).name : null;
+      const faName = (s as ShiftCode).focusAreaId != null
+        ? focusAreas.find(fa => fa.id === (s as ShiftCode).focusAreaId)?.name
+        : undefined;
       return (
         <div
           style={{
@@ -212,9 +290,9 @@ export default function ShiftEditPanel({
           <span style={{ fontWeight: 800, fontSize: 20, color: s.text, lineHeight: 1 }}>
             {label}
           </span>
-          {fullName && (
+          {(fullName || faName) && (
             <span style={{ fontSize: 11, color: s.text, opacity: 0.7, lineHeight: 1 }}>
-              {fullName}
+              {fullName}{fullName && faName ? " · " : ""}{faName}
             </span>
           )}
           {renderNoteDots(noteTypes)}
@@ -226,10 +304,14 @@ export default function ShiftEditPanel({
     return (
       <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         {currentLabels.map((label, i) => {
-          const s = getShiftTypeStyle(label);
-          const fullName = (s as ShiftType).name && (s as ShiftType).name !== label ? (s as ShiftType).name : null;
-          const shiftWing = shiftTypes.find((st) => st.label === label)?.wingName ?? activeTab;
-          const pillNoteTypes = getNoteTypes ? getNoteTypes(shiftWing) : [];
+          const s = getShiftCodeStyle(label, currentShiftCodeIds[i]);
+          const fullName = (s as ShiftCode).name && (s as ShiftCode).name !== label ? (s as ShiftCode).name : null;
+          const shiftCode = currentShiftCodeIds[i] != null
+            ? shiftCodes.find((st) => st.id === currentShiftCodeIds[i])
+            : shiftCodes.find((st) => st.label === label);
+          const shiftFaId = shiftCode?.focusAreaId;
+          const shiftWingId = shiftFaId ?? activeTab;
+          const pillNoteTypes = getNoteTypes ? getNoteTypes(shiftWingId) : [];
           return (
             <div key={label + i}>
               {/* Pill */}
@@ -250,18 +332,27 @@ export default function ShiftEditPanel({
                 <span style={{ fontWeight: 800, fontSize: 18, color: s.text, lineHeight: 1 }}>
                   {label}
                 </span>
-                {fullName && (
-                  <span style={{ fontSize: 11, color: s.text, opacity: 0.7, lineHeight: 1 }}>
-                    {fullName}
-                  </span>
-                )}
+                {(() => {
+                  const faName = shiftCode?.focusAreaId != null
+                    ? focusAreas.find(fa => fa.id === shiftCode.focusAreaId)?.name
+                    : undefined;
+                  return (fullName || faName) ? (
+                    <span style={{ fontSize: 11, color: s.text, opacity: 0.7, lineHeight: 1 }}>
+                      {fullName}{fullName && faName ? " · " : ""}{faName}
+                    </span>
+                  ) : null;
+                })()}
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
                   <button
                     onClick={() => {
-                      const remaining = currentLabels.filter((_, j) => j !== i);
+                      const remainingIds = currentShiftCodeIds.filter((_, j) => j !== i);
+                      const remainingLabels = remainingIds
+                        .map(id => shiftCodes.find(sc => sc.id === id)?.label)
+                        .filter((l): l is string => l != null);
                       onSelect(
-                        remaining.length > 0 ? remaining.join("/") : "OFF",
+                        remainingLabels.length > 0 ? remainingLabels.join("/") : "OFF",
+                        remainingIds,
                         seriesId ? seriesScope : undefined,
                       );
                     }}
@@ -291,8 +382,8 @@ export default function ShiftEditPanel({
                 {/* Note dots inside pill — left side to avoid colliding with × button */}
                 {renderNoteDots(pillNoteTypes, "left")}
               </div>
-              {/* Inline indicators for this shift's wing */}
-              {renderInlineIndicators(shiftWing)}
+              {/* Inline indicators for this shift's focus area */}
+              {renderInlineIndicators(shiftWingId)}
             </div>
           );
         })}
@@ -300,20 +391,16 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderInlineIndicators(wingName: string) {
-    if (!canEditNotes) return null;
-    const noteTypeDefs = [
-      { type: "readings" as NoteType, label: "Readings", color: "#EF4444" },
-      { type: "shower" as NoteType, label: "Shower", color: "#1E293B" },
-    ];
+  function renderInlineIndicators(focusAreaId: number) {
+    if (!canEditNotes || indicatorTypes.length === 0) return null;
     return (
-      <div style={{ display: "flex", gap: 6, paddingTop: 6 }}>
-        {noteTypeDefs.map(({ type, label, color }) => {
-          const isActive = getNoteTypes ? getNoteTypes(wingName).includes(type) : false;
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
+        {indicatorTypes.map(({ name, color }) => {
+          const isActive = getNoteTypes ? getNoteTypes(focusAreaId).includes(name) : false;
           return (
             <button
-              key={type}
-              onClick={() => onNoteToggle?.(type, !isActive, wingName)}
+              key={name}
+              onClick={() => onNoteToggle?.(name, !isActive, focusAreaId)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -339,7 +426,7 @@ export default function ShiftEditPanel({
                   flexShrink: 0,
                 }}
               />
-              {label}
+              {name}
             </button>
           );
         })}
@@ -348,34 +435,17 @@ export default function ShiftEditPanel({
   }
 
   function renderNotesSection() {
-    if (!canEditNotes) return null;
+    if (!canEditNotes || indicatorTypes.length === 0) return null;
     return (
       <div>
         <div style={sectionLabel}>Indicators</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {(
-            [
-              {
-                type: "readings" as NoteType,
-                label: "Readings",
-                color: "#EF4444",
-                desc: "Appears as a red dot",
-              },
-              {
-                type: "shower" as NoteType,
-                label: "Shower",
-                color: "#1E293B",
-                desc: "Appears as a black dot",
-              },
-            ] as { type: NoteType; label: string; color: string; desc: string }[]
-          ).map(({ type, label, color, desc }) => {
-            const isActive = getNoteTypes
-              ? getNoteTypes(activeTab).includes(type)
-              : false;
+          {indicatorTypes.map(({ name, color }) => {
+            const isActive = getNoteTypes ? getNoteTypes(activeTab).includes(name) : false;
             return (
               <button
-                key={type}
-                onClick={() => onNoteToggle?.(type, !isActive, activeTab)}
+                key={name}
+                onClick={() => onNoteToggle?.(name, !isActive, activeTab)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -402,31 +472,15 @@ export default function ShiftEditPanel({
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: isActive ? color : "var(--color-text-secondary)",
-                    }}
-                  >
-                    {label}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? color : "var(--color-text-secondary)" }}>
+                    {name}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "var(--color-text-subtle)",
-                      marginTop: 1,
-                    }}
-                  >
-                    {desc}
+                  <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 1 }}>
+                    Appears as a colored dot
                   </div>
                 </div>
                 {isActive && (
-                  <div
-                    style={{ fontSize: 10, fontWeight: 700, color, flexShrink: 0 }}
-                  >
-                    ON
-                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color, flexShrink: 0 }}>ON</div>
                 )}
               </button>
             );
@@ -436,21 +490,25 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderShiftButton(s: ShiftType) {
-    const isActive = currentLabels.includes(s.label);
+  function renderShiftButton(s: ShiftCode) {
+    const isActive = currentShiftCodeIds.includes(s.id);
     const disabled = !allowShiftEdits;
 
     const handleToggle = () => {
       if (!allowShiftEdits) return;
-      let newLabels: string[];
+      let newIds: number[];
       if (isActive) {
-        newLabels = currentLabels.filter((l) => l !== s.label);
+        // Remove this specific shift code by ID
+        newIds = currentShiftCodeIds.filter(id => id !== s.id);
       } else {
-        newLabels = [...currentLabels, s.label];
+        // Add this specific shift code by ID
+        newIds = [...currentShiftCodeIds, s.id];
       }
-      newLabels = newLabels.filter((l) => l !== "OFF");
+      const newLabels = newIds
+        .map(id => shiftCodes.find(sc => sc.id === id)?.label)
+        .filter((l): l is string => l != null && l !== "OFF");
       const newShift = newLabels.length > 0 ? newLabels.join("/") : "OFF";
-      onSelect(newShift, seriesId ? seriesScope : undefined);
+      onSelect(newShift, newIds, seriesId ? seriesScope : undefined);
       if (newShift !== "OFF") {
         setShowPicker(false);
       }
@@ -458,7 +516,7 @@ export default function ShiftEditPanel({
 
     return (
       <button
-        key={s.label}
+        key={s.id}
         onClick={handleToggle}
         disabled={disabled}
         style={{
@@ -546,7 +604,7 @@ export default function ShiftEditPanel({
               }}
             >
               {formatDate(modal.date)}
-              {modal.empDesignation && (
+              {modal.empCertificationId != null && (
                 <>
                   {" · "}
                   <span
@@ -555,7 +613,7 @@ export default function ShiftEditPanel({
                       fontWeight: 500,
                     }}
                   >
-                    {modal.empDesignation}
+                    {getCertName(modal.empCertificationId, certifications)}
                   </span>
                 </>
               )}
@@ -576,37 +634,6 @@ export default function ShiftEditPanel({
           </button>
         </div>
 
-        {/* Wing tabs */}
-        {tabs.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              borderBottom: "1px solid var(--color-border)",
-              overflowX: "auto",
-              flexShrink: 0,
-              background: "#fff",
-              paddingLeft: 16,
-              paddingRight: 16,
-            }}
-          >
-            {tabs.map((wing) => {
-              const isActive = wing === activeTab;
-              const isHome =
-                modal.empWings.includes(wing) && wing === modal.empWings[0];
-              return (
-                <button
-                  key={wing}
-                  onClick={() => setActiveTab(wing)}
-                  className={`dg-sub-tab${isActive ? " active" : ""}`}
-                  style={{ fontSize: 12 }}
-                >
-                  {wing}
-                  {isHome ? " ★" : ""}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
@@ -615,6 +642,116 @@ export default function ShiftEditPanel({
             <>
               {/* Current shift displayed prominently */}
               {renderCurrentShiftPill()}
+
+              {/* Custom time override — single active shifts only */}
+              {hasActiveShift && allowShiftEdits && onCustomTimeChange && currentLabels.length === 1 && (() => {
+                const defaultStart = shiftCodes.find(st => st.label === currentLabels[0])?.defaultStartTime ?? null;
+                function handleUndoCustomTime() {
+                  const s = parseTo12h(customStartTime); const e = parseTo12h(customEndTime);
+                  setStartH(s.hour); setStartM(s.minute); setStartP(s.period);
+                  setEndH(e.hour); setEndM(e.minute); setEndP(e.period);
+                }
+                const inputSt: React.CSSProperties = {
+                  width: 32, padding: "7px 2px",
+                  border: "1px solid var(--color-border)", borderRadius: 6,
+                  fontSize: 15, fontWeight: 600, fontFamily: "inherit",
+                  background: "#fff", textAlign: "center", boxSizing: "border-box",
+                  outline: "none",
+                };
+                function AmPm({ value, onChange }: { value: "AM" | "PM"; onChange: (v: "AM" | "PM") => void }) {
+                  return (
+                    <div style={{ display: "flex", border: "1px solid var(--color-border)", borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
+                      {(["AM", "PM"] as const).map((p) => (
+                        <button key={p} onClick={() => onChange(p)} style={{
+                          padding: "7px 6px", fontSize: 10, fontWeight: 700, border: "none",
+                          borderRight: p === "AM" ? "1px solid var(--color-border)" : "none",
+                          background: value === p ? "var(--color-text-secondary)" : "#fff",
+                          color: value === p ? "#fff" : "var(--color-text-subtle)",
+                          cursor: "pointer", fontFamily: "inherit", lineHeight: 1,
+                          transition: "background 100ms ease, color 100ms ease",
+                        }}>{p}</button>
+                      ))}
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ marginBottom: 16 }}>
+                    {!showCustomTime ? (
+                      <button
+                        onClick={() => setShowCustomTime(true)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6, fontSize: 12,
+                          color: "var(--color-text-subtle)", background: "none",
+                          border: "1px dashed var(--color-border)", borderRadius: 7,
+                          padding: "7px 12px", cursor: "pointer", fontFamily: "inherit",
+                          width: "100%", justifyContent: "center",
+                        }}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Set custom time
+                        {defaultStart && <span style={{ marginLeft: 2, opacity: 0.6 }}>· default {fmt12h(defaultStart)}</span>}
+                      </button>
+                    ) : (
+                      <div style={{ background: "#F8FAFC", border: "1px solid var(--color-border)", borderRadius: 10, padding: "12px" }}>
+                        {/* Header */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
+                          <button
+                            onClick={() => { setShowCustomTime(false); onCustomTimeChange(null, null); }}
+                            style={{ fontSize: 11, color: "var(--color-text-subtle)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+                          >Remove</button>
+                        </div>
+
+                        {/* Single row: [H]:[M][AM/PM] → [H]:[M][AM/PM] */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
+                          {/* Start */}
+                          <input type="text" inputMode="numeric" value={startH} placeholder={focusedField === "sH" ? "" : "8"} maxLength={2}
+                            onFocus={() => { setFocusedField("sH"); setStartH(""); }}
+                            onChange={(e) => setStartH(e.target.value.replace(/\D/g, ""))}
+                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setStartH(parseTo12h(customStartTime).hour); }}
+                            style={inputSt}
+                          />
+                          <span style={{ fontSize: 14, color: "var(--color-text-subtle)", fontWeight: 700, lineHeight: 1, flexShrink: 0 }}>:</span>
+                          <input type="text" inputMode="numeric" value={startM} placeholder={focusedField === "sM" ? "" : "00"} maxLength={2}
+                            onFocus={() => { setFocusedField("sM"); setStartM(""); }}
+                            onChange={(e) => setStartM(e.target.value.replace(/\D/g, ""))}
+                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setStartM(parseTo12h(customStartTime).minute); else setStartM(e.target.value.padStart(2, "0")); }}
+                            style={inputSt}
+                          />
+                          <AmPm value={startP} onChange={setStartP} />
+
+                          {/* Divider */}
+                          <span style={{ color: "var(--color-text-subtle)", fontSize: 11, fontWeight: 500, flexShrink: 0, margin: "0 3px" }}>→</span>
+
+                          {/* End */}
+                          <input type="text" inputMode="numeric" value={endH} placeholder={focusedField === "eH" ? "" : "4"} maxLength={2}
+                            onFocus={() => { setFocusedField("eH"); setEndH(""); }}
+                            onChange={(e) => setEndH(e.target.value.replace(/\D/g, ""))}
+                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setEndH(parseTo12h(customEndTime).hour); }}
+                            style={inputSt}
+                          />
+                          <span style={{ fontSize: 14, color: "var(--color-text-subtle)", fontWeight: 700, lineHeight: 1, flexShrink: 0 }}>:</span>
+                          <input type="text" inputMode="numeric" value={endM} placeholder={focusedField === "eM" ? "" : "00"} maxLength={2}
+                            onFocus={() => { setFocusedField("eM"); setEndM(""); }}
+                            onChange={(e) => setEndM(e.target.value.replace(/\D/g, ""))}
+                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setEndM(parseTo12h(customEndTime).minute); else setEndM(e.target.value.padStart(2, "0")); }}
+                            style={inputSt}
+                          />
+                          <AmPm value={endP} onChange={setEndP} />
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: "flex", gap: 7 }}>
+                          <button onClick={handleUndoCustomTime} style={{ flex: 1, padding: "8px 0", fontSize: 12, fontWeight: 500, border: "1px solid var(--color-border)", borderRadius: 7, background: "#fff", color: "var(--color-text)", cursor: "pointer", fontFamily: "inherit" }}>Undo</button>
+                          <button onClick={() => commitCustomTime(startH, startM, startP, endH, endM, endP)} style={{ flex: 2, padding: "8px 0", fontSize: 12, fontWeight: 600, border: "1px solid var(--color-primary)", borderRadius: 7, background: "var(--color-primary)", color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {!hasActiveShift && !allowShiftEdits && (
                 <div
@@ -714,7 +851,7 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && (
                 <div style={{ marginTop: 16 }}>
                   <button
-                    onClick={() => onSelect("OFF", seriesId ? seriesScope : undefined)}
+                    onClick={() => onSelect("OFF", [], seriesId ? seriesScope : undefined)}
                     style={{
                       width: "100%",
                       fontSize: 12,
@@ -759,7 +896,14 @@ export default function ShiftEditPanel({
               {allowShiftEdits && (
                 <div style={{ marginTop: 8 }}>
                   <button
-                    onClick={() => setShowPicker(true)}
+                    onClick={() => {
+                      // Sync tab to the current shift's focus area
+                      if (currentShiftCodeIds.length) {
+                        const fa = shiftCodes.find((s) => s.id === currentShiftCodeIds[0])?.focusAreaId;
+                        if (fa != null) setPickerTab(fa);
+                      }
+                      setShowPicker(true);
+                    }}
                     className="dg-btn dg-btn-ghost"
                     style={{
                       width: "100%",
@@ -824,58 +968,108 @@ export default function ShiftEditPanel({
                 </button>
               )}
 
-              {/* Wing-specific shifts */}
-              {wingShifts.length > 0 && (
-                <>
-                  <div style={sectionLabel}>Shift Assignment</div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 8,
-                      marginBottom: 16,
-                    }}
-                  >
-                    {wingShifts.map((s) => renderShiftButton(s))}
-                  </div>
-                </>
-              )}
-
-              {/* General shifts */}
-              {generalShifts.length > 0 && (
-                <>
-                  <div
-                    style={{
-                      ...sectionLabel,
-                      marginTop: wingShifts.length > 0 ? 4 : 0,
-                    }}
-                  >
-                    General
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 8,
-                    }}
-                  >
-                    {generalShifts.map((s) => renderShiftButton(s))}
-                  </div>
-                </>
-              )}
-
-              {wingShifts.length === 0 && generalShifts.length === 0 && (
-                <div
-                  style={{
-                    padding: "24px 16px",
-                    textAlign: "center",
-                    color: "var(--color-text-subtle)",
-                    fontSize: 13,
-                  }}
-                >
-                  No shifts available for this wing.
+              {/* Focus area tabs */}
+              {allPickerAreas.length > 1 && (
+                <div style={{
+                  display: "flex",
+                  borderBottom: "2px solid var(--color-border)",
+                  marginBottom: 16,
+                  marginLeft: -20,
+                  marginRight: -20,
+                  paddingLeft: 20,
+                  paddingRight: 20,
+                  gap: 0,
+                }}>
+                  {allPickerAreas.map((fa) => {
+                    const isActive = pickerTab === fa.id;
+                    return (
+                      <button
+                        key={fa.id}
+                        onClick={() => setPickerTab(fa.id)}
+                        style={{
+                          flex: 1,
+                          padding: "9px 8px",
+                          border: "none",
+                          borderBottom: isActive ? "2.5px solid var(--color-primary)" : "2.5px solid transparent",
+                          background: isActive ? "var(--color-primary-light, rgba(59,130,246,0.08))" : "none",
+                          color: isActive ? "var(--color-primary)" : "var(--color-text-subtle)",
+                          fontSize: 12,
+                          fontWeight: isActive ? 700 : 500,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          transition: "color 100ms ease, background 100ms ease",
+                          marginBottom: -2,
+                          whiteSpace: "nowrap",
+                          borderRadius: isActive ? "6px 6px 0 0" : 0,
+                        }}
+                      >
+                        {fa.name}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Shifts for the active tab's focus area */}
+              {(() => {
+                const activeArea = allPickerAreas.find((fa) => fa.id === pickerTab);
+                const areaName = activeArea?.name ?? allPickerAreas[0]?.name ?? "";
+                const areaShifts = getShiftsForFocusArea(areaName);
+
+                const boldHeading: React.CSSProperties = {
+                  marginBottom: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "var(--color-text-secondary)",
+                };
+
+                return (
+                  <>
+                    {/* Focus area shifts — heading only shown when there's a single area (no tabs) */}
+                    {areaShifts.length > 0 && (
+                      <div style={{ marginBottom: 20 }}>
+                        {allPickerAreas.length <= 1 && <div style={boldHeading}>{areaName}</div>}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {areaShifts.map((s) => renderShiftButton(s))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* General shifts (non-off-day) */}
+                    {generalNonOffShifts.length > 0 && (
+                      <div style={{ marginBottom: 20 }}>
+                        <div style={boldHeading}>General</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {generalNonOffShifts.map((s) => renderShiftButton(s))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Off Days */}
+                    {offDayShifts.length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={boldHeading}>Off Days</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {offDayShifts.map((s) => renderShiftButton(s))}
+                        </div>
+                      </div>
+                    )}
+
+                    {areaShifts.length === 0 && generalNonOffShifts.length === 0 && offDayShifts.length === 0 && (
+                      <div
+                        style={{
+                          padding: "24px 16px",
+                          textAlign: "center",
+                          color: "var(--color-text-subtle)",
+                          fontSize: 13,
+                        }}
+                      >
+                        No shifts available.
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </>
           )}
         </div>

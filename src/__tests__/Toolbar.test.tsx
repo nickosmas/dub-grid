@@ -2,12 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Toolbar from "@/components/Toolbar";
-import { Wing } from "@/types";
+import { FocusArea } from "@/types";
 
-const defaultWings: Wing[] = [
+const defaultFocusAreas: FocusArea[] = [
   {
     id: 1,
-    orgId: "org-1",
+    companyId: "company-1",
     name: "North",
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
@@ -15,7 +15,7 @@ const defaultWings: Wing[] = [
   },
   {
     id: 2,
-    orgId: "org-1",
+    companyId: "company-1",
     name: "South",
     colorBg: "#F0FDF4",
     colorText: "#166534",
@@ -27,14 +27,14 @@ const defaultProps = {
   viewMode: "schedule" as const,
   weekStart: new Date(2024, 0, 7), // Jan 7, 2024 (Sunday)
   spanWeeks: 1 as const,
-  activeWing: "All",
+  activeFocusArea: null as number | null,
   staffSearch: "",
-  wings: defaultWings,
+  focusAreas: defaultFocusAreas,
   onPrev: vi.fn(),
   onNext: vi.fn(),
   onToday: vi.fn(),
   onSpanChange: vi.fn(),
-  onWingChange: vi.fn(),
+  onFocusAreaChange: vi.fn(),
   onStaffSearchChange: vi.fn(),
 };
 
@@ -65,7 +65,7 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument();
   });
 
-  it("renders All wing button plus one per wing in wings prop", () => {
+  it("renders All focus area button plus one per focus area in focusAreas prop", () => {
     render(<Toolbar {...defaultProps} />);
     expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "North" })).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("Toolbar — non-schedule mode", () => {
     expect(screen.queryByRole("button", { name: "M" })).not.toBeInTheDocument();
   });
 
-  it("does NOT render wing filter buttons", () => {
+  it("does NOT render focus area filter buttons", () => {
     render(<Toolbar {...nonScheduleProps} />);
     expect(
       screen.queryByRole("button", { name: "All" }),
@@ -118,45 +118,43 @@ describe("Toolbar — non-schedule mode", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("DOES render Tools button", () => {
-    render(<Toolbar {...nonScheduleProps} />);
-    expect(screen.getByRole("button", { name: /Tools/i })).toBeInTheDocument();
+  it("renders null (nothing) in non-schedule mode", () => {
+    const { container } = render(<Toolbar {...nonScheduleProps} />);
+    // The component returns null for non-schedule viewMode
+    expect(container.firstChild).toBeNull();
   });
 });
 
-describe("Toolbar — Tools dropdown", () => {
-  it("opens on click and shows Print / Save as PDF", async () => {
-    const user = userEvent.setup();
+describe("Toolbar — Print button", () => {
+  it("renders a Print button in schedule mode", () => {
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
-    expect(screen.getByText(/Print \/ Save as PDF/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Print/i })).toBeInTheDocument();
   });
 
-  it("closes when clicking outside", async () => {
+  it("Print button calls onPrintOpen when clicked", async () => {
     const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
-    expect(screen.getByText(/Print \/ Save as PDF/i)).toBeInTheDocument();
-    await user.click(document.body);
-    expect(screen.queryByText(/Print \/ Save as PDF/i)).not.toBeInTheDocument();
+    const onPrintOpen = vi.fn();
+    render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} />);
+    await user.click(screen.getByRole("button", { name: /Print/i }));
+    expect(onPrintOpen).toHaveBeenCalledOnce();
   });
 });
 
 describe("Toolbar — active state styles", () => {
-  it("active span button (matching spanWeeks) has dark background style", () => {
+  it("active span button (matching spanWeeks) has 'active' CSS class; inactive buttons do not", () => {
     render(<Toolbar {...defaultProps} spanWeeks={1} />);
     const btn1W = screen.getByRole("button", { name: "1W" });
     const btn2W = screen.getByRole("button", { name: "2W" });
-    expect(btn1W.style.background).toBe("var(--color-dark)");
-    expect(btn2W.style.background).toBe("none");
+    expect(btn1W.className).toContain("active");
+    expect(btn2W.className).not.toContain("active");
   });
 
-  it("active wing button (matching activeWing) has dark background style", () => {
-    render(<Toolbar {...defaultProps} activeWing="North" />);
+  it("active focus area button (matching activeFocusArea) has 'active' CSS class; others do not", () => {
+    render(<Toolbar {...defaultProps} activeFocusArea={1} />);
     const northBtn = screen.getByRole("button", { name: "North" });
     const allBtn = screen.getByRole("button", { name: "All" });
-    expect(northBtn.style.background).toBe("var(--color-dark)");
-    expect(allBtn.style.background).toBe("none");
+    expect(northBtn.className).toContain("active");
+    expect(allBtn.className).not.toContain("active");
   });
 });
 
@@ -203,11 +201,11 @@ describe("Toolbar — callbacks", () => {
     expect(defaultProps.onSpanChange).toHaveBeenCalledWith("month");
   });
 
-  it("clicking a wing button calls onWingChange with wing name", async () => {
+  it("clicking a focus area button calls onFocusAreaChange with focus area id", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
     await user.click(screen.getByRole("button", { name: "North" }));
-    expect(defaultProps.onWingChange).toHaveBeenCalledWith("North");
+    expect(defaultProps.onFocusAreaChange).toHaveBeenCalledWith(1);
   });
 });
 

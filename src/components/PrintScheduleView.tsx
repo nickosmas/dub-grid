@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { Employee, ShiftType, Wing } from "@/types";
-import { addDays, formatDateKey, formatDate } from "@/lib/utils";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem } from "@/types";
+import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleNames } from "@/lib/utils";
 import { DAY_LABELS } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
@@ -25,38 +25,91 @@ const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#94A3B8" };
 
 interface PrintSectionProps {
   sectionName: string;
+  focusAreaId: number;
   exclusiveLabels: string[];
   employees: Employee[];
   dates: Date[];
   shiftForKey: (empId: string, date: Date) => string | null;
-  getShiftStyle: (type: string) => ShiftType;
-  shiftTypes: ShiftType[];
+  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  certifications: NamedItem[];
+  companyRoles: NamedItem[];
   splitAtIndex?: number;
   fontSize: number;
 }
 
 function PrintSection({
   sectionName,
+  focusAreaId,
   exclusiveLabels,
   employees,
   dates,
   shiftForKey,
+  shiftCodeIdsForKey,
   getShiftStyle,
-  shiftTypes,
+  shiftCodes,
+  shiftCategories,
+  certifications,
+  companyRoles,
   splitAtIndex,
   fontSize,
 }: PrintSectionProps) {
   if (employees.length === 0) return null;
 
-  const sectionShiftTypes = shiftTypes.filter((st) => st.wingName === sectionName);
-  const showDayCount = sectionShiftTypes.some((st) => st.countsTowardDay);
-  const showEveCount = sectionShiftTypes.some((st) => st.countsTowardEve);
-  const showNightCount = sectionShiftTypes.some((st) => st.countsTowardNight);
+  // Bind focus-area context so label lookups resolve the section-specific definition first.
+  const contextualGetShiftStyle = useMemo(
+    () => (label: string) => getShiftStyle(label, sectionName),
+    [getShiftStyle, sectionName],
+  );
+
+  // Look up shift codes by ID so cross-focus-area shifts render in their own color
+  const shiftCodeById = useMemo(() => {
+    const map = new Map<number, ShiftCode>();
+    for (const sc of shiftCodes) map.set(sc.id, sc);
+    return map;
+  }, [shiftCodes]);
+
+  const getStyleByIdOrLabel = useMemo(
+    () => (label: string, codeId?: number): ShiftCode => {
+      if (codeId != null) {
+        const byId = shiftCodeById.get(codeId);
+        if (byId) return byId;
+      }
+      return contextualGetShiftStyle(label);
+    },
+    [shiftCodeById, contextualGetShiftStyle],
+  );
+
+  // Set of shift code IDs that belong to this section's focus area
+  const sectionCodeIds = useMemo(() => {
+    return new Set(
+      shiftCodes.filter((sc) => sc.focusAreaId === focusAreaId).map((sc) => sc.id),
+    );
+  }, [shiftCodes, focusAreaId]);
+
+  const shiftCodeIdsForKeyFn = shiftCodeIdsForKey ?? (() => []);
 
   const dailyTallies = useMemo(
-    () => dates.map((date) => computeDailyTallies(employees, date, shiftForKey, getShiftStyle, exclusiveLabels)),
-    [dates, employees, shiftForKey, getShiftStyle, exclusiveLabels],
+    () => dates.map((date) => computeDailyTallies(employees, date, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds)),
+    [dates, employees, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds],
   );
+
+  // Derive tally rows from actual data so tallies always show when categorized shifts exist
+  const tallyRows = useMemo(() => {
+    const allCatIds = new Set<number>();
+    for (const dayTally of dailyTallies) {
+      for (const catId of Object.keys(dayTally).map(Number)) {
+        allCatIds.add(catId);
+      }
+    }
+    if (allCatIds.size === 0) return [];
+    return shiftCategories
+      .filter((cat) => allCatIds.has(cat.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((cat) => ({ id: cat.id, name: cat.name }));
+  }, [dailyTallies, shiftCategories]);
 
   // em-based name column; day columns fill the rest equally
   const nameColEm = 16;
@@ -122,7 +175,8 @@ function PrintSection({
         {/* Employee rows */}
         {employees.map((emp, ri) => {
           const rowBg = ri % 2 === 0 ? "#fff" : "#FAFBFC";
-          const dc = DESIGNATION_COLORS[emp.designation] ?? DEFAULT_DESIG_COLOR;
+          const certAbbr = getCertAbbr(emp.certificationId, certifications);
+          const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
           return (
             <div
@@ -164,29 +218,14 @@ function PrintSection({
                     >
                       {emp.name}
                     </span>
-                    {emp.fteWeight < 1 && (
-                      <span
-                        style={{
-                          fontSize: "0.8em",
-                          fontWeight: 700,
-                          background: "#F1F5F9",
-                          color: "#64748B",
-                          padding: "0.1em 0.3em",
-                          borderRadius: 3,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {emp.fteWeight}
-                      </span>
-                    )}
                   </div>
-                  {emp.roles.length > 0 && (
+                  {emp.roleIds.length > 0 && (
                     <div style={{ fontSize: "0.8em", color: "#94A3B8", marginTop: "0.1em", whiteSpace: "nowrap" }}>
-                      {emp.roles.join(", ")}
+                      {getRoleNames(emp.roleIds, companyRoles).join(", ")}
                     </div>
                   )}
                 </div>
-                {emp.designation && emp.designation !== "—" && (
+                {certAbbr && certAbbr !== "—" && (
                   <span
                     style={{
                       fontSize: "0.8em",
@@ -199,7 +238,7 @@ function PrintSection({
                       flexShrink: 0,
                     }}
                   >
-                    {emp.designation}
+                    {certAbbr}
                   </span>
                 )}
               </div>
@@ -207,8 +246,9 @@ function PrintSection({
               {/* Shift cells */}
               {dates.map((date, di) => {
                 const isSplit = splitAtIndex !== undefined && di === splitAtIndex;
-                const shiftType = shiftForKey(emp.id, date);
-                const shiftStyle = shiftType ? getShiftStyle(shiftType) : null;
+                const shiftCode = shiftForKey(emp.id, date);
+                const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                const shiftStyle = shiftCode ? getStyleByIdOrLabel(shiftCode, cellCodeIds[0]) : null;
 
                 return (
                   <div
@@ -223,11 +263,11 @@ function PrintSection({
                       borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #F1F5F9",
                     }}
                   >
-                    {shiftType && shiftType !== "OFF" ? (
+                    {shiftCode && shiftCode !== "OFF" ? (
                       (() => {
-                        const labels = shiftType.split("/");
+                        const labels = shiftCode.split("/");
                         if (labels.length === 1) {
-                          const style = getShiftStyle(labels[0]);
+                          const style = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
                           const isCross =
                             exclusiveLabels.length > 0 &&
                             !exclusiveLabels.includes(labels[0]) &&
@@ -253,7 +293,7 @@ function PrintSection({
                             </div>
                           );
                         }
-                        const firstStyle = getShiftStyle(labels[0]);
+                        const firstStyle = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
                         return (
                           <div
                             style={{
@@ -266,7 +306,7 @@ function PrintSection({
                             }}
                           >
                             {labels.map((label, li) => {
-                              const style = getShiftStyle(label);
+                              const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
                               const isCross =
                                 exclusiveLabels.length > 0 &&
                                 !exclusiveLabels.includes(label) &&
@@ -303,7 +343,7 @@ function PrintSection({
                         style={{
                           width: "1em",
                           height: "0.18em",
-                          background: shiftType === "OFF" ? "#CBD5E1" : "#E2E8F0",
+                          background: shiftCode === "OFF" ? "#CBD5E1" : "#E2E8F0",
                           borderRadius: 2,
                         }}
                       />
@@ -315,42 +355,19 @@ function PrintSection({
           );
         })}
 
-        {/* Tally rows */}
-        {(showDayCount || showEveCount || showNightCount) && (
-          <>
-            {showDayCount && (
-              <TallyRow
-                label="TALLY DAY"
-                color="#1E3A8A"
-                gridTemplate={gridTemplate}
-                height={tallyH}
-                splitAtIndex={splitAtIndex}
-                dailyTallies={dailyTallies.map((t) => t.day)}
-                isFirst
-              />
-            )}
-            {showEveCount && (
-              <TallyRow
-                label="TALLY EVE"
-                color="#9A3412"
-                gridTemplate={gridTemplate}
-                height={tallyH}
-                splitAtIndex={splitAtIndex}
-                dailyTallies={dailyTallies.map((t) => t.eve)}
-              />
-            )}
-            {showNightCount && (
-              <TallyRow
-                label="TALLY NIGHT"
-                color="#5B21B6"
-                gridTemplate={gridTemplate}
-                height={tallyH}
-                splitAtIndex={splitAtIndex}
-                dailyTallies={dailyTallies.map((t) => t.night)}
-              />
-            )}
-          </>
-        )}
+        {/* Tally rows — one per active tally category for this section */}
+        {tallyRows.map((row, ci) => (
+          <TallyRow
+            key={row.id}
+            label={row.name}
+            bgColor="#fff"
+            gridTemplate={gridTemplate}
+            height={tallyH}
+            splitAtIndex={splitAtIndex}
+            dailyTallies={dailyTallies.map((t) => t[row.id] ?? {})}
+            isFirst={ci === 0}
+          />
+        ))}
       </div>
     </div>
   );
@@ -358,7 +375,7 @@ function PrintSection({
 
 function TallyRow({
   label,
-  color,
+  bgColor,
   gridTemplate,
   height,
   splitAtIndex,
@@ -366,7 +383,7 @@ function TallyRow({
   isFirst,
 }: {
   label: string;
-  color: string;
+  bgColor: string;
   gridTemplate: string;
   height: string;
   splitAtIndex?: number;
@@ -378,7 +395,7 @@ function TallyRow({
       style={{
         display: "grid",
         gridTemplateColumns: gridTemplate,
-        background: "#F1F5F9",
+        background: bgColor,
         borderTop: isFirst ? "2px solid #0F172A" : "1px solid #E2E8F0",
       }}
     >
@@ -408,7 +425,7 @@ function TallyRow({
               borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #E2E8F0",
               fontSize: "0.8em",
               fontWeight: 700,
-              color: entries.length > 0 ? color : "#CBD5E1",
+              color: entries.length > 0 ? "#1E293B" : "#CBD5E1",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -441,11 +458,16 @@ interface PrintScheduleViewProps {
   config: PrintConfig;
   employees: Employee[];
   allEmployees: Employee[];
-  wings: Wing[];
-  shiftTypes: ShiftType[];
+  focusAreas: FocusArea[];
+  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  certifications: NamedItem[];
+  companyRoles: NamedItem[];
   shiftForKey: (empId: string, date: Date) => string | null;
-  getShiftStyle: (type: string) => ShiftType;
+  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
   onClose: () => void;
+  focusAreaLabel?: string;
 }
 
 export default function PrintScheduleView({
@@ -454,13 +476,18 @@ export default function PrintScheduleView({
   config,
   employees,
   allEmployees,
-  wings,
-  shiftTypes,
+  focusAreas,
+  shiftCodes,
+  shiftCategories,
+  certifications,
+  companyRoles,
   shiftForKey,
+  shiftCodeIdsForKey,
   getShiftStyle,
   onClose,
+  focusAreaLabel = "Focus Areas",
 }: PrintScheduleViewProps) {
-  const { fontSize, selectedWings, spanWeeks } = config;
+  const { fontSize, selectedFocusAreas: selectedWings, spanWeeks } = config;
 
   // Build date array
   const dates = useMemo(() => {
@@ -487,35 +514,35 @@ export default function PrintScheduleView({
     return `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, spanWeeks * 7 - 1))}`;
   }, [weekStart, spanWeeks]);
 
-  // Filter wings to print
-  const printWings = useMemo(
+  // Filter focus areas to print
+  const printFocusAreas = useMemo(
     () =>
-      wings.filter(
+      focusAreas.filter(
         (w) =>
           selectedWings.length === 0 || selectedWings.includes(w.name),
       ),
-    [wings, selectedWings],
+    [focusAreas, selectedWings],
   );
 
   // Exclusive labels per section
   const exclusiveLabelsPerSection = useMemo(() => {
     return Object.fromEntries(
-      printWings.map((w) => [
+      printFocusAreas.map((w) => [
         w.name,
-        shiftTypes.filter((st) => st.wingName === w.name).map((st) => st.label),
+        shiftCodes.filter((st) => st.focusAreaId === w.id).map((st) => st.label),
       ]),
     );
-  }, [printWings, shiftTypes]);
+  }, [printFocusAreas, shiftCodes]);
 
-  // General shift labels (not wing-specific)
+  // General shift labels (not focus-area-specific)
   const generalShiftLabels = useMemo(
     () =>
       new Set(
-        shiftTypes
-          .filter((st) => st.isGeneral || !st.wingName)
+        shiftCodes
+          .filter((st) => st.isGeneral || st.focusAreaId == null)
           .map((st) => st.label),
       ),
-    [shiftTypes],
+    [shiftCodes],
   );
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -550,7 +577,7 @@ export default function PrintScheduleView({
     }, 250);
   }
 
-  const legendItems = shiftTypes.filter((s) => !EXCLUDED_LEGEND.has(s.label));
+  const legendItems = shiftCodes.filter((s) => !EXCLUDED_LEGEND.has(s.label));
 
   return (
     <div
@@ -616,7 +643,7 @@ export default function PrintScheduleView({
               color: "#94A3B8",
             }}
           >
-            Font: {fontSize}px · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} · {selectedWings.length === wings.length ? "All wings" : selectedWings.join(", ")}
+            Font: {fontSize}px · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} · {selectedWings.length === focusAreas.length ? `All ${focusAreaLabel.toLowerCase()}` : selectedWings.join(", ")}
           </span>
           <button
             onClick={handlePrint}
@@ -723,13 +750,13 @@ export default function PrintScheduleView({
             </div>
           </div>
 
-          {/* Wing sections */}
-          {printWings.map((wing) => {
-            const exclusiveLabels = exclusiveLabelsPerSection[wing.name] ?? [];
-            const homeEmps = employees.filter((e) => e.wings.includes(wing.name));
+          {/* Focus area sections */}
+          {printFocusAreas.map((focusArea) => {
+            const exclusiveLabels = exclusiveLabelsPerSection[focusArea.name] ?? [];
+            const homeEmps = employees.filter((e) => e.focusAreaIds.includes(focusArea.id));
             const guestEmps = allEmployees.filter(
               (e) =>
-                !e.wings.includes(wing.name) &&
+                !e.focusAreaIds.includes(focusArea.id) &&
                 dates.some((date) => {
                   const shift = shiftForKey(e.id, date);
                   return shift !== null && exclusiveLabels.includes(shift);
@@ -740,14 +767,19 @@ export default function PrintScheduleView({
 
             return (
               <PrintSection
-                key={wing.name}
-                sectionName={wing.name}
+                key={focusArea.name}
+                sectionName={focusArea.name}
+                focusAreaId={focusArea.id}
                 exclusiveLabels={exclusiveLabels}
                 employees={sectionEmps}
                 dates={dates}
                 shiftForKey={shiftForKey}
+                shiftCodeIdsForKey={shiftCodeIdsForKey}
                 getShiftStyle={getShiftStyle}
-                shiftTypes={shiftTypes}
+                shiftCodes={shiftCodes}
+                shiftCategories={shiftCategories}
+                certifications={certifications}
+                companyRoles={companyRoles}
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
               />
@@ -782,7 +814,7 @@ export default function PrintScheduleView({
               >
                 {legendItems.map((s) => (
                   <div
-                    key={s.label}
+                    key={s.id}
                     style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
                   >
                     <span

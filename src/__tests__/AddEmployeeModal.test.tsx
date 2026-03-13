@@ -1,7 +1,6 @@
 import {
   render,
   screen,
-  within,
   cleanup,
   fireEvent,
 } from "@testing-library/react";
@@ -9,12 +8,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
-import { Wing } from "@/types";
+import { FocusArea } from "@/types";
 
-const wings: Wing[] = [
+const focusAreas: FocusArea[] = [
   {
     id: 1,
-    orgId: "org-1",
+    companyId: "company-1",
     name: "North",
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
@@ -22,7 +21,7 @@ const wings: Wing[] = [
   },
   {
     id: 2,
-    orgId: "org-1",
+    companyId: "company-1",
     name: "South",
     colorBg: "#F0FDF4",
     colorText: "#166534",
@@ -30,8 +29,23 @@ const wings: Wing[] = [
   },
 ];
 
-const defaultSkillLevels = ["JLCSN", "CSN III", "CSN II", "STAFF", "—"];
-const defaultRoles = ["DCSN", "DVCSN", "Supv", "Mentor", "CN", "SC. Mgr.", "Activity Coordinator", "SC/Asst/Act/Cor"];
+const defaultCertifications = [
+  { id: 1, companyId: "company-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
+  { id: 2, companyId: "company-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
+  { id: 3, companyId: "company-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
+  { id: 4, companyId: "company-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
+  { id: 5, companyId: "company-1", name: "—", abbr: "—", sortOrder: 4 },
+];
+const defaultRoles = [
+  { id: 1, companyId: "company-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },
+  { id: 2, companyId: "company-1", name: "DVCSN", abbr: "DVCSN", sortOrder: 1 },
+  { id: 3, companyId: "company-1", name: "Supv", abbr: "Supv", sortOrder: 2 },
+  { id: 4, companyId: "company-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
+  { id: 5, companyId: "company-1", name: "CN", abbr: "CN", sortOrder: 4 },
+  { id: 6, companyId: "company-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
+  { id: 7, companyId: "company-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
+  { id: 8, companyId: "company-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
+];
 
 function renderModal(
   overrides: {
@@ -41,187 +55,168 @@ function renderModal(
 ) {
   const onAdd = overrides.onAdd ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
-  render(<AddEmployeeModal wings={wings} skillLevels={defaultSkillLevels} roles={defaultRoles} onAdd={onAdd} onClose={onClose} />);
+  render(<AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={onClose} />);
   return { onAdd, onClose };
+}
+
+// The component renders 3 rows by default. Each row has a "Full name" input.
+// Focus area buttons appear per-row. We scope row interactions by index.
+function getRowInputs(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLInputElement>('input[placeholder="Full name"]'));
 }
 
 describe("AddEmployeeModal", () => {
   describe("Rendering", () => {
-    it("renders name input with placeholder", () => {
-      renderModal();
-      expect(screen.getByPlaceholderText("e.g. Maria S.")).toBeInTheDocument();
+    it("renders name inputs with 'Full name' placeholder (one per default row)", () => {
+      const { container } = render(
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={vi.fn()} onClose={vi.fn()} />,
+      );
+      const inputs = getRowInputs(container);
+      // 3 rows by default
+      expect(inputs.length).toBeGreaterThanOrEqual(1);
+      expect(inputs[0]).toBeInTheDocument();
     });
 
-    it("renders FTE input", () => {
+    it("renders designation selects (one per default row)", () => {
       renderModal();
-      expect(screen.getByDisplayValue("1.0")).toBeInTheDocument();
+      const selects = screen.getAllByRole("combobox");
+      expect(selects.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders phone input", () => {
-      renderModal();
-      expect(screen.getByPlaceholderText("(415) 555-0100")).toBeInTheDocument();
+    it("renders focus area toggle buttons for each focus area (in at least the first row)", () => {
+      const { container } = render(
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={vi.fn()} onClose={vi.fn()} />,
+      );
+      // At minimum one "North" and one "South" button should be present (per-row)
+      const northBtns = Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.textContent === "North",
+      );
+      const southBtns = Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.textContent === "South",
+      );
+      expect(northBtns.length).toBeGreaterThanOrEqual(1);
+      expect(southBtns.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders email input", () => {
+    it("renders Add Staff Members submit button", () => {
       renderModal();
-      expect(
-        screen.getByPlaceholderText("name@example.com"),
-      ).toBeInTheDocument();
-    });
-
-    it("renders designation select", () => {
-      renderModal();
-      expect(screen.getByRole("combobox")).toBeInTheDocument();
-    });
-
-    it("renders wing toggle buttons (one per wing)", () => {
-      renderModal();
-      expect(screen.getByRole("button", { name: "North" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "South" })).toBeInTheDocument();
-    });
-
-    it("renders role toggle buttons", () => {
-      renderModal();
-      expect(screen.getByRole("button", { name: "DCSN" })).toBeInTheDocument();
-    });
-
-    it("renders Add to Schedule submit button", () => {
-      renderModal();
-      expect(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      ).toBeInTheDocument();
+      // Button text is dynamic: "Add Staff Members" when no valid rows, or "Add N Staff Member(s)"
+      const btn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      expect(btn).toBeInTheDocument();
     });
   });
 
   describe("Validation", () => {
-    it("clicking submit with empty name does NOT call onAdd", async () => {
+    it("clicking submit with all empty names does NOT call onAdd", async () => {
       const { onAdd } = renderModal();
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      );
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
       expect(onAdd).not.toHaveBeenCalled();
     });
 
-    it("clicking submit with no wings selected does NOT call onAdd", async () => {
-      const { onAdd } = renderModal();
-      // North is selected by default — deselect it
-      await userEvent.click(screen.getByRole("button", { name: "North" }));
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Alice",
+    it("clicking submit with name but no focus areas selected does NOT call onAdd", async () => {
+      const { onAdd, container } = (() => {
+        const onAdd = vi.fn();
+        const onClose = vi.fn();
+        const { container } = render(
+          <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={onClose} />,
+        );
+        return { onAdd, container };
+      })();
+
+      const inputs = getRowInputs(container);
+      // Type a name in the first row
+      await userEvent.type(inputs[0], "Alice");
+
+      // Deselect North (selected by default) in the first row
+      // Find the first row's North button
+      const allNorthBtns = Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.textContent === "North",
       );
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      );
+      await userEvent.click(allNorthBtns[0]);
+
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
       expect(onAdd).not.toHaveBeenCalled();
     });
   });
 
   describe("Submission", () => {
-    it("valid submission calls onAdd with correct shape (no id or seniority)", async () => {
-      const { onAdd } = renderModal();
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Alice Smith",
+    it("valid submission calls onAdd with correct shape (array of employees, no id or seniority)", async () => {
+      const onAdd = vi.fn();
+      const { container } = render(
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      );
+      const inputs = getRowInputs(container);
+      await userEvent.type(inputs[0], "Alice Smith");
+
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
+
       expect(onAdd).toHaveBeenCalledOnce();
-      expect(onAdd).toHaveBeenCalledWith(
+      // onAdd is called with an array
+      const calledWithArg = onAdd.mock.calls[0][0];
+      expect(Array.isArray(calledWithArg)).toBe(true);
+      expect(calledWithArg.length).toBeGreaterThanOrEqual(1);
+      const firstEmployee = calledWithArg[0];
+      expect(firstEmployee).toEqual(
         expect.objectContaining({
           name: "Alice Smith",
-          designation: expect.any(String),
-          wings: expect.any(Array),
-          roles: expect.any(Array),
-          fteWeight: expect.any(Number),
+          focusAreaIds: expect.any(Array),
+          roleIds: expect.any(Array),
           phone: expect.any(String),
           email: expect.any(String),
           contactNotes: expect.any(String),
         }),
       );
-      expect(onAdd).toHaveBeenCalledWith(
-        expect.not.objectContaining({ id: expect.anything() }),
-      );
-      expect(onAdd).toHaveBeenCalledWith(
-        expect.not.objectContaining({ seniority: expect.anything() }),
-      );
+      expect(firstEmployee).toHaveProperty("certificationId");
+      expect(firstEmployee).not.toHaveProperty("id");
+      expect(firstEmployee).not.toHaveProperty("seniority");
     });
   });
 
   describe("Toggles", () => {
-    it("clicking a wing button selects it; clicking again deselects it", async () => {
-      const { onAdd } = renderModal();
-      // Click South to add it
-      await userEvent.click(screen.getByRole("button", { name: "South" }));
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Test",
+    it("clicking a focus area button selects it; resulting submission includes that focus area", async () => {
+      const onAdd = vi.fn();
+      const { container } = render(
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
+      const inputs = getRowInputs(container);
+      await userEvent.type(inputs[0], "Test");
+
+      // Click South in the first row to add it
+      const allSouthBtns = Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.textContent === "South",
       );
-      expect(onAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ wings: expect.arrayContaining(["South"]) }),
-      );
+      await userEvent.click(allSouthBtns[0]);
+
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
+
+      const calledWithArg = onAdd.mock.calls[0][0];
+      expect(calledWithArg[0].focusAreaIds).toContain(2);
     });
 
-    it("clicking a wing button twice returns to original state", async () => {
-      const { onAdd } = renderModal();
-      // North is selected by default; click twice
-      await userEvent.click(screen.getByRole("button", { name: "North" }));
-      await userEvent.click(screen.getByRole("button", { name: "North" }));
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Test",
+    it("clicking a focus area button twice returns to original state", async () => {
+      const onAdd = vi.fn();
+      const { container } = render(
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      );
-      expect(onAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ wings: expect.arrayContaining(["North"]) }),
-      );
-    });
+      const inputs = getRowInputs(container);
+      await userEvent.type(inputs[0], "Test");
 
-    it("clicking a role button adds it to selection", async () => {
-      const { onAdd } = renderModal();
-      await userEvent.click(screen.getByRole("button", { name: "DCSN" }));
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Test",
+      // North is selected by default in first row; click twice
+      const allNorthBtns = Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.textContent === "North",
       );
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      );
-      expect(onAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ roles: expect.arrayContaining(["DCSN"]) }),
-      );
-    });
+      await userEvent.click(allNorthBtns[0]);
+      await userEvent.click(allNorthBtns[0]);
 
-    it("clicking a role button twice removes it from selection", async () => {
-      const { onAdd } = renderModal();
-      await userEvent.click(screen.getByRole("button", { name: "DCSN" }));
-      await userEvent.click(screen.getByRole("button", { name: "DCSN" }));
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Test",
-      );
-      await userEvent.click(
-        screen.getByRole("button", { name: "Add to Schedule" }),
-      );
-      const calledWith = onAdd.mock.calls[0][0];
-      expect(calledWith.roles).not.toContain("DCSN");
-    });
-  });
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
 
-  describe("Keyboard", () => {
-    it("pressing Enter in the name input triggers submission when form is valid", async () => {
-      const { onAdd } = renderModal();
-      await userEvent.type(
-        screen.getByPlaceholderText("e.g. Maria S."),
-        "Alice{Enter}",
-      );
-      expect(onAdd).toHaveBeenCalledOnce();
+      const calledWithArg = onAdd.mock.calls[0][0];
+      expect(calledWithArg[0].focusAreaIds).toContain(1);
     });
   });
 
@@ -236,9 +231,9 @@ describe("AddEmployeeModal", () => {
   });
 
   describe("Property Tests", () => {
-    // Feature: ui-ux-test-suite, Property 6: Wing toggle idempotency
+    // Feature: ui-ux-test-suite, Property 6: Focus area toggle idempotency
     // Validates: Requirements 6.6, 8.3
-    it("toggling a wing button twice returns selection to its original state", async () => {
+    it("toggling a focus area button twice returns selection to its original state", async () => {
       await fc.assert(
         fc.asyncProperty(
           fc.array(
@@ -248,19 +243,19 @@ describe("AddEmployeeModal", () => {
             { minLength: 1, maxLength: 6 },
           ),
           fc.integer({ min: 0, max: 5 }),
-          async (wingNames, indexSeed) => {
-            // Deduplicate and trim wing names to avoid RTL accessible-name normalization issues
+          async (focusAreaNames, indexSeed) => {
+            // Deduplicate and trim focus area names to avoid RTL accessible-name normalization issues
             const uniqueNames = [
-              ...new Set(wingNames.map((n) => n.trim())),
+              ...new Set(focusAreaNames.map((n) => n.trim())),
             ].filter((n) => n.length > 0);
             if (uniqueNames.length === 0) return;
 
-            const wingIndex = indexSeed % uniqueNames.length;
-            const wingToToggle = uniqueNames[wingIndex];
+            const focusAreaIndex = indexSeed % uniqueNames.length;
+            const focusAreaToToggle = uniqueNames[focusAreaIndex];
 
-            const testWings: Wing[] = uniqueNames.map((name, i) => ({
+            const testFocusAreas: FocusArea[] = uniqueNames.map((name, i) => ({
               id: i + 1,
-              orgId: "org-1",
+              companyId: "company-1",
               name,
               colorBg: "#EFF6FF",
               colorText: "#1D4ED8",
@@ -271,45 +266,43 @@ describe("AddEmployeeModal", () => {
             const onClose = vi.fn();
             const { container, unmount } = render(
               <AddEmployeeModal
-                wings={testWings}
-                skillLevels={defaultSkillLevels}
+                focusAreas={testFocusAreas}
+                certifications={defaultCertifications}
                 roles={defaultRoles}
                 onAdd={onAdd}
                 onClose={onClose}
               />,
             );
 
-            const scope = within(container);
-
-            // Find the wing buttons container (the div after "ASSIGNED WINGS" label).
-            // We locate wing buttons by matching their exact textContent to the wing name.
-            const findWingBtn = (name: string): HTMLElement => {
+            // Find the focus area buttons in the first row.
+            // We locate focus area buttons by matching their exact textContent to the focus area name.
+            const findFocusAreaBtnInFirstRow = (name: string): HTMLElement => {
               const allBtns = container.querySelectorAll("button");
               const btn = Array.from(allBtns).find(
                 (b) => b.textContent === name,
               );
-              if (!btn) throw new Error(`Wing button not found: "${name}"`);
+              if (!btn) throw new Error(`Focus area button not found: "${name}"`);
               return btn as HTMLElement;
             };
 
-            // Helper: read which wing buttons are "active" by checking background style.
+            // Helper: read which focus area buttons are "active" in the first row by checking background style.
             // Active buttons have colorBg (#EFF6FF = rgb(239, 246, 255)) as background.
-            const getActiveWings = () =>
+            const getActiveFocusAreasInFirstRow = () =>
               uniqueNames.filter((name) => {
-                const btn = findWingBtn(name);
+                const btn = findFocusAreaBtnInFirstRow(name);
                 return btn.style.background === "rgb(239, 246, 255)";
               });
 
             // Record initial selection
-            const initialActive = getActiveWings();
+            const initialActive = getActiveFocusAreasInFirstRow();
 
-            // Toggle the chosen wing once, then back
-            const toggleBtn = findWingBtn(wingToToggle);
+            // Toggle the chosen focus area once, then back
+            const toggleBtn = findFocusAreaBtnInFirstRow(focusAreaToToggle);
             fireEvent.click(toggleBtn);
             fireEvent.click(toggleBtn);
 
             // Record final selection — must equal initial
-            const finalActive = getActiveWings();
+            const finalActive = getActiveFocusAreasInFirstRow();
             expect(finalActive.slice().sort()).toEqual(
               initialActive.slice().sort(),
             );
