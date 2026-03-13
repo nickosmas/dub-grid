@@ -27,7 +27,7 @@ const FEATURES = [
   {
     icon: "🏥",
     title: "Built for Care Facilities",
-    desc: "Wings, skill levels, shift types — DubGrid understands your world out of the box.",
+    desc: "Focus areas, certifications, shift types — DubGrid understands your world out of the box.",
   },
   {
     icon: "📊",
@@ -51,8 +51,8 @@ const PAIN_POINTS = [
     after: "Shift types with built-in color coding",
   },
   {
-    before: '"Who\'s covering Wing B tonight?"',
-    after: "Filtered views by wing, role & date",
+    before: '"Who\'s covering Focus Area B tonight?"',
+    after: "Filtered views by focus area, role & date",
   },
   {
     before: "Version confusion across copies",
@@ -87,15 +87,15 @@ export default function RootPage() {
           if (isApexHost(parsed)) {
             const { data: profile } = await supabase
               .from("profiles")
-              .select("organizations(slug)")
+              .select("companies(slug)")
               .eq("id", session.user.id)
               .maybeSingle();
 
             const slug = (
               profile as {
-                organizations?: { slug?: string | null } | null;
+                companies?: { slug?: string | null } | null;
               } | null
-            )?.organizations?.slug;
+            )?.companies?.slug;
             if (slug) {
               const host = buildSubdomainHost(slug, parsed);
               window.location.replace(

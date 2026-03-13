@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { addDays, formatDate } from "@/lib/utils";
-import { Wing } from "@/types";
+import { FocusArea } from "@/types";
 import { ViewMode } from "@/components/Header";
 
 const MONTH_NAMES = [
@@ -14,42 +14,47 @@ interface ToolbarProps {
   viewMode: ViewMode;
   weekStart: Date;
   spanWeeks: 1 | 2 | "month";
-  activeWing: string;
+  activeFocusArea: number | null;
   staffSearch: string;
-  wings: Wing[];
+  focusAreas: FocusArea[];
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
   onSpanChange: (n: 1 | 2 | "month") => void;
-  onWingChange: (wing: string) => void;
+  onFocusAreaChange: (id: number | null) => void;
   onStaffSearchChange: (q: string) => void;
-  canEditSchedule?: boolean;
+  canEditShifts?: boolean;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
   onApplyRegular?: () => void;
   isApplyingRegular?: boolean;
   onPrintOpen?: () => void;
+  hasSavedDraft?: boolean;
+  /** True when there are both published AND draft shifts — shows Print + Edit Draft. */
+  hasMixedSchedule?: boolean;
 }
 
 export default function Toolbar({
   viewMode,
   weekStart,
   spanWeeks,
-  activeWing,
+  activeFocusArea,
   staffSearch,
-  wings,
+  focusAreas,
   onPrev,
   onNext,
   onToday,
   onSpanChange,
-  onWingChange,
+  onFocusAreaChange,
   onStaffSearchChange,
-  canEditSchedule,
+  canEditShifts,
   isEditMode,
   onToggleEditMode,
   onApplyRegular,
   isApplyingRegular,
   onPrintOpen,
+  hasSavedDraft,
+  hasMixedSchedule,
 }: ToolbarProps) {
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
@@ -60,7 +65,10 @@ export default function Toolbar({
       : `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, 6))}`;
   }, [weekStart, spanWeeks]);
 
-  const wingOptions = [{ name: "All" }, ...wings];
+  const focusAreaOptions: { id: number | null; name: string }[] = [
+    { id: null, name: "All" },
+    ...focusAreas.map((fa) => ({ id: fa.id, name: fa.name })),
+  ];
 
   if (viewMode !== "schedule") {
     return null;
@@ -140,14 +148,14 @@ export default function Toolbar({
         ))}
       </div>
 
-      {/* Wing filter */}
-      {wingOptions.length > 1 && (
+      {/* Focus area filter */}
+      {focusAreaOptions.length > 1 && (
         <div className="dg-segment">
-          {wingOptions.map((w) => (
+          {focusAreaOptions.map((w) => (
             <button
-              key={w.name}
-              onClick={() => onWingChange(w.name)}
-              className={`dg-segment-btn${activeWing === w.name ? " active" : ""}`}
+              key={w.id ?? "all"}
+              onClick={() => onFocusAreaChange(w.id)}
+              className={`dg-segment-btn${activeFocusArea === w.id ? " active" : ""}`}
             >
               {w.name}
             </button>
@@ -194,33 +202,35 @@ export default function Toolbar({
       {/* ── RIGHT ZONE: Global actions ── */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
 
-        {/* Print — disabled while editing to prevent printing draft state */}
-        <button
-          onClick={onPrintOpen}
-          disabled={isEditMode || !onPrintOpen}
-          className="dg-btn dg-btn-ghost"
-          style={{
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            padding: "7px 12px",
-            opacity: isEditMode ? 0.4 : 1,
-            cursor: isEditMode ? "not-allowed" : "pointer",
-          }}
-          title={isEditMode ? "Exit edit mode to print" : "Print / Export schedule"}
-        >
-          <svg
-            width="13" height="13" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        {/* Print — hidden for draft-only schedules, disabled while editing */}
+        {(!hasSavedDraft || hasMixedSchedule) && (
+          <button
+            onClick={onPrintOpen}
+            disabled={isEditMode || !onPrintOpen}
+            className="dg-btn dg-btn-ghost"
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 10,
+              padding: "7px 12px",
+              opacity: isEditMode ? 0.4 : 1,
+              cursor: isEditMode ? "not-allowed" : "pointer",
+            }}
+            title={isEditMode ? "Exit edit mode to print" : "Print / Export schedule"}
           >
-            <polyline points="6 9 6 2 18 2 18 9" />
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-            <rect x="6" y="14" width="12" height="8" />
-          </svg>
-          Print
-        </button>
+            <svg
+              width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Print
+          </button>
+        )}
 
         {/* Apply Regular Schedules — shown in edit mode */}
-        {canEditSchedule && isEditMode && onApplyRegular && (
+        {canEditShifts && isEditMode && onApplyRegular && (
           <button
             onClick={onApplyRegular}
             disabled={isApplyingRegular}
@@ -248,8 +258,8 @@ export default function Toolbar({
           </button>
         )}
 
-        {/* Edit mode toggle — only for schedulers */}
-        {canEditSchedule && onToggleEditMode && (
+        {/* Edit mode toggle — only for schedulers; hidden for draft-only saved drafts */}
+        {canEditShifts && onToggleEditMode && !hasMixedSchedule && (!hasSavedDraft) && (
           isEditMode ? (
             <span
               style={{

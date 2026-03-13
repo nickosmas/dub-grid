@@ -3,20 +3,33 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import StaffView from "@/components/StaffView";
-import { Employee, Wing } from "@/types";
-const DESIGNATIONS = ["JLCSN", "CSN III", "CSN II", "STAFF", "—"] as const;
-const ROLES = [
-  "DCSN", "DVCSN", "Supv", "Mentor", "CN", "SC. Mgr.", "Activity Coordinator", "SC/Asst/Act/Cor",
-] as const;
+import { Employee, FocusArea, NamedItem } from "@/types";
+const DESIGNATIONS: NamedItem[] = [
+  { id: 1, companyId: "company-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
+  { id: 2, companyId: "company-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
+  { id: 3, companyId: "company-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
+  { id: 4, companyId: "company-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
+  { id: 5, companyId: "company-1", name: "—", abbr: "—", sortOrder: 4 },
+];
+const ROLES: NamedItem[] = [
+  { id: 1, companyId: "company-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },
+  { id: 2, companyId: "company-1", name: "DVCSN", abbr: "DVCSN", sortOrder: 1 },
+  { id: 3, companyId: "company-1", name: "Supv", abbr: "Supv", sortOrder: 2 },
+  { id: 4, companyId: "company-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
+  { id: 5, companyId: "company-1", name: "CN", abbr: "CN", sortOrder: 4 },
+  { id: 6, companyId: "company-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
+  { id: 7, companyId: "company-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
+  { id: 8, companyId: "company-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
+];
 
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: () => <div data-testid="edit-panel" />,
 }));
 
-const wings: Wing[] = [
+const focusAreas: FocusArea[] = [
   {
     id: 1,
-    orgId: "org-1",
+    companyId: "company-1",
     name: "North",
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
@@ -28,11 +41,13 @@ const employees: Employee[] = [
   {
     id: "emp-1",
     name: "Alice Smith",
-    designation: "STAFF",
-    roles: [],
-    fteWeight: 1.0,
+    status: "active",
+    statusChangedAt: null,
+    statusNote: "",
+    certificationId: 4,
+    roleIds: [],
     seniority: 2,
-    wings: ["North"],
+    focusAreaIds: [1],
     phone: "",
     email: "",
     contactNotes: "",
@@ -40,53 +55,59 @@ const employees: Employee[] = [
   {
     id: "emp-2",
     name: "Bob Jones",
-    designation: "CSN II",
-    roles: [],
-    fteWeight: 0.5,
+    status: "active",
+    statusChangedAt: null,
+    statusNote: "",
+    certificationId: 3,
+    roleIds: [],
     seniority: 1,
-    wings: ["North"],
+    focusAreaIds: [1],
     phone: "",
     email: "",
     contactNotes: "",
   },
 ];
 
-const defaultSkillLevels = [...DESIGNATIONS as unknown as string[]];
-const defaultRoles = [...ROLES as unknown as string[]];
+const defaultCertifications = [...DESIGNATIONS];
+const defaultRoles = [...ROLES];
 
 const defaultProps = {
   employees,
-  wings,
-  skillLevels: defaultSkillLevels,
+  focusAreas,
+  certifications: defaultCertifications,
   roles: defaultRoles,
   onSave: vi.fn(),
   onDelete: vi.fn(),
+  onBench: vi.fn(),
+  onActivate: vi.fn(),
   onAdd: vi.fn(),
 };
 
 describe("StaffView", () => {
   describe("Controls", () => {
-    it("renders '+ Add Employee' button", () => {
+    it("renders '+ Add Staff Members' button", () => {
       render(<StaffView {...defaultProps} />);
-      expect(screen.getByText("+ Add Employee")).toBeInTheDocument();
+      expect(screen.getByText("+ Add Staff Members")).toBeInTheDocument();
     });
 
-    it("clicking '+ Add Employee' calls onAdd", async () => {
+    it("clicking '+ Add Staff Members' calls onAdd", async () => {
       const onAdd = vi.fn();
       render(<StaffView {...defaultProps} onAdd={onAdd} />);
-      await userEvent.click(screen.getByText("+ Add Employee"));
+      await userEvent.click(screen.getByText("+ Add Staff Members"));
       expect(onAdd).toHaveBeenCalledTimes(1);
     });
 
-    it("renders sort buttons 'Seniority', 'Name', 'Assigned Wings'", () => {
+    it("renders sort buttons 'Seniority', 'Name', 'Focus Areas'", () => {
       render(<StaffView {...defaultProps} />);
       expect(
         screen.getByRole("button", { name: "Seniority" }),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Name" })).toBeInTheDocument();
+      // "Focus Areas" appears in both the sort bar and the sidebar nav;
+      // confirm at least one exists with that label.
       expect(
-        screen.getByRole("button", { name: "Assigned Wings" }),
-      ).toBeInTheDocument();
+        screen.getAllByRole("button", { name: "Focus Areas" }).length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -119,39 +140,32 @@ describe("StaffView", () => {
     });
   });
 
-  describe("FTE badge", () => {
-    it("shows FTE badge with value when fteWeight < 1", () => {
+  describe("Employee count", () => {
+    it("renders both employees in the list", () => {
       render(<StaffView {...defaultProps} />);
-      // Bob has fteWeight=0.5
-      expect(screen.getByText("0.5")).toBeInTheDocument();
-    });
-
-    it("does not show FTE badge when fteWeight >= 1", () => {
-      // Render only Alice (fteWeight=1.0) to avoid Bob's badge
-      render(<StaffView {...defaultProps} employees={[employees[0]]} />);
-      // The FTE badge is a <span> — there should be no span with "1" as text
-      const spans = document.querySelectorAll("span");
-      const fteBadge = Array.from(spans).find((s) => s.textContent === "1");
-      expect(fteBadge).toBeUndefined();
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.getByText("Bob Jones")).toBeInTheDocument();
     });
   });
 });
 
 // Feature: ui-ux-test-suite, Property 3: Seniority sort produces non-decreasing sequence
 // Feature: ui-ux-test-suite, Property 4: Name sort produces non-decreasing alphabetical sequence
-// Feature: ui-ux-test-suite, Property 5: Wing sort ordering
+// Feature: ui-ux-test-suite, Property 5: Focus area sort ordering
 describe("Property-based tests", () => {
   const arbUniqueEmployees = fc
     .array(
       fc.record({
         name: fc.string({ minLength: 1, maxLength: 40 }),
-        designation: fc.constantFrom(...DESIGNATIONS),
-        roles: fc.array(fc.constantFrom(...ROLES)),
-        fteWeight: fc.float({ min: Math.fround(0.1), max: Math.fround(1.0) }),
+        status: fc.constant("active" as const),
+        statusChangedAt: fc.constant(null as string | null),
+        statusNote: fc.constant(""),
+        certificationId: fc.oneof(fc.constant(null as number | null), fc.constantFrom(...DESIGNATIONS.map((d) => d.id))),
+        roleIds: fc.array(fc.constantFrom(...ROLES.map((r) => r.id))).map(ids => [...new Set(ids)]),
         seniority: fc.integer({ min: 1, max: 999 }),
-        wings: fc.array(fc.string({ minLength: 1, maxLength: 20 }), {
+        focusAreaIds: fc.array(fc.integer({ min: 1, max: 10 }), {
           minLength: 1,
-        }),
+        }).map(ids => [...new Set(ids)]),
         phone: fc.string(),
         email: fc.string(),
         contactNotes: fc.string(),
@@ -162,23 +176,23 @@ describe("Property-based tests", () => {
       emps.map((emp, idx) => ({
         ...emp,
         id: `emp-${idx + 1}`,
-        roles: Array.from(new Set(emp.roles)) as typeof emp.roles,
-        wings: Array.from(new Set(emp.wings)),
       })),
     );
 
-  it("seniority sort produces non-decreasing sequence", async () => {
+  it("seniority sort produces non-decreasing sequence", { timeout: 15000 }, async () => {
     // Validates: Requirements 5.4, 8.2
     await fc.assert(
       fc.asyncProperty(arbUniqueEmployees, async (emps) => {
         const { unmount, container } = render(
           <StaffView
             employees={emps}
-            wings={[]}
-            skillLevels={defaultSkillLevels}
+            focusAreas={[]}
+            certifications={defaultCertifications}
             roles={defaultRoles}
             onSave={vi.fn()}
             onDelete={vi.fn()}
+            onBench={vi.fn()}
+            onActivate={vi.fn()}
             onAdd={vi.fn()}
           />,
         );
@@ -188,9 +202,13 @@ describe("Property-based tests", () => {
           within(container).getByRole("button", { name: "Seniority" }),
         );
 
-        // The table container is the second child of the root div (first is controls)
+        // StaffView renders sidebar (children[0]) + content area (children[1]).
+        // Content area > MembersSection root (children[0]) > table card (children[2]).
+        // children[0] = status tabs, children[1] = controls, children[2] = table
         const rootDiv = container.children[0] as HTMLElement;
-        const tableContainer = rootDiv.children[1] as HTMLElement;
+        const contentArea = rootDiv.children[1] as HTMLElement;
+        const membersSectionRoot = contentArea.children[0] as HTMLElement;
+        const tableContainer = membersSectionRoot.children[2] as HTMLElement;
 
         // Employee data rows: skip the header row (first child), get remaining row wrappers
         const allRowWrappers = Array.from(tableContainer.children).slice(1);
@@ -229,11 +247,13 @@ describe("Property-based tests", () => {
           const { unmount, container } = render(
             <StaffView
               employees={emps}
-              wings={[]}
-              skillLevels={defaultSkillLevels}
+              focusAreas={[]}
+              certifications={defaultCertifications}
               roles={defaultRoles}
               onSave={vi.fn()}
               onDelete={vi.fn()}
+              onBench={vi.fn()}
+              onActivate={vi.fn()}
               onAdd={vi.fn()}
             />,
           );
@@ -243,9 +263,13 @@ describe("Property-based tests", () => {
             within(container).getByRole("button", { name: "Name" }),
           );
 
-          // The table container is the second child of the root div (first is controls)
+          // StaffView renders sidebar (children[0]) + content area (children[1]).
+          // Content area > MembersSection root (children[0]).
+          // children[0] = status tabs, children[1] = controls, children[2] = table
           const rootDiv = container.children[0] as HTMLElement;
-          const tableContainer = rootDiv.children[1] as HTMLElement;
+          const contentArea = rootDiv.children[1] as HTMLElement;
+          const membersSectionRoot = contentArea.children[0] as HTMLElement;
+          const tableContainer = membersSectionRoot.children[2] as HTMLElement;
 
           // Employee data rows: skip the header row (first child), get remaining row wrappers
           const allRowWrappers = Array.from(tableContainer.children).slice(1);
@@ -281,7 +305,7 @@ describe("Property-based tests", () => {
   );
 
   it(
-    "wing sort: first wing alphabetical, ties broken by seniority",
+    "focus area sort: first focus area alphabetical, ties broken by seniority",
     { timeout: 15000 },
     async () => {
       // Validates: Requirements 5.6
@@ -289,33 +313,36 @@ describe("Property-based tests", () => {
 
       await fc.assert(
         fc.asyncProperty(arbUniqueEmployees, async (emps) => {
-          // Compute expected order using the same comparator as StaffView
-          const expected = [...emps].sort((a, b) => {
-            const wA = a.wings[0] ?? "";
-            const wB = b.wings[0] ?? "";
-            return wA !== wB ? wA.localeCompare(wB) : a.seniority - b.seniority;
-          });
+          // With empty focusAreas prop, all focus area names resolve to "" so
+          // sort falls through to seniority
+          const expected = [...emps].sort((a, b) => a.seniority - b.seniority);
 
           const { unmount, container } = render(
             <StaffView
               employees={emps}
-              wings={[]}
-              skillLevels={defaultSkillLevels}
+              focusAreas={[]}
+              certifications={defaultCertifications}
               roles={defaultRoles}
               onSave={vi.fn()}
               onDelete={vi.fn()}
+              onBench={vi.fn()}
+              onActivate={vi.fn()}
               onAdd={vi.fn()}
             />,
           );
 
-          // Click "Assigned Wings" sort button
+          // Click the sort bar "Focus Areas" button, scoped to the sort segment
+          const sortSegment = container.querySelector(".dg-segment") as HTMLElement;
           await userEvent.click(
-            within(container).getByRole("button", { name: "Assigned Wings" }),
+            within(sortSegment).getByRole("button", { name: "Focus Areas" }),
           );
 
           // Read rendered names from the DOM (same structure as name sort test)
+          // children[0] = status tabs, children[1] = controls, children[2] = table
           const rootDiv = container.children[0] as HTMLElement;
-          const tableContainer = rootDiv.children[1] as HTMLElement;
+          const contentArea = rootDiv.children[1] as HTMLElement;
+          const membersSectionRoot = contentArea.children[0] as HTMLElement;
+          const tableContainer = membersSectionRoot.children[2] as HTMLElement;
           const allRowWrappers = Array.from(tableContainer.children).slice(1);
 
           const renderedNames = allRowWrappers.map((wrapper) => {

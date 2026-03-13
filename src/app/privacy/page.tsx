@@ -108,7 +108,7 @@ export default function PrivacyPolicyPage() {
             <li style={{ marginBottom: "8px" }}>
               <strong>Employee roster data.</strong> Organizations use
               DubGrid to manage staff rosters. This may include employee
-              names, designations, roles, wing or section assignments,
+              names, designations, roles, focus area assignments,
               seniority, FTE weight, and optional contact information (phone,
               email, contact notes) that your organization chooses to store
               in the system.
