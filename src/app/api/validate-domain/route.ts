@@ -19,11 +19,17 @@ export async function GET(req: NextRequest) {
 
   const supabase = createClient(url, serviceKey);
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("companies")
     .select("id")
     .eq("slug", slug)
     .maybeSingle();
+
+  if (error) {
+    console.error("[validate-domain] Supabase error:", error.message);
+    // On query error, allow through rather than blocking valid users
+    return NextResponse.json({ valid: true });
+  }
 
   return NextResponse.json({ valid: !!data });
 }
