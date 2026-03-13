@@ -13,18 +13,20 @@ interface ProfileData {
 
 const ROLE_LABELS: Record<string, string> = {
   gridmaster: "Gridmaster",
+  super_admin: "Super Admin",
   admin: "Admin",
-  scheduler: "Scheduler",
-  supervisor: "Supervisor",
+  scheduler: "Admin",   // legacy
+  supervisor: "Admin",  // legacy
   user: "User",
 };
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-  gridmaster: { bg: "#EFF6FF", text: "#2563EB" },
-  admin:      { bg: "#F0FDF4", text: "#15803D" },
-  scheduler:  { bg: "#FFF7ED", text: "#C2410C" },
-  supervisor: { bg: "#FAF5FF", text: "#7C3AED" },
-  user:       { bg: "var(--color-surface-overlay)", text: "var(--color-text-muted)" },
+  gridmaster:  { bg: "#EFF6FF", text: "#2563EB" },
+  super_admin: { bg: "#F0FDF4", text: "#15803D" },
+  admin:       { bg: "#EFF6FF", text: "#3B82F6" },
+  scheduler:   { bg: "#EFF6FF", text: "#3B82F6" },
+  supervisor:  { bg: "#EFF6FF", text: "#3B82F6" },
+  user:        { bg: "var(--color-surface-overlay)", text: "var(--color-text-muted)" },
 };
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -42,7 +44,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { role, orgId, isLoading } = usePermissions();
+  const { role, companyId, isLoading } = usePermissions();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
 
@@ -188,11 +190,11 @@ export default function ProfilePage() {
               <Field label="First name" value={firstName} />
               <Field label="Last name" value={lastName} />
               <Field label="Email" value={user?.email} />
-              <Field label="Org role" value={ROLE_LABELS[role] ?? "User"} />
+              <Field label="Company role" value={ROLE_LABELS[role] ?? "User"} />
               {role === "gridmaster" && (
                 <Field label="Platform role" value="Gridmaster" />
               )}
-              <Field label="Organisation ID" value={orgId} />
+              <Field label="Company ID" value={companyId} />
               <Field label="Member since" value={createdAt} />
               <Field label="Last sign in" value={lastSignIn} />
             </div>

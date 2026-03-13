@@ -71,7 +71,7 @@ export default function OnboardingPage() {
             color: "#0F172A",
           }}
         >
-          Pending Organization Assignment
+          Pending Company Assignment
         </h1>
 
         <p
@@ -83,7 +83,7 @@ export default function OnboardingPage() {
           }}
         >
           Your account has been successfully created, but you haven't been
-          assigned to an organization yet. Please contact your administrator and
+          assigned to a company yet. Please contact your administrator and
           ask them to invite you to their workspace.
         </p>
 

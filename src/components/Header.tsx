@@ -41,6 +41,7 @@ const NAV_ITEMS: { id: ViewMode; label: string; icon?: React.ReactNode }[] = [
 
 const ROLE_LABELS: Record<string, string> = {
   gridmaster: "Gridmaster",
+  super_admin: "Super Admin",
   admin: "Admin",
   scheduler: "Scheduler",
   supervisor: "Supervisor",
@@ -62,15 +63,13 @@ export default function Header({
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [userName, setUserName] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("dg_user_name") || null;
-    }
-    return null;
-  });
+  const [userName, setUserName] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const cached = sessionStorage.getItem("dg_user_name");
+    if (cached) setUserName(cached);
+
     void (async () => {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;

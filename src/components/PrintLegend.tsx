@@ -1,19 +1,19 @@
 "use client";
 
-import { ShiftType } from "@/types";
+import { ShiftCode } from "@/types";
 
 // Excluded from legend — internal/meta entries with no printed meaning
 const EXCLUDED = new Set(["OFF", "0.3"]);
 
-export default function PrintLegend({ shiftTypes }: { shiftTypes: ShiftType[] }) {
-  const items = shiftTypes.filter((s) => !EXCLUDED.has(s.label));
+export default function PrintLegend({ shiftCodes }: { shiftCodes: ShiftCode[] }) {
+  const items = shiftCodes.filter((s) => !EXCLUDED.has(s.label));
 
   return (
     <div className="print-legend">
       <div className="print-legend__title">Shift Code Key</div>
       <div className="print-legend__grid">
         {items.map((s) => (
-          <div key={s.label} className="print-legend__item">
+          <div key={s.id} className="print-legend__item">
             <span
               className="print-legend__badge"
               style={{

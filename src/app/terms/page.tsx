@@ -76,7 +76,7 @@ export default function TermsOfServicePage() {
             DubGrid is a multi-tenant web application for staff scheduling in
             care facilities. The Service allows organizations to manage
             employee rosters, create and edit shift schedules (including
-            draft and published states), organize staff by wings or sections,
+            draft and published states), organize staff by focus areas,
             assign shift codes (e.g., day, evening, night, PTO), and view
             shift counts and printed schedules. Access to features and data
             is determined by role (e.g., platform administrator, organization
@@ -184,9 +184,9 @@ export default function TermsOfServicePage() {
           </h2>
           <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
             Organization administrators and schedulers are responsible for
-            managing their organization&apos;s roster, schedules, wings,
+            managing their organization&apos;s roster, schedules, focus areas,
             shift types, and user invitations. Supervisors may have limited
-            edit access (e.g., within their wing or for certain note types).
+            edit access (e.g., within their focus area or for certain note types).
             Staff users typically have read-only access to view schedules.
             You are responsible for ensuring that only authorized personnel
             receive elevated roles and that schedule and employee data are

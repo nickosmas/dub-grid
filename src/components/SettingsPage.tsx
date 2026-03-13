@@ -1,20 +1,31 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-import { Organization, Wing, ShiftType } from "@/types";
+import { Company, FocusArea, ShiftCategory, ShiftCode, IndicatorType, CompanyUser, AdminPermissions, NamedItem } from "@/types";
 import * as db from "@/lib/db";
+import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { usePermissions } from "@/hooks";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface SettingsPageProps {
-  organization: Organization;
-  wings: Wing[];
-  shiftTypes: ShiftType[];
-  onOrgSave: (org: Organization) => void;
-  onWingsChange: (wings: Wing[]) => void;
-  onShiftTypesChange: (types: ShiftType[]) => void;
-  canManageOrg: boolean;
+  company: Company;
+  focusAreas: FocusArea[];
+  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  indicatorTypes: IndicatorType[];
+  certifications: NamedItem[];
+  companyRoles: NamedItem[];
+  onCompanySave: (company: Company) => void;
+  onFocusAreasChange: (focusAreas: FocusArea[]) => void;
+  onShiftCodesChange: (codes: ShiftCode[]) => void;
+  onShiftCategoriesChange: (categories: ShiftCategory[]) => void;
+  onIndicatorTypesChange: (types: IndicatorType[]) => void;
+  onCertificationsChange: (items: NamedItem[]) => void;
+  onCompanyRolesChange: (items: NamedItem[]) => void;
+  canManageCompany: boolean;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -72,101 +83,246 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 5,
 };
 
-// ── Organization Settings ─────────────────────────────────────────────────────
-function OrgSettings({
-  organization,
+// ── Common IANA timezones ─────────────────────────────────────────────────────
+const TIMEZONES = [
+  { value: "America/New_York",    label: "Eastern (ET) — New York" },
+  { value: "America/Chicago",     label: "Central (CT) — Chicago" },
+  { value: "America/Denver",      label: "Mountain (MT) — Denver" },
+  { value: "America/Phoenix",     label: "Mountain (no DST) — Phoenix" },
+  { value: "America/Los_Angeles", label: "Pacific (PT) — Los Angeles" },
+  { value: "America/Anchorage",   label: "Alaska (AKT) — Anchorage" },
+  { value: "Pacific/Honolulu",    label: "Hawaii (HT) — Honolulu" },
+  { value: "America/Toronto",     label: "Eastern (ET) — Toronto" },
+  { value: "America/Vancouver",   label: "Pacific (PT) — Vancouver" },
+  { value: "America/Winnipeg",    label: "Central (CT) — Winnipeg" },
+  { value: "America/Halifax",     label: "Atlantic (AT) — Halifax" },
+  { value: "America/St_Johns",    label: "Newfoundland (NT) — St. John's" },
+  { value: "Europe/London",       label: "GMT/BST — London" },
+  { value: "Europe/Paris",        label: "CET/CEST — Paris" },
+  { value: "Australia/Sydney",    label: "AEST/AEDT — Sydney" },
+  { value: "Australia/Melbourne", label: "AEST/AEDT — Melbourne" },
+  { value: "Pacific/Auckland",    label: "NZST/NZDT — Auckland" },
+];
+
+// ── 12-hour time picker ───────────────────────────────────────────────────────
+function TimeInput12h({ value, onChange }: { value: string | null | undefined; onChange: (v: string | null) => void }) {
+  const init = parseTo12h(value);
+  const [hour, setHour] = useState(init.hour);
+  const [minute, setMinute] = useState(init.minute);
+  const [period, setPeriod] = useState<"AM" | "PM">(init.period);
+
+  useEffect(() => {
+    const p = parseTo12h(value);
+    setHour(p.hour);
+    setMinute(p.minute);
+    setPeriod(p.period);
+  }, [value]);
+
+  const selStyle: React.CSSProperties = {
+    ...inputStyle,
+    padding: "7px 4px",
+    textAlign: "center",
+    cursor: "pointer",
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <select
+        value={hour}
+        onChange={(e) => { setHour(e.target.value); onChange(to24h(e.target.value, minute, period)); }}
+        style={{ ...selStyle, width: 52 }}
+      >
+        <option value="">--</option>
+        {[1,2,3,4,5,6,7,8,9,10,11,12].map((h) => (
+          <option key={h} value={String(h)}>{h}</option>
+        ))}
+      </select>
+      <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
+      <select
+        value={minute}
+        onChange={(e) => { setMinute(e.target.value); onChange(to24h(hour, e.target.value, period)); }}
+        style={{ ...selStyle, width: 52 }}
+      >
+        {["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+      <select
+        value={period}
+        onChange={(e) => { const p = e.target.value as "AM" | "PM"; setPeriod(p); onChange(to24h(hour, minute, p)); }}
+        style={{ ...selStyle, width: 58 }}
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+  );
+}
+
+// ── Company Settings ──────────────────────────────────────────────────────────
+function CompanySettings({
+  company,
   onSave,
 }: {
-  organization: Organization;
-  onSave: (o: Organization) => void;
+  company: Company;
+  onSave: (o: Company) => void;
 }) {
   const [form, setForm] = useState({
-    name: organization.name,
-    address: organization.address,
-    phone: organization.phone,
-    employeeCount: organization.employeeCount?.toString() ?? "",
+    name: company.name,
+    address: company.address,
+    phone: company.phone,
+    employeeCount: company.employeeCount?.toString() ?? "",
+    focusAreaLabel: company.focusAreaLabel,
+    certificationLabel: company.certificationLabel,
+    roleLabel: company.roleLabel,
+    timezone: company.timezone ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const isModified =
-    form.name !== organization.name ||
-    form.address !== organization.address ||
-    form.phone !== organization.phone ||
-    (form.employeeCount || "") !==
-      (organization.employeeCount?.toString() ?? "");
+    form.name !== company.name ||
+    form.address !== company.address ||
+    form.phone !== company.phone ||
+    (form.employeeCount || "") !== (company.employeeCount?.toString() ?? "") ||
+    form.focusAreaLabel !== company.focusAreaLabel ||
+    form.certificationLabel !== company.certificationLabel ||
+    form.roleLabel !== company.roleLabel ||
+    form.timezone !== (company.timezone ?? "");
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const updated: Organization = {
-        ...organization,
+      const updated: Company = {
+        ...company,
         name: form.name.trim(),
         address: form.address.trim(),
         phone: form.phone.trim(),
         employeeCount: form.employeeCount ? parseInt(form.employeeCount) : null,
+        focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
+        certificationLabel: form.certificationLabel.trim() || "Certifications",
+        roleLabel: form.roleLabel.trim() || "Roles",
+        timezone: form.timezone || null,
       };
-      await db.updateOrganization(updated);
+      await db.updateCompany(updated);
       onSave(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      toast.success("Settings saved");
     } catch (err) {
+      toast.error("Failed to save settings");
       console.error(err);
     } finally {
       setSaving(false);
     }
-  }, [form, organization, onSave]);
+  }, [form, company, onSave]);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-      <div>
-        <label style={labelStyle}>ORGANIZATION NAME</label>
-        <input
-          value={form.name}
-          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-          style={inputStyle}
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <label style={labelStyle}>COMPANY NAME</label>
+          <input
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>PHONE</label>
+          <input
+            value={form.phone}
+            onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+            placeholder="(415) 555-0100"
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>ADDRESS</label>
+          <input
+            value={form.address}
+            onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+            placeholder="123 Main St, City, State ZIP"
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>NUMBER OF EMPLOYEES</label>
+          <input
+            type="number"
+            min="0"
+            value={form.employeeCount}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, employeeCount: e.target.value }))
+            }
+            placeholder="e.g. 28"
+            style={inputStyle}
+          />
+        </div>
       </div>
+
+      {/* Custom terminology labels */}
       <div>
-        <label style={labelStyle}>PHONE</label>
-        <input
-          value={form.phone}
-          onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-          placeholder="(415) 555-0100"
-          style={inputStyle}
-        />
+        <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 12px" }}>
+          Customize what your company calls each feature. These labels appear throughout the app.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={labelStyle}>FOCUS AREAS LABEL</label>
+            <input
+              value={form.focusAreaLabel}
+              onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
+              placeholder="Focus Areas"
+              style={inputStyle}
+            />
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+              e.g. Focus Areas, Departments, Units
+            </p>
+          </div>
+          <div>
+            <label style={labelStyle}>CERTIFICATIONS LABEL</label>
+            <input
+              value={form.certificationLabel}
+              onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
+              placeholder="Certifications"
+              style={inputStyle}
+            />
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+              e.g. Certifications, Designations
+            </p>
+          </div>
+          <div>
+            <label style={labelStyle}>ROLES LABEL</label>
+            <input
+              value={form.roleLabel}
+              onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
+              placeholder="Roles"
+              style={inputStyle}
+            />
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+              e.g. Responsibilities, Positions
+            </p>
+          </div>
+        </div>
       </div>
+
+      {/* Timezone */}
       <div>
-        <label style={labelStyle}>ADDRESS</label>
-        <input
-          value={form.address}
-          onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-          placeholder="123 Main St, City, State ZIP"
-          style={inputStyle}
-        />
+        <label style={labelStyle}>TIME ZONE</label>
+        <select
+          value={form.timezone}
+          onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
+          style={{ ...inputStyle, maxWidth: 340 }}
+        >
+          <option value="">— Select a time zone —</option>
+          {TIMEZONES.map((tz) => (
+            <option key={tz.value} value={tz.value}>{tz.label}</option>
+          ))}
+        </select>
       </div>
-      <div>
-        <label style={labelStyle}>NUMBER OF EMPLOYEES</label>
-        <input
-          type="number"
-          min="0"
-          value={form.employeeCount}
-          onChange={(e) =>
-            setForm((p) => ({ ...p, employeeCount: e.target.value }))
-          }
-          placeholder="e.g. 28"
-          style={inputStyle}
-        />
-      </div>
-      <div
-        style={{
-          gridColumn: "1 / -1",
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-        }}
-      >
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <button
           onClick={handleSave}
           disabled={!isModified || saving}
@@ -193,66 +349,72 @@ function OrgSettings({
   );
 }
 
-// ── Wing row ──────────────────────────────────────────────────────────────────
-function WingRow({
-  wing,
-  orgId,
+// ── Focus Area row ────────────────────────────────────────────────────────────
+function FocusAreaRow({
+  focusArea,
+  companyId,
   onSaved,
   onDeleted,
 }: {
-  wing: Wing & { isNew?: boolean };
-  orgId: string;
-  onSaved: (w: Wing) => void;
+  focusArea: FocusArea & { isNew?: boolean };
+  companyId: string;
+  onSaved: (w: FocusArea) => void;
   onDeleted: (id: number) => void;
 }) {
   const [form, setForm] = useState({
-    name: wing.name,
-    colorBg: wing.colorBg,
-    colorText: wing.colorText,
+    name: focusArea.name,
+    colorBg: focusArea.colorBg,
+    colorText: focusArea.colorText,
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isModified =
-    form.name !== wing.name ||
-    form.colorBg !== wing.colorBg ||
-    form.colorText !== wing.colorText;
+    form.name !== focusArea.name ||
+    form.colorBg !== focusArea.colorBg ||
+    form.colorText !== focusArea.colorText;
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const saved = await db.upsertWing({
-        id: wing.isNew ? undefined : wing.id,
-        orgId,
+      const saved = await db.upsertFocusArea({
+        id: focusArea.isNew ? undefined : focusArea.id,
+        companyId: companyId,
         name: form.name.trim(),
         colorBg: form.colorBg,
         colorText: form.colorText,
-        sortOrder: wing.sortOrder,
-      });
+        sortOrder: focusArea.sortOrder,
+      }) as FocusArea;
       onSaved(saved);
+      toast.success("Focus area saved");
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to save focus area");
+      console.error('upsertFocusArea error:', err instanceof Error ? err.message : JSON.stringify(err), err);
     } finally {
       setSaving(false);
     }
-  }, [form, wing, orgId, onSaved]);
+  }, [form, focusArea, companyId, onSaved]);
 
   const handleDelete = useCallback(async () => {
-    if (wing.isNew) {
-      onDeleted(wing.id);
+    if (focusArea.isNew) {
+      onDeleted(focusArea.id);
       return;
     }
     setDeleting(true);
     try {
-      await db.deleteWing(wing.id);
-      onDeleted(wing.id);
+      await db.deleteFocusArea(focusArea.id);
+      onDeleted(focusArea.id);
+      toast.success("Focus area deleted");
     } catch (err) {
+      toast.error("Failed to delete focus area");
       console.error(err);
     } finally {
       setDeleting(false);
+      setShowDeleteConfirm(false);
     }
-  }, [wing, onDeleted]);
+  }, [focusArea, onDeleted]);
 
   return (
     <div
@@ -268,7 +430,7 @@ function WingRow({
       <input
         value={form.name}
         onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-        placeholder="Wing name"
+        placeholder="Area name"
         style={{ ...inputStyle }}
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -340,7 +502,7 @@ function WingRow({
         {saving ? "…" : "Save"}
       </button>
       <button
-        onClick={handleDelete}
+        onClick={() => setShowDeleteConfirm(true)}
         disabled={deleting}
         style={{
           background: "none",
@@ -355,62 +517,72 @@ function WingRow({
       >
         {deleting ? "…" : "Delete"}
       </button>
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Focus Area?"
+          message={<>Delete <strong>{form.name || "this area"}</strong>? Employees assigned to this area will need to be reassigned.</>}
+          confirmLabel="Delete"
+          variant="danger"
+          isLoading={deleting}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Wings Settings ────────────────────────────────────────────────────────────
-function WingsSettings({
-  wings,
-  orgId,
+// ── Focus Areas Settings ──────────────────────────────────────────────────────
+function FocusAreasSettings({
+  focusAreas,
+  companyId,
+  label,
   onChange,
 }: {
-  wings: Wing[];
-  orgId: string;
-  onChange: (wings: Wing[]) => void;
+  focusAreas: FocusArea[];
+  companyId: string;
+  label: string;
+  onChange: (focusAreas: FocusArea[]) => void;
 }) {
-  const [localWings, setLocalWings] =
-    useState<(Wing & { isNew?: boolean })[]>(wings);
-  let nextTmpId = -1;
+  const [localFocusAreas, setLocalFocusAreas] =
+    useState<(FocusArea & { isNew?: boolean })[]>(focusAreas);
+  const nextTmpId = useRef(-1);
 
   const handleAdd = () => {
-    const tmp: Wing & { isNew: boolean } = {
-      id: nextTmpId--,
-      orgId,
+    const tmp: FocusArea & { isNew: boolean } = {
+      id: nextTmpId.current--,
+      companyId: companyId,
       name: "",
       colorBg: "#F1F5F9",
       colorText: "#475569",
-      sortOrder: localWings.length,
+      sortOrder: localFocusAreas.length,
       isNew: true,
     };
-    setLocalWings((prev) => [...prev, tmp]);
+    setLocalFocusAreas((prev) => [...prev, tmp]);
   };
 
-  const handleSaved = (saved: Wing) => {
-    setLocalWings((prev) =>
-      prev.map((w) => (w.name === saved.name || w.id === saved.id ? saved : w)),
+  const handleSaved = (saved: FocusArea) => {
+    const updated = localFocusAreas.map((w) =>
+      w.name === saved.name || w.id === saved.id ? saved : w,
     );
-    onChange(
-      localWings.map((w) =>
-        w.name === saved.name || w.id === saved.id ? saved : w,
-      ),
-    );
+    setLocalFocusAreas(updated);
+    onChange(updated);
   };
 
   const handleDeleted = (id: number) => {
-    const updated = localWings.filter((w) => w.id !== id);
-    setLocalWings(updated);
+    const updated = localFocusAreas.filter((w) => w.id !== id);
+    setLocalFocusAreas(updated);
     onChange(updated);
   };
 
   return (
     <div>
       <div style={{ marginBottom: 4 }}>
-        {localWings.map((wing) => (
-          <WingRow
-            key={wing.id}
-            wing={wing}
-            orgId={orgId}
+        {localFocusAreas.map((focusArea) => (
+          <FocusAreaRow
+            key={focusArea.id}
+            focusArea={focusArea}
+            companyId={companyId}
             onSaved={handleSaved}
             onDeleted={handleDeleted}
           />
@@ -431,26 +603,36 @@ function WingsSettings({
           width: "100%",
         }}
       >
-        + Add Wing
+        + Add {label}
       </button>
     </div>
   );
 }
 
-// ── Shift Type row ────────────────────────────────────────────────────────────
-function ShiftTypeRow({
-  st,
-  wings,
-  orgId,
-  orgSkillLevels,
+// ── Shift Code row ────────────────────────────────────────────────────────────
+function ShiftCodeRow({
+    st,
+  focusAreas,
+  shiftCategories,
+  companyId,
+  certifications,
+  certificationLabel,
+  focusAreaLabel = "Focus Area",
+  isOffDayRow,
+  hideFocusAreaSelect,
   onSaved,
   onDeleted,
 }: {
-  st: ShiftType & { isNew?: boolean };
-  wings: Wing[];
-  orgId: string;
-  orgSkillLevels: string[];
-  onSaved: (s: ShiftType) => void;
+  st: ShiftCode & { isNew?: boolean };
+  focusAreas: FocusArea[];
+  shiftCategories: ShiftCategory[];
+  companyId: string;
+  certifications: NamedItem[];
+  certificationLabel: string;
+  focusAreaLabel?: string;
+  isOffDayRow?: boolean;
+  hideFocusAreaSelect?: boolean;
+  onSaved: (s: ShiftCode, prevId: number) => void;
   onDeleted: (id: number) => void;
 }) {
   const [form, setForm] = useState({
@@ -459,47 +641,85 @@ function ShiftTypeRow({
     color: st.color === "transparent" ? "#F8FAFC" : st.color,
     border: st.border === "transparent" ? "#CBD5E1" : st.border,
     text: st.text === "transparent" ? "#64748B" : st.text,
-    countsTowardDay: st.countsTowardDay ?? false,
-    countsTowardEve: st.countsTowardEve ?? false,
-    countsTowardNight: st.countsTowardNight ?? false,
-    isOrientation: st.isOrientation ?? false,
-    isGeneral: st.isGeneral ?? false,
-    wingName: st.wingName ?? "",
-    requiredDesignations: st.requiredDesignations ?? [],
+    categoryId: st.categoryId ?? null as number | null,
+    isOffDay: st.isOffDay ?? isOffDayRow ?? false,
+    focusAreaId: st.focusAreaId ?? null as number | null,
+    requiredCertificationIds: st.requiredCertificationIds ?? [],
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(!!st.isNew);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Re-sync form from prop when the parent data changes (e.g. fresh fetch
+  // after cert deletion trigger cleans up IDs).
+  const stIdRef = useRef(st.id);
+  const stVersionRef = useRef(JSON.stringify(st.requiredCertificationIds ?? []));
+  useEffect(() => {
+    const newVersion = JSON.stringify(st.requiredCertificationIds ?? []);
+    if (st.id !== stIdRef.current || newVersion !== stVersionRef.current) {
+      stIdRef.current = st.id;
+      stVersionRef.current = newVersion;
+      setForm({
+        label: st.label,
+        name: st.name,
+        color: st.color === "transparent" ? "#F8FAFC" : st.color,
+        border: st.border === "transparent" ? "#CBD5E1" : st.border,
+        text: st.text === "transparent" ? "#64748B" : st.text,
+        categoryId: st.categoryId ?? null,
+        isOffDay: st.isOffDay ?? isOffDayRow ?? false,
+        focusAreaId: st.focusAreaId ?? null,
+        requiredCertificationIds: st.requiredCertificationIds ?? [],
+      });
+    }
+  }, [st, isOffDayRow]);
+
+  const isDirty = st.isNew ||
+    form.label !== st.label ||
+    form.name !== st.name ||
+    form.color !== (st.color === "transparent" ? "#F8FAFC" : st.color) ||
+    form.border !== (st.border === "transparent" ? "#CBD5E1" : st.border) ||
+    form.text !== (st.text === "transparent" ? "#64748B" : st.text) ||
+    form.categoryId !== (st.categoryId ?? null) ||
+    form.isOffDay !== (st.isOffDay ?? isOffDayRow ?? false) ||
+    form.focusAreaId !== (st.focusAreaId ?? null) ||
+    JSON.stringify(form.requiredCertificationIds) !== JSON.stringify(st.requiredCertificationIds ?? []);
+
+  const canSave = isDirty && !!form.label.trim() && !!form.name.trim();
 
   const handleSave = useCallback(async () => {
     if (!form.label.trim() || !form.name.trim()) return;
     setSaving(true);
+    setSaveError(null);
     try {
-      const saved = await db.upsertShiftType({
+      const saved = await db.upsertShiftCode({
         id: st.isNew ? undefined : st.id,
-        orgId,
+        companyId: companyId,
         label: form.label.trim(),
         name: form.name.trim(),
         color: form.color,
         border: form.border,
         text: form.text,
-        countsTowardDay: form.countsTowardDay,
-        countsTowardEve: form.countsTowardEve,
-        countsTowardNight: form.countsTowardNight,
-        isOrientation: form.isOrientation,
-        isGeneral: form.isGeneral,
-        wingName: form.wingName || null,
+        categoryId: form.categoryId,
+        isGeneral: form.focusAreaId == null,
+        isOffDay: form.isOffDay,
+        focusAreaId: form.focusAreaId,
         sortOrder: st.sortOrder,
-        requiredDesignations: form.requiredDesignations,
+        requiredCertificationIds: form.requiredCertificationIds,
       });
-      onSaved(saved);
+      onSaved(saved, st.id);
       setExpanded(false);
+      toast.success("Shift code saved");
     } catch (err) {
-      console.error(err);
+      const msg = (err as { message?: string })?.message ?? JSON.stringify(err) ?? "Unknown error";
+      console.error("Save shift code error:", msg, err);
+      setSaveError(msg);
+      toast.error("Failed to save shift code");
     } finally {
       setSaving(false);
     }
-  }, [form, st, orgId, onSaved]);
+  }, [form, st, companyId, onSaved]);
 
   const handleDelete = useCallback(async () => {
     if (st.isNew) {
@@ -508,12 +728,15 @@ function ShiftTypeRow({
     }
     setDeleting(true);
     try {
-      await db.deleteShiftType(st.id);
+      await db.deleteShiftCode(st.id);
       onDeleted(st.id);
+      toast.success("Shift code deleted");
     } catch (err) {
+      toast.error("Failed to delete shift code");
       console.error(err);
     } finally {
       setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   }, [st, onDeleted]);
 
@@ -555,14 +778,22 @@ function ShiftTypeRow({
         >
           {form.name || "—"}
         </span>
-        {form.wingName && (
+        {!hideFocusAreaSelect && form.focusAreaId != null && (
           <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-            {form.wingName}
+            {focusAreas.find((w) => w.id === form.focusAreaId)?.name}
           </span>
         )}
-        {form.isGeneral && (
-          <span style={{ fontSize: 11, color: "var(--color-text-faint)" }}>
-            General
+        {form.categoryId !== null && (
+          <span style={{
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "2px 6px",
+            background: "var(--color-bg-subtle)",
+            color: "var(--color-text-secondary)",
+            borderRadius: 4,
+            border: "1px solid var(--color-border-light)",
+          }}>
+            {shiftCategories.find(c => c.id === form.categoryId)?.name}
           </span>
         )}
         <span
@@ -622,6 +853,49 @@ function ShiftTypeRow({
               />
             </div>
           </div>
+
+          {/* Focus area — single select (hidden when section pre-assigns it) */}
+          {!hideFocusAreaSelect && (
+            <div>
+              <label style={labelStyle}>
+                {focusAreaLabel.toUpperCase()} (leave blank for global)
+              </label>
+              <select
+                value={form.focusAreaId ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    focusAreaId: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+                style={{ ...inputStyle, marginTop: 4 }}
+              >
+                <option value="">— Global (no {focusAreaLabel.toLowerCase()}) —</option>
+                {focusAreas.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Shift Category */}
+          {!form.isOffDay && (
+            <div>
+              <label style={labelStyle}>SHIFT CATEGORY</label>
+              <select
+                value={form.categoryId ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value ? Number(e.target.value) : null }))}
+                style={{ ...inputStyle, marginTop: 4 }}
+              >
+                <option value="">— Generic (No Category) —</option>
+                {shiftCategories
+                  .filter(c => form.focusAreaId == null || c.focusAreaId == null || c.focusAreaId === form.focusAreaId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} {c.focusAreaId ? `(${focusAreas.find(w => w.id === c.focusAreaId)?.name})` : "(Global)"}</option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           {/* Colors */}
           <div
@@ -687,91 +961,18 @@ function ShiftTypeRow({
             </div>
           </div>
 
-          {/* Preview */}
-          <div>
-            <label style={labelStyle}>PREVIEW</label>
-            <span
-              style={{
-                display: "inline-block",
-                padding: "5px 12px",
-                background: form.color,
-                border: `1.5px solid ${form.border}`,
-                color: form.text,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              {form.label || "Label"} — {form.name || "Name"}
-            </span>
-          </div>
-
-          {/* Wing association */}
-          <div>
-            <label style={labelStyle}>
-              ASSOCIATED WING (leave blank for general)
-            </label>
-            <select
-              value={form.wingName}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, wingName: e.target.value }))
-              }
-              style={{ ...inputStyle }}
-            >
-              <option value="">— General shift —</option>
-              {wings.map((w) => (
-                <option key={w.id} value={w.name}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Flags */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-            {(
-              [
-                ["countsTowardDay", "Counts toward Day"],
-                ["countsTowardEve", "Counts toward Eve"],
-                ["countsTowardNight", "Counts toward Night"],
-                ["isOrientation", "Orientation shift"],
-                ["isGeneral", "Show in General section"],
-              ] as const
-            ).map(([key, label]) => (
-              <label
-                key={key}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={form[key]}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, [key]: e.target.checked }))
-                  }
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-
-          {/* Required Skill Levels */}
-          {orgSkillLevels.length > 0 && (
+          {/* Required Certifications — only for regular shifts */}
+          {!form.isOffDay && certifications.length > 0 && (
             <div>
               <label style={labelStyle}>
-                REQUIRED SKILL LEVELS (leave all unchecked = any qualification)
+                REQUIRED {certificationLabel.toUpperCase()} (leave all unchecked = any qualification)
               </label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
-                {orgSkillLevels.map((desig) => {
-                  const checked = form.requiredDesignations.includes(desig);
+                {certifications.map((desig) => {
+                  const checked = form.requiredCertificationIds.includes(desig.id);
                   return (
                     <label
-                      key={desig}
+                      key={desig.id}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -794,9 +995,9 @@ function ShiftTypeRow({
                         onChange={(e) =>
                           setForm((p) => ({
                             ...p,
-                            requiredDesignations: e.target.checked
-                              ? [...p.requiredDesignations, desig]
-                              : p.requiredDesignations.filter((d) => d !== desig),
+                            requiredCertificationIds: e.target.checked
+                              ? [...p.requiredCertificationIds, desig.id]
+                              : p.requiredCertificationIds.filter((d) => d !== desig.id),
                           }))
                         }
                       />
@@ -808,34 +1009,40 @@ function ShiftTypeRow({
                             : "var(--color-text-secondary)",
                         }}
                       >
-                        {desig}
+                        {desig.name !== desig.abbr ? `${desig.abbr} — ${desig.name}` : desig.name}
                       </span>
                     </label>
                   );
                 })}
               </div>
-              {form.requiredDesignations.length > 0 && (
+              {form.requiredCertificationIds.length > 0 && (
                 <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>
-                  Only {form.requiredDesignations.join(", ")} can be assigned this shift.
+                  Only {form.requiredCertificationIds.map(id => certifications.find(s => s.id === id)?.name).filter(Boolean).join(", ")} can be assigned this shift.
                 </p>
               )}
             </div>
           )}
 
           {/* Actions */}
+          {saveError && (
+            <p style={{ color: "#EF4444", fontSize: 12, margin: "0 0 8px" }}>
+              <strong>Error:</strong> {saveError}
+            </p>
+          )}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !canSave}
               style={{
-                background: "var(--color-accent-gradient)",
+                background: canSave ? "var(--color-accent-gradient)" : "var(--color-border-light)",
                 border: "none",
-                color: "#fff",
+                color: canSave ? "#fff" : "var(--color-text-muted)",
                 borderRadius: 7,
                 padding: "8px 18px",
                 fontSize: 13,
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: canSave ? "pointer" : "default",
+                opacity: canSave ? 1 : 0.6,
               }}
             >
               {saving ? "Saving…" : "Save"}
@@ -856,7 +1063,7 @@ function ShiftTypeRow({
             </button>
             <div style={{ flex: 1 }} />
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               disabled={deleting}
               style={{
                 background: "none",
@@ -874,47 +1081,74 @@ function ShiftTypeRow({
           </div>
         </div>
       )}
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Shift Code?"
+          message={<>Delete <strong>{form.label}</strong>? This code will be removed from future schedules.</>}
+          confirmLabel="Delete"
+          variant="danger"
+          isLoading={deleting}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Shift Types Settings ──────────────────────────────────────────────────────
-function ShiftTypesSettings({
-  shiftTypes,
-  wings,
-  orgId,
-  orgSkillLevels,
+// ── Shift Codes Settings ──────────────────────────────────────────────────────
+function ShiftCodesSettings({
+  shiftCodes,
+  focusAreas,
+  shiftCategories,
+  companyId,
+  certifications,
+  certificationLabel,
+  focusAreaLabel,
   onChange,
 }: {
-  shiftTypes: ShiftType[];
-  wings: Wing[];
-  orgId: string;
-  orgSkillLevels: string[];
-  onChange: (types: ShiftType[]) => void;
+  shiftCodes: ShiftCode[];
+  focusAreas: FocusArea[];
+  shiftCategories: ShiftCategory[];
+  companyId: string;
+  certifications: NamedItem[];
+  certificationLabel: string;
+  focusAreaLabel: string;
+  onChange: (types: ShiftCode[]) => void;
 }) {
   const [local, setLocal] =
-    useState<(ShiftType & { isNew?: boolean })[]>(shiftTypes);
-  let nextTmpId = -1;
+    useState<(ShiftCode & { isNew?: boolean })[]>(shiftCodes);
+  const nextTmpId = useRef(-1);
 
-  const handleAdd = () => {
-    const tmp: ShiftType & { isNew: boolean } = {
-      id: nextTmpId--,
-      orgId,
+  // Sync local state when the parent shiftCodes prop changes (e.g. fresh DB
+  // data replacing stale cache data). Only replaces items that haven't been
+  // locally added (isNew), so unsaved additions aren't lost.
+  useEffect(() => {
+    setLocal((prev) => {
+      const newItems = prev.filter((s) => (s as { isNew?: boolean }).isNew);
+      return [...shiftCodes, ...newItems];
+    });
+  }, [shiftCodes]);
+
+  const handleAdd = (focusAreaId: number | null, isOffDay = false) => {
+    const tmp: ShiftCode & { isNew: boolean } = {
+      id: nextTmpId.current--,
+      companyId: companyId,
       label: "",
       name: "",
-      color: "#F8FAFC",
+      color: isOffDay ? "#F1F5F9" : "#F8FAFC",
       border: "#CBD5E1",
       text: "#64748B",
-      sortOrder: local.length,
+      isOffDay,
+      focusAreaId: focusAreaId,
+      sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
       isNew: true,
     };
     setLocal((prev) => [...prev, tmp]);
   };
 
-  const handleSaved = (saved: ShiftType) => {
-    const updated = local.map((s) =>
-      s.label === saved.label || s.id === saved.id ? saved : s,
-    );
+  const handleSaved = (saved: ShiftCode, prevId: number) => {
+    const updated = local.map((s) => (s.id === prevId ? saved : s));
     setLocal(updated);
     onChange(updated);
   };
@@ -925,47 +1159,122 @@ function ShiftTypesSettings({
     onChange(updated);
   };
 
+  const addBtnStyle: React.CSSProperties = {
+    marginTop: 6,
+    background: "none",
+    border: "1.5px dashed var(--color-border)",
+    borderRadius: 8,
+    color: "var(--color-text-muted)",
+    padding: "6px 14px",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    width: "100%",
+  };
+
+  const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], isOffDaySection = false, hideAreaSelect = false) =>
+    codes.map((st) => (
+      <ShiftCodeRow
+        key={st.id}
+        st={st}
+        focusAreas={focusAreas}
+        shiftCategories={shiftCategories}
+        companyId={companyId}
+        certifications={certifications}
+        certificationLabel={certificationLabel}
+        focusAreaLabel={focusAreaLabel}
+        isOffDayRow={isOffDaySection}
+        hideFocusAreaSelect={hideAreaSelect}
+        onSaved={handleSaved}
+        onDeleted={handleDeleted}
+      />
+    ));
+
+  const sectionHeader = (label: string, colorBg?: string, colorText?: string) => (
+    <div style={{
+      padding: "10px 16px",
+      background: colorBg || "var(--color-bg-subtle)",
+      color: colorText || "var(--color-text-secondary)",
+      fontWeight: 700,
+      fontSize: 13,
+      borderBottom: "1px solid var(--color-border-light)",
+    }}>
+      {label}
+    </div>
+  );
+
   return (
-    <div>
-      <p
-        style={{
-          fontSize: 12,
-          color: "var(--color-text-muted)",
-          marginTop: 0,
-          marginBottom: 12,
-        }}
-      >
-        Click any row to expand and edit. The label (code) is used in the
-        schedule grid.
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
+        Click any row to expand and edit. The label (code) is used in the schedule grid.
       </p>
-      {local.map((st) => (
-        <ShiftTypeRow
-          key={st.id}
-          st={st}
-          wings={wings}
-          orgId={orgId}
-          orgSkillLevels={orgSkillLevels}
-          onSaved={handleSaved}
-          onDeleted={handleDeleted}
-        />
-      ))}
-      <button
-        onClick={handleAdd}
-        style={{
-          marginTop: 12,
-          background: "none",
-          border: "1.5px dashed var(--color-border)",
-          borderRadius: 8,
-          color: "var(--color-text-muted)",
-          padding: "8px 16px",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-          width: "100%",
-        }}
-      >
-        + Add Shift Type
-      </button>
+
+      {/* Per-focus-area sections */}
+      {focusAreas.map((focusArea) => {
+        const areaCodes = local.filter(
+          (s) => !s.isOffDay && s.focusAreaId === focusArea.id,
+        );
+        return (
+          <div key={focusArea.id} style={{ marginBottom: 20, border: "1px solid var(--color-border-light)", borderRadius: 10, overflow: "hidden" }}>
+            {sectionHeader(focusArea.name, focusArea.colorBg, focusArea.colorText)}
+            {areaCodes.length > 0 && (
+              <div style={{ padding: "0 16px" }}>
+                {renderRows(areaCodes, false, true)}
+              </div>
+            )}
+            <div style={{ padding: "8px 16px" }}>
+              <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                + Add Shift Code
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* General / cross-area codes */}
+      {(() => {
+        const generalCodes = local.filter(
+          (s) => !s.isOffDay && s.focusAreaId == null,
+        );
+        return (
+          <div style={{ marginBottom: 20, border: "1px solid var(--color-border-light)", borderRadius: 10, overflow: "hidden" }}>
+            {sectionHeader("General / Cross-Area")}
+            {generalCodes.length > 0 && (
+              <div style={{ padding: "0 16px" }}>
+                {renderRows(generalCodes, false, true)}
+              </div>
+            )}
+            <div style={{ padding: "8px 16px" }}>
+              <button onClick={() => handleAdd(null)} style={addBtnStyle}>
+                + Add General Code
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Off Days */}
+      {(() => {
+        const offDayCodes = local.filter((s) => s.isOffDay);
+        return (
+          <div style={{ border: "1px solid var(--color-border-light)", borderRadius: 10, overflow: "hidden" }}>
+            {sectionHeader("Off Days")}
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
+              Off days (scheduled off, sick leave, vacation) do not count toward shift totals.
+            </p>
+            {offDayCodes.length > 0 && (
+              <div style={{ padding: "0 16px" }}>
+                {renderRows(offDayCodes, true, true)}
+              </div>
+            )}
+            <div style={{ padding: "8px 16px" }}>
+              <button onClick={() => handleAdd(null, true)} style={addBtnStyle}>
+                + Add Off Day Code
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -979,22 +1288,47 @@ function StringListSettings({
   placeholder,
 }: {
   label: string;
-  items: string[];
-  onSave: (items: string[]) => Promise<void>;
+  items: NamedItem[];
+  onSave: (items: NamedItem[]) => Promise<void>;
   placeholder: string;
 }) {
-  const [local, setLocal] = useState<string[]>(items);
-  const [newItem, setNewItem] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [local, setLocal] = useState<NamedItem[]>(items);
+  const [newName, setNewName] = useState("");
+  const [newAbbr, setNewAbbr] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [dragging, setDragging] = useState<number | null>(null);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const dragOrigin = useRef<string[]>([]);
-  const dragItem = useRef<string | null>(null);
-  const dropped = useRef(false);
-
   const isDirty = JSON.stringify(local) !== JSON.stringify(items);
+
+  const displayList = useMemo((): NamedItem[] => {
+    if (!isEditing || draggedIdx === null || dragOverIdx === null) return isEditing ? local : items;
+    const list = [...local];
+    const [item] = list.splice(draggedIdx, 1);
+    list.splice(dragOverIdx, 0, item);
+    return list;
+  }, [isEditing, local, items, draggedIdx, dragOverIdx]);
+
+  const handleEnterEdit = () => {
+    setLocal([...items]);
+    setIsEditing(true);
+    setNewName("");
+    setNewAbbr("");
+    setError(null);
+  };
+
+  const handleCancel = () => {
+    setLocal([...items]);
+    setIsEditing(false);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+    setNewName("");
+    setNewAbbr("");
+    setError(null);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -1002,6 +1336,7 @@ function StringListSettings({
     try {
       await onSave(local);
       setSaved(true);
+      setIsEditing(false);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       const msg =
@@ -1015,54 +1350,51 @@ function StringListSettings({
   };
 
   const handleAdd = () => {
-    const trimmed = newItem.trim();
-    if (!trimmed || local.includes(trimmed)) return;
-    setLocal((prev) => [...prev, trimmed]);
-    setNewItem("");
+    const trimmedName = newName.trim();
+    const trimmedAbbr = newAbbr.trim() || trimmedName;
+    if (!trimmedName || local.some((it) => it.name === trimmedName)) return;
+    setLocal((prev) => [...prev, { id: 0, companyId: "", name: trimmedName, abbr: trimmedAbbr, sortOrder: prev.length }]);
+    setNewName("");
+    setNewAbbr("");
   };
 
   const handleRemove = (i: number) => {
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  const handleDragStart = (_e: React.DragEvent<HTMLSpanElement>, index: number) => {
-    dragOrigin.current = [...local];
-    dragItem.current = local[index];
-    dropped.current = false;
-    setDragging(index);
+  const handleItemChange = (i: number, field: "name" | "abbr", value: string) => {
+    setLocal((prev) => prev.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)));
   };
 
-  const handleDragEnter = (_e: React.DragEvent<HTMLSpanElement>, targetIndex: number) => {
-    if (dragItem.current === null) return;
-    setLocal((prev) => {
-      const fromIndex = prev.indexOf(dragItem.current!);
-      if (fromIndex === -1 || fromIndex === targetIndex) return prev;
-      const next = [...prev];
-      next.splice(fromIndex, 1);
-      next.splice(targetIndex, 0, dragItem.current!);
-      setDragging(targetIndex);
-      return next;
-    });
+  const handleDragStart = (idx: number) => {
+    setDraggedIdx(idx);
+    setDragOverIdx(idx);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLSpanElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, targetIdx: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+    setDragOverIdx(targetIdx);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLSpanElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    dropped.current = true;
+    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx) {
+      const list = [...local];
+      const [item] = list.splice(draggedIdx, 1);
+      list.splice(dragOverIdx, 0, item);
+      setLocal(list);
+    }
+    setDraggedIdx(null);
+    setDragOverIdx(null);
   };
 
   const handleDragEnd = () => {
-    if (!dropped.current) {
-      setLocal(dragOrigin.current);
-    }
-    dragItem.current = null;
-    dragOrigin.current = [];
-    setDragging(null);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
   };
+
+  const gridCols = isEditing ? "24px 32px 1fr 200px 28px" : "32px 1fr 200px";
 
   return (
     <div>
@@ -1070,122 +1402,221 @@ function StringListSettings({
         {label}
       </p>
 
-      {/* Tag list */}
-      <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={() => { dropped.current = true; }}
-      >
-        {local.map((item, i) => (
-          <span
-            key={item}
-            draggable
-            onDragStart={(e) => handleDragStart(e, i)}
-            onDragEnter={(e) => handleDragEnter(e, i)}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background:
-                dragging === i
-                  ? "var(--color-accent-light, #EEF2FF)"
-                  : "var(--color-border-light)",
-              border:
-                dragging === i
-                  ? "1.5px dashed var(--color-accent-start, #6366F1)"
-                  : "1.5px solid transparent",
-              borderRadius: 20,
-              padding: "3px 10px 3px 12px",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-text-secondary)",
-              cursor: "grab",
-              opacity: dragging === i ? 0.7 : 1,
-              transition: "background 0.1s ease",
-              userSelect: "none",
-            }}
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        {!isEditing && (
+          <button
+            onClick={handleEnterEdit}
+            className="dg-btn"
+            style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
           >
-            <span
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Edit
+          </button>
+        )}
+        {isEditing && isDirty && (
+          <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary" style={{ padding: "7px 14px" }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        )}
+        {isEditing && (
+          <button onClick={handleCancel} className="dg-btn" style={{ padding: "7px 14px" }}>
+            Cancel
+          </button>
+        )}
+        {saved && (
+          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>Saved!</span>
+        )}
+      </div>
+
+      {/* Table */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 12,
+          border: isEditing ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
+          overflow: "hidden",
+          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : "0 1px 4px rgba(0,0,0,0.04)",
+          transition: "border-color 0.15s, box-shadow 0.15s",
+        }}
+      >
+        {/* Header row */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: gridCols,
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--color-border-light)",
+            background: isEditing ? "#EFF6FF" : undefined,
+          }}
+        >
+          {(isEditing
+            ? ["", "#", "Full Name", "Abbreviation", ""]
+            : ["#", "Full Name", "Abbreviation"]
+          ).map((h, i) => (
+            <div
+              key={i}
               style={{
                 fontSize: 11,
-                color: "var(--color-text-faint, #CBD5E1)",
-                letterSpacing: "-1px",
-                pointerEvents: "none",
+                fontWeight: 700,
+                color: "var(--color-text-subtle)",
+                letterSpacing: "0.06em",
               }}
             >
-              ⠿
-            </span>
-            {item}
+              {h}
+            </div>
+          ))}
+        </div>
+
+        {/* Item rows */}
+        {displayList.map((item, i) => {
+          const isDragging = isEditing && draggedIdx !== null && local[draggedIdx]?.name === item.name;
+          const isDropTarget = isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
+          return (
+            <div
+              key={i}
+              draggable={isEditing}
+              onDragStart={isEditing ? () => handleDragStart(i) : undefined}
+              onDragOver={isEditing ? (e) => handleDragOver(e, i) : undefined}
+              onDrop={isEditing ? handleDrop : undefined}
+              onDragEnd={isEditing ? handleDragEnd : undefined}
+              style={{
+                display: "grid",
+                gridTemplateColumns: gridCols,
+                padding: "8px 16px",
+                borderTop: isDropTarget
+                  ? "2px solid #2563EB"
+                  : i === 0
+                    ? "none"
+                    : "1px solid var(--color-border-light)",
+                alignItems: "center",
+                background: i % 2 === 0 ? "#fff" : "var(--color-row-alt, #FAFAFA)",
+                cursor: isEditing ? "grab" : "default",
+                transition: "background 0.15s, opacity 0.15s",
+                opacity: isDragging ? 0.4 : 1,
+                userSelect: isEditing ? "none" : undefined,
+              }}
+            >
+              {isEditing && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-faint)" }}>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <rect x="3" y="2" width="2" height="2" rx="1"/>
+                    <rect x="9" y="2" width="2" height="2" rx="1"/>
+                    <rect x="3" y="6" width="2" height="2" rx="1"/>
+                    <rect x="9" y="6" width="2" height="2" rx="1"/>
+                    <rect x="3" y="10" width="2" height="2" rx="1"/>
+                    <rect x="9" y="10" width="2" height="2" rx="1"/>
+                  </svg>
+                </div>
+              )}
+
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-faint)" }}>
+                {i + 1}
+              </div>
+
+              {isEditing ? (
+                <input
+                  value={item.name}
+                  onChange={(e) => handleItemChange(i, "name", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  draggable={false}
+                  placeholder="Full name"
+                  style={{ ...inputStyle, fontSize: 13, fontWeight: 500 }}
+                />
+              ) : (
+                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                  {item.name}
+                </div>
+              )}
+
+              {isEditing ? (
+                <input
+                  value={item.abbr}
+                  onChange={(e) => handleItemChange(i, "abbr", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  draggable={false}
+                  placeholder="Abbreviation"
+                  style={{ ...inputStyle, fontSize: 13, fontWeight: 600 }}
+                />
+              ) : (
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-muted)" }}>
+                  {item.abbr}
+                </div>
+              )}
+
+              {isEditing && (
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--color-text-muted)",
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: "0 2px",
+                  }}
+                  title="Remove"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Add new row — only in edit mode */}
+        {isEditing && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: gridCols,
+              padding: "8px 16px",
+              borderTop: "1px solid var(--color-border-light)",
+              alignItems: "center",
+              background: "#F8FAFC",
+            }}
+          >
+            <div />
+            <div />
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder={placeholder}
+              style={{ ...inputStyle, fontSize: 13 }}
+            />
+            <input
+              value={newAbbr}
+              onChange={(e) => setNewAbbr(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Abbreviation"
+              style={{ ...inputStyle, fontSize: 13 }}
+            />
             <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+              onClick={handleAdd}
+              disabled={!newName.trim()}
               style={{
                 background: "none",
                 border: "none",
-                cursor: "pointer",
-                color: "var(--color-text-muted)",
-                fontSize: 15,
+                cursor: newName.trim() ? "pointer" : "not-allowed",
+                color: newName.trim() ? "#2563EB" : "var(--color-text-faint)",
+                fontSize: 18,
+                fontWeight: 700,
                 lineHeight: 1,
-                padding: "0 2px",
+                padding: 0,
               }}
-              title="Remove"
+              title="Add"
             >
-              ×
+              +
             </button>
-          </span>
-        ))}
-      </div>
-
-      {/* Add new */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-        <input
-          value={newItem}
-          onChange={(e) => setNewItem(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder={placeholder}
-          style={{ ...inputStyle, flex: 1 }}
-        />
-        <button
-          onClick={handleAdd}
-          disabled={!newItem.trim()}
-          style={{
-            background: newItem.trim() ? "var(--color-accent-gradient)" : "#ccc",
-            border: "none",
-            color: "#fff",
-            borderRadius: 8,
-            padding: "8px 16px",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: newItem.trim() ? "pointer" : "not-allowed",
-          }}
-        >
-          + Add
-        </button>
-      </div>
-
-      {/* Save */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button
-          onClick={handleSave}
-          disabled={!isDirty || saving}
-          style={{
-            background: isDirty ? "var(--color-accent-gradient)" : "#ccc",
-            border: "none",
-            color: "#fff",
-            borderRadius: 8,
-            padding: "9px 20px",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: isDirty ? "pointer" : "not-allowed",
-          }}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
-        {saved && (
-          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>Saved!</span>
+          </div>
         )}
       </div>
 
@@ -1211,6 +1642,863 @@ function StringListSettings({
   );
 }
 
+
+// ── Indicator Types Settings ──────────────────────────────────────────────────
+function IndicatorTypesSettings({
+  indicatorTypes,
+  companyId,
+  onChange,
+}: {
+  indicatorTypes: IndicatorType[];
+  companyId: string;
+  onChange: (types: IndicatorType[]) => void;
+}) {
+  const [local, setLocal] = useState<(IndicatorType & { isNew?: boolean })[]>(indicatorTypes);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const nextTmpId = useRef(-1);
+
+  const handleAdd = () => {
+    const tmp: IndicatorType & { isNew: boolean } = {
+      id: nextTmpId.current--,
+      companyId: companyId,
+      name: "",
+      color: "#6366F1",
+      sortOrder: local.length,
+      isNew: true,
+    };
+    setLocal((prev) => [...prev, tmp]);
+  };
+
+  const handleSave = async (indicator: IndicatorType & { isNew?: boolean }) => {
+    if (!indicator.name.trim()) return;
+    setSaving(indicator.id);
+    try {
+      const saved = await db.upsertIndicatorType({
+        id: indicator.isNew ? undefined : indicator.id,
+        companyId: companyId,
+        name: indicator.name.trim(),
+        color: indicator.color,
+        sortOrder: indicator.sortOrder,
+      });
+      const updated = local.map((i) => (i.id === indicator.id ? saved : i));
+      setLocal(updated);
+      onChange(updated);
+      toast.success("Indicator saved");
+    } catch (err) {
+      toast.error("Failed to save indicator");
+      console.error(err);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleDelete = async (indicator: IndicatorType & { isNew?: boolean }) => {
+    if (indicator.isNew) {
+      const updated = local.filter((i) => i.id !== indicator.id);
+      setLocal(updated);
+      onChange(updated);
+      return;
+    }
+    setDeleting(indicator.id);
+    try {
+      await db.deleteIndicatorType(indicator.id);
+      const updated = local.filter((i) => i.id !== indicator.id);
+      setLocal(updated);
+      onChange(updated);
+      toast.success("Indicator deleted");
+    } catch (err) {
+      toast.error("Failed to delete indicator");
+      console.error(err);
+    } finally {
+      setDeleting(null);
+      setConfirmDeleteId(null);
+    }
+  };
+
+  const handleChange = (id: number, field: "name" | "color", value: string) => {
+    setLocal((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
+        Indicators appear as colored dots on shift cells. Add, rename, or recolor them here.
+      </p>
+      {local.map((indicator) => {
+        const isSavingThis = saving === indicator.id;
+        const isDeletingThis = deleting === indicator.id;
+        return (
+          <div
+            key={indicator.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 80px auto auto",
+              gap: 10,
+              alignItems: "center",
+              padding: "10px 0",
+              borderBottom: "1px solid var(--color-border-light)",
+            }}
+          >
+            <input
+              value={indicator.name}
+              onChange={(e) => handleChange(indicator.id, "name", e.target.value)}
+              placeholder="Indicator name (e.g. Readings)"
+              style={{ ...inputStyle }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                type="color"
+                value={indicator.color}
+                onChange={(e) => handleChange(indicator.id, "color", e.target.value)}
+                style={{
+                  width: 32,
+                  height: 28,
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  padding: 2,
+                }}
+              />
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  background: indicator.color,
+                  border: "1px solid rgba(0,0,0,0.12)",
+                  flexShrink: 0,
+                }}
+              />
+            </div>
+            <button
+              onClick={() => handleSave(indicator)}
+              disabled={isSavingThis || !indicator.name.trim()}
+              style={{
+                background: indicator.name.trim() ? "var(--color-accent-gradient)" : "#ccc",
+                border: "none",
+                color: "#fff",
+                borderRadius: 7,
+                padding: "7px 14px",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: indicator.name.trim() ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {isSavingThis ? "…" : "Save"}
+            </button>
+            <button
+              onClick={() => indicator.isNew ? handleDelete(indicator) : setConfirmDeleteId(indicator.id)}
+              disabled={isDeletingThis}
+              style={{
+                background: "none",
+                border: "1px solid #FEE2E2",
+                borderRadius: 7,
+                color: "#EF4444",
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {isDeletingThis ? "…" : "Delete"}
+            </button>
+          </div>
+        );
+      })}
+      <button
+        onClick={handleAdd}
+        style={{
+          marginTop: 8,
+          background: "none",
+          border: "1.5px dashed var(--color-border)",
+          borderRadius: 8,
+          color: "var(--color-text-muted)",
+          padding: "8px 16px",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          width: "100%",
+        }}
+      >
+        + Add Indicator
+      </button>
+      {confirmDeleteId !== null && (() => {
+        const indicator = local.find(i => i.id === confirmDeleteId);
+        if (!indicator) return null;
+        return (
+          <ConfirmDialog
+            title="Delete Indicator?"
+            message={<>Delete <strong>{indicator.name || "this indicator"}</strong>? This indicator will be removed from all shift cells.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting === confirmDeleteId}
+            onConfirm={() => handleDelete(indicator)}
+            onCancel={() => setConfirmDeleteId(null)}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+
+// ── Shift Categories Settings ──────────────────────────────────────────────────
+function ShiftCategoriesSettings({
+  shiftCategories,
+  focusAreas,
+  companyId,
+  onChange,
+}: {
+  shiftCategories: ShiftCategory[];
+  focusAreas: FocusArea[];
+  companyId: string;
+  onChange: (categories: ShiftCategory[]) => void;
+}) {
+  const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const originalRef = useRef<Map<number, ShiftCategory>>(
+    new Map(shiftCategories.map((c) => [c.id, c]))
+  );
+  const nextTmpId = useRef(-1);
+
+  const handleAdd = (focusAreaId: number | null) => {
+    const tmpId = nextTmpId.current--;
+    const tmp: ShiftCategory & { isNew: boolean } = {
+      id: tmpId,
+      companyId: companyId,
+      name: "",
+      color: "#EFF6FF",
+      startTime: null,
+      endTime: null,
+      sortOrder: local.filter((c) => c.focusAreaId === focusAreaId).length,
+      focusAreaId,
+      isNew: true,
+    };
+    setLocal((prev) => [...prev, tmp]);
+    setEditingId(tmpId);
+  };
+
+  const handleChange = (id: number, field: keyof ShiftCategory, value: string | number | null) => {
+    setLocal((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+  };
+
+  const handleCancel = (cat: ShiftCategory & { isNew?: boolean }) => {
+    if (cat.isNew) {
+      setLocal((prev) => prev.filter((c) => c.id !== cat.id));
+      onChange(local.filter((c) => c.id !== cat.id));
+    } else {
+      const orig = originalRef.current.get(cat.id);
+      if (orig) setLocal((prev) => prev.map((c) => (c.id === cat.id ? orig : c)));
+    }
+    setEditingId(null);
+  };
+
+  const handleSave = async (cat: ShiftCategory & { isNew?: boolean }) => {
+    if (!cat.name.trim()) return;
+    setSaving(cat.id);
+    try {
+      const saved = await db.upsertShiftCategory({
+        id: cat.isNew ? undefined : cat.id,
+        companyId: companyId,
+        name: cat.name.trim(),
+        color: cat.color,
+        startTime: cat.startTime || null,
+        endTime: cat.endTime || null,
+        sortOrder: cat.sortOrder,
+        focusAreaId: cat.focusAreaId ?? null,
+      });
+      originalRef.current.set(saved.id, saved);
+      const updated = local.map((c) => (c.id === cat.id ? saved : c));
+      setLocal(updated);
+      onChange(updated);
+      setEditingId(null);
+      toast.success("Category saved");
+    } catch (err) {
+      toast.error("Failed to save category");
+      console.error(err);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleDelete = async (cat: ShiftCategory & { isNew?: boolean }) => {
+    if (cat.isNew) {
+      const updated = local.filter((c) => c.id !== cat.id);
+      setLocal(updated);
+      onChange(updated);
+      setEditingId(null);
+      return;
+    }
+    setDeleting(cat.id);
+    try {
+      await db.deleteShiftCategory(cat.id);
+      const updated = local.filter((c) => c.id !== cat.id);
+      setLocal(updated);
+      onChange(updated);
+      setEditingId(null);
+      toast.success("Category deleted");
+    } catch (err) {
+      toast.error("Failed to delete category");
+      console.error(err);
+    } finally {
+      setDeleting(null);
+      setConfirmDeleteId(null);
+    }
+  };
+
+  const addBtnStyle: React.CSSProperties = {
+    marginTop: 6,
+    background: "none",
+    border: "1.5px dashed var(--color-border)",
+    borderRadius: 8,
+    color: "var(--color-text-muted)",
+    padding: "6px 14px",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    width: "100%",
+  };
+
+  const renderCategoryRow = (cat: ShiftCategory & { isNew?: boolean }) => {
+    const isEditing = editingId === cat.id;
+    const isSavingThis = saving === cat.id;
+    const isDeletingThis = deleting === cat.id;
+    const orig = originalRef.current.get(cat.id);
+    const isDirty = cat.isNew || !orig ||
+      cat.name !== orig.name ||
+      (cat.startTime ?? null) !== (orig.startTime ?? null) ||
+      (cat.endTime ?? null) !== (orig.endTime ?? null);
+
+    if (!isEditing) {
+      return (
+        <div
+          key={cat.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "11px 0",
+            borderBottom: "1px solid var(--color-border-light)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+              {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>Untitled</span>}
+            </span>
+            {(cat.startTime || cat.endTime) && (
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setEditingId(cat.id)}
+            style={{
+              background: "none",
+              border: "1px solid var(--color-border)",
+              borderRadius: 7,
+              color: "var(--color-text-primary)",
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Edit
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={cat.id}
+        style={{
+          padding: "12px 0",
+          borderBottom: "1px solid var(--color-border-light)",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto",
+            gap: 10,
+            alignItems: "end",
+            marginBottom: 10,
+          }}
+        >
+          <div>
+            <label style={labelStyle}>NAME</label>
+            <input
+              value={cat.name}
+              onChange={(e) => handleChange(cat.id, "name", e.target.value)}
+              placeholder="e.g. Day Shift"
+              style={{ ...inputStyle }}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>START</label>
+            <TimeInput12h
+              value={cat.startTime}
+              onChange={(v) => handleChange(cat.id, "startTime", v)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>END</label>
+            <TimeInput12h
+              value={cat.endTime}
+              onChange={(v) => handleChange(cat.id, "endTime", v)}
+            />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => handleSave(cat)}
+            disabled={isSavingThis || !cat.name.trim() || !isDirty}
+            style={{
+              background: cat.name.trim() && isDirty ? "var(--color-accent-gradient)" : "#ccc",
+              border: "none",
+              color: "#fff",
+              borderRadius: 7,
+              padding: "7px 14px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: cat.name.trim() && isDirty ? "pointer" : "not-allowed",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isSavingThis ? "…" : "Save"}
+          </button>
+          <button
+            onClick={() => handleCancel(cat)}
+            disabled={isSavingThis}
+            style={{
+              background: "none",
+              border: "1px solid var(--color-border)",
+              borderRadius: 7,
+              color: "var(--color-text-primary)",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => cat.isNew ? handleDelete(cat) : setConfirmDeleteId(cat.id)}
+            disabled={isDeletingThis}
+            style={{
+              background: "none",
+              border: "1px solid #FEE2E2",
+              borderRadius: 7,
+              color: "#EF4444",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              marginLeft: "auto",
+            }}
+          >
+            {isDeletingThis ? "…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
+        Define the tally categories for each focus area (e.g. Day, Evening, Night).
+      </p>
+
+      {focusAreas.map((focusArea) => {
+        const areaCats = local.filter((c) => c.focusAreaId === focusArea.id);
+        return (
+          <div
+            key={focusArea.id}
+            style={{
+              marginBottom: 20,
+              border: "1px solid var(--color-border-light)",
+              borderRadius: 10,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "10px 16px",
+                background: focusArea.colorBg || "var(--color-bg)",
+                color: focusArea.colorText || "var(--color-text-primary)",
+                fontWeight: 700,
+                fontSize: 13,
+                borderBottom: areaCats.length > 0 ? "1px solid var(--color-border-light)" : "none",
+              }}
+            >
+              {focusArea.name}
+            </div>
+            {areaCats.length > 0 && (
+              <div style={{ padding: "0 16px" }}>
+                {areaCats.map(renderCategoryRow)}
+              </div>
+            )}
+            <div style={{ padding: "8px 16px" }}>
+              <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                + Add Category
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      {confirmDeleteId !== null && (() => {
+        const cat = local.find(c => c.id === confirmDeleteId);
+        if (!cat) return null;
+        return (
+          <ConfirmDialog
+            title="Delete Category?"
+            message={<>Delete <strong>{cat.name || "this category"}</strong>? Shift codes in this category will become uncategorized.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting === confirmDeleteId}
+            onConfirm={() => handleDelete(cat)}
+            onCancel={() => setConfirmDeleteId(null)}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+
+// ── Admin permission metadata ──────────────────────────────────────────────────
+
+const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
+  { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRegularSchedule"] },
+  { label: "Notes", keys: ["canEditNotes"] },
+  { label: "Recurring", keys: ["canManageRegularShifts", "canManageShiftSeries"] },
+  { label: "Staff", keys: ["canManageEmployees"] },
+  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageCompanySettings"] },
+];
+
+const PERM_LABELS: Record<keyof AdminPermissions, string> = {
+  canViewSchedule: "View Schedule",
+  canEditShifts: "Edit Shifts",
+  canPublishSchedule: "Publish Schedule",
+  canApplyRegularSchedule: "Apply Regular Schedule",
+  canEditNotes: "Edit Notes / Indicators",
+  canManageRegularShifts: "Manage Regular Shifts",
+  canManageShiftSeries: "Manage Shift Series",
+  canViewStaff: "View Staff",
+  canManageEmployees: "Manage Employees",
+  canManageFocusAreas: "Manage Focus Areas",
+  canManageShiftCodes: "Manage Shift Codes",
+  canManageIndicatorTypes: "Manage Indicator Types",
+  canManageCompanySettings: "Manage Company Settings",
+};
+
+/** Permissions that are always on and cannot be toggled off. */
+const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule", "canViewStaff"]);
+
+function emptyAdminPerms(): AdminPermissions {
+  return {
+    canViewSchedule: true,
+    canEditShifts: false,
+    canPublishSchedule: false,
+    canApplyRegularSchedule: false,
+    canEditNotes: false,
+    canManageRegularShifts: false,
+    canManageShiftSeries: false,
+    canViewStaff: true,
+    canManageEmployees: false,
+    canManageFocusAreas: false,
+    canManageShiftCodes: false,
+    canManageIndicatorTypes: false,
+    canManageCompanySettings: false,
+  };
+}
+
+// ── User Management Settings ──────────────────────────────────────────────────
+function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string; isSuperAdmin: boolean }) {
+  const myRole = isSuperAdmin ? "super_admin" : "user";
+  const [users, setUsers] = useState<CompanyUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [editingPerms, setEditingPerms] = useState<Record<string, AdminPermissions>>({});
+  const [savingPerms, setSavingPerms] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    db.fetchCompanyUsers(companyId)
+      .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
+      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    return () => { mounted = false; };
+  }, [companyId]);
+
+  const handleRoleChange = async (userId: string, newRole: "admin" | "user") => {
+    setSaving(userId);
+    setError(null);
+    try {
+      await db.changeCompanyUserRole(userId, newRole);
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, companyRole: newRole } : u));
+      if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
+      toast.success("Role updated");
+    } catch (e) {
+      toast.error("Failed to change role");
+      setError(e instanceof Error ? e.message : "Failed to change role");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const openPermissions = (user: CompanyUser) => {
+    if (expandedUserId === user.id) { setExpandedUserId(null); return; }
+    setExpandedUserId(user.id);
+    if (!editingPerms[user.id]) {
+      setEditingPerms((prev) => ({
+        ...prev,
+        [user.id]: { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) },
+      }));
+    }
+  };
+
+  const handlePermToggle = (userId: string, key: keyof AdminPermissions, value: boolean) => {
+    setEditingPerms((prev) => ({ ...prev, [userId]: { ...prev[userId], [key]: value } }));
+  };
+
+  const handlePermsSave = async (userId: string) => {
+    setSavingPerms(userId);
+    setError(null);
+    try {
+      await db.updateAdminPermissions(userId, editingPerms[userId], companyId);
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: editingPerms[userId] } : u));
+      toast.success("Permissions saved");
+    } catch (e) {
+      toast.error("Failed to save permissions");
+      setError(e instanceof Error ? e.message : "Failed to save permissions");
+    } finally {
+      setSavingPerms(null);
+    }
+  };
+
+  const handlePermsReset = async (userId: string) => {
+    setSavingPerms(userId);
+    setError(null);
+    try {
+      await db.updateAdminPermissions(userId, null, companyId);
+      const cleared = emptyAdminPerms();
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: null } : u));
+      setEditingPerms((prev) => ({ ...prev, [userId]: cleared }));
+      toast.success("Permissions reset");
+    } catch (e) {
+      toast.error("Failed to reset permissions");
+      setError(e instanceof Error ? e.message : "Failed to reset permissions");
+    } finally {
+      setSavingPerms(null);
+    }
+  };
+
+  const ROLE_LABELS: Record<string, string> = {
+    super_admin: "Super Admin",
+    admin: "Admin",
+    user: "User",
+  };
+
+  const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
+    super_admin: { bg: "#F0FDF4", text: "#15803D" },
+    admin: { bg: "#EFF6FF", text: "#2563EB" },
+    user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
+  };
+
+  if (loading) {
+    return <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Loading users…</p>;
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 16px" }}>
+        Manage user roles and admin permissions. Super Admins can promote users to Admin and configure their access.
+      </p>
+      {error && (
+        <div style={{ marginBottom: 12, padding: 10, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 8, color: "#B91C1C", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {users.map((user) => {
+          const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+          const roleColor = ROLE_COLORS[user.companyRole] ?? ROLE_COLORS.user;
+          const isProtected = user.companyRole === "super_admin" || user.platformRole === "gridmaster";
+          const isExpanded = expandedUserId === user.id;
+          const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
+          const perms = editingPerms[user.id] ?? savedPerms;
+          const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
+          const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
+            allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
+
+          return (
+            <div key={user.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+              {/* User row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: "50%",
+                  background: "var(--color-accent-gradient)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0,
+                }}>
+                  {(displayName !== "—" ? displayName : "?")[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+                    {displayName}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    {user.email ?? "—"} · Joined {new Date(user.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 20,
+                  background: roleColor.bg, color: roleColor.text, whiteSpace: "nowrap",
+                }}>
+                  {ROLE_LABELS[user.companyRole] ?? user.companyRole}
+                </span>
+                {!isProtected && myRole === "super_admin" && (
+                  <select
+                    value={user.companyRole}
+                    disabled={saving === user.id}
+                    onChange={(e) => handleRoleChange(user.id, e.target.value as "admin" | "user")}
+                    style={{
+                      fontSize: 12, padding: "4px 8px",
+                      border: "1.5px solid var(--color-border)", borderRadius: 7,
+                      background: "#fff", cursor: "pointer",
+                    }}
+                  >
+                    <option value="admin">Promote to Admin</option>
+                    <option value="user">Reset to User</option>
+                  </select>
+                )}
+                {user.companyRole === "admin" && myRole === "super_admin" && (
+                  <button
+                    onClick={() => openPermissions(user)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      fontSize: 12, padding: "4px 10px",
+                      border: "1.5px solid var(--color-border)", borderRadius: 7,
+                      background: isExpanded ? "var(--color-surface-overlay)" : "#fff",
+                      color: "var(--color-text-secondary)",
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                    </svg>
+                    Permissions
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                      style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 150ms" }}>
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+                )}
+                {saving === user.id && (
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Saving…</span>
+                )}
+              </div>
+
+              {/* Permissions panel */}
+              {isExpanded && user.companyRole === "admin" && (
+                <div style={{
+                  marginBottom: 10, padding: "16px 20px",
+                  background: "var(--color-surface-subtle, #F9FAFB)",
+                  border: "1px solid var(--color-border-light)",
+                  borderTop: "none", borderRadius: "0 0 10px 10px",
+                }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "16px 28px" }}>
+                    {PERM_GROUPS.map((group) => (
+                      <div key={group.label}>
+                        <div style={{
+                          fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                          color: "var(--color-text-subtle)", textTransform: "uppercase", marginBottom: 8,
+                        }}>
+                          {group.label}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                          {group.keys.map((key) => {
+                            const alwaysOn = ALWAYS_ON.has(key);
+                            return (
+                              <label key={key} style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                cursor: alwaysOn ? "default" : "pointer",
+                                opacity: alwaysOn ? 0.45 : 1,
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={perms[key] ?? false}
+                                  disabled={alwaysOn || savingPerms === user.id}
+                                  onChange={(e) => handlePermToggle(user.id, key, e.target.checked)}
+                                  style={{ width: 14, height: 14, accentColor: "#2563EB", cursor: alwaysOn ? "default" : "pointer", flexShrink: 0 }}
+                                />
+                                <span style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
+                                  {PERM_LABELS[key]}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
+                    <button
+                      onClick={() => handlePermsSave(user.id)}
+                      disabled={savingPerms === user.id}
+                      style={{
+                        fontSize: 12, fontWeight: 600, padding: "6px 14px",
+                        background: "#2563EB", color: "#fff", border: "none", borderRadius: 7,
+                        cursor: savingPerms === user.id ? "not-allowed" : "pointer",
+                        fontFamily: "inherit", opacity: savingPerms === user.id ? 0.6 : 1,
+                      }}
+                    >
+                      {savingPerms === user.id ? "Saving…" : "Save Permissions"}
+                    </button>
+                    <button
+                      onClick={() => handlePermsReset(user.id)}
+                      disabled={savingPerms === user.id}
+                      style={{
+                        fontSize: 12, fontWeight: 500, padding: "6px 14px",
+                        background: "transparent", color: "var(--color-text-muted)",
+                        border: "1.5px solid var(--color-border)", borderRadius: 7,
+                        cursor: savingPerms === user.id ? "not-allowed" : "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Reset All
+                    </button>
+                    {hasUnsavedChanges && (
+                      <span style={{ fontSize: 11, color: "#D97706" }}>Unsaved changes</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ── Sidebar nav link ──────────────────────────────────────────────────────────
 function SidebarLink({
@@ -1277,47 +2565,59 @@ function SidebarLink({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage({
-  organization,
-  wings,
-  shiftTypes,
-  onOrgSave,
-  onWingsChange,
-  onShiftTypesChange,
-  canManageOrg,
+  company,
+  focusAreas,
+  shiftCodes,
+  shiftCategories,
+  indicatorTypes,
+  certifications,
+  companyRoles,
+  onCompanySave,
+  onFocusAreasChange,
+  onShiftCodesChange,
+  onShiftCategoriesChange,
+  onIndicatorTypesChange,
+  onCertificationsChange,
+  onCompanyRolesChange,
+  canManageCompany,
 }: SettingsPageProps) {
-  const { isGridmaster } = usePermissions();
+  const { isGridmaster, isSuperAdmin } = usePermissions();
   const [activeSection, setActiveSection] = useState<string>(
-    canManageOrg ? "org" : "impersonation"
+    canManageCompany ? "company" : "impersonation"
   );
 
-  const orgLinks = canManageOrg ? [
-    {
-      id: "org", label: "Organization",
-      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-    },
-    {
-      id: "shift-types", label: "Shift Types",
-      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-    },
-    {
-      id: "staff-config", label: "Staff Configuration",
-      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-    },
+  const focusAreaLabel = company.focusAreaLabel || "Focus Areas";
+  const certificationLabel = company.certificationLabel || "Certifications";
+  const roleLabel = company.roleLabel || "Roles";
+
+  const iconBuilding = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+  const iconCalendar = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+  const iconDesignations = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>;
+  const iconUsers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+  const iconImpersonate = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+
+  const iconIndicator = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>;
+  const iconTag = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
+
+  const companyLinks = canManageCompany ? [
+    { id: "company", label: "Company", icon: iconBuilding },
+    { id: "shift-categories", label: "Shift Categories", icon: iconTag },
+    { id: "shift-codes", label: "Shift Codes", icon: iconCalendar },
+    { id: "indicators", label: "Indicators", icon: iconIndicator },
+    { id: "staff-config", label: "Designations", icon: iconDesignations },
+    ...(isSuperAdmin ? [{ id: "users", label: "User Management", icon: iconUsers }] : []),
   ] : [];
 
   const gridmasterLinks = isGridmaster ? [
-    {
-      id: "impersonation", label: "Impersonation",
-      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-    },
+    { id: "impersonation", label: "Impersonation", icon: iconImpersonate },
   ] : [];
 
-  const allLinks = [...orgLinks, ...gridmasterLinks];
+  const allLinks = [...companyLinks, ...gridmasterLinks];
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
 
-      {/* Sidebar — flush to top, full height */}
+      {/* Sidebar */}
       <aside style={{
         width: 220,
         flexShrink: 0,
@@ -1341,63 +2641,104 @@ export default function SettingsPage({
         ))}
       </aside>
 
-      {/* Content — scrolls independently */}
+      {/* Content */}
       <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px" }}>
 
-        {activeSection === "org" && canManageOrg && (
+        {activeSection === "company" && canManageCompany && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <Section title="Organization Details">
-              <OrgSettings organization={organization} onSave={onOrgSave} />
+            <Section title="Company Details">
+              <CompanySettings company={company} onSave={onCompanySave} />
             </Section>
-            <Section title="Wings">
-              <WingsSettings
-                wings={wings}
-                orgId={organization.id}
-                onChange={onWingsChange}
+            <Section title={focusAreaLabel}>
+              <FocusAreasSettings
+                focusAreas={focusAreas}
+                companyId={company.id}
+                label={focusAreaLabel.replace(/s$/, "")}
+                onChange={onFocusAreasChange}
               />
             </Section>
           </div>
         )}
 
-        {activeSection === "shift-types" && canManageOrg && (
-          <Section title="Shift Types">
-            <ShiftTypesSettings
-              shiftTypes={shiftTypes}
-              wings={wings}
-              orgId={organization.id}
-              orgSkillLevels={organization.skillLevels ?? []}
-              onChange={onShiftTypesChange}
+        {activeSection === "shift-categories" && canManageCompany && (
+          <Section title="Shift Categories">
+            <ShiftCategoriesSettings
+              shiftCategories={shiftCategories}
+              focusAreas={focusAreas}
+              companyId={company.id}
+              onChange={onShiftCategoriesChange}
             />
           </Section>
         )}
 
-        {activeSection === "staff-config" && canManageOrg && (
+        {activeSection === "shift-codes" && canManageCompany && (
+          <Section title="Shift Codes & Off Days">
+            <ShiftCodesSettings
+              shiftCodes={shiftCodes}
+              focusAreas={focusAreas}
+              shiftCategories={shiftCategories}
+              companyId={company.id}
+              certifications={certifications}
+              certificationLabel={certificationLabel}
+              focusAreaLabel={focusAreaLabel}
+              onChange={onShiftCodesChange}
+            />
+          </Section>
+        )}
+
+        {activeSection === "indicators" && canManageCompany && (
+          <Section title="Indicators">
+            <IndicatorTypesSettings
+              indicatorTypes={indicatorTypes}
+              companyId={company.id}
+              onChange={onIndicatorTypesChange}
+            />
+          </Section>
+        )}
+
+        {activeSection === "staff-config" && canManageCompany && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <Section title="Skill Levels">
+            <Section title={certificationLabel}>
               <StringListSettings
-                label="Define the skill levels available when adding or editing staff. These also determine the order in which they appear in dropdowns."
-                items={organization.skillLevels ?? []}
+                label={`Define the ${certificationLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
+                items={certifications}
                 placeholder="e.g. RN"
                 onSave={async (updated) => {
-                  const updatedOrg = { ...organization, skillLevels: updated };
-                  await db.updateOrganization(updatedOrg);
-                  onOrgSave(updatedOrg);
+                  try {
+                    const saved = await db.saveCertifications(company.id, updated, certifications);
+                    onCertificationsChange(saved);
+                    toast.success("Certifications saved");
+                  } catch (err) {
+                    toast.error("Failed to save certifications");
+                    throw err;
+                  }
                 }}
               />
             </Section>
-            <Section title="Roles">
+            <Section title={roleLabel}>
               <StringListSettings
-                label="Define the roles available when adding or editing staff. These also determine the order in which they appear in dropdowns."
-                items={organization.roles ?? []}
+                label={`Define the ${roleLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
+                items={companyRoles}
                 placeholder="e.g. Charge Nurse"
                 onSave={async (updated) => {
-                  const updatedOrg = { ...organization, roles: updated };
-                  await db.updateOrganization(updatedOrg);
-                  onOrgSave(updatedOrg);
+                  try {
+                    const saved = await db.saveCompanyRoles(company.id, updated, companyRoles);
+                    onCompanyRolesChange(saved);
+                    toast.success("Roles saved");
+                  } catch (err) {
+                    toast.error("Failed to save roles");
+                    throw err;
+                  }
                 }}
               />
             </Section>
           </div>
+        )}
+
+        {activeSection === "users" && isSuperAdmin && (
+          <Section title="User Management">
+            <UserManagementSettings companyId={company.id} isSuperAdmin={isSuperAdmin} />
+          </Section>
         )}
 
         {activeSection === "impersonation" && isGridmaster && (
