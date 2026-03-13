@@ -699,15 +699,28 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const claims = decodeJwt(session.access_token);
-        const userSlug = typeof claims.company_slug === "string" ? claims.company_slug : null;
         const isGridmaster = claims.platform_role === "gridmaster";
 
-        if (!isGridmaster && userSlug !== companySlug) {
-          await supabase.auth.signOut();
-          setMessage("Your account is not associated with this workspace.");
-          setIsError(true);
-          setLoading(false);
-          return;
+        if (!isGridmaster) {
+          // Try JWT claim first, fall back to DB lookup if hook isn't configured
+          let userSlug = typeof claims.company_slug === "string" ? claims.company_slug : null;
+
+          if (!userSlug) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("company_id, companies(slug)")
+              .eq("id", session.user.id)
+              .maybeSingle();
+            userSlug = (profile?.companies as { slug: string } | null)?.slug ?? null;
+          }
+
+          if (userSlug !== companySlug) {
+            await supabase.auth.signOut();
+            setMessage("Your account is not associated with this workspace.");
+            setIsError(true);
+            setLoading(false);
+            return;
+          }
         }
       }
 
