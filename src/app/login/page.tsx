@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
+import { decodeJwt } from "jose";
 
 import { parseHost } from "@/lib/subdomain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -105,13 +106,38 @@ function Card({ children }: { children: React.ReactNode }) {
 function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(""), 4000);
+  }
+
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const baseDomain = parsed?.rootDomain ?? "localhost";
   const suffix = `.${baseDomain}`;
 
-  function handleContinue(e: React.FormEvent<HTMLFormElement>) {
+  // Hidden gridmaster entry — 5 taps on logo within 3s
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLogoTap = useCallback(() => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      window.location.href = "/admin/login";
+      return;
+    }
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 3000);
+  }, []);
+
+  async function handleContinue(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const trimmed = slug
       .trim()
@@ -121,6 +147,24 @@ function DomainSelector() {
       setError("Please enter your domain name.");
       return;
     }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(trimmed)}`);
+      const { valid } = await res.json();
+      if (!valid) {
+        showToast("No workspace found for that domain. Please check and try again.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      showToast("Unable to verify domain. Please try again.");
+      setLoading(false);
+      return;
+    }
+
     const { protocol, port } = window.location;
     const portStr = port ? `:${port}` : "";
     window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login`;
@@ -129,14 +173,17 @@ function DomainSelector() {
   return (
     <PageShell footerCenteredOnly>
       <Card>
-        {/* Logo */}
+        {/* Logo — hidden gridmaster entry on 5 rapid taps */}
         <div
+          onClick={handleLogoTap}
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: "10px",
             marginBottom: "32px",
+            userSelect: "none",
+            WebkitTapHighlightColor: "transparent",
           }}
         >
           <DubGridLogo size={52} />
@@ -175,6 +222,7 @@ function DomainSelector() {
               onChange={(e) => {
                 setSlug(e.target.value);
                 setError("");
+                if (toast) setToast("");
               }}
               placeholder="yourcompany"
               style={{
@@ -225,19 +273,20 @@ function DomainSelector() {
           >
             <button
               type="submit"
+              disabled={loading}
               style={{
-                background: "#1B3A2D",
+                background: loading ? "#6B7280" : "#1B3A2D",
                 color: "#fff",
                 border: "none",
                 borderRadius: "999px",
                 padding: "12px 28px",
                 fontSize: "15px",
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 whiteSpace: "nowrap",
               }}
             >
-              Continue
+              {loading ? "Checking…" : "Continue"}
             </button>
             <button
               type="button"
@@ -329,6 +378,72 @@ function DomainSelector() {
           </div>
         </div>
       )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 200,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "14px 20px",
+            background: "#1F2937",
+            color: "#F9FAFB",
+            borderRadius: "12px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            fontSize: "14px",
+            fontWeight: 500,
+            lineHeight: 1.4,
+            maxWidth: "420px",
+            animation: "toast-slide-in 0.3s ease-out",
+          }}
+        >
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "22px",
+              height: "22px",
+              borderRadius: "50%",
+              background: "#EF4444",
+              flexShrink: 0,
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            !
+          </span>
+          <span style={{ flex: 1 }}>{toast}</span>
+          <button
+            type="button"
+            onClick={() => setToast("")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#9CA3AF",
+              fontSize: "18px",
+              cursor: "pointer",
+              padding: "0 0 0 4px",
+              lineHeight: 1,
+            }}
+            aria-label="Dismiss"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+      <style>{`
+        @keyframes toast-slide-in {
+          from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
     </PageShell>
   );
 }
@@ -540,6 +655,32 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [validating, setValidating] = useState(true);
+
+  // Validate subdomain corresponds to a real company on mount
+  useEffect(() => {
+    let cancelled = false;
+    async function validate() {
+      try {
+        const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(companySlug)}`);
+        const { valid } = await res.json();
+        if (!cancelled && !valid) {
+          // Redirect to apex login with error hint
+          const parsed = parseHost(window.location.host);
+          const { protocol } = window.location;
+          const portStr = parsed.port || "";
+          window.location.replace(`${protocol}//${parsed.rootDomain}${portStr}/login`);
+          return;
+        }
+      } catch {
+        // If validation fails (network error), allow login attempt —
+        // the post-login JWT check will still catch mismatches
+      }
+      if (!cancelled) setValidating(false);
+    }
+    validate();
+    return () => { cancelled = true; };
+  }, [companySlug]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -553,6 +694,22 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
         password,
       });
       if (error) throw error;
+
+      // Verify the user belongs to this company's workspace
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const claims = decodeJwt(session.access_token);
+        const userSlug = typeof claims.company_slug === "string" ? claims.company_slug : null;
+        const isGridmaster = claims.platform_role === "gridmaster";
+
+        if (!isGridmaster && userSlug !== companySlug) {
+          await supabase.auth.signOut();
+          setMessage("Your account is not associated with this workspace.");
+          setIsError(true);
+          setLoading(false);
+          return;
+        }
+      }
 
       // Navigate immediately — don't wait for AuthProvider's async chain.
       window.location.replace("/schedule");
@@ -572,6 +729,19 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const baseDomain = parsed?.rootDomain ?? "localhost";
+
+  // Don't render the form until we've confirmed the subdomain is valid
+  if (validating) {
+    return (
+      <PageShell>
+        <Card>
+          <div style={{ textAlign: "center", padding: "40px 0", color: "#6B7280", fontSize: "15px" }}>
+            Verifying workspace…
+          </div>
+        </Card>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell>

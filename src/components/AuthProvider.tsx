@@ -74,15 +74,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     <AuthContext.Provider value={{ user, signOut, isLoading }}>
       <Toaster
         position="top-center"
-        richColors
+        closeButton
         duration={6000}
         toastOptions={{
           style: {
-            padding: "14px 20px",
-            fontSize: "14px",
-            fontWeight: 600,
+            padding: "16px 24px",
+            fontSize: "15px",
+            fontWeight: 700,
             borderRadius: "10px",
-            minWidth: "320px",
+            width: "min(calc(100vw - 48px), 800px)",
           },
         }}
       />

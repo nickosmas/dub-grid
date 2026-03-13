@@ -84,7 +84,7 @@ export default function SuperAdminLoginPage() {
               color: "#F8FAFC",
             }}
           >
-            Super Admin Portal
+            Gridmaster Portal
           </h1>
 
           {message && (
@@ -117,7 +117,7 @@ export default function SuperAdminLoginPage() {
                   color: "#94A3B8",
                 }}
               >
-                Admin Email
+                Email
               </label>
               <input
                 type="email"
