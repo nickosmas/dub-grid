@@ -22,6 +22,7 @@ import type { DraftSession } from "@/lib/db";
 import { validateConfig, supabase } from "@/lib/supabase";
 import { handleApiError } from "@/lib/error-handling";
 import { usePermissions } from "@/hooks";
+import { ProtectedRoute } from "@/components/RouteGuards";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
@@ -488,7 +489,7 @@ function SchedulerContent() {
         name: type,
         color: "#F8FAFC",
         border: "#CBD5E1",
-        text: "#64748B",
+        text:"#475569",
         sortOrder: 999,
       } satisfies ShiftCode;
     },
@@ -1446,6 +1447,7 @@ function SchedulerContent() {
           shiftForKey={shiftForKey}
           shiftCodeIdsForKey={shiftCodeIdsForKey}
           getShiftStyle={getShiftStyle}
+          getCustomShiftTimes={getCustomShiftTimes}
           onClose={() => setActivePrintConfig(null)}
           focusAreaLabel={org?.focusAreaLabel}
         />
@@ -1522,5 +1524,9 @@ function SchedulerContent() {
 }
 
 export default function SchedulerPage() {
-  return <SchedulerContent />;
+  return (
+    <ProtectedRoute>
+      <SchedulerContent />
+    </ProtectedRoute>
+  );
 }

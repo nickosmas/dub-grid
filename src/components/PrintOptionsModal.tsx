@@ -17,6 +17,14 @@ interface PrintOptionsModalProps {
   focusAreaLabel?: string;
 }
 
+const FONT_SIZES = [
+  { key: "small", label: "Small", value: 7 },
+  { key: "medium", label: "Medium", value: 9 },
+  { key: "large", label: "Large", value: 11 },
+] as const;
+
+type FontSizeKey = (typeof FONT_SIZES)[number]["key"];
+
 export default function PrintOptionsModal({
   focusAreas,
   currentSpanWeeks,
@@ -30,6 +38,7 @@ export default function PrintOptionsModal({
   const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(
     currentSpanWeeks,
   );
+  const [fontSizeKey, setFontSizeKey] = useState<FontSizeKey>("medium");
 
   const allSelected = selectedFocusAreas.length === focusAreas.length;
 
@@ -44,7 +53,8 @@ export default function PrintOptionsModal({
   }
 
   function handlePrint() {
-    onPrint({ fontSize: 8, selectedFocusAreas, spanWeeks });
+    const fontSize = FONT_SIZES.find((f) => f.key === fontSizeKey)!.value;
+    onPrint({ fontSize, selectedFocusAreas, spanWeeks });
   }
 
   return (
@@ -113,9 +123,36 @@ export default function PrintOptionsModal({
                 marginTop: 6,
               }}
             >
-              Tip: use Small font for month view
+              Tip: Small font works best for month view
             </div>
           )}
+        </div>
+
+        {/* Font Size */}
+        <div style={{ marginBottom: 20 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--color-text-subtle)",
+              letterSpacing: "0.07em",
+              marginBottom: 8,
+            }}
+          >
+            FONT SIZE
+          </div>
+          <div className="dg-segment" style={{ display: "inline-flex" }}>
+            {FONT_SIZES.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFontSizeKey(f.key)}
+                className={`dg-segment-btn${fontSizeKey === f.key ? " active" : ""}`}
+                style={{ minWidth: 72 }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Focus Areas */}

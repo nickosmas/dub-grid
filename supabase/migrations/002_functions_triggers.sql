@@ -956,7 +956,15 @@ LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 BEGIN
-  IF NOT public.is_gridmaster() THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+  IF NOT (
+    public.is_gridmaster()
+    OR (
+      public.caller_org_id() = p_org_id
+      AND public.caller_org_role() = 'super_admin'
+    )
+  ) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
 
   RETURN QUERY
   SELECT p.id, u.email::TEXT, p.first_name, p.last_name, p.platform_role,

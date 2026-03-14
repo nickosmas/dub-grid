@@ -100,27 +100,22 @@ export default function AuditLogView({
         </div>
       ) : (
         <>
-          <div style={sectionStyle}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Timestamp</th>
-                    <th style={thStyle}>Target User</th>
-                    <th style={thStyle}>Change</th>
-                    <th style={thStyle}>Changed By</th>
-                    {!orgId && <th style={thStyle}>Organization</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.length === 0 ? (
+          {/* Table & Empty State */}
+          {entries.length > 0 ? (
+            <div style={sectionStyle}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
                     <tr>
-                      <td colSpan={orgId ? 4 : 5} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
-                        No audit log entries
-                      </td>
+                      <th style={thStyle}>Timestamp</th>
+                      <th style={thStyle}>Target User</th>
+                      <th style={thStyle}>Change</th>
+                      <th style={thStyle}>Changed By</th>
+                      {!orgId && <th style={thStyle}>Organization</th>}
                     </tr>
-                  ) : (
-                    entries.map((e) => {
+                  </thead>
+                  <tbody>
+                    {entries.map((e) => {
                       const date = new Date(e.createdAt);
                       return (
                         <tr key={e.id}>
@@ -149,12 +144,34 @@ export default function AuditLogView({
                           )}
                         </tr>
                       );
-                    })
-                  )}
-                </tbody>
-              </table>
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div
+              style={{
+                padding: "48px 20px",
+                textAlign: "center",
+                background: "#fff",
+                borderRadius: 12,
+                border: "1px dashed var(--color-border)",
+                color: "var(--color-text-muted)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ color: "var(--color-text-faint)", background: "#F8FAFC", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                No audit log entries
+              </div>
+            </div>
+          )}
 
           {/* Pagination */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
