@@ -48,6 +48,7 @@ interface JWTClaims {
 interface ProfileClaimsRow {
   company_id: string | null;
   platform_role: string | null;
+  company_role: string | null;
   companies?: { slug: string | null } | null;
 }
 
@@ -133,29 +134,20 @@ export async function middleware(req: NextRequest) {
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/company
-  // from the caller's profile so route guards still work.
+  // from the caller's profile so route guards still work. This reads
+  // company_role directly from profiles (same source as the JWT hook)
+  // to avoid depending on the company_memberships table.
   if (!claims.platform_role || !claims.company_role || !claims.company_id || !claims.company_slug) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("company_id, platform_role, companies(slug)")
+      .select("company_id, platform_role, company_role, companies(slug)")
       .eq("id", session.user.id)
       .maybeSingle<ProfileClaimsRow>();
 
     if (profile) {
-      let membershipRole: string | null = null;
-      if (profile.company_id && profile.platform_role !== "gridmaster") {
-        const { data: mem } = await supabase
-          .from("company_memberships")
-          .select("company_role")
-          .eq("user_id", session.user.id)
-          .eq("company_id", profile.company_id)
-          .maybeSingle<{ company_role: string }>();
-        membershipRole = mem?.company_role ?? null;
-      }
-
       claims = {
         platform_role: claims.platform_role ?? profile.platform_role ?? "none",
-        company_role: claims.company_role ?? membershipRole ?? "user",
+        company_role: claims.company_role ?? profile.company_role ?? "user",
         company_id: claims.company_id ?? profile.company_id ?? undefined,
         company_slug: claims.company_slug ?? profile.companies?.slug ?? undefined,
       };
@@ -186,11 +178,6 @@ export async function middleware(req: NextRequest) {
   // Redirect users below admin (level < 3) away from /settings
   if (pathname.startsWith("/settings") && level < 3) {
     return NextResponse.redirect(new URL("/schedule", req.url));
-  }
-
-  // Redirect users below scheduler (level < 2) away from /schedule
-  if (pathname.startsWith("/schedule") && level < 2) {
-    return NextResponse.redirect(new URL("/", req.url));
   }
 
   // Gridmaster-only admin route

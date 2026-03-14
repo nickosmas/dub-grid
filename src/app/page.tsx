@@ -117,8 +117,22 @@ export default function RootPage() {
 
   if (!ready) {
     return (
-      <div className="loading-screen">
-        <div className="spinner" />
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#F8FAFC",
+      }}>
+        <div style={{
+          width: 32,
+          height: 32,
+          border: "3px solid #E2E8F0",
+          borderTopColor: "#1B3A2D",
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
