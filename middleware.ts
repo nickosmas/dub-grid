@@ -11,10 +11,10 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
  * - Uses @supabase/ssr createServerClient to read the session from cookies
  *   (handles the sb-<project-ref>-auth-token format and multi-chunk cookies)
  * - Verifies the access token JWT with SUPABASE_JWT_SECRET
- * - Parses platform_role and company_role top-level claims from the JWT
+ * - Parses platform_role and org_role top-level claims from the JWT
  * - Calculates effective role based on role hierarchy
  * - Blocks unauthorized access to protected routes
- * - Injects verified role and company_id into request headers
+ * - Injects verified role and org_id into request headers
  *
  * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
  */
@@ -40,26 +40,19 @@ const ROLE_HIERARCHY: Record<string, number> = {
  */
 interface JWTClaims {
   platform_role?: string;
-  company_role?: string;
-  company_id?: string;
-  company_slug?: string;
-}
-
-interface ProfileClaimsRow {
-  company_id: string | null;
-  platform_role: string | null;
-  company_role: string | null;
-  companies?: { slug: string | null } | null;
+  org_role?: string;
+  org_id?: string;
+  org_slug?: string;
 }
 
 /**
- * Calculates the effective role based on platform_role and company_role.
- * Gridmaster platform_role takes precedence over company_role.
+ * Calculates the effective role based on platform_role and org_role.
+ * Gridmaster platform_role takes precedence over org_role.
  */
 export function calculateEffectiveRole(claims: JWTClaims): string {
   return claims.platform_role === "gridmaster"
     ? "gridmaster"
-    : claims.company_role ?? "user";
+    : claims.org_role ?? "user";
 }
 
 /**
@@ -75,13 +68,16 @@ export async function middleware(req: NextRequest) {
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
-  // Public routes — accessible without authentication
+  // Public routes — accessible without authentication.
+  // Note: /api routes are also excluded at the matcher level (line 191),
+  // so the /api check here is a safety net for if the matcher changes.
   if (
     pathname === "/" ||
     pathname === "/login" ||
     pathname === "/admin/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/accept-invite" ||
     pathname.startsWith("/api")
   ) {
     return NextResponse.next();
@@ -133,23 +129,29 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Fallback path: if custom JWT claims are missing, resolve role/company
-  // from the caller's profile so route guards still work. This reads
-  // company_role directly from profiles (same source as the JWT hook)
-  // to avoid depending on the company_memberships table.
-  if (!claims.platform_role || !claims.company_role || !claims.company_id || !claims.company_slug) {
+  // Fallback path: if custom JWT claims are missing, resolve role/org
+  // from the caller's profile so route guards still work.
+  // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
+  const isGridmaster = claims.platform_role === "gridmaster";
+  if (
+    !claims.platform_role ||
+    !claims.org_role ||
+    (!isGridmaster && (!claims.org_id || !claims.org_slug))
+  ) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("company_id, platform_role, company_role, companies(slug)")
+      .select("org_id, platform_role, organization_memberships(org_role), organizations(slug)")
       .eq("id", session.user.id)
-      .maybeSingle<ProfileClaimsRow>();
+      .maybeSingle<any>();
 
     if (profile) {
+      const memberships = profile.organization_memberships as any;
+      const orgs = profile.organizations as any;
       claims = {
         platform_role: claims.platform_role ?? profile.platform_role ?? "none",
-        company_role: claims.company_role ?? profile.company_role ?? "user",
-        company_id: claims.company_id ?? profile.company_id ?? undefined,
-        company_slug: claims.company_slug ?? profile.companies?.slug ?? undefined,
+        org_role: claims.org_role ?? (Array.isArray(memberships) ? memberships[0]?.org_role : memberships?.org_role) ?? "user",
+        org_id: claims.org_id ?? profile.org_id ?? undefined,
+        org_slug: claims.org_slug ?? (Array.isArray(orgs) ? orgs[0]?.slug : orgs?.slug) ?? undefined,
       };
     }
   }
@@ -163,9 +165,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Keep company-scoped users on their company subdomain.
-  if (effectiveRole !== "gridmaster" && claims.company_slug) {
-    const expectedHost = buildSubdomainHost(claims.company_slug, parsedHost);
+  // Keep org-scoped users on their org subdomain.
+  if (effectiveRole !== "gridmaster" && claims.org_slug) {
+    const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
     if (host !== expectedHost) {
       const url = new URL(req.url);
       url.host = expectedHost;
@@ -187,9 +189,9 @@ export async function middleware(req: NextRequest) {
 
   // Inject headers - Requirement 11.5
   res.headers.set("x-dubgrid-role", effectiveRole);
-  res.headers.set("x-dubgrid-company-id", claims.company_id ?? "");
-  if (claims.company_slug) {
-    res.headers.set("x-dubgrid-company-slug", claims.company_slug);
+  res.headers.set("x-dubgrid-org-id", claims.org_id ?? "");
+  if (claims.org_slug) {
+    res.headers.set("x-dubgrid-org-slug", claims.org_slug);
   }
   return res;
 }

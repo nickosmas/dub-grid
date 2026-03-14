@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Company, AuditLogEntry } from "@/types";
+import type { Organization, AuditLogEntry } from "@/types";
 import type { TenantStats } from "@/lib/db";
 import { fetchAuditLog } from "@/lib/db";
 
@@ -58,9 +58,9 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
           {entry.toRole.replace("_", " ")}
         </span>
       </div>
-      {entry.companyName && (
+      {entry.orgName && (
         <span style={{ fontSize: 11, color: "var(--color-text-subtle)", flexShrink: 0 }}>
-          {entry.companyName}
+          {entry.orgName}
         </span>
       )}
       <span style={{ fontSize: 11, color: "var(--color-text-subtle)", flexShrink: 0, whiteSpace: "nowrap" }}>
@@ -75,19 +75,19 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard({
-  companies,
+  organizations,
   stats,
   totalUsers,
   totalEmployees,
-  onSelectCompany,
-  onCreateCompany,
+  onSelectOrg,
+  onCreateOrg,
 }: {
-  companies: Company[];
+  organizations: Organization[];
   stats: Map<string, TenantStats>;
   totalUsers: number;
   totalEmployees: number;
-  onSelectCompany: (id: string) => void;
-  onCreateCompany: () => void;
+  onSelectOrg: (id: string) => void;
+  onCreateOrg: () => void;
 }) {
   const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
 
@@ -99,7 +99,7 @@ export default function AdminDashboard({
     return () => { cancelled = true; };
   }, []);
 
-  const activeCompanies = companies.filter((c) => !c.archivedAt);
+  const activeOrganizations = organizations.filter((c) => !c.archivedAt);
 
   return (
     <>
@@ -107,14 +107,14 @@ export default function AdminDashboard({
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
           Dashboard
         </h2>
-        <button className="dg-btn dg-btn-primary" onClick={onCreateCompany}>
-          + New Company
+        <button className="dg-btn dg-btn-primary" onClick={onCreateOrg}>
+          + New Organization
         </button>
       </div>
 
       {/* Stats row */}
       <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
-        <StatCard label="Companies" value={activeCompanies.length} />
+        <StatCard label="Organizations" value={activeOrganizations.length} />
         <StatCard label="Users" value={totalUsers} />
         <StatCard label="Employees" value={totalEmployees} />
       </div>
@@ -141,9 +141,9 @@ export default function AdminDashboard({
         </div>
       )}
 
-      {/* Company list */}
+      {/* Organization list */}
       <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "var(--color-text-secondary)" }}>
-        All Companies
+        All Organizations
       </h3>
       <div
         style={{
@@ -178,12 +178,12 @@ export default function AdminDashboard({
             </tr>
           </thead>
           <tbody>
-            {activeCompanies.map((c) => {
+            {activeOrganizations.map((c) => {
               const s = stats.get(c.id);
               return (
                 <tr
                   key={c.id}
-                  onClick={() => onSelectCompany(c.id)}
+                  onClick={() => onSelectOrg(c.id)}
                   style={{ cursor: "pointer", transition: "background 80ms ease" }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-surface-overlay)"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}

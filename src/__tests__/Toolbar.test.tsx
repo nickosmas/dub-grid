@@ -7,7 +7,7 @@ import { FocusArea } from "@/types";
 const defaultFocusAreas: FocusArea[] = [
   {
     id: 1,
-    companyId: "company-1",
+    orgId: "org-1",
     name: "North",
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
@@ -15,7 +15,7 @@ const defaultFocusAreas: FocusArea[] = [
   },
   {
     id: 2,
-    companyId: "company-1",
+    orgId: "org-1",
     name: "South",
     colorBg: "#F0FDF4",
     colorText: "#166534",

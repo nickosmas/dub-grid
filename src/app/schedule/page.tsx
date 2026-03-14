@@ -31,7 +31,7 @@ import {
   ShiftCode,
   ShiftCategory,
   IndicatorType,
-  Company,
+  Organization,
   FocusArea,
   NoteType,
   RegularShift,
@@ -67,14 +67,14 @@ function getDraftDateRangeFromState(
 }
 
 function SchedulerContent() {
-  const { canEditShifts, canEditNotes, canManageCompany, isSuperAdmin, isGridmaster, isLoading: permsLoading } = usePermissions();
+  const { canEditShifts, canEditNotes, canManageOrg, isSuperAdmin, isGridmaster, isLoading: permsLoading } = usePermissions();
   const today = useRef(new Date()).current;
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(new Date()),
   );
   const [activeFocusArea, setActiveFocusArea] = useState<number | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
+  const [org, setOrg] = useState<Organization | null>(null);
   const [focusAreas, setFocusAreas] = useState<FocusArea[]>([]);
   const [shiftCodes, setShiftCodes] = useState<ShiftCode[]>([]);
   // Full set including archived codes — used to build the codeMap for historical label resolution
@@ -82,7 +82,7 @@ function SchedulerContent() {
   const [shiftCategories, setShiftCategories] = useState<ShiftCategory[]>([]);
   const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[]>([]);
   const [certifications, setCertifications] = useState<NamedItem[]>([]);
-  const [companyRoles, setCompanyRoles] = useState<NamedItem[]>([]);
+  const [orgRoles, setOrgRoles] = useState<NamedItem[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [benchedEmployees, setBenchedEmployees] = useState<Employee[]>([]);
   const [terminatedEmployees, setTerminatedEmployees] = useState<Employee[]>([]);
@@ -136,9 +136,9 @@ function SchedulerContent() {
   const availableViewModes: ViewMode[] = useMemo(() => {
     const modes: ViewMode[] = ["schedule"];
     if (canEditShifts) modes.push("staff");
-    if (canManageCompany || isSuperAdmin || isGridmaster) modes.push("settings");
+    if (canManageOrg || isSuperAdmin || isGridmaster) modes.push("settings");
     return modes;
-  }, [canEditShifts, canManageCompany, isSuperAdmin, isGridmaster]);
+  }, [canEditShifts, canManageOrg, isSuperAdmin, isGridmaster]);
 
   const employeesRef = useRef<Employee[]>([]);
   employeesRef.current = employees;
@@ -153,9 +153,9 @@ function SchedulerContent() {
       try {
         validateConfig();
 
-        const org = await db.fetchUserCompany();
+        const org = await db.fetchUserOrganization();
         if (!org) {
-          setLoadError("No company found. Check your database setup.");
+          setLoadError("No organization found. Check your database setup.");
           return;
         }
 
@@ -168,7 +168,7 @@ function SchedulerContent() {
           db.fetchShiftCategories(org.id),
           db.fetchIndicatorTypes(org.id),
           db.fetchCertifications(org.id),
-          db.fetchCompanyRoles(org.id),
+          db.fetchOrganizationRoles(org.id),
         ]);
         const activeCodes = allCodes.filter(sc => !sc.archivedAt);
         const codeMap = new Map(allCodes.map(sc => [sc.id, sc.label]));
@@ -188,14 +188,14 @@ function SchedulerContent() {
           if (!noteMap[key]) noteMap[key] = [];
           noteMap[key].push({ type: note.noteType, status: note.status });
         }
-        setCompany(org);
+        setOrg(org);
         setFocusAreas(w);
         allShiftCodesRef.current = allCodes;
         setShiftCodes(activeCodes);
         setShiftCategories(cats);
         setIndicatorTypes(indicators);
         setCertifications(certs);
-        setCompanyRoles(roles);
+        setOrgRoles(roles);
         setEmployees(emps);
         setBenchedEmployees(benched);
         setTerminatedEmployees(terminated);
@@ -229,16 +229,16 @@ function SchedulerContent() {
   // Subscribe to real-time schedule broadcasts so other tabs/users see
   // published changes immediately without a manual refresh.
   useEffect(() => {
-    if (!company) return;
+    if (!org) return;
 
     const channel = supabase
-      .channel(`schedule:${company.id}`)
+      .channel(`schedule:${org.id}`)
       .on('broadcast', { event: 'schedule_published' }, async () => {
         try {
           const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
           const [shiftData, noteRows] = await Promise.all([
-            db.fetchShifts(company.id, canEditShifts, cMap),
-            db.fetchScheduleNotes(company.id),
+            db.fetchShifts(org.id, canEditShifts, cMap),
+            db.fetchScheduleNotes(org.id),
           ]);
           const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
           for (const note of noteRows) {
@@ -262,25 +262,25 @@ function SchedulerContent() {
       realtimeChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [company, canEditShifts]);
+  }, [org, canEditShifts]);
 
   // Draft recovery: detect saved or orphaned drafts on initial load.
   const draftCheckStarted = useRef(false);
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
-    if (permsLoading || !company || loading || draftCheckStarted.current) return;
+    if (permsLoading || !org || loading || draftCheckStarted.current) return;
     if (!canEditShifts) { setDraftCheckComplete(true); return; }
     draftCheckStarted.current = true;
 
     (async () => {
       try {
-        const session = await db.getDraftSession(company.id);
+        const session = await db.getDraftSession(org.id);
         if (session) {
           // Re-fetch shifts with scheduler visibility so draft data is loaded.
           // The initial load may have run before permissions resolved, fetching
           // published-only data.
           const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-          const draftShifts = await db.fetchShifts(company.id, true, cMap);
+          const draftShifts = await db.fetchShifts(org.id, true, cMap);
           setShifts(draftShifts);
           setDraftSession(session);
           setShowDraftRecoveryBanner(true);
@@ -296,11 +296,11 @@ function SchedulerContent() {
         if (hasDrafts) {
           const range = getDraftDateRangeFromState(shifts, notes);
           if (range) {
-            await db.discardScheduleDrafts(company.id, range.startDate, range.endDate);
+            await db.discardScheduleDrafts(org.id, range.startDate, range.endDate);
             const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
             const [freshShifts, freshNotes] = await Promise.all([
-              db.fetchShifts(company.id, true, cMap),
-              db.fetchScheduleNotes(company.id),
+              db.fetchShifts(org.id, true, cMap),
+              db.fetchScheduleNotes(org.id),
             ]);
             const noteMap: Record<string, { type: NoteType; status: "published" | "draft" | "draft_deleted" }[]> = {};
             for (const note of freshNotes) {
@@ -321,7 +321,7 @@ function SchedulerContent() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permsLoading, company, loading, canEditShifts]);
+  }, [permsLoading, org, loading, canEditShifts]);
 
   const dates = useMemo(
     () =>
@@ -401,7 +401,7 @@ function SchedulerContent() {
 
   const handleCustomTimeChange = useCallback(
     (start: string | null, end: string | null) => {
-      if (!editPanel || !company?.id) return;
+      if (!editPanel || !org?.id) return;
       const dateKey = formatDateKey(editPanel.date);
       const key = `${editPanel.empId}_${dateKey}`;
       setShifts((prev) => {
@@ -409,12 +409,12 @@ function SchedulerContent() {
         if (!existing) return prev;
         return { ...prev, [key]: { ...existing, customStartTime: start, customEndTime: end } };
       });
-      db.upsertShiftTimes(editPanel.empId, dateKey, start, end, company.id).catch((err) => {
+      db.upsertShiftTimes(editPanel.empId, dateKey, start, end, org.id).catch((err) => {
         toast.error("Failed to save shift times");
         console.error(err);
       });
     },
-    [editPanel, company?.id],
+    [editPanel, org?.id],
   );
 
   const noteTypesForKey = useCallback(
@@ -432,9 +432,9 @@ function SchedulerContent() {
 
   const setShift = useCallback(
     (empId: string, date: Date, label: string, shiftCodeIds: number[]) => {
-      const companyId = company?.id;
-      if (!companyId) {
-        console.error("Cannot modify shifts before company is loaded");
+      const orgId = org?.id;
+      if (!orgId) {
+        console.error("Cannot modify shifts before org is loaded");
         return;
       }
 
@@ -452,13 +452,13 @@ function SchedulerContent() {
         });
       } else {
         setShifts((prev) => ({ ...prev, [key]: { label, shiftCodeIds, isDraft: true } }));
-        db.upsertShift(empId, dateKey, shiftCodeIds, companyId).catch((err) => {
+        db.upsertShift(empId, dateKey, shiftCodeIds, orgId).catch((err) => {
           toast.error("Failed to save shift");
           console.error(err);
         });
       }
     },
-    [company?.id],
+    [org?.id],
   );
 
   const getShiftStyle = useCallback(
@@ -483,7 +483,7 @@ function SchedulerContent() {
       // 4. Fallback
       return {
         id: 0,
-        companyId: "",
+        orgId: "",
         label: type,
         name: type,
         color: "#F8FAFC",
@@ -532,7 +532,7 @@ function SchedulerContent() {
         // Bulk-update all shifts in the series (series are single-shift)
         try {
           await db.updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
-          const shiftData = await db.fetchShifts(company!.id, canEditShifts, shiftCodeMap);
+          const shiftData = await db.fetchShifts(org!.id, canEditShifts, shiftCodeMap);
           setShifts(shiftData);
           toast.success("Series updated");
         } catch (err) {
@@ -543,7 +543,7 @@ function SchedulerContent() {
         setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
       }
     },
-    [editPanel, shifts, company, canEditShifts, setShift, shiftCodeMap],
+    [editPanel, shifts, org, canEditShifts, setShift, shiftCodeMap],
   );
 
   const handleMakeRepeating = useCallback(() => {
@@ -566,13 +566,13 @@ function SchedulerContent() {
       endDate: string | null,
       maxOccurrences: number | null,
     ) => {
-      if (!repeatModalState || !company) return;
+      if (!repeatModalState || !org) return;
       const sc = shiftCodes.find(s => s.label === repeatModalState.label);
       if (!sc) return;
       try {
         await db.createShiftSeries(
           repeatModalState.empId,
-          company.id,
+          org.id,
           sc.id,
           repeatModalState.label,
           frequency,
@@ -581,7 +581,7 @@ function SchedulerContent() {
           endDate,
           maxOccurrences,
         );
-        const shiftData = await db.fetchShifts(company.id, canEditShifts, shiftCodeMap);
+        const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap);
         setShifts(shiftData);
         toast.success("Repeating shift created");
       } catch (err) {
@@ -592,11 +592,11 @@ function SchedulerContent() {
         setEditPanel(null);
       }
     },
-    [repeatModalState, company, canEditShifts, shiftCodes, shiftCodeMap],
+    [repeatModalState, org, canEditShifts, shiftCodes, shiftCodeMap],
   );
 
   const handleApplyRegular = useCallback(async () => {
-    if (!company) return;
+    if (!org) return;
     setIsApplyingRegular(true);
     try {
       let startDate: Date;
@@ -610,11 +610,11 @@ function SchedulerContent() {
       }
 
       // Always fetch fresh regular shifts so we pick up any recently saved templates
-      const freshRegularShifts = await db.fetchRegularShifts(company.id, undefined, shiftCodeMap);
+      const freshRegularShifts = await db.fetchRegularShifts(org.id, undefined, shiftCodeMap);
       setRegularShifts(freshRegularShifts);
 
       const generated = await db.applyRegularSchedules(
-        company.id,
+        org.id,
         startDate,
         endDate,
         freshRegularShifts,
@@ -639,11 +639,11 @@ function SchedulerContent() {
     } finally {
       setIsApplyingRegular(false);
     }
-  }, [company, spanWeeks, monthStart, weekStart, regularShifts, shifts]);
+  }, [org, spanWeeks, monthStart, weekStart, regularShifts, shifts]);
 
   const handleNoteToggle = useCallback(
     async (noteType: NoteType, active: boolean, focusAreaId: number) => {
-      if (!company || !editPanel) return;
+      if (!org || !editPanel) return;
       const dateKey = formatDateKey(editPanel.date);
       const key = `${editPanel.empId}_${dateKey}_${focusAreaId}`;
 
@@ -674,7 +674,7 @@ function SchedulerContent() {
       try {
         if (active) {
           await db.upsertScheduleNote(
-            company.id,
+            org.id,
             editPanel.empId,
             dateKey,
             noteType,
@@ -694,7 +694,7 @@ function SchedulerContent() {
         console.error(error);
       }
     },
-    [editPanel, company],
+    [editPanel, org],
   );
 
   useEffect(() => {
@@ -705,7 +705,7 @@ function SchedulerContent() {
 
   const handleAddEmployee = useCallback(
     async (dataList: Omit<Employee, "id" | "seniority">[]) => {
-      if (!company) return;
+      if (!org) return;
       try {
         const added: Employee[] = [];
         for (const data of dataList) {
@@ -716,7 +716,7 @@ function SchedulerContent() {
           );
           const newEmp = await db.insertEmployee(
             { ...data, seniority: maxSen + 1 },
-            company.id,
+            org.id,
           );
           added.push(newEmp);
         }
@@ -728,22 +728,22 @@ function SchedulerContent() {
         console.error(err);
       }
     },
-    [company],
+    [org],
   );
 
   const handleSaveEmployee = useCallback(
     async (emp: Employee) => {
-      if (!company) return;
+      if (!org) return;
       setEmployees((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
       try {
-        await db.updateEmployee(emp, company.id);
+        await db.updateEmployee(emp, org.id);
         toast.success("Employee saved");
       } catch (err) {
         toast.error("Failed to save employee");
         console.error(err);
       }
     },
-    [company],
+    [org],
   );
 
   const handleDeleteEmployee = useCallback(async (empId: string) => {
@@ -814,9 +814,9 @@ function SchedulerContent() {
     setCertifications(items);
     // Certification renames/deletions may affect shift_codes.required_certification_ids
     // — re-fetch shift codes (including archived for codeMap) to reflect updates.
-    if (company) {
+    if (org) {
       try {
-        const allCodes = await db.fetchShiftCodes(company.id, true);
+        const allCodes = await db.fetchShiftCodes(org.id, true);
         const activeCodes = allCodes.filter(sc => !sc.archivedAt);
         allShiftCodesRef.current = allCodes;
         setShiftCodes(activeCodes);
@@ -824,10 +824,10 @@ function SchedulerContent() {
         console.error("re-fetch shift codes after cert change:", err);
       }
     }
-  }, [company]);
+  }, [org]);
 
-  const handleCompanyRolesChange = useCallback((items: NamedItem[]) => {
-    setCompanyRoles(items);
+  const handleOrgRolesChange = useCallback((items: NamedItem[]) => {
+    setOrgRoles(items);
   }, []);
 
   const handlePrev = useCallback(() => {
@@ -856,7 +856,7 @@ function SchedulerContent() {
   );
 
   const handlePublish = useCallback(async () => {
-    if (!company) return;
+    if (!org) return;
     setIsPublishing(true);
     try {
       let startDate: Date;
@@ -870,11 +870,11 @@ function SchedulerContent() {
         endDate = addDays(weekStart, (spanWeeks * 7) - 1);
       }
 
-      await db.publishSchedule(company.id, startDate, endDate);
+      await db.publishSchedule(org.id, startDate, endDate);
 
       const [shiftData, noteRows] = await Promise.all([
-        db.fetchShifts(company.id, canEditShifts, shiftCodeMap),
-        db.fetchScheduleNotes(company.id),
+        db.fetchShifts(org.id, canEditShifts, shiftCodeMap),
+        db.fetchScheduleNotes(org.id),
       ]);
       const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
       for (const note of noteRows) {
@@ -886,7 +886,7 @@ function SchedulerContent() {
       }
       setShifts(shiftData);
       setNotes(noteMap);
-      await db.deleteDraftSession(company.id).catch(console.error);
+      await db.deleteDraftSession(org.id).catch(console.error);
       setDraftSession(null);
       setShowDraftRecoveryBanner(false);
       setIsEditMode(false);
@@ -904,10 +904,10 @@ function SchedulerContent() {
     } finally {
       setIsPublishing(false);
     }
-  }, [company, weekStart, monthStart, spanWeeks, canEditShifts, setIsPublishing]);
+  }, [org, weekStart, monthStart, spanWeeks, canEditShifts, setIsPublishing]);
 
   const handleCancelChanges = useCallback(async () => {
-    if (!company) return;
+    if (!org) return;
     setIsCanceling(true);
     try {
       let startDate: Date;
@@ -921,11 +921,11 @@ function SchedulerContent() {
         endDate = addDays(weekStart, (spanWeeks * 7) - 1);
       }
 
-      await db.discardScheduleDrafts(company.id, startDate, endDate);
+      await db.discardScheduleDrafts(org.id, startDate, endDate);
 
       const [shiftData, noteRows] = await Promise.all([
-        db.fetchShifts(company.id, canEditShifts, shiftCodeMap),
-        db.fetchScheduleNotes(company.id),
+        db.fetchShifts(org.id, canEditShifts, shiftCodeMap),
+        db.fetchScheduleNotes(org.id),
       ]);
       const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
       for (const note of noteRows) {
@@ -937,7 +937,7 @@ function SchedulerContent() {
       }
       setShifts(shiftData);
       setNotes(noteMap);
-      await db.deleteDraftSession(company.id).catch(console.error);
+      await db.deleteDraftSession(org.id).catch(console.error);
       setDraftSession(null);
       setShowDraftRecoveryBanner(false);
       setIsEditMode(false);
@@ -948,10 +948,10 @@ function SchedulerContent() {
     } finally {
       setIsCanceling(false);
     }
-  }, [company, weekStart, monthStart, spanWeeks, canEditShifts, shiftCodeMap]);
+  }, [org, weekStart, monthStart, spanWeeks, canEditShifts, shiftCodeMap]);
 
   const handleSaveDraft = useCallback(async () => {
-    if (!company) return;
+    if (!org) return;
     setIsSavingDraft(true);
     try {
       const range = getDraftDateRangeFromState(shifts, notes);
@@ -963,10 +963,10 @@ function SchedulerContent() {
       const userId = session?.user?.id;
       if (!userId) return;
 
-      await db.saveDraftSession(company.id, userId, range.startDate, range.endDate);
+      await db.saveDraftSession(org.id, userId, range.startDate, range.endDate);
       const startDate = formatDateKey(range.startDate);
       const endDate = formatDateKey(range.endDate);
-      setDraftSession({ id: "", companyId: company.id, savedBy: userId, startDate, endDate, savedAt: new Date().toISOString() });
+      setDraftSession({ id: "", orgId: org.id, savedBy: userId, startDate, endDate, savedAt: new Date().toISOString() });
       setShowDraftRecoveryBanner(true);
       setIsEditMode(false);
       toast.success("Draft saved");
@@ -976,7 +976,7 @@ function SchedulerContent() {
     } finally {
       setIsSavingDraft(false);
     }
-  }, [company, shifts, notes]);
+  }, [org, shifts, notes]);
 
   const handleResumeDraft = useCallback(() => {
     setIsEditMode(true);
@@ -984,18 +984,18 @@ function SchedulerContent() {
   }, []);
 
   const handleRecoveryPublish = useCallback(async () => {
-    if (!company || !draftSession) return;
+    if (!org || !draftSession) return;
     setIsPublishing(true);
     try {
       const start = new Date(draftSession.startDate + "T00:00:00");
       const end = new Date(draftSession.endDate + "T00:00:00");
-      await db.publishSchedule(company.id, start, end);
-      await db.deleteDraftSession(company.id);
+      await db.publishSchedule(org.id, start, end);
+      await db.deleteDraftSession(org.id);
 
       const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
       const [freshShifts, freshNotes] = await Promise.all([
-        db.fetchShifts(company.id, canEditShifts, cMap),
-        db.fetchScheduleNotes(company.id),
+        db.fetchShifts(org.id, canEditShifts, cMap),
+        db.fetchScheduleNotes(org.id),
       ]);
       const noteMap: Record<string, { type: NoteType; status: "published" | "draft" | "draft_deleted" }[]> = {};
       for (const note of freshNotes) {
@@ -1016,21 +1016,21 @@ function SchedulerContent() {
     } finally {
       setIsPublishing(false);
     }
-  }, [company, draftSession, canEditShifts]);
+  }, [org, draftSession, canEditShifts]);
 
   const handleRecoveryDiscard = useCallback(async () => {
-    if (!company || !draftSession) return;
+    if (!org || !draftSession) return;
     setIsCanceling(true);
     try {
       const start = new Date(draftSession.startDate + "T00:00:00");
       const end = new Date(draftSession.endDate + "T00:00:00");
-      await db.discardScheduleDrafts(company.id, start, end);
-      await db.deleteDraftSession(company.id);
+      await db.discardScheduleDrafts(org.id, start, end);
+      await db.deleteDraftSession(org.id);
 
       const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
       const [freshShifts, freshNotes] = await Promise.all([
-        db.fetchShifts(company.id, canEditShifts, cMap),
-        db.fetchScheduleNotes(company.id),
+        db.fetchShifts(org.id, canEditShifts, cMap),
+        db.fetchScheduleNotes(org.id),
       ]);
       const noteMap: Record<string, { type: NoteType; status: "published" | "draft" | "draft_deleted" }[]> = {};
       for (const note of freshNotes) {
@@ -1051,7 +1051,7 @@ function SchedulerContent() {
     } finally {
       setIsCanceling(false);
     }
-  }, [company, draftSession, canEditShifts]);
+  }, [org, draftSession, canEditShifts]);
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
@@ -1201,7 +1201,7 @@ function SchedulerContent() {
         <Header
           viewMode={viewMode}
           onViewChange={setViewMode}
-          orgName={company?.name}
+          orgName={org?.name}
           availableViewModes={availableViewModes}
         />
         {isEditMode && canEditShifts && viewMode === "schedule" && (
@@ -1302,7 +1302,7 @@ function SchedulerContent() {
               shiftCategories={shiftCategories}
               indicatorTypes={indicatorTypes}
               certifications={certifications}
-              companyRoles={companyRoles}
+              orgRoles={orgRoles}
               isCellInteractive={isEditMode && canEditNotes}
               noteTypesForKey={noteTypesForKey}
               activeFocusArea={activeFocusArea}
@@ -1336,39 +1336,39 @@ function SchedulerContent() {
           terminatedEmployees={terminatedEmployees}
           focusAreas={focusAreas}
           certifications={certifications}
-          roles={companyRoles}
+          roles={orgRoles}
           onSave={handleSaveEmployee}
           onDelete={handleDeleteEmployee}
           onBench={handleBenchEmployee}
           onActivate={handleActivateEmployee}
           onAdd={() => setShowAddModal(true)}
-          companyId={company?.id ?? ""}
+          orgId={org?.id ?? ""}
           shiftCodes={shiftCodes}
           shiftCodeMap={shiftCodeMap}
           canEditShifts={canEditShifts}
-          focusAreaLabel={company?.focusAreaLabel}
-          certificationLabel={company?.certificationLabel}
-          roleLabel={company?.roleLabel}
+          focusAreaLabel={org?.focusAreaLabel}
+          certificationLabel={org?.certificationLabel}
+          roleLabel={org?.roleLabel}
         />
       )}
 
-      {viewMode === "settings" && company && (
+      {viewMode === "settings" && org && (
         <SettingsPage
-          company={company}
+          organization={org}
           focusAreas={focusAreas}
           shiftCodes={shiftCodes}
           shiftCategories={shiftCategories}
           indicatorTypes={indicatorTypes}
           certifications={certifications}
-          companyRoles={companyRoles}
-          onCompanySave={setCompany}
+          orgRoles={orgRoles}
+          onOrganizationSave={setOrg}
           onFocusAreasChange={setFocusAreas}
           onShiftCodesChange={handleShiftCodesChange}
           onShiftCategoriesChange={setShiftCategories}
           onIndicatorTypesChange={setIndicatorTypes}
           onCertificationsChange={handleCertificationsChange}
-          onCompanyRolesChange={handleCompanyRolesChange}
-          canManageCompany={canManageCompany}
+          onOrgRolesChange={handleOrgRolesChange}
+          canManageOrg={canManageOrg}
         />
       )}
 
@@ -1410,7 +1410,7 @@ function SchedulerContent() {
         <AddEmployeeModal
           focusAreas={focusAreas}
           certifications={certifications}
-          roles={companyRoles}
+          roles={orgRoles}
           onAdd={handleAddEmployee}
           onClose={() => setShowAddModal(false)}
         />
@@ -1427,13 +1427,13 @@ function SchedulerContent() {
             setActivePrintConfig(config);
           }}
           onClose={() => setShowPrintOptions(false)}
-          focusAreaLabel={company?.focusAreaLabel}
+          focusAreaLabel={org?.focusAreaLabel}
         />
       )}
 
       {activePrintConfig && (
         <PrintScheduleView
-          orgName={company?.name}
+          orgName={org?.name}
           weekStart={spanWeeks === "month" ? monthStart : weekStart}
           config={activePrintConfig}
           employees={employees}
@@ -1442,12 +1442,12 @@ function SchedulerContent() {
           shiftCodes={shiftCodes}
           shiftCategories={shiftCategories}
           certifications={certifications}
-          companyRoles={companyRoles}
+          orgRoles={orgRoles}
           shiftForKey={shiftForKey}
           shiftCodeIdsForKey={shiftCodeIdsForKey}
           getShiftStyle={getShiftStyle}
           onClose={() => setActivePrintConfig(null)}
-          focusAreaLabel={company?.focusAreaLabel}
+          focusAreaLabel={org?.focusAreaLabel}
         />
       )}
 

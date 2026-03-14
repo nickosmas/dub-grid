@@ -654,9 +654,9 @@
           "maxLength": null
         },
         {
-          "id": "public.certifications.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.certifications.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -724,13 +724,13 @@
           "maxLength": null
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "certificationsTocompanies",
+          "relationName": "certificationsToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -765,626 +765,10 @@
           "nullNotDistinct": false
         },
         {
-          "name": "certifications_company_name_active_unique",
+          "name": "certifications_org_name_active_unique",
           "fields": [
-            "company_id",
-            "name"
-          ],
-          "nullNotDistinct": false
-        }
-      ]
-    },
-    "companies": {
-      "id": "public.companies",
-      "schemaName": "public",
-      "tableName": "companies",
-      "fields": [
-        {
-          "id": "public.companies.id",
-          "name": "id",
-          "columnName": "id",
-          "type": "uuid",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": true,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.name",
-          "name": "name",
-          "columnName": "name",
-          "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.slug",
-          "name": "slug",
-          "columnName": "slug",
-          "type": "text",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.address",
-          "name": "address",
-          "columnName": "address",
-          "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.phone",
-          "name": "phone",
-          "columnName": "phone",
-          "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.employee_count",
-          "name": "employee_count",
-          "columnName": "employee_count",
-          "type": "int4",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.created_at",
-          "name": "created_at",
-          "columnName": "created_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.created_by",
-          "name": "created_by",
-          "columnName": "created_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.updated_by",
-          "name": "updated_by",
-          "columnName": "updated_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.updated_at",
-          "name": "updated_at",
-          "columnName": "updated_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.focus_area_label",
-          "name": "focus_area_label",
-          "columnName": "focus_area_label",
-          "type": "text",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.certification_label",
-          "name": "certification_label",
-          "columnName": "certification_label",
-          "type": "text",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.role_label",
-          "name": "role_label",
-          "columnName": "role_label",
-          "type": "text",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.timezone",
-          "name": "timezone",
-          "columnName": "timezone",
-          "type": "text",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.companies.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "name": "users_companies_created_byTousers",
-          "type": "users",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "companies_created_byTousers",
-          "relationFromFields": [
-            "created_by"
-          ],
-          "relationToFields": [
-            "id"
-          ],
-          "isList": false,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "users_companies_updated_byTousers",
-          "type": "users",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "companies_updated_byTousers",
-          "relationFromFields": [
-            "updated_by"
-          ],
-          "relationToFields": [
-            "id"
-          ],
-          "isList": false,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "certifications",
-          "type": "certifications",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "certificationsTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "company_roles",
-          "type": "company_roles",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "company_rolesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "employees",
-          "type": "employees",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "employeesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "focus_areas",
-          "type": "focus_areas",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "focus_areasTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "impersonation_sessions",
-          "type": "impersonation_sessions",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "impersonation_sessionsTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "indicator_types",
-          "type": "indicator_types",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "indicator_typesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "invitations",
-          "type": "invitations",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "invitationsTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "profiles",
-          "type": "profiles",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "profilesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "regular_shifts",
-          "type": "regular_shifts",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "regular_shiftsTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "schedule_draft_sessions",
-          "type": "schedule_draft_sessions",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "schedule_draft_sessionsTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "schedule_notes",
-          "type": "schedule_notes",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "schedule_notesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "shift_categories",
-          "type": "shift_categories",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "shift_categoriesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "shift_codes",
-          "type": "shift_codes",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "shift_codesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "shift_series",
-          "type": "shift_series",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "shift_seriesTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "shifts",
-          "type": "shifts",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "shiftsTocompanies",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        }
-      ],
-      "uniqueConstraints": [
-        {
-          "name": "organizations_name_key",
-          "fields": [
-            "name"
-          ],
-          "nullNotDistinct": false
-        },
-        {
-          "name": "organizations_pkey",
-          "fields": [
-            "id"
-          ],
-          "nullNotDistinct": false
-        },
-        {
-          "name": "organizations_slug_key",
-          "fields": [
-            "slug"
-          ],
-          "nullNotDistinct": false
-        }
-      ]
-    },
-    "company_roles": {
-      "id": "public.company_roles",
-      "schemaName": "public",
-      "tableName": "company_roles",
-      "fields": [
-        {
-          "id": "public.company_roles.id",
-          "name": "id",
-          "columnName": "id",
-          "type": "int8",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": true,
-          "sequence": {
-            "identifier": "\"public\".\"company_roles_id_seq\"",
-            "increment": 1,
-            "start": 1
-          },
-          "hasDefaultValue": false,
-          "isId": true,
-          "maxLength": null
-        },
-        {
-          "id": "public.company_roles.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
-          "type": "uuid",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.company_roles.name",
-          "name": "name",
-          "columnName": "name",
-          "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.company_roles.abbr",
-          "name": "abbr",
-          "columnName": "abbr",
-          "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.company_roles.sort_order",
-          "name": "sort_order",
-          "columnName": "sort_order",
-          "type": "int4",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.company_roles.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "name": "companies",
-          "type": "companies",
-          "isRequired": true,
-          "kind": "object",
-          "relationName": "company_rolesTocompanies",
-          "relationFromFields": [
-            "company_id"
-          ],
-          "relationToFields": [
-            "id"
-          ],
-          "isList": false,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        }
-      ],
-      "uniqueConstraints": [
-        {
-          "name": "company_roles_pkey",
-          "fields": [
-            "id"
-          ],
-          "nullNotDistinct": false
-        },
-        {
-          "name": "company_roles_company_name_active_unique",
-          "fields": [
-            "company_id",
-            "name"
+            "name",
+            "org_id"
           ],
           "nullNotDistinct": false
         }
@@ -1762,9 +1146,9 @@
           "maxLength": null
         },
         {
-          "id": "public.employees.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.employees.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -1846,6 +1230,104 @@
           "maxLength": null
         },
         {
+          "id": "public.employees.certification_id",
+          "name": "certification_id",
+          "columnName": "certification_id",
+          "type": "int8",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.employees.role_ids",
+          "name": "role_ids",
+          "columnName": "role_ids",
+          "type": "int8[]",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.employees.focus_area_ids",
+          "name": "focus_area_ids",
+          "columnName": "focus_area_ids",
+          "type": "int4[]",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.employees.status",
+          "name": "status",
+          "columnName": "status",
+          "type": "employee_status",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.employees.status_changed_at",
+          "name": "status_changed_at",
+          "columnName": "status_changed_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.employees.status_note",
+          "name": "status_note",
+          "columnName": "status_note",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.employees.archived_at",
+          "name": "archived_at",
+          "columnName": "archived_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
           "id": "public.employees.created_by",
           "name": "created_by",
           "columnName": "created_by",
@@ -1893,104 +1375,6 @@
           "columnName": "updated_at",
           "type": "timestamptz",
           "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.certification_id",
-          "name": "certification_id",
-          "columnName": "certification_id",
-          "type": "int8",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.role_ids",
-          "name": "role_ids",
-          "columnName": "role_ids",
-          "type": "int8[]",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.focus_area_ids",
-          "name": "focus_area_ids",
-          "columnName": "focus_area_ids",
-          "type": "int4[]",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.status",
-          "name": "status",
-          "columnName": "status",
-          "type": "employee_status",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.status_changed_at",
-          "name": "status_changed_at",
-          "columnName": "status_changed_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.employees.status_note",
-          "name": "status_note",
-          "columnName": "status_note",
-          "type": "text",
-          "isRequired": true,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -2054,13 +1438,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "employeesTocompanies",
+          "relationName": "employeesToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -2137,10 +1521,10 @@
           "nullNotDistinct": false
         },
         {
-          "name": "employees_company_name_active_unique",
+          "name": "employees_org_name_active_unique",
           "fields": [
-            "company_id",
-            "name"
+            "name",
+            "org_id"
           ],
           "nullNotDistinct": false
         }
@@ -2540,7 +1924,7 @@
           "isList": false,
           "isGenerated": true,
           "sequence": {
-            "identifier": "\"public\".\"wings_id_seq\"",
+            "identifier": "\"public\".\"focus_areas_id_seq\"",
             "increment": 1,
             "start": 1
           },
@@ -2549,9 +1933,9 @@
           "maxLength": null
         },
         {
-          "id": "public.focus_areas.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.focus_areas.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -2619,6 +2003,20 @@
           "maxLength": null
         },
         {
+          "id": "public.focus_areas.archived_at",
+          "name": "archived_at",
+          "columnName": "archived_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
           "id": "public.focus_areas.created_by",
           "name": "created_by",
           "columnName": "created_by",
@@ -2675,20 +2073,6 @@
           "maxLength": null
         },
         {
-          "id": "public.focus_areas.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
           "name": "users_focus_areas_created_byTousers",
           "type": "users",
           "isRequired": false,
@@ -2725,13 +2109,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "focus_areasTocompanies",
+          "relationName": "focus_areasToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -2801,17 +2185,17 @@
       ],
       "uniqueConstraints": [
         {
-          "name": "wings_pkey",
+          "name": "focus_areas_pkey",
           "fields": [
             "id"
           ],
           "nullNotDistinct": false
         },
         {
-          "name": "focus_areas_company_name_active_unique",
+          "name": "focus_areas_org_name_active_unique",
           "fields": [
-            "company_id",
-            "name"
+            "name",
+            "org_id"
           ],
           "nullNotDistinct": false
         }
@@ -3574,9 +2958,9 @@
           "maxLength": null
         },
         {
-          "id": "public.impersonation_sessions.target_company_id",
-          "name": "target_company_id",
-          "columnName": "target_company_id",
+          "id": "public.impersonation_sessions.target_org_id",
+          "name": "target_org_id",
+          "columnName": "target_org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -3652,13 +3036,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "impersonation_sessionsTocompanies",
+          "relationName": "impersonation_sessionsToorganizations",
           "relationFromFields": [
-            "target_company_id"
+            "target_org_id"
           ],
           "relationToFields": [
             "id"
@@ -3701,20 +3085,20 @@
           "isRequired": true,
           "kind": "scalar",
           "isList": false,
-          "isGenerated": false,
+          "isGenerated": true,
           "sequence": {
             "identifier": "\"public\".\"indicator_types_id_seq\"",
             "increment": 1,
             "start": 1
           },
-          "hasDefaultValue": true,
+          "hasDefaultValue": false,
           "isId": true,
           "maxLength": null
         },
         {
-          "id": "public.indicator_types.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.indicator_types.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -3796,13 +3180,13 @@
           "maxLength": null
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "indicator_typesTocompanies",
+          "relationName": "indicator_typesToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -3823,10 +3207,10 @@
           "nullNotDistinct": false
         },
         {
-          "name": "indicator_types_company_name_active_unique",
+          "name": "indicator_types_org_name_active_unique",
           "fields": [
-            "company_id",
-            "name"
+            "name",
+            "org_id"
           ],
           "nullNotDistinct": false
         }
@@ -3930,9 +3314,9 @@
           "maxLength": null
         },
         {
-          "id": "public.invitations.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.invitations.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -3948,7 +3332,7 @@
           "name": "invited_by",
           "columnName": "invited_by",
           "type": "uuid",
-          "isRequired": true,
+          "isRequired": false,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -3968,6 +3352,20 @@
           "isGenerated": false,
           "sequence": false,
           "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.invitations.role_to_assign",
+          "name": "role_to_assign",
+          "columnName": "role_to_assign",
+          "type": "org_role",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
           "isId": false,
           "maxLength": null
         },
@@ -4042,37 +3440,9 @@
           "maxLength": null
         },
         {
-          "id": "public.invitations.role_to_assign",
-          "name": "role_to_assign",
-          "columnName": "role_to_assign",
-          "type": "company_role",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.invitations.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
           "name": "users",
           "type": "users",
-          "isRequired": true,
+          "isRequired": false,
           "kind": "object",
           "relationName": "invitationsTousers",
           "relationFromFields": [
@@ -4088,13 +3458,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "invitationsTocompanies",
+          "relationName": "invitationsToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -4108,17 +3478,24 @@
       ],
       "uniqueConstraints": [
         {
-          "name": "org_invitations_pkey",
+          "name": "invitations_pkey",
           "fields": [
             "id"
           ],
           "nullNotDistinct": false
         },
         {
-          "name": "invitations_pending_unique",
+          "name": "one_pending_invite_per_email",
           "fields": [
-            "company_id",
-            "email"
+            "email",
+            "org_id"
+          ],
+          "nullNotDistinct": false
+        },
+        {
+          "name": "idx_invitations_token",
+          "fields": [
+            "token"
           ],
           "nullNotDistinct": false
         }
@@ -5986,6 +5363,847 @@
         }
       ]
     },
+    "organization_memberships": {
+      "id": "public.organization_memberships",
+      "schemaName": "public",
+      "tableName": "organization_memberships",
+      "fields": [
+        {
+          "id": "public.organization_memberships.id",
+          "name": "id",
+          "columnName": "id",
+          "type": "int8",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": true,
+          "sequence": {
+            "identifier": "\"public\".\"organization_memberships_id_seq\"",
+            "increment": 1,
+            "start": 1
+          },
+          "hasDefaultValue": false,
+          "isId": true,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_memberships.user_id",
+          "name": "user_id",
+          "columnName": "user_id",
+          "type": "uuid",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_memberships.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
+          "type": "uuid",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_memberships.org_role",
+          "name": "org_role",
+          "columnName": "org_role",
+          "type": "org_role",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_memberships.admin_permissions",
+          "name": "admin_permissions",
+          "columnName": "admin_permissions",
+          "type": "jsonb",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_memberships.joined_at",
+          "name": "joined_at",
+          "columnName": "joined_at",
+          "type": "timestamptz",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "name": "users",
+          "type": "users",
+          "isRequired": true,
+          "kind": "object",
+          "relationName": "organization_membershipsTousers",
+          "relationFromFields": [
+            "user_id"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organizations",
+          "type": "organizations",
+          "isRequired": true,
+          "kind": "object",
+          "relationName": "organization_membershipsToorganizations",
+          "relationFromFields": [
+            "org_id"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        }
+      ],
+      "uniqueConstraints": [
+        {
+          "name": "organization_memberships_pkey",
+          "fields": [
+            "id"
+          ],
+          "nullNotDistinct": false
+        },
+        {
+          "name": "organization_memberships_user_id_org_id_key",
+          "fields": [
+            "org_id",
+            "user_id"
+          ],
+          "nullNotDistinct": false
+        }
+      ]
+    },
+    "organization_roles": {
+      "id": "public.organization_roles",
+      "schemaName": "public",
+      "tableName": "organization_roles",
+      "fields": [
+        {
+          "id": "public.organization_roles.id",
+          "name": "id",
+          "columnName": "id",
+          "type": "int8",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": true,
+          "sequence": {
+            "identifier": "\"public\".\"organization_roles_id_seq\"",
+            "increment": 1,
+            "start": 1
+          },
+          "hasDefaultValue": false,
+          "isId": true,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_roles.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
+          "type": "uuid",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_roles.name",
+          "name": "name",
+          "columnName": "name",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_roles.abbr",
+          "name": "abbr",
+          "columnName": "abbr",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_roles.sort_order",
+          "name": "sort_order",
+          "columnName": "sort_order",
+          "type": "int4",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organization_roles.archived_at",
+          "name": "archived_at",
+          "columnName": "archived_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "name": "organizations",
+          "type": "organizations",
+          "isRequired": true,
+          "kind": "object",
+          "relationName": "organization_rolesToorganizations",
+          "relationFromFields": [
+            "org_id"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        }
+      ],
+      "uniqueConstraints": [
+        {
+          "name": "organization_roles_pkey",
+          "fields": [
+            "id"
+          ],
+          "nullNotDistinct": false
+        },
+        {
+          "name": "organization_roles_org_name_active_unique",
+          "fields": [
+            "name",
+            "org_id"
+          ],
+          "nullNotDistinct": false
+        }
+      ]
+    },
+    "organizations": {
+      "id": "public.organizations",
+      "schemaName": "public",
+      "tableName": "organizations",
+      "fields": [
+        {
+          "id": "public.organizations.id",
+          "name": "id",
+          "columnName": "id",
+          "type": "uuid",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": true,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.name",
+          "name": "name",
+          "columnName": "name",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.slug",
+          "name": "slug",
+          "columnName": "slug",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.address",
+          "name": "address",
+          "columnName": "address",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.phone",
+          "name": "phone",
+          "columnName": "phone",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.employee_count",
+          "name": "employee_count",
+          "columnName": "employee_count",
+          "type": "int4",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.logo_url",
+          "name": "logo_url",
+          "columnName": "logo_url",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.app_name",
+          "name": "app_name",
+          "columnName": "app_name",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.meta_description",
+          "name": "meta_description",
+          "columnName": "meta_description",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.theme_config",
+          "name": "theme_config",
+          "columnName": "theme_config",
+          "type": "jsonb",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.landing_page_config",
+          "name": "landing_page_config",
+          "columnName": "landing_page_config",
+          "type": "jsonb",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.focus_area_label",
+          "name": "focus_area_label",
+          "columnName": "focus_area_label",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.certification_label",
+          "name": "certification_label",
+          "columnName": "certification_label",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.role_label",
+          "name": "role_label",
+          "columnName": "role_label",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.timezone",
+          "name": "timezone",
+          "columnName": "timezone",
+          "type": "text",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.archived_at",
+          "name": "archived_at",
+          "columnName": "archived_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.created_by",
+          "name": "created_by",
+          "columnName": "created_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.updated_by",
+          "name": "updated_by",
+          "columnName": "updated_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.created_at",
+          "name": "created_at",
+          "columnName": "created_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.organizations.updated_at",
+          "name": "updated_at",
+          "columnName": "updated_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "name": "users_organizations_created_byTousers",
+          "type": "users",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organizations_created_byTousers",
+          "relationFromFields": [
+            "created_by"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "users_organizations_updated_byTousers",
+          "type": "users",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organizations_updated_byTousers",
+          "relationFromFields": [
+            "updated_by"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "certifications",
+          "type": "certifications",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "certificationsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "employees",
+          "type": "employees",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "employeesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "focus_areas",
+          "type": "focus_areas",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "focus_areasToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "impersonation_sessions",
+          "type": "impersonation_sessions",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "impersonation_sessionsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "indicator_types",
+          "type": "indicator_types",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "indicator_typesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "invitations",
+          "type": "invitations",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "invitationsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organization_memberships",
+          "type": "organization_memberships",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organization_membershipsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organization_roles",
+          "type": "organization_roles",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organization_rolesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "profiles",
+          "type": "profiles",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "profilesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "regular_shifts",
+          "type": "regular_shifts",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "regular_shiftsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "schedule_draft_sessions",
+          "type": "schedule_draft_sessions",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "schedule_draft_sessionsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "schedule_notes",
+          "type": "schedule_notes",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "schedule_notesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "shift_categories",
+          "type": "shift_categories",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "shift_categoriesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "shift_codes",
+          "type": "shift_codes",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "shift_codesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "shift_series",
+          "type": "shift_series",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "shift_seriesToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "shifts",
+          "type": "shifts",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "shiftsToorganizations",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        }
+      ],
+      "uniqueConstraints": [
+        {
+          "name": "organizations_pkey",
+          "fields": [
+            "id"
+          ],
+          "nullNotDistinct": false
+        },
+        {
+          "name": "organizations_slug_key",
+          "fields": [
+            "slug"
+          ],
+          "nullNotDistinct": false
+        }
+      ]
+    },
     "profiles": {
       "id": "public.profiles",
       "schemaName": "public",
@@ -6006,9 +6224,9 @@
           "maxLength": null
         },
         {
-          "id": "public.profiles.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.profiles.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": false,
           "kind": "scalar",
@@ -6025,34 +6243,6 @@
           "columnName": "platform_role",
           "type": "platform_role",
           "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.profiles.created_at",
-          "name": "created_at",
-          "columnName": "created_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.profiles.updated_at",
-          "name": "updated_at",
-          "columnName": "updated_at",
-          "type": "timestamptz",
-          "isRequired": false,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -6118,25 +6308,25 @@
           "maxLength": null
         },
         {
-          "id": "public.profiles.admin_permissions",
-          "name": "admin_permissions",
-          "columnName": "admin_permissions",
-          "type": "jsonb",
+          "id": "public.profiles.created_at",
+          "name": "created_at",
+          "columnName": "created_at",
+          "type": "timestamptz",
           "isRequired": false,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
           "sequence": false,
-          "hasDefaultValue": false,
+          "hasDefaultValue": true,
           "isId": false,
           "maxLength": null
         },
         {
-          "id": "public.profiles.company_role",
-          "name": "company_role",
-          "columnName": "company_role",
-          "type": "company_role",
-          "isRequired": true,
+          "id": "public.profiles.updated_at",
+          "name": "updated_at",
+          "columnName": "updated_at",
+          "type": "timestamptz",
+          "isRequired": false,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -6164,13 +6354,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": false,
           "kind": "object",
-          "relationName": "profilesTocompanies",
+          "relationName": "profilesToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -6390,9 +6580,9 @@
           "maxLength": null
         },
         {
-          "id": "public.regular_shifts.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.regular_shifts.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -6409,6 +6599,20 @@
           "columnName": "day_of_week",
           "type": "int2",
           "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.regular_shifts.shift_code_id",
+          "name": "shift_code_id",
+          "columnName": "shift_code_id",
+          "type": "int4",
+          "isRequired": false,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -6436,6 +6640,20 @@
           "name": "effective_until",
           "columnName": "effective_until",
           "type": "date",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.regular_shifts.archived_at",
+          "name": "archived_at",
+          "columnName": "archived_at",
+          "type": "timestamptz",
           "isRequired": false,
           "kind": "scalar",
           "isList": false,
@@ -6502,34 +6720,6 @@
           "maxLength": null
         },
         {
-          "id": "public.regular_shifts.shift_code_id",
-          "name": "shift_code_id",
-          "columnName": "shift_code_id",
-          "type": "int4",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.regular_shifts.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
           "name": "users_regular_shifts_created_byTousers",
           "type": "users",
           "isRequired": false,
@@ -6566,13 +6756,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "employees",
+          "type": "employees",
           "isRequired": true,
           "kind": "object",
-          "relationName": "regular_shiftsTocompanies",
+          "relationName": "regular_shiftsToemployees",
           "relationFromFields": [
-            "company_id"
+            "emp_id"
           ],
           "relationToFields": [
             "id"
@@ -6584,13 +6774,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "employees",
-          "type": "employees",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "regular_shiftsToemployees",
+          "relationName": "regular_shiftsToorganizations",
           "relationFromFields": [
-            "emp_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -6677,7 +6867,7 @@
           "name": "changed_by_id",
           "columnName": "changed_by_id",
           "type": "uuid",
-          "isRequired": true,
+          "isRequired": false,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -6729,6 +6919,48 @@
           "maxLength": null
         },
         {
+          "id": "public.role_change_log.change_type",
+          "name": "change_type",
+          "columnName": "change_type",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.role_change_log.permissions_before",
+          "name": "permissions_before",
+          "columnName": "permissions_before",
+          "type": "jsonb",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.role_change_log.permissions_after",
+          "name": "permissions_after",
+          "columnName": "permissions_after",
+          "type": "jsonb",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
           "id": "public.role_change_log.created_at",
           "name": "created_at",
           "columnName": "created_at",
@@ -6745,7 +6977,7 @@
         {
           "name": "users_role_change_log_changed_by_idTousers",
           "type": "users",
-          "isRequired": true,
+          "isRequired": false,
           "kind": "object",
           "relationName": "role_change_log_changed_by_idTousers",
           "relationFromFields": [
@@ -7482,9 +7714,9 @@
           "maxLength": null
         },
         {
-          "id": "public.schedule_draft_sessions.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.schedule_draft_sessions.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -7570,13 +7802,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "schedule_draft_sessionsTocompanies",
+          "relationName": "schedule_draft_sessionsToorganizations",
           "relationFromFields": [
-            "company_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -7590,9 +7822,9 @@
       ],
       "uniqueConstraints": [
         {
-          "name": "schedule_draft_sessions_company_id_key",
+          "name": "schedule_draft_sessions_org_id_key",
           "fields": [
-            "company_id"
+            "org_id"
           ],
           "nullNotDistinct": false
         },
@@ -7618,20 +7850,20 @@
           "isRequired": true,
           "kind": "scalar",
           "isList": false,
-          "isGenerated": false,
+          "isGenerated": true,
           "sequence": {
             "identifier": "\"public\".\"schedule_notes_id_seq\"",
             "increment": 1,
             "start": 1
           },
-          "hasDefaultValue": true,
+          "hasDefaultValue": false,
           "isId": true,
           "maxLength": null
         },
         {
-          "id": "public.schedule_notes.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.schedule_notes.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -7680,6 +7912,34 @@
           "isList": false,
           "isGenerated": false,
           "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.schedule_notes.status",
+          "name": "status",
+          "columnName": "status",
+          "type": "text",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.schedule_notes.focus_area_id",
+          "name": "focus_area_id",
+          "columnName": "focus_area_id",
+          "type": "int4",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
           "hasDefaultValue": false,
           "isId": false,
           "maxLength": null
@@ -7688,6 +7948,20 @@
           "id": "public.schedule_notes.created_by",
           "name": "created_by",
           "columnName": "created_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.schedule_notes.updated_by",
+          "name": "updated_by",
+          "columnName": "updated_by",
           "type": "uuid",
           "isRequired": false,
           "kind": "scalar",
@@ -7723,48 +7997,6 @@
           "isGenerated": false,
           "sequence": false,
           "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.schedule_notes.updated_by",
-          "name": "updated_by",
-          "columnName": "updated_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.schedule_notes.status",
-          "name": "status",
-          "columnName": "status",
-          "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.schedule_notes.focus_area_id",
-          "name": "focus_area_id",
-          "columnName": "focus_area_id",
-          "type": "int4",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
           "isId": false,
           "maxLength": null
         },
@@ -7805,24 +8037,6 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
-          "isRequired": true,
-          "kind": "object",
-          "relationName": "schedule_notesTocompanies",
-          "relationFromFields": [
-            "company_id"
-          ],
-          "relationToFields": [
-            "id"
-          ],
-          "isList": false,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
           "name": "employees",
           "type": "employees",
           "isRequired": true,
@@ -7848,6 +8062,24 @@
           "relationName": "schedule_notesTofocus_areas",
           "relationFromFields": [
             "focus_area_id"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organizations",
+          "type": "organizations",
+          "isRequired": true,
+          "kind": "object",
+          "relationName": "schedule_notesToorganizations",
+          "relationFromFields": [
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -8465,9 +8697,9 @@
           "maxLength": null
         },
         {
-          "id": "public.shift_categories.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.shift_categories.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -8577,13 +8809,13 @@
           "maxLength": null
         },
         {
-          "name": "companies",
-          "type": "companies",
-          "isRequired": true,
+          "name": "focus_areas",
+          "type": "focus_areas",
+          "isRequired": false,
           "kind": "object",
-          "relationName": "shift_categoriesTocompanies",
+          "relationName": "shift_categoriesTofocus_areas",
           "relationFromFields": [
-            "company_id"
+            "focus_area_id"
           ],
           "relationToFields": [
             "id"
@@ -8595,13 +8827,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "focus_areas",
-          "type": "focus_areas",
-          "isRequired": false,
+          "name": "organizations",
+          "type": "organizations",
+          "isRequired": true,
           "kind": "object",
-          "relationName": "shift_categoriesTofocus_areas",
+          "relationName": "shift_categoriesToorganizations",
           "relationFromFields": [
-            "focus_area_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -8638,17 +8870,17 @@
         {
           "name": "shift_categories_area_name_unique",
           "fields": [
-            "company_id",
             "focus_area_id",
-            "name"
+            "name",
+            "org_id"
           ],
           "nullNotDistinct": false
         },
         {
           "name": "shift_categories_global_name_unique",
           "fields": [
-            "company_id",
-            "name"
+            "name",
+            "org_id"
           ],
           "nullNotDistinct": false
         }
@@ -8669,7 +8901,7 @@
           "isList": false,
           "isGenerated": true,
           "sequence": {
-            "identifier": "\"public\".\"shift_types_id_seq\"",
+            "identifier": "\"public\".\"shift_codes_id_seq\"",
             "increment": 1,
             "start": 1
           },
@@ -8678,9 +8910,9 @@
           "maxLength": null
         },
         {
-          "id": "public.shift_codes.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.shift_codes.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -8776,10 +9008,10 @@
           "maxLength": null
         },
         {
-          "id": "public.shift_codes.sort_order",
-          "name": "sort_order",
-          "columnName": "sort_order",
-          "type": "int4",
+          "id": "public.shift_codes.is_off_day",
+          "name": "is_off_day",
+          "columnName": "is_off_day",
+          "type": "bool",
           "isRequired": true,
           "kind": "scalar",
           "isList": false,
@@ -8790,66 +9022,10 @@
           "maxLength": null
         },
         {
-          "id": "public.shift_codes.created_by",
-          "name": "created_by",
-          "columnName": "created_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shift_codes.updated_by",
-          "name": "updated_by",
-          "columnName": "updated_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shift_codes.created_at",
-          "name": "created_at",
-          "columnName": "created_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shift_codes.updated_at",
-          "name": "updated_at",
-          "columnName": "updated_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shift_codes.is_off_day",
-          "name": "is_off_day",
-          "columnName": "is_off_day",
-          "type": "bool",
+          "id": "public.shift_codes.sort_order",
+          "name": "sort_order",
+          "columnName": "sort_order",
+          "type": "int4",
           "isRequired": true,
           "kind": "scalar",
           "isList": false,
@@ -8944,6 +9120,62 @@
           "maxLength": null
         },
         {
+          "id": "public.shift_codes.created_by",
+          "name": "created_by",
+          "columnName": "created_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shift_codes.updated_by",
+          "name": "updated_by",
+          "columnName": "updated_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shift_codes.created_at",
+          "name": "created_at",
+          "columnName": "created_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shift_codes.updated_at",
+          "name": "updated_at",
+          "columnName": "updated_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
           "name": "users_shift_codes_created_byTousers",
           "type": "users",
           "isRequired": false,
@@ -8980,13 +9212,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
-          "isRequired": true,
+          "name": "focus_areas",
+          "type": "focus_areas",
+          "isRequired": false,
           "kind": "object",
-          "relationName": "shift_codesTocompanies",
+          "relationName": "shift_codesTofocus_areas",
           "relationFromFields": [
-            "company_id"
+            "focus_area_id"
           ],
           "relationToFields": [
             "id"
@@ -8998,13 +9230,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "focus_areas",
-          "type": "focus_areas",
-          "isRequired": false,
+          "name": "organizations",
+          "type": "organizations",
+          "isRequired": true,
           "kind": "object",
-          "relationName": "shift_codesTofocus_areas",
+          "relationName": "shift_codesToorganizations",
           "relationFromFields": [
-            "focus_area_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -9064,26 +9296,26 @@
       ],
       "uniqueConstraints": [
         {
-          "name": "shift_types_pkey",
+          "name": "shift_codes_pkey",
           "fields": [
             "id"
           ],
           "nullNotDistinct": false
         },
         {
-          "name": "shift_codes_company_label_focus_area_unique",
+          "name": "shift_codes_org_label_focus_area_unique",
           "fields": [
-            "company_id",
             "focus_area_id",
-            "label"
+            "label",
+            "org_id"
           ],
           "nullNotDistinct": false
         },
         {
-          "name": "shift_codes_company_label_global_unique",
+          "name": "shift_codes_org_label_global_unique",
           "fields": [
-            "company_id",
-            "label"
+            "label",
+            "org_id"
           ],
           "nullNotDistinct": false
         }
@@ -9123,9 +9355,9 @@
           "maxLength": null
         },
         {
-          "id": "public.shift_series.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.shift_series.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": true,
           "kind": "scalar",
@@ -9207,6 +9439,34 @@
           "maxLength": null
         },
         {
+          "id": "public.shift_series.shift_code_id",
+          "name": "shift_code_id",
+          "columnName": "shift_code_id",
+          "type": "int4",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shift_series.archived_at",
+          "name": "archived_at",
+          "columnName": "archived_at",
+          "type": "timestamptz",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
           "id": "public.shift_series.created_by",
           "name": "created_by",
           "columnName": "created_by",
@@ -9263,34 +9523,6 @@
           "maxLength": null
         },
         {
-          "id": "public.shift_series.shift_code_id",
-          "name": "shift_code_id",
-          "columnName": "shift_code_id",
-          "type": "int4",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shift_series.archived_at",
-          "name": "archived_at",
-          "columnName": "archived_at",
-          "type": "timestamptz",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
           "name": "users_shift_series_created_byTousers",
           "type": "users",
           "isRequired": false,
@@ -9327,13 +9559,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
+          "name": "employees",
+          "type": "employees",
           "isRequired": true,
           "kind": "object",
-          "relationName": "shift_seriesTocompanies",
+          "relationName": "shift_seriesToemployees",
           "relationFromFields": [
-            "company_id"
+            "emp_id"
           ],
           "relationToFields": [
             "id"
@@ -9345,13 +9577,13 @@
           "hasDefaultValue": false
         },
         {
-          "name": "employees",
-          "type": "employees",
+          "name": "organizations",
+          "type": "organizations",
           "isRequired": true,
           "kind": "object",
-          "relationName": "shift_seriesToemployees",
+          "relationName": "shift_seriesToorganizations",
           "relationFromFields": [
-            "emp_id"
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -9439,9 +9671,9 @@
           "maxLength": null
         },
         {
-          "id": "public.shifts.company_id",
-          "name": "company_id",
-          "columnName": "company_id",
+          "id": "public.shifts.org_id",
+          "name": "org_id",
+          "columnName": "org_id",
           "type": "uuid",
           "isRequired": false,
           "kind": "scalar",
@@ -9471,62 +9703,6 @@
           "name": "version",
           "columnName": "version",
           "type": "int8",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shifts.created_by",
-          "name": "created_by",
-          "columnName": "created_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shifts.updated_by",
-          "name": "updated_by",
-          "columnName": "updated_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shifts.created_at",
-          "name": "created_at",
-          "columnName": "created_at",
-          "type": "timestamptz",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": true,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.shifts.updated_at",
-          "name": "updated_at",
-          "columnName": "updated_at",
-          "type": "timestamptz",
           "isRequired": true,
           "kind": "scalar",
           "isList": false,
@@ -9649,6 +9825,62 @@
           "maxLength": null
         },
         {
+          "id": "public.shifts.created_by",
+          "name": "created_by",
+          "columnName": "created_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shifts.updated_by",
+          "name": "updated_by",
+          "columnName": "updated_by",
+          "type": "uuid",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shifts.created_at",
+          "name": "created_at",
+          "columnName": "created_at",
+          "type": "timestamptz",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "public.shifts.updated_at",
+          "name": "updated_at",
+          "columnName": "updated_at",
+          "type": "timestamptz",
+          "isRequired": true,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
           "name": "users_shifts_created_byTousers",
           "type": "users",
           "isRequired": false,
@@ -9703,24 +9935,6 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies",
-          "type": "companies",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "shiftsTocompanies",
-          "relationFromFields": [
-            "company_id"
-          ],
-          "relationToFields": [
-            "id"
-          ],
-          "isList": false,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
           "name": "employees",
           "type": "employees",
           "isRequired": true,
@@ -9746,6 +9960,24 @@
           "relationName": "shiftsTofocus_areas",
           "relationFromFields": [
             "focus_area_id"
+          ],
+          "relationToFields": [
+            "id"
+          ],
+          "isList": false,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organizations",
+          "type": "organizations",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "shiftsToorganizations",
+          "relationFromFields": [
+            "org_id"
           ],
           "relationToFields": [
             "id"
@@ -10108,58 +10340,12 @@
           "hasDefaultValue": true,
           "isId": false,
           "maxLength": null
-        }
-      ],
-      "uniqueConstraints": [
+        },
         {
-          "name": "subscription_subscription_id_entity_filters_key",
-          "fields": [
-            "entity",
-            "filters",
-            "subscription_id"
-          ],
-          "nullNotDistinct": false
-        }
-      ]
-    },
-    "system_config": {
-      "id": "public.system_config",
-      "schemaName": "public",
-      "tableName": "system_config",
-      "fields": [
-        {
-          "id": "public.system_config.key",
-          "name": "key",
-          "columnName": "key",
+          "id": "realtime.subscription.action_filter",
+          "name": "action_filter",
+          "columnName": "action_filter",
           "type": "text",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": true,
-          "maxLength": null
-        },
-        {
-          "id": "public.system_config.value",
-          "name": "value",
-          "columnName": "value",
-          "type": "jsonb",
-          "isRequired": true,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "id": "public.system_config.updated_at",
-          "name": "updated_at",
-          "columnName": "updated_at",
-          "type": "timestamptz",
           "isRequired": false,
           "kind": "scalar",
           "isList": false,
@@ -10168,45 +10354,16 @@
           "hasDefaultValue": true,
           "isId": false,
           "maxLength": null
-        },
-        {
-          "id": "public.system_config.updated_by",
-          "name": "updated_by",
-          "columnName": "updated_by",
-          "type": "uuid",
-          "isRequired": false,
-          "kind": "scalar",
-          "isList": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false,
-          "isId": false,
-          "maxLength": null
-        },
-        {
-          "name": "users",
-          "type": "users",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "system_configTousers",
-          "relationFromFields": [
-            "updated_by"
-          ],
-          "relationToFields": [
-            "id"
-          ],
-          "isList": false,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
         }
       ],
       "uniqueConstraints": [
         {
-          "name": "system_config_pkey",
+          "name": "subscription_subscription_id_entity_filters_action_filter_key",
           "fields": [
-            "key"
+            "action_filter",
+            "entity",
+            "filters",
+            "subscription_id"
           ],
           "nullNotDistinct": false
         }
@@ -10489,6 +10646,48 @@
           "columnName": "max_payload_size_in_kb",
           "type": "int4",
           "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": true,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "_realtime.tenants.max_client_presence_events_per_window",
+          "name": "max_client_presence_events_per_window",
+          "columnName": "max_client_presence_events_per_window",
+          "type": "int4",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "_realtime.tenants.client_presence_window_ms",
+          "name": "client_presence_window_ms",
+          "columnName": "client_presence_window_ms",
+          "type": "int4",
+          "isRequired": false,
+          "kind": "scalar",
+          "isList": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false,
+          "isId": false,
+          "maxLength": null
+        },
+        {
+          "id": "_realtime.tenants.presence_enabled",
+          "name": "presence_enabled",
+          "columnName": "presence_enabled",
+          "type": "bool",
+          "isRequired": true,
           "kind": "scalar",
           "isList": false,
           "isGenerated": false,
@@ -11241,34 +11440,6 @@
           "hasDefaultValue": false
         },
         {
-          "name": "companies_companies_created_byTousers",
-          "type": "companies",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "companies_created_byTousers",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "companies_companies_updated_byTousers",
-          "type": "companies",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "companies_updated_byTousers",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
           "name": "employees_employees_created_byTousers",
           "type": "employees",
           "isRequired": false,
@@ -11372,6 +11543,48 @@
           "isRequired": false,
           "kind": "object",
           "relationName": "jwt_refresh_locksTousers",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organization_memberships",
+          "type": "organization_memberships",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organization_membershipsTousers",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organizations_organizations_created_byTousers",
+          "type": "organizations",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organizations_created_byTousers",
+          "relationFromFields": [],
+          "relationToFields": [],
+          "isList": true,
+          "isId": false,
+          "isGenerated": false,
+          "sequence": false,
+          "hasDefaultValue": false
+        },
+        {
+          "name": "organizations_organizations_updated_byTousers",
+          "type": "organizations",
+          "isRequired": false,
+          "kind": "object",
+          "relationName": "organizations_updated_byTousers",
           "relationFromFields": [],
           "relationToFields": [],
           "isList": true,
@@ -11582,20 +11795,6 @@
           "isRequired": false,
           "kind": "object",
           "relationName": "shifts_user_idTousers",
-          "relationFromFields": [],
-          "relationToFields": [],
-          "isList": true,
-          "isId": false,
-          "isGenerated": false,
-          "sequence": false,
-          "hasDefaultValue": false
-        },
-        {
-          "name": "system_config",
-          "type": "system_config",
-          "isRequired": false,
-          "kind": "object",
-          "relationName": "system_configTousers",
           "relationFromFields": [],
           "relationToFields": [],
           "isList": true,
@@ -11968,20 +12167,6 @@
         }
       ]
     },
-    "company_role": {
-      "schemaName": "public",
-      "values": [
-        {
-          "name": "admin"
-        },
-        {
-          "name": "super_admin"
-        },
-        {
-          "name": "user"
-        }
-      ]
-    },
     "employee_status": {
       "schemaName": "public",
       "values": [
@@ -11996,11 +12181,28 @@
         }
       ]
     },
+    "org_role": {
+      "schemaName": "public",
+      "values": [
+        {
+          "name": "admin"
+        },
+        {
+          "name": "super_admin"
+        },
+        {
+          "name": "user"
+        }
+      ]
+    },
     "platform_role": {
       "schemaName": "public",
       "values": [
         {
           "name": "gridmaster"
+        },
+        {
+          "name": "nexus_architect"
         },
         {
           "name": "none"

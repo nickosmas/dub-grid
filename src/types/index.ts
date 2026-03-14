@@ -3,7 +3,7 @@
 /** A named entity with a full name and abbreviation (certifications & roles). */
 export interface NamedItem {
   id: number;
-  companyId: string;
+  orgId: string;
   name: string;
   abbr: string;
   sortOrder: number;
@@ -11,7 +11,7 @@ export interface NamedItem {
   archivedAt?: string | null;
 }
 
-export interface Company {
+export interface Organization {
   id: string;
   name: string;
   slug: string | null;
@@ -24,16 +24,16 @@ export interface Company {
   certificationLabel: string;
   /** Custom display label for roles (e.g. "Responsibilities"). Defaults to "Roles". */
   roleLabel: string;
-  /** IANA timezone for this company, e.g. "America/New_York". Null = not set. */
+  /** IANA timezone for this organization, e.g. "America/New_York". Null = not set. */
   timezone: string | null;
-  /** Non-null when the company has been archived (soft-deleted). */
+  /** Non-null when the organization has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
 
 
 export interface FocusArea {
   id: number;
-  companyId: string;
+  orgId: string;
   name: string;
   colorBg: string;
   colorText: string;
@@ -44,7 +44,7 @@ export interface FocusArea {
 
 export interface ShiftCategory {
   id: number;
-  companyId: string;
+  orgId: string;
   name: string;
   /** Tally row accent color */
   color: string;
@@ -65,7 +65,7 @@ export interface ShiftCategory {
  */
 export interface ShiftCode {
   id: number;
-  companyId: string;
+  orgId: string;
   label: string;
   name: string;
   color: string;
@@ -127,7 +127,7 @@ export type SeriesScope = 'this' | 'all';
 export interface RegularShift {
   id: string;
   empId: string;
-  companyId: string;
+  orgId: string;
   /** 0 = Sunday, 1 = Monday … 6 = Saturday */
   dayOfWeek: number;
   shiftCodeId: number;
@@ -143,7 +143,7 @@ export interface RegularShift {
 export interface ShiftSeries {
   id: string;
   empId: string;
-  companyId: string;
+  orgId: string;
   shiftCodeId: number;
   shiftLabel: string;
   frequency: SeriesFrequency;
@@ -173,7 +173,7 @@ export type NoteType = string;
 
 export interface IndicatorType {
   id: number;
-  companyId: string;
+  orgId: string;
   name: string;
   color: string;
   sortOrder: number;
@@ -183,7 +183,7 @@ export interface IndicatorType {
 
 export interface ScheduleNote {
   id: number;
-  companyId: string;
+  orgId: string;
   empId: string;
   date: string;
   noteType: NoteType;
@@ -198,16 +198,16 @@ export interface ScheduleNote {
 
 export type PlatformRole = 'gridmaster' | 'none';
 /**
- * super_admin: company owner — full company management
+ * super_admin: organization owner — full org management
  * admin: configurable permissions assigned by super_admin
  * user: read-only staff
  */
-export type CompanyRole = 'super_admin' | 'admin' | 'user';
+export type OrganizationRole = 'super_admin' | 'admin' | 'user';
 /** Roles assignable by super_admin from the user management panel. */
-export type AssignableCompanyRole = 'admin' | 'user';
+export type AssignableOrganizationRole = 'admin' | 'user';
 
 /**
- * Fine-grained permissions for admin users. Stored as JSONB in company_memberships.admin_permissions.
+ * Fine-grained permissions for admin users. Stored as JSONB in organization_memberships.admin_permissions.
  * super_admin and gridmaster always have all permissions regardless of this field.
  * Null/undefined = all false for admin users.
  */
@@ -234,20 +234,20 @@ export interface AdminPermissions {
   canViewStaff: boolean;
   /** Add / edit / delete employee records */
   canManageEmployees: boolean;
-  // Company Configuration
+  // Organization Configuration
   /** Add / edit / delete focus areas (departments) */
   canManageFocusAreas: boolean;
   /** Add / edit / delete shift code definitions */
   canManageShiftCodes: boolean;
   /** Add / edit / delete indicator / note type definitions */
   canManageIndicatorTypes: boolean;
-  /** Edit company name, address, labels, certifications, roles */
-  canManageCompanySettings: boolean;
+  /** Edit organization name, address, labels, certifications, roles */
+  canManageOrgSettings: boolean;
 }
 
 export interface Profile {
   id: string;
-  companyId: string;
+  orgId: string;
   firstName: string | null;
   lastName: string | null;
   platformRole: PlatformRole;
@@ -257,13 +257,13 @@ export interface Profile {
   updatedAt: string;
 }
 
-/** A company user record for the user management panel. */
-export interface CompanyUser {
+/** An organization user record for the user management panel. */
+export interface OrganizationUser {
   id: string;
   email: string | null;
   firstName: string | null;
   lastName: string | null;
-  companyRole: CompanyRole;
+  orgRole: OrganizationRole;
   platformRole: PlatformRole;
   adminPermissions: AdminPermissions | null;
   createdAt: string;
@@ -294,16 +294,29 @@ export interface ImpersonationSession {
   sessionId: string;
   gridmasterId: string;
   targetUserId: string;
-  targetCompanyId: string;
+  targetOrgId: string;
   expiresAt: string;
+  createdAt: string;
+}
+
+export interface Invitation {
+  id: string;
+  orgId: string;
+  invitedBy: string | null;
+  email: string;
+  roleToAssign: AssignableOrganizationRole;
+  token: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
   createdAt: string;
 }
 
 export interface UserClaims {
   userId: string;
   email: string | null;
-  companyId: string | null;
-  companySlug: string | null;
+  orgId: string | null;
+  orgSlug: string | null;
 }
 
 // ── Gridmaster Portal Types ──────────────────────────────────────────────────
@@ -315,9 +328,9 @@ export interface PlatformUser {
   firstName: string | null;
   lastName: string | null;
   platformRole: PlatformRole;
-  companyRole: CompanyRole | null;
-  companyId: string | null;
-  companyName: string | null;
+  orgRole: OrganizationRole | null;
+  orgId: string | null;
+  orgName: string | null;
   createdAt: string;
   lastSignInAt: string | null;
 }
@@ -332,16 +345,16 @@ export interface AuditLogEntry {
   fromRole: string;
   toRole: string;
   createdAt: string;
-  companyId: string | null;
-  companyName: string | null;
+  orgId: string | null;
+  orgName: string | null;
 }
 
-/** A company membership row with denormalized user info for display. */
-export interface CompanyMembership {
+/** An organization membership row with denormalized user info for display. */
+export interface OrganizationMembership {
   id: number;
   userId: string;
-  companyId: string;
-  companyRole: CompanyRole;
+  orgId: string;
+  orgRole: OrganizationRole;
   adminPermissions: AdminPermissions | null;
   joinedAt: string;
   email: string | null;

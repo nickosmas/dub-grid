@@ -4,25 +4,25 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { usePermissions, useLogout } from "@/hooks";
 import { DubGridLogo } from "@/components/Logo";
 import AdminDashboard from "@/components/admin/AdminDashboard";
-import CompanyDetail from "@/components/admin/CompanyDetail";
-import CreateCompanyForm from "@/components/admin/CreateCompanyForm";
+import OrganizationDetail from "@/components/admin/OrganizationDetail";
+import CreateOrganizationForm from "@/components/admin/CreateOrganizationForm";
 import AllUsersView from "@/components/admin/AllUsersView";
 import AuditLogView from "@/components/admin/AuditLogView";
 import EnhancedImpersonation from "@/components/admin/EnhancedImpersonation";
 import {
-  fetchAllCompanies,
+  fetchAllOrganizations,
   fetchTenantStats,
   type TenantStats,
 } from "@/lib/db";
-import type { Company } from "@/types";
+import type { Organization } from "@/types";
 
 type AdminView =
   | "dashboard"
   | "all-users"
   | "audit-log"
-  | "company"
+  | "organization"
   | "impersonation"
-  | "create-company";
+  | "create-organization";
 
 // ── Sidebar link (same pattern as StaffView / SettingsPage) ──────────────────
 
@@ -154,17 +154,17 @@ const PlusIcon = (
   </svg>
 );
 
-// ── Company search combobox (header) ─────────────────────────────────────────
+// ── Organization search combobox (header) ────────────────────────────────────
 
-function CompanySearchCombobox({
-  companies,
+function OrgSearchCombobox({
+  organizations,
   stats,
-  selectedCompany,
+  selectedOrg,
   onSelect,
 }: {
-  companies: Company[];
+  organizations: Organization[];
   stats: Map<string, TenantStats>;
-  selectedCompany: Company | null;
+  selectedOrg: Organization | null;
   onSelect: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -173,10 +173,10 @@ function CompanySearchCombobox({
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    return companies.filter((c) =>
+    return organizations.filter((c) =>
       !q || c.name.toLowerCase().includes(q) || (c.slug ?? "").toLowerCase().includes(q)
     );
-  }, [companies, query]);
+  }, [organizations, query]);
 
   // Close on outside click
   useEffect(() => {
@@ -190,7 +190,7 @@ function CompanySearchCombobox({
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {selectedCompany && (
+        {selectedOrg && (
           <span
             style={{
               fontSize: 12,
@@ -206,12 +206,12 @@ function CompanySearchCombobox({
               textOverflow: "ellipsis",
             }}
           >
-            {selectedCompany.name}
+            {selectedOrg.name}
           </span>
         )}
         <input
           type="text"
-          placeholder="Search companies…"
+          placeholder="Search organizations…"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -246,18 +246,18 @@ function CompanySearchCombobox({
             letterSpacing: "0.05em",
             borderBottom: "1px solid var(--color-border-light)",
           }}>
-            {query ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""}` : `All Companies (${companies.length})`}
+            {query ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""}` : `All Organizations (${organizations.length})`}
           </div>
           <div style={{ maxHeight: 400, overflowY: "auto" }}>
             {filtered.length === 0 ? (
               <div style={{ padding: "20px 14px", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
-                No matching companies
+                No matching organizations
               </div>
             ) : (
               filtered.map((c) => {
                 const empCount = stats.get(c.id)?.employeeCount ?? 0;
                 const isArchived = !!c.archivedAt;
-                const isActive = selectedCompany?.id === c.id;
+                const isActive = selectedOrg?.id === c.id;
                 return (
                   <button
                     key={c.id}
@@ -316,7 +316,7 @@ export default function AdminPage() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
   const { signOutLocal } = useLogout();
 
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [stats, setStats] = useState<Map<string, TenantStats>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -327,13 +327,13 @@ export default function AdminPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [companiesData, statsData] = await Promise.all([
-        fetchAllCompanies(),
+      const [orgsData, statsData] = await Promise.all([
+        fetchAllOrganizations(),
         fetchTenantStats(),
       ]);
-      setCompanies(companiesData);
+      setOrganizations(orgsData);
       const map = new Map<string, TenantStats>();
-      for (const s of statsData) map.set(s.companyId, s);
+      for (const s of statsData) map.set(s.orgId, s);
       setStats(map);
     } catch (err: any) {
       setError(err.message ?? "Failed to load data");
@@ -375,11 +375,11 @@ export default function AdminPage() {
   const totalUsers = Array.from(stats.values()).reduce((n, s) => n + s.userCount, 0);
   const totalEmployees = Array.from(stats.values()).reduce((n, s) => n + s.employeeCount, 0);
 
-  const selectedCompany = selectedId ? companies.find((c) => c.id === selectedId) ?? null : null;
+  const selectedOrg = selectedId ? organizations.find((c) => c.id === selectedId) ?? null : null;
 
-  function selectCompany(id: string) {
+  function selectOrg(id: string) {
     setSelectedId(id);
-    setView("company");
+    setView("organization");
   }
 
   function handleImpersonate(userId: string) {
@@ -388,13 +388,13 @@ export default function AdminPage() {
     setSelectedId(null);
   }
 
-  function handleCompanyCreated(company: Company) {
-    setCompanies((prev) => [...prev, company].sort((a, b) => a.name.localeCompare(b.name)));
-    selectCompany(company.id);
+  function handleOrgCreated(org: Organization) {
+    setOrganizations((prev) => [...prev, org].sort((a, b) => a.name.localeCompare(b.name)));
+    selectOrg(org.id);
   }
 
-  function handleCompanyUpdated(updated: Company) {
-    setCompanies((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  function handleOrgUpdated(updated: Organization) {
+    setOrganizations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -435,11 +435,11 @@ export default function AdminPage() {
           </span>
         </div>
         <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-          <CompanySearchCombobox
-            companies={companies}
+          <OrgSearchCombobox
+            organizations={organizations}
             stats={stats}
-            selectedCompany={selectedCompany}
-            onSelect={selectCompany}
+            selectedOrg={selectedOrg}
+            onSelect={selectOrg}
           />
         </div>
         <button
@@ -514,10 +514,10 @@ export default function AdminPage() {
               Actions
             </div>
             <SidebarLink
-              label="New Company"
+              label="New Organization"
               icon={PlusIcon}
-              active={view === "create-company"}
-              onClick={() => { setView("create-company"); setSelectedId(null); }}
+              active={view === "create-organization"}
+              onClick={() => { setView("create-organization"); setSelectedId(null); }}
             />
           </div>
 
@@ -564,19 +564,19 @@ export default function AdminPage() {
 
           {view === "dashboard" && (
             <AdminDashboard
-              companies={companies}
+              organizations={organizations}
               stats={stats}
               totalUsers={totalUsers}
               totalEmployees={totalEmployees}
-              onSelectCompany={selectCompany}
-              onCreateCompany={() => { setView("create-company"); setSelectedId(null); }}
+              onSelectOrg={selectOrg}
+              onCreateOrg={() => { setView("create-organization"); setSelectedId(null); }}
             />
           )}
 
           {view === "all-users" && (
             <AllUsersView
-              companies={companies}
-              onNavigateToCompany={selectCompany}
+              organizations={organizations}
+              onNavigateToOrg={selectOrg}
               onImpersonate={handleImpersonate}
             />
           )}
@@ -585,14 +585,14 @@ export default function AdminPage() {
             <AuditLogView />
           )}
 
-          {view === "create-company" && (
-            <CreateCompanyForm
-              onCreated={handleCompanyCreated}
+          {view === "create-organization" && (
+            <CreateOrganizationForm
+              onCreated={handleOrgCreated}
               onCancel={() => setView("dashboard")}
             />
           )}
 
-          {view === "company" && selectedCompany && (
+          {view === "organization" && selectedOrg && (
             <>
               <button
                 onClick={() => { setView("dashboard"); setSelectedId(null); }}
@@ -615,12 +615,12 @@ export default function AdminPage() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
-                All Companies
+                All Organizations
               </button>
-              <CompanyDetail
-                company={selectedCompany}
-                stats={stats.get(selectedCompany.id)}
-                onCompanyUpdated={handleCompanyUpdated}
+              <OrganizationDetail
+                organization={selectedOrg}
+                stats={stats.get(selectedOrg.id)}
+                onOrgUpdated={handleOrgUpdated}
                 onImpersonate={handleImpersonate}
               />
             </>

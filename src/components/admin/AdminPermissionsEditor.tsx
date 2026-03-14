@@ -40,7 +40,7 @@ const PERMISSION_GROUPS = [
       { key: "canManageFocusAreas", label: "Manage Focus Areas" },
       { key: "canManageShiftCodes", label: "Manage Shift Codes" },
       { key: "canManageIndicatorTypes", label: "Manage Indicator Types" },
-      { key: "canManageCompanySettings", label: "Manage Company Settings" },
+      { key: "canManageOrgSettings", label: "Manage Organization Settings" },
     ],
   },
 ] as const;
@@ -58,19 +58,19 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canManageFocusAreas: false,
   canManageShiftCodes: false,
   canManageIndicatorTypes: false,
-  canManageCompanySettings: false,
+  canManageOrgSettings: false,
 };
 
 export default function AdminPermissionsEditor({
   userId,
-  companyId,
+  orgId,
   userName,
   currentPermissions,
   onClose,
   onSaved,
 }: {
   userId: string;
-  companyId: string;
+  orgId: string;
   userName: string;
   currentPermissions: AdminPermissions | null;
   onClose: () => void;
@@ -115,7 +115,7 @@ export default function AdminPermissionsEditor({
   async function handleSave() {
     setSaving(true);
     try {
-      await updateAdminPermissions(userId, perms, companyId);
+      await updateAdminPermissions(userId, perms, orgId);
       toast.success("Permissions updated");
       onSaved(perms);
       onClose();

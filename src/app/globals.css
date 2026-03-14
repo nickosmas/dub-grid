@@ -412,63 +412,104 @@ textarea {
 }
 
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
-/* Bold, wide banner-style toasts — use direct properties to override richColors */
+/* Vibrant, full-color banner toasts — no shadows */
+[data-sonner-toaster] {
+  --width: min(calc(100vw - 48px), 720px) !important;
+}
+
+[data-sonner-toast] {
+  box-shadow: none !important;
+  padding: 14px 48px 14px 20px !important;
+  width: var(--width) !important;
+}
+
 [data-sonner-toast][data-type="success"] {
-  background: #15803D !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 6px 20px rgba(21, 128, 61, 0.4) !important;
+  background: #DCFCE7 !important;
+  color: #16A34A !important;
+  border: 1px solid #BBF7D0 !important;
 }
 
 [data-sonner-toast][data-type="error"] {
-  background: #991B1B !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 6px 20px rgba(153, 27, 27, 0.4) !important;
+  background: #FEE2E2 !important;
+  color: #DC2626 !important;
+  border: 1px solid #FECACA !important;
 }
 
 [data-sonner-toast][data-type="info"] {
-  background: #1E40AF !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 6px 20px rgba(30, 64, 175, 0.4) !important;
+  background: #DBEAFE !important;
+  color: #2563EB !important;
+  border: 1px solid #BFDBFE !important;
 }
 
 [data-sonner-toast][data-type="warning"] {
-  background: #92400E !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 6px 20px rgba(146, 64, 14, 0.4) !important;
+  background: #FEF3C7 !important;
+  color: #D97706 !important;
+  border: 1px solid #FDE68A !important;
 }
 
-/* Ensure toast text inherits the white color */
-[data-sonner-toast][data-type="success"] [data-title],
-[data-sonner-toast][data-type="error"] [data-title],
-[data-sonner-toast][data-type="info"] [data-title],
-[data-sonner-toast][data-type="warning"] [data-title],
-[data-sonner-toast][data-type="success"] [data-description],
-[data-sonner-toast][data-type="error"] [data-description],
-[data-sonner-toast][data-type="info"] [data-description],
-[data-sonner-toast][data-type="warning"] [data-description] {
-  color: #fff !important;
+/* Toast text inherits color from type-specific parent */
+[data-sonner-toast] [data-title] {
+  color: inherit !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
 }
 
-/* Close button on bold toasts */
+[data-sonner-toast] [data-description] {
+  color: inherit !important;
+  opacity: 0.8 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* Close button — prominent white pill */
 [data-sonner-toast] [data-close-button] {
-  background: transparent !important;
-  color: #fff !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 10px !important;
+  left: auto !important;
+  transform: translateY(-50%) !important;
+  background: #FFFFFF !important;
+  color: inherit !important;
   border: none !important;
-  opacity: 0.8;
-  transition: opacity 150ms ease;
+  opacity: 1 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  transition: transform 150ms ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 28px !important;
+  height: 28px !important;
 }
 
 [data-sonner-toast] [data-close-button]:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  opacity: 1;
+  background: #FFFFFF !important;
+  transform: translateY(-50%) scale(1.1) !important;
 }
 
 [data-sonner-toast] [data-close-button] svg {
+  width: 14px !important;
+  height: 14px !important;
+  color: currentColor !important;
+}
+
+/* Action button — dark for universal contrast */
+[data-sonner-toast] [data-button] {
+  background: var(--color-dark) !important;
   color: #fff !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  margin-left: auto !important;
+  transition: all 150ms ease !important;
+}
+
+[data-sonner-toast] [data-button]:hover {
+  background: var(--color-dark-elevated) !important;
+  transform: translateY(-1px);
 }
 
 /* ── Spinner ────────────────────────────────────────────── */

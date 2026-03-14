@@ -26,7 +26,7 @@ const ALL_PERMS: AdminPermissions = {
   canManageFocusAreas: true,
   canManageShiftCodes: true,
   canManageIndicatorTypes: true,
-  canManageCompanySettings: true,
+  canManageOrgSettings: true,
 };
 
 /** Read-only baseline — used for user role (and admin with no configured perms). */
@@ -43,19 +43,19 @@ const READ_ONLY_PERMS: AdminPermissions = {
   canManageFocusAreas: false,
   canManageShiftCodes: false,
   canManageIndicatorTypes: false,
-  canManageCompanySettings: false,
+  canManageOrgSettings: false,
 };
 
 export interface Permissions extends AdminPermissions {
   role: string;
-  companyId: string | null;
+  orgId: string | null;
   level: number;
   isLoading: boolean;
   isGridmaster: boolean;
   isSuperAdmin: boolean;
   /** True if user can access the settings page (has any config-level permission). */
-  canManageCompany: boolean;
-  /** True if user can invite / change roles of company members (super_admin+ only). */
+  canManageOrg: boolean;
+  /** True if user can invite / change roles of org members (super_admin+ only). */
   canManageUsers: boolean;
   /** True if user can configure per-admin permissions (super_admin+ only). */
   canConfigureAdminPermissions: boolean;
@@ -64,7 +64,7 @@ export interface Permissions extends AdminPermissions {
 
 function buildPerms(
   role: string,
-  companyId: string | null,
+  orgId: string | null,
   isLoading: boolean,
   adminPerms?: AdminPermissions | null,
 ): Permissions {
@@ -84,23 +84,23 @@ function buildPerms(
     p = READ_ONLY_PERMS;
   }
 
-  const canManageCompany =
+  const canManageOrg =
     isGridmaster ||
     isSuperAdmin ||
     p.canManageFocusAreas ||
     p.canManageShiftCodes ||
     p.canManageIndicatorTypes ||
-    p.canManageCompanySettings;
+    p.canManageOrgSettings;
 
   return {
     ...p,
     role,
-    companyId,
+    orgId,
     level,
     isLoading,
     isGridmaster,
     isSuperAdmin,
-    canManageCompany,
+    canManageOrg,
     canManageUsers: isSuperAdmin || isGridmaster,
     canConfigureAdminPermissions: isSuperAdmin || isGridmaster,
     atLeast: (r: string) => level >= (ROLE_LEVEL[r] ?? 0),
@@ -113,34 +113,34 @@ LOADING_PERMS.isLoading = true;
 const NO_PERMS: Permissions = buildPerms("user", null, false);
 
 /**
- * Extracts the effective role + company from the JWT access token.
- * Custom claims (platform_role, company_role, company_id) are written at the top level
+ * Extracts the effective role + org from the JWT access token.
+ * Custom claims (platform_role, org_role, org_id) are written at the top level
  * of the JWT payload by the custom_access_token_hook.
  */
 function extractJwtClaims(accessToken: string): {
   effectiveRole: string;
-  companyId: string | null;
+  orgId: string | null;
 } {
   let payload: Record<string, unknown>;
   try {
     payload = decodeJwt(accessToken) as Record<string, unknown>;
   } catch {
-    return { effectiveRole: "user", companyId: null };
+    return { effectiveRole: "user", orgId: null };
   }
 
   const platformRole = payload.platform_role as string | undefined;
-  const companyRole = (payload.company_role as string) || "user";
-  const companyId = (payload.company_id as string) || null;
-  const effectiveRole = platformRole === "gridmaster" ? "gridmaster" : companyRole;
+  const orgRole = (payload.org_role as string) || "user";
+  const orgId = (payload.org_id as string) || null;
+  const effectiveRole = platformRole === "gridmaster" ? "gridmaster" : orgRole;
 
-  return { effectiveRole, companyId };
+  return { effectiveRole, orgId };
 }
 
 export function getPermissionsFromSession(session: Session | null): Permissions {
   if (!session?.access_token) return NO_PERMS;
-  const { effectiveRole, companyId } = extractJwtClaims(session.access_token);
+  const { effectiveRole, orgId } = extractJwtClaims(session.access_token);
   // No admin_permissions available from JWT alone — caller must enrich from DB for admin role.
-  return buildPerms(effectiveRole, companyId, false);
+  return buildPerms(effectiveRole, orgId, false);
 }
 
 export function usePermissions(): Permissions {
@@ -157,25 +157,25 @@ export function usePermissions(): Permissions {
         return;
       }
 
-      const { effectiveRole, companyId } = extractJwtClaims(session.access_token);
+      const { effectiveRole, orgId } = extractJwtClaims(session.access_token);
 
       // gridmaster / super_admin: all perms, no DB query needed.
       if (effectiveRole === "gridmaster" || effectiveRole === "super_admin") {
-        if (mounted) setPerms(buildPerms(effectiveRole, companyId, false));
+        if (mounted) setPerms(buildPerms(effectiveRole, orgId, false));
         return;
       }
 
-      // admin: fetch admin_permissions from company_memberships.
-      if (effectiveRole === "admin" && session.user?.id && companyId) {
+      // admin: fetch admin_permissions from organization_memberships.
+      if (effectiveRole === "admin" && session.user?.id && orgId) {
         const { data } = await supabase
-          .from("company_memberships")
+          .from("organization_memberships")
           .select("admin_permissions")
           .eq("user_id", session.user.id)
-          .eq("company_id", companyId)
+          .eq("org_id", orgId)
           .single();
 
         if (mounted) {
-          setPerms(buildPerms("admin", companyId, false, data?.admin_permissions ?? null));
+          setPerms(buildPerms("admin", orgId, false, data?.admin_permissions ?? null));
         }
         return;
       }
@@ -184,28 +184,28 @@ export function usePermissions(): Permissions {
       if (session.user?.id) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("company_id, platform_role")
+          .select("org_id, platform_role")
           .eq("id", session.user.id)
           .single();
 
         if (mounted && profile) {
           if (profile.platform_role === "gridmaster") {
-            setPerms(buildPerms("gridmaster", profile.company_id, false));
+            setPerms(buildPerms("gridmaster", profile.org_id, false));
             return;
           }
 
-          if (profile.company_id) {
+          if (profile.org_id) {
             const { data: membership } = await supabase
-              .from("company_memberships")
-              .select("company_role, admin_permissions")
+              .from("organization_memberships")
+              .select("org_role, admin_permissions")
               .eq("user_id", session.user.id)
-              .eq("company_id", profile.company_id)
+              .eq("org_id", profile.org_id)
               .single();
 
             if (mounted && membership) {
               setPerms(buildPerms(
-                membership.company_role,
-                profile.company_id,
+                membership.org_role,
+                profile.org_id,
                 false,
                 membership.admin_permissions ?? null,
               ));
@@ -215,7 +215,7 @@ export function usePermissions(): Permissions {
         }
       }
 
-      if (mounted) setPerms(buildPerms(effectiveRole, companyId, false));
+      if (mounted) setPerms(buildPerms(effectiveRole, orgId, false));
     }
 
     supabase.auth

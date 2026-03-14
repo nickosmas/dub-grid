@@ -6,6 +6,7 @@ import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, NoteType, IndicatorType, NamedItem } from "@/types";
 import { getCertAbbr, getRoleAbbrs } from "@/lib/utils";
+import { borderColor } from "@/lib/colors";
 
 const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
   JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },      // Purple
@@ -14,6 +15,15 @@ const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
   STAFF: { bg: "#F1F5F9", text: "#475569" },     // Slate
 };
 const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#94A3B8" };
+
+function getFocusAreaInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 3);
+}
 
 function fmt12hShort(time24: string): string {
   const [h, m] = time24.split(":").map(Number);
@@ -43,7 +53,7 @@ interface ScheduleGridProps {
   noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
-  companyRoles?: NamedItem[];
+  orgRoles?: NamedItem[];
   isEditMode?: boolean;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
 }
@@ -51,7 +61,7 @@ interface ScheduleGridProps {
 
 interface SectionBlockProps {
   sectionName: string;
-  exclusiveLabels: string[];
+  exclusiveCodeIds: Set<number>;
   employees: Employee[];
   weekDates: Date[];
   todayKey: string;
@@ -73,12 +83,12 @@ interface SectionBlockProps {
   onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
   certifications: NamedItem[];
-  companyRoles: NamedItem[];
+  orgRoles: NamedItem[];
 }
 
 const SectionBlock = memo(function SectionBlock({
   sectionName,
-  exclusiveLabels,
+  exclusiveCodeIds,
   employees,
   weekDates,
   todayKey,
@@ -99,7 +109,7 @@ const SectionBlock = memo(function SectionBlock({
   onTooltipChange,
   getCustomShiftTimes,
   certifications,
-  companyRoles,
+  orgRoles,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
@@ -325,7 +335,7 @@ const SectionBlock = memo(function SectionBlock({
               highlightEmpIds && highlightEmpIds.size > 0
                 ? highlightEmpIds.has(emp.id)
                 : true;
-            const rowBg = ri % 2 === 0 ? "#fff" : "var(--color-row-alt)";
+            const rowBg = "#fff";
             const certAbbr = getCertAbbr(emp.certificationId, certifications);
             const dc =
               DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
@@ -384,7 +394,7 @@ const SectionBlock = memo(function SectionBlock({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {getRoleAbbrs(emp.roleIds, companyRoles).join(", ")}
+                        {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
                       </div>
                     )}
                   </div>
@@ -484,69 +494,92 @@ const SectionBlock = memo(function SectionBlock({
                             const isCross = label !== "X" && codeEntry0?.focusAreaId != null
                               && sectionFocusArea != null
                               && codeEntry0.focusAreaId !== sectionFocusArea.id;
-                            return (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: customTimes ? "4px" : "0.625rem",
-                                  right: "0.625rem",
-                                  bottom: customTimes ? "4px" : "0.625rem",
-                                  left: "0.625rem",
-                                  background: style.color,
-                                  border: `1.5px ${isDraft ? "dashed" : "solid"} ${style.border}`,
-                                  borderRadius: 6,
-                                  color: style.text,
-                                  boxShadow: "none",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  overflow: "hidden",
-                                  opacity: isCross ? 0.7 : 1,
-                                }}
-                              >
-                                <span style={{ fontSize: 12, fontWeight: 800, lineHeight: 1 }}>{label}</span>
-                                {customTimes && (
-                                  <span style={{
-                                    fontSize: 9,
-                                    fontWeight: 500,
-                                    lineHeight: 1,
-                                    marginTop: 4,
-                                    opacity: 0.7,
-                                    letterSpacing: "0.02em",
-                                  }}>
-                                    {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
-                                  </span>
-                                )}
-                                {noteTypes.length > 0 && (
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      bottom: 3,
-                                      right: 4,
-                                      display: "flex",
-                                      gap: 2,
-                                    }}
-                                  >
-                                    {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
-                                      <div
-                                        key={ind.name}
-                                        title={ind.name}
-                                        style={{
-                                          width: 5,
-                                          height: 5,
-                                          borderRadius: "50%",
-                                          background: ind.color,
-                                          border: "1px solid rgba(255,255,255,0.85)",
-                                          flexShrink: 0,
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
+                            const crossHomeFa = isCross
+                              ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
+                              : undefined;
+                             return (
+                               <div
+                                 style={{
+                                   position: "absolute",
+                                   top: customTimes ? "4px" : "0.625rem",
+                                   right: "0.625rem",
+                                   bottom: customTimes ? "4px" : "0.625rem",
+                                   left: "0.625rem",
+                                   background: isCross ? "#ffffff" : style.color,
+                                   opacity: isDraft ? 0.6 : 1,
+                                   border: `1px solid ${borderColor(style.text)}`,
+                                   borderRadius: 6,
+                                   color: style.text,
+                                   boxShadow: "none",
+                                   cursor: "pointer",
+                                   display: "flex",
+                                   flexDirection: "column",
+                                   alignItems: "center",
+                                   justifyContent: "center",
+                                   overflow: "hidden",
+                                 }}
+                               >
+                                 {isCross && crossHomeFa && (
+                                   <span
+                                     style={{
+                                       position: "absolute",
+                                       top: 2,
+                                       left: 3,
+                                       fontSize: 7,
+                                       fontWeight: 800,
+                                       lineHeight: 1,
+                                       background: crossHomeFa.colorBg,
+                                       color: crossHomeFa.colorText,
+                                       borderRadius: 3,
+                                       padding: "1px 3px",
+                                       letterSpacing: "0.02em",
+                                       pointerEvents: "none",
+                                     }}
+                                   >
+                                     {getFocusAreaInitials(crossHomeFa.name)}
+                                   </span>
+                                 )}
+                                 <span style={{ fontSize: 12, fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                                 {customTimes && (
+                                   <span style={{
+                                     fontSize: 9,
+                                     fontWeight: 500,
+                                     lineHeight: 1,
+                                     marginTop: 4,
+                                     opacity: 0.7,
+                                     letterSpacing: "0.02em",
+                                   }}>
+                                     {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
+                                   </span>
+                                 )}
+                                 {noteTypes.length > 0 && (
+                                   <div
+                                     style={{
+                                       position: "absolute",
+                                       bottom: 3,
+                                       right: 4,
+                                       display: "flex",
+                                       gap: 2,
+                                     }}
+                                   >
+                                     {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
+                                       <div
+                                         key={ind.name}
+                                         title={ind.name}
+                                         style={{
+                                           width: 5,
+                                           height: 5,
+                                           borderRadius: "50%",
+                                           background: ind.color,
+                                           border: "1px solid rgba(255,255,255,0.85)",
+                                           flexShrink: 0,
+                                         }}
+                                       />
+                                     ))}
+                                   </div>
+                                 )}
+                               </div>
+                             );
                           }
 
                           const firstStyle = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
@@ -565,7 +598,8 @@ const SectionBlock = memo(function SectionBlock({
                                   display: "flex",
                                   borderRadius: 6,
                                   overflow: "hidden",
-                                  border: `1.5px ${isDraft ? "dashed" : "solid"} ${firstStyle?.border || "var(--color-border)"}`,
+                                  border: firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)",
+                                  opacity: isDraft ? 0.6 : 1,
                                   boxShadow: "none",
                                   cursor: "pointer",
                                   width: "100%",
@@ -579,6 +613,9 @@ const SectionBlock = memo(function SectionBlock({
                                     && codeEntryLi?.focusAreaId != null
                                     && sectionFocusArea != null
                                     && codeEntryLi.focusAreaId !== sectionFocusArea.id;
+                                  const crossHomeFaLi = isCross
+                                    ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
+                                    : undefined;
 
                                   return (
                                     <div
@@ -586,7 +623,7 @@ const SectionBlock = memo(function SectionBlock({
                                       style={{
                                         flex: 1,
                                         background: isCross ? "#ffffff" : style.color,
-                                        color: isCross ? style.color : style.text,
+                                        color: style.text,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
@@ -594,11 +631,31 @@ const SectionBlock = memo(function SectionBlock({
                                         fontWeight: 800,
                                         borderRight:
                                           li < labels.length - 1
-                                            ? `1px solid ${style.border}`
+                                            ? `1px solid rgba(0,0,0,0.1)`
                                             : "none",
                                         position: "relative",
                                       }}
                                     >
+                                      {isCross && crossHomeFaLi && (
+                                         <span
+                                           style={{
+                                             position: "absolute",
+                                             top: 2,
+                                             left: 2,
+                                             fontSize: 6,
+                                             fontWeight: 800,
+                                             lineHeight: 1,
+                                             background: crossHomeFaLi.colorBg,
+                                             color: crossHomeFaLi.colorText,
+                                             borderRadius: 3,
+                                             padding: "1px 2px",
+                                             letterSpacing: "0.02em",
+                                             pointerEvents: "none",
+                                           }}
+                                         >
+                                           {getFocusAreaInitials(crossHomeFaLi.name)}
+                                         </span>
+                                       )}
                                       {label}
                                     </div>
                                   );
@@ -768,7 +825,7 @@ export default function ScheduleGrid({
   noteTypesForKey,
   activeFocusArea = null,
   certifications = [],
-  companyRoles = [],
+  orgRoles = [],
   isEditMode = true,
   getCustomShiftTimes,
 }: ScheduleGridProps) {
@@ -812,15 +869,17 @@ export default function ScheduleGrid({
     [focusAreas],
   );
 
-  // For each section, compute which shift labels belong to it
-  const exclusiveLabelsPerSection = useMemo(() => {
+  // For each section, compute which shift code IDs belong to it
+  const exclusiveCodeIdsPerSection = useMemo(() => {
     return Object.fromEntries(
       sections.map((section) => {
         const focusAreaId = focusAreaIdByName[section];
-        const labels = shiftCodes
-          .filter((st) => focusAreaId != null && st.focusAreaId === focusAreaId)
-          .map((st) => st.label);
-        return [section, labels];
+        const ids = new Set(
+          shiftCodes
+            .filter((st) => focusAreaId != null && st.focusAreaId === focusAreaId)
+            .map((st) => st.id)
+        );
+        return [section, ids];
       }),
     );
   }, [sections, shiftCodes, focusAreaIdByName]);
@@ -837,27 +896,24 @@ export default function ScheduleGrid({
   );
 
   const renderedSections = sections.filter(section => {
-    const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
+    const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
     const sectionId = focusAreaIdByName[section];
     const rawHomeEmps = filteredEmployees.filter((e) => sectionId != null && e.focusAreaIds.includes(sectionId));
     const homeEmps = isEditMode
       ? rawHomeEmps
       : rawHomeEmps.filter((emp) =>
           allDates.some((date) => {
-            const shift = shiftForKey(emp.id, date);
-            return (
-              shift !== null &&
-              shift !== "OFF" &&
-              (exclusiveLabels.includes(shift) || generalShiftLabels.has(shift))
-            );
+            const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+            return codeIds.some(id => exclusiveCodeIds.has(id) || (shiftCodes.find(sc => sc.id === id)?.focusAreaId === null));
           }),
         );
     const guestEmps = allEmployees.filter(
       (e) =>
+        e.focusAreaIds.length > 0 &&
         (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
         allDates.some((date) => {
-          const shift = shiftForKey(e.id, date);
-          return shift !== null && exclusiveLabels.includes(shift);
+          const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+          return codeIds.some(id => exclusiveCodeIds.has(id));
         }),
     );
     return [...homeEmps, ...guestEmps].length > 0;
@@ -934,7 +990,7 @@ export default function ScheduleGrid({
             </div>
           )}
           {renderedSections.map((section) => {
-        const exclusiveLabels = exclusiveLabelsPerSection[section] ?? [];
+        const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
         const sectionId = focusAreaIdByName[section];
         const rawHomeEmps = filteredEmployees.filter((e) =>
           sectionId != null && e.focusAreaIds.includes(sectionId),
@@ -943,21 +999,17 @@ export default function ScheduleGrid({
           ? rawHomeEmps
           : rawHomeEmps.filter((emp) =>
               allDates.some((date) => {
-                const shift = shiftForKey(emp.id, date);
-                return (
-                  shift !== null &&
-                  shift !== "OFF" &&
-                  (exclusiveLabels.includes(shift) ||
-                    generalShiftLabels.has(shift))
-                );
+                const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                return codeIds.some(id => exclusiveCodeIds.has(id) || (shiftCodes.find(sc => sc.id === id)?.focusAreaId === null));
               }),
             );
         const guestEmps = allEmployees.filter(
           (e) =>
+            e.focusAreaIds.length > 0 &&
             (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
             allDates.some((date) => {
-              const shift = shiftForKey(e.id, date);
-              return shift !== null && exclusiveLabels.includes(shift);
+              const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+              return codeIds.some(id => exclusiveCodeIds.has(id));
             }),
         );
         const sectionEmps = [...homeEmps, ...guestEmps];
@@ -965,7 +1017,7 @@ export default function ScheduleGrid({
           <SectionBlock
             key={section}
             sectionName={section}
-            exclusiveLabels={exclusiveLabels}
+            exclusiveCodeIds={exclusiveCodeIds}
             employees={sectionEmps}
             weekDates={allDates}
             todayKey={todayKey}
@@ -986,7 +1038,7 @@ export default function ScheduleGrid({
             onTooltipChange={setTooltip}
             getCustomShiftTimes={getCustomShiftTimes}
             certifications={certifications}
-            companyRoles={companyRoles}
+            orgRoles={orgRoles}
           />
         );
       })}

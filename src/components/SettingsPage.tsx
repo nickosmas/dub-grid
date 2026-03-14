@@ -2,30 +2,61 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-import { Company, FocusArea, ShiftCategory, ShiftCode, IndicatorType, CompanyUser, AdminPermissions, NamedItem } from "@/types";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, AdminPermissions, NamedItem } from "@/types";
 import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
+import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { usePermissions } from "@/hooks";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
+function PresetColorPicker({ valueBg, onChange }: { valueBg: string; onChange: (c: PredefinedColor) => void }) {
+  const active = getPresetByBg(valueBg);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {PREDEFINED_COLORS.map(c => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onChange(c)}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: c.bg,
+            border: active.id === c.id ? `2px solid ${c.text}` : "1px solid var(--color-border)",
+            cursor: "pointer",
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+          title={c.name}
+        >
+          {active.id === c.id && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.text }} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface SettingsPageProps {
-  company: Company;
+  organization: Organization;
   focusAreas: FocusArea[];
   shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
-  companyRoles: NamedItem[];
-  onCompanySave: (company: Company) => void;
+  orgRoles: NamedItem[];
+  onOrganizationSave: (organization: Organization) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
   onShiftCodesChange: (codes: ShiftCode[]) => void;
   onShiftCategoriesChange: (categories: ShiftCategory[]) => void;
   onIndicatorTypesChange: (types: IndicatorType[]) => void;
   onCertificationsChange: (items: NamedItem[]) => void;
-  onCompanyRolesChange: (items: NamedItem[]) => void;
-  canManageCompany: boolean;
+  onOrgRolesChange: (items: NamedItem[]) => void;
+  canManageOrg: boolean;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -159,43 +190,43 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
   );
 }
 
-// ── Company Settings ──────────────────────────────────────────────────────────
-function CompanySettings({
-  company,
+// ── Organization Settings ─────────────────────────────────────────────────────
+function OrganizationSettings({
+  organization,
   onSave,
 }: {
-  company: Company;
-  onSave: (o: Company) => void;
+  organization: Organization;
+  onSave: (o: Organization) => void;
 }) {
   const [form, setForm] = useState({
-    name: company.name,
-    address: company.address,
-    phone: company.phone,
-    employeeCount: company.employeeCount?.toString() ?? "",
-    focusAreaLabel: company.focusAreaLabel,
-    certificationLabel: company.certificationLabel,
-    roleLabel: company.roleLabel,
-    timezone: company.timezone ?? "",
+    name: organization.name,
+    address: organization.address,
+    phone: organization.phone,
+    employeeCount: organization.employeeCount?.toString() ?? "",
+    focusAreaLabel: organization.focusAreaLabel,
+    certificationLabel: organization.certificationLabel,
+    roleLabel: organization.roleLabel,
+    timezone: organization.timezone ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const isModified =
-    form.name !== company.name ||
-    form.address !== company.address ||
-    form.phone !== company.phone ||
-    (form.employeeCount || "") !== (company.employeeCount?.toString() ?? "") ||
-    form.focusAreaLabel !== company.focusAreaLabel ||
-    form.certificationLabel !== company.certificationLabel ||
-    form.roleLabel !== company.roleLabel ||
-    form.timezone !== (company.timezone ?? "");
+    form.name !== organization.name ||
+    form.address !== organization.address ||
+    form.phone !== organization.phone ||
+    (form.employeeCount || "") !== (organization.employeeCount?.toString() ?? "") ||
+    form.focusAreaLabel !== organization.focusAreaLabel ||
+    form.certificationLabel !== organization.certificationLabel ||
+    form.roleLabel !== organization.roleLabel ||
+    form.timezone !== (organization.timezone ?? "");
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const updated: Company = {
-        ...company,
+      const updated: Organization = {
+        ...organization,
         name: form.name.trim(),
         address: form.address.trim(),
         phone: form.phone.trim(),
@@ -205,7 +236,7 @@ function CompanySettings({
         roleLabel: form.roleLabel.trim() || "Roles",
         timezone: form.timezone || null,
       };
-      await db.updateCompany(updated);
+      await db.updateOrganization(updated);
       onSave(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -216,13 +247,13 @@ function CompanySettings({
     } finally {
       setSaving(false);
     }
-  }, [form, company, onSave]);
+  }, [form, organization, onSave]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div>
-          <label style={labelStyle}>COMPANY NAME</label>
+          <label style={labelStyle}>ORGANIZATION NAME</label>
           <input
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
@@ -265,7 +296,7 @@ function CompanySettings({
       {/* Custom terminology labels */}
       <div>
         <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 12px" }}>
-          Customize what your company calls each feature. These labels appear throughout the app.
+          Customize what your organization calls each feature. These labels appear throughout the app.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
           <div>
@@ -352,12 +383,12 @@ function CompanySettings({
 // ── Focus Area row ────────────────────────────────────────────────────────────
 function FocusAreaRow({
   focusArea,
-  companyId,
+  orgId,
   onSaved,
   onDeleted,
 }: {
   focusArea: FocusArea & { isNew?: boolean };
-  companyId: string;
+  orgId: string;
   onSaved: (w: FocusArea) => void;
   onDeleted: (id: number) => void;
 }) {
@@ -369,6 +400,7 @@ function FocusAreaRow({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(!!focusArea.isNew);
 
   const isModified =
     form.name !== focusArea.name ||
@@ -381,13 +413,14 @@ function FocusAreaRow({
     try {
       const saved = await db.upsertFocusArea({
         id: focusArea.isNew ? undefined : focusArea.id,
-        companyId: companyId,
+        orgId: orgId,
         name: form.name.trim(),
         colorBg: form.colorBg,
         colorText: form.colorText,
         sortOrder: focusArea.sortOrder,
       }) as FocusArea;
       onSaved(saved);
+      setIsEditing(false);
       toast.success("Focus area saved");
     } catch (err) {
       toast.error("Failed to save focus area");
@@ -395,7 +428,20 @@ function FocusAreaRow({
     } finally {
       setSaving(false);
     }
-  }, [form, focusArea, companyId, onSaved]);
+  }, [form, focusArea, orgId, onSaved]);
+
+  const handleCancel = useCallback(() => {
+    setForm({
+      name: focusArea.name,
+      colorBg: focusArea.colorBg,
+      colorText: focusArea.colorText,
+    });
+    if (focusArea.isNew) {
+      onDeleted(focusArea.id);
+    } else {
+      setIsEditing(false);
+    }
+  }, [focusArea, onDeleted]);
 
   const handleDelete = useCallback(async () => {
     if (focusArea.isNew) {
@@ -416,107 +462,155 @@ function FocusAreaRow({
     }
   }, [focusArea, onDeleted]);
 
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 100px 100px auto auto",
-        gap: 10,
-        alignItems: "center",
-        padding: "10px 0",
-        borderBottom: "1px solid var(--color-border-light)",
-      }}
-    >
-      <input
-        value={form.name}
-        onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-        placeholder="Area name"
-        style={{ ...inputStyle }}
-      />
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        <label style={{ ...labelStyle, marginBottom: 2 }}>BG COLOR</label>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input
-            type="color"
-            value={form.colorBg}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, colorBg: e.target.value }))
-            }
-            style={{
-              width: 32,
-              height: 28,
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              cursor: "pointer",
-              padding: 2,
-            }}
-          />
+  if (!isEditing) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "11px 0",
+          borderBottom: "1px solid var(--color-border-light)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span
             style={{
               display: "inline-block",
-              padding: "2px 8px",
+              padding: "3px 12px",
               borderRadius: 20,
-              background: form.colorBg,
-              color: form.colorText,
-              fontSize: 11,
-              fontWeight: 600,
+              background: focusArea.colorBg,
+              border: "1px solid rgba(0,0,0,0.08)",
+              color: focusArea.colorText,
+              fontSize: 13,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
             }}
           >
-            Preview
+            {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
           </span>
         </div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        <label style={{ ...labelStyle, marginBottom: 2 }}>TEXT COLOR</label>
-        <input
-          type="color"
-          value={form.colorText}
-          onChange={(e) =>
-            setForm((p) => ({ ...p, colorText: e.target.value }))
-          }
+        <button
+          onClick={() => setIsEditing(true)}
           style={{
-            width: 32,
-            height: 28,
+            background: "none",
             border: "1px solid var(--color-border)",
-            borderRadius: 4,
+            borderRadius: 7,
+            color: "var(--color-text-primary)",
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 600,
             cursor: "pointer",
-            padding: 2,
+            whiteSpace: "nowrap",
           }}
+        >
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        padding: "12px 0",
+        borderBottom: "1px solid var(--color-border-light)",
+      }}
+    >
+      {/* Live preview */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+        <span
+          style={{
+            display: "inline-block",
+            padding: "5px 20px",
+            borderRadius: 20,
+            background: form.colorBg,
+            border: "1px solid rgba(0,0,0,0.08)",
+            color: form.colorText,
+            fontSize: 14,
+            fontWeight: 700,
+          }}
+        >
+          {form.name || "Preview"}
+        </span>
+      </div>
+
+      {/* Name */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={labelStyle}>NAME</label>
+        <input
+          value={form.name}
+          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+          placeholder="Area name"
+          style={inputStyle}
+          autoFocus
         />
       </div>
-      <button
-        onClick={handleSave}
-        disabled={!isModified || saving}
-        style={{
-          background: isModified ? "var(--color-accent-gradient)" : "#ccc",
-          border: "none",
-          color: "#fff",
-          borderRadius: 7,
-          padding: "7px 14px",
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: isModified ? "pointer" : "not-allowed",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {saving ? "…" : "Save"}
-      </button>
-      <button
-        onClick={() => setShowDeleteConfirm(true)}
-        disabled={deleting}
-        style={{
-          background: "none",
-          border: "1px solid #FEE2E2",
-          borderRadius: 7,
-          color: "#EF4444",
-          padding: "7px 12px",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        {deleting ? "…" : "Delete"}
-      </button>
+
+      {/* Color */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>COLOR</label>
+        <PresetColorPicker
+          valueBg={form.colorBg}
+          onChange={(c) => setForm((p) => ({ ...p, colorBg: c.bg, colorText: c.text }))}
+        />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          onClick={handleSave}
+          disabled={!isModified || saving}
+          style={{
+            background: isModified ? "var(--color-accent-gradient)" : "#ccc",
+            border: "none",
+            color: "#fff",
+            borderRadius: 7,
+            padding: "7px 16px",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: isModified ? "pointer" : "not-allowed",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={handleCancel}
+          style={{
+            background: "none",
+            border: "1px solid var(--color-border)",
+            borderRadius: 7,
+            color: "var(--color-text-muted)",
+            padding: "7px 14px",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+        <div style={{ flex: 1 }} />
+        {!focusArea.isNew && (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={deleting}
+            style={{
+              background: "none",
+              border: "1px solid #FEE2E2",
+              borderRadius: 7,
+              color: "#EF4444",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            {deleting ? "…" : "Delete"}
+          </button>
+        )}
+      </div>
+
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete Focus Area?"
@@ -532,15 +626,16 @@ function FocusAreaRow({
   );
 }
 
+
 // ── Focus Areas Settings ──────────────────────────────────────────────────────
 function FocusAreasSettings({
   focusAreas,
-  companyId,
+  orgId,
   label,
   onChange,
 }: {
   focusAreas: FocusArea[];
-  companyId: string;
+  orgId: string;
   label: string;
   onChange: (focusAreas: FocusArea[]) => void;
 }) {
@@ -551,10 +646,10 @@ function FocusAreasSettings({
   const handleAdd = () => {
     const tmp: FocusArea & { isNew: boolean } = {
       id: nextTmpId.current--,
-      companyId: companyId,
+      orgId: orgId,
       name: "",
-      colorBg: "#F1F5F9",
-      colorText: "#475569",
+      colorBg: PREDEFINED_COLORS[0].bg,
+      colorText: PREDEFINED_COLORS[0].text,
       sortOrder: localFocusAreas.length,
       isNew: true,
     };
@@ -582,7 +677,7 @@ function FocusAreasSettings({
           <FocusAreaRow
             key={focusArea.id}
             focusArea={focusArea}
-            companyId={companyId}
+            orgId={orgId}
             onSaved={handleSaved}
             onDeleted={handleDeleted}
           />
@@ -614,7 +709,7 @@ function ShiftCodeRow({
     st,
   focusAreas,
   shiftCategories,
-  companyId,
+  orgId,
   certifications,
   certificationLabel,
   focusAreaLabel = "Focus Area",
@@ -626,7 +721,7 @@ function ShiftCodeRow({
   st: ShiftCode & { isNew?: boolean };
   focusAreas: FocusArea[];
   shiftCategories: ShiftCategory[];
-  companyId: string;
+  orgId: string;
   certifications: NamedItem[];
   certificationLabel: string;
   focusAreaLabel?: string;
@@ -638,9 +733,9 @@ function ShiftCodeRow({
   const [form, setForm] = useState({
     label: st.label,
     name: st.name,
-    color: st.color === "transparent" ? "#F8FAFC" : st.color,
-    border: st.border === "transparent" ? "#CBD5E1" : st.border,
-    text: st.text === "transparent" ? "#64748B" : st.text,
+    color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
+    border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
+    text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
     categoryId: st.categoryId ?? null as number | null,
     isOffDay: st.isOffDay ?? isOffDayRow ?? false,
     focusAreaId: st.focusAreaId ?? null as number | null,
@@ -664,9 +759,9 @@ function ShiftCodeRow({
       setForm({
         label: st.label,
         name: st.name,
-        color: st.color === "transparent" ? "#F8FAFC" : st.color,
-        border: st.border === "transparent" ? "#CBD5E1" : st.border,
-        text: st.text === "transparent" ? "#64748B" : st.text,
+        color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
+        border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
+        text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
         categoryId: st.categoryId ?? null,
         isOffDay: st.isOffDay ?? isOffDayRow ?? false,
         focusAreaId: st.focusAreaId ?? null,
@@ -678,9 +773,9 @@ function ShiftCodeRow({
   const isDirty = st.isNew ||
     form.label !== st.label ||
     form.name !== st.name ||
-    form.color !== (st.color === "transparent" ? "#F8FAFC" : st.color) ||
-    form.border !== (st.border === "transparent" ? "#CBD5E1" : st.border) ||
-    form.text !== (st.text === "transparent" ? "#64748B" : st.text) ||
+    form.color !== (st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color) ||
+    form.border !== (st.border === "transparent" ? TRANSPARENT_BORDER : st.border) ||
+    form.text !== (st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text) ||
     form.categoryId !== (st.categoryId ?? null) ||
     form.isOffDay !== (st.isOffDay ?? isOffDayRow ?? false) ||
     form.focusAreaId !== (st.focusAreaId ?? null) ||
@@ -695,7 +790,7 @@ function ShiftCodeRow({
     try {
       const saved = await db.upsertShiftCode({
         id: st.isNew ? undefined : st.id,
-        companyId: companyId,
+        orgId: orgId,
         label: form.label.trim(),
         name: form.name.trim(),
         color: form.color,
@@ -719,7 +814,7 @@ function ShiftCodeRow({
     } finally {
       setSaving(false);
     }
-  }, [form, st, companyId, onSaved]);
+  }, [form, st, orgId, onSaved]);
 
   const handleDelete = useCallback(async () => {
     if (st.isNew) {
@@ -759,7 +854,7 @@ function ShiftCodeRow({
             minWidth: 44,
             padding: "3px 8px",
             background: form.color,
-            border: `1.5px solid ${form.border}`,
+            border: `1px solid ${borderColor(form.text)}`,
             color: form.text,
             borderRadius: 6,
             fontSize: 12,
@@ -898,67 +993,12 @@ function ShiftCodeRow({
           )}
 
           {/* Colors */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 10,
-            }}
-          >
-            <div>
-              <label style={labelStyle}>BACKGROUND</label>
-              <input
-                type="color"
-                value={form.color}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, color: e.target.value }))
-                }
-                style={{
-                  width: "100%",
-                  height: 34,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                  padding: 2,
-                }}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>BORDER</label>
-              <input
-                type="color"
-                value={form.border}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, border: e.target.value }))
-                }
-                style={{
-                  width: "100%",
-                  height: 34,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                  padding: 2,
-                }}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>TEXT</label>
-              <input
-                type="color"
-                value={form.text}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, text: e.target.value }))
-                }
-                style={{
-                  width: "100%",
-                  height: 34,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                  padding: 2,
-                }}
-              />
-            </div>
+          <div>
+            <label style={labelStyle}>COLOR PRESET</label>
+            <PresetColorPicker 
+              valueBg={form.color} 
+              onChange={c => setForm(p => ({ ...p, color: c.bg, text: c.text, border: TRANSPARENT_BORDER }))} 
+            />
           </div>
 
           {/* Required Certifications — only for regular shifts */}
@@ -1101,7 +1141,7 @@ function ShiftCodesSettings({
   shiftCodes,
   focusAreas,
   shiftCategories,
-  companyId,
+  orgId,
   certifications,
   certificationLabel,
   focusAreaLabel,
@@ -1110,7 +1150,7 @@ function ShiftCodesSettings({
   shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
   shiftCategories: ShiftCategory[];
-  companyId: string;
+  orgId: string;
   certifications: NamedItem[];
   certificationLabel: string;
   focusAreaLabel: string;
@@ -1133,7 +1173,7 @@ function ShiftCodesSettings({
   const handleAdd = (focusAreaId: number | null, isOffDay = false) => {
     const tmp: ShiftCode & { isNew: boolean } = {
       id: nextTmpId.current--,
-      companyId: companyId,
+      orgId: orgId,
       label: "",
       name: "",
       color: isOffDay ? "#F1F5F9" : "#F8FAFC",
@@ -1179,7 +1219,7 @@ function ShiftCodesSettings({
         st={st}
         focusAreas={focusAreas}
         shiftCategories={shiftCategories}
-        companyId={companyId}
+        orgId={orgId}
         certifications={certifications}
         certificationLabel={certificationLabel}
         focusAreaLabel={focusAreaLabel}
@@ -1353,7 +1393,7 @@ function StringListSettings({
     const trimmedName = newName.trim();
     const trimmedAbbr = newAbbr.trim() || trimmedName;
     if (!trimmedName || local.some((it) => it.name === trimmedName)) return;
-    setLocal((prev) => [...prev, { id: 0, companyId: "", name: trimmedName, abbr: trimmedAbbr, sortOrder: prev.length }]);
+    setLocal((prev) => [...prev, { id: 0, orgId: "", name: trimmedName, abbr: trimmedAbbr, sortOrder: prev.length }]);
     setNewName("");
     setNewAbbr("");
   };
@@ -1646,11 +1686,11 @@ function StringListSettings({
 // ── Indicator Types Settings ──────────────────────────────────────────────────
 function IndicatorTypesSettings({
   indicatorTypes,
-  companyId,
+  orgId,
   onChange,
 }: {
   indicatorTypes: IndicatorType[];
-  companyId: string;
+  orgId: string;
   onChange: (types: IndicatorType[]) => void;
 }) {
   const [local, setLocal] = useState<(IndicatorType & { isNew?: boolean })[]>(indicatorTypes);
@@ -1662,7 +1702,7 @@ function IndicatorTypesSettings({
   const handleAdd = () => {
     const tmp: IndicatorType & { isNew: boolean } = {
       id: nextTmpId.current--,
-      companyId: companyId,
+      orgId: orgId,
       name: "",
       color: "#6366F1",
       sortOrder: local.length,
@@ -1677,7 +1717,7 @@ function IndicatorTypesSettings({
     try {
       const saved = await db.upsertIndicatorType({
         id: indicator.isNew ? undefined : indicator.id,
-        companyId: companyId,
+        orgId: orgId,
         name: indicator.name.trim(),
         color: indicator.color,
         sortOrder: indicator.sortOrder,
@@ -1850,12 +1890,12 @@ function IndicatorTypesSettings({
 function ShiftCategoriesSettings({
   shiftCategories,
   focusAreas,
-  companyId,
+  orgId,
   onChange,
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];
-  companyId: string;
+  orgId: string;
   onChange: (categories: ShiftCategory[]) => void;
 }) {
   const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
@@ -1872,7 +1912,7 @@ function ShiftCategoriesSettings({
     const tmpId = nextTmpId.current--;
     const tmp: ShiftCategory & { isNew: boolean } = {
       id: tmpId,
-      companyId: companyId,
+      orgId: orgId,
       name: "",
       color: "#EFF6FF",
       startTime: null,
@@ -1906,7 +1946,7 @@ function ShiftCategoriesSettings({
     try {
       const saved = await db.upsertShiftCategory({
         id: cat.isNew ? undefined : cat.id,
-        companyId: companyId,
+        orgId: orgId,
         name: cat.name.trim(),
         color: cat.color,
         startTime: cat.startTime || null,
@@ -2188,7 +2228,7 @@ const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
   { label: "Notes", keys: ["canEditNotes"] },
   { label: "Recurring", keys: ["canManageRegularShifts", "canManageShiftSeries"] },
   { label: "Staff", keys: ["canManageEmployees"] },
-  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageCompanySettings"] },
+  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings"] },
 ];
 
 const PERM_LABELS: Record<keyof AdminPermissions, string> = {
@@ -2204,7 +2244,7 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canManageFocusAreas: "Manage Focus Areas",
   canManageShiftCodes: "Manage Shift Codes",
   canManageIndicatorTypes: "Manage Indicator Types",
-  canManageCompanySettings: "Manage Company Settings",
+  canManageOrgSettings: "Manage Organization Settings",
 };
 
 /** Permissions that are always on and cannot be toggled off. */
@@ -2224,14 +2264,14 @@ function emptyAdminPerms(): AdminPermissions {
     canManageFocusAreas: false,
     canManageShiftCodes: false,
     canManageIndicatorTypes: false,
-    canManageCompanySettings: false,
+    canManageOrgSettings: false,
   };
 }
 
 // ── User Management Settings ──────────────────────────────────────────────────
-function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string; isSuperAdmin: boolean }) {
+function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean }) {
   const myRole = isSuperAdmin ? "super_admin" : "user";
-  const [users, setUsers] = useState<CompanyUser[]>([]);
+  const [users, setUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2241,18 +2281,18 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
 
   useEffect(() => {
     let mounted = true;
-    db.fetchCompanyUsers(companyId)
+    db.fetchOrganizationUsers(orgId)
       .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
       .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
     return () => { mounted = false; };
-  }, [companyId]);
+  }, [orgId]);
 
   const handleRoleChange = async (userId: string, newRole: "admin" | "user") => {
     setSaving(userId);
     setError(null);
     try {
-      await db.changeCompanyUserRole(userId, newRole);
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, companyRole: newRole } : u));
+      await db.changeOrganizationUserRole(userId, newRole);
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
       if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
       toast.success("Role updated");
     } catch (e) {
@@ -2263,7 +2303,7 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
     }
   };
 
-  const openPermissions = (user: CompanyUser) => {
+  const openPermissions = (user: OrganizationUser) => {
     if (expandedUserId === user.id) { setExpandedUserId(null); return; }
     setExpandedUserId(user.id);
     if (!editingPerms[user.id]) {
@@ -2282,7 +2322,7 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
     setSavingPerms(userId);
     setError(null);
     try {
-      await db.updateAdminPermissions(userId, editingPerms[userId], companyId);
+      await db.updateAdminPermissions(userId, editingPerms[userId], orgId);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: editingPerms[userId] } : u));
       toast.success("Permissions saved");
     } catch (e) {
@@ -2297,7 +2337,7 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
     setSavingPerms(userId);
     setError(null);
     try {
-      await db.updateAdminPermissions(userId, null, companyId);
+      await db.updateAdminPermissions(userId, null, orgId);
       const cleared = emptyAdminPerms();
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: null } : u));
       setEditingPerms((prev) => ({ ...prev, [userId]: cleared }));
@@ -2339,8 +2379,8 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
       <div style={{ display: "flex", flexDirection: "column" }}>
         {users.map((user) => {
           const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
-          const roleColor = ROLE_COLORS[user.companyRole] ?? ROLE_COLORS.user;
-          const isProtected = user.companyRole === "super_admin" || user.platformRole === "gridmaster";
+          const roleColor = ROLE_COLORS[user.orgRole] ?? ROLE_COLORS.user;
+          const isProtected = user.orgRole === "super_admin" || user.platformRole === "gridmaster";
           const isExpanded = expandedUserId === user.id;
           const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
           const perms = editingPerms[user.id] ?? savedPerms;
@@ -2372,11 +2412,11 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
                   fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 20,
                   background: roleColor.bg, color: roleColor.text, whiteSpace: "nowrap",
                 }}>
-                  {ROLE_LABELS[user.companyRole] ?? user.companyRole}
+                  {ROLE_LABELS[user.orgRole] ?? user.orgRole}
                 </span>
                 {!isProtected && myRole === "super_admin" && (
                   <select
-                    value={user.companyRole}
+                    value={user.orgRole}
                     disabled={saving === user.id}
                     onChange={(e) => handleRoleChange(user.id, e.target.value as "admin" | "user")}
                     style={{
@@ -2389,7 +2429,7 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
                     <option value="user">Reset to User</option>
                   </select>
                 )}
-                {user.companyRole === "admin" && myRole === "super_admin" && (
+                {user.orgRole === "admin" && myRole === "super_admin" && (
                   <button
                     onClick={() => openPermissions(user)}
                     style={{
@@ -2417,7 +2457,7 @@ function UserManagementSettings({ companyId, isSuperAdmin }: { companyId: string
               </div>
 
               {/* Permissions panel */}
-              {isExpanded && user.companyRole === "admin" && (
+              {isExpanded && user.orgRole === "admin" && (
                 <div style={{
                   marginBottom: 10, padding: "16px 20px",
                   background: "var(--color-surface-subtle, #F9FAFB)",
@@ -2565,30 +2605,30 @@ function SidebarLink({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage({
-  company,
+  organization,
   focusAreas,
   shiftCodes,
   shiftCategories,
   indicatorTypes,
   certifications,
-  companyRoles,
-  onCompanySave,
+  orgRoles,
+  onOrganizationSave,
   onFocusAreasChange,
   onShiftCodesChange,
   onShiftCategoriesChange,
   onIndicatorTypesChange,
   onCertificationsChange,
-  onCompanyRolesChange,
-  canManageCompany,
+  onOrgRolesChange,
+  canManageOrg,
 }: SettingsPageProps) {
   const { isGridmaster, isSuperAdmin } = usePermissions();
   const [activeSection, setActiveSection] = useState<string>(
-    canManageCompany ? "company" : "impersonation"
+    canManageOrg ? "organization" : "impersonation"
   );
 
-  const focusAreaLabel = company.focusAreaLabel || "Focus Areas";
-  const certificationLabel = company.certificationLabel || "Certifications";
-  const roleLabel = company.roleLabel || "Roles";
+  const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
+  const certificationLabel = organization.certificationLabel || "Certifications";
+  const roleLabel = organization.roleLabel || "Roles";
 
   const iconBuilding = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
   const iconCalendar = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
@@ -2599,8 +2639,8 @@ export default function SettingsPage({
   const iconIndicator = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>;
   const iconTag = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
 
-  const companyLinks = canManageCompany ? [
-    { id: "company", label: "Company", icon: iconBuilding },
+  const orgLinks = canManageOrg ? [
+    { id: "organization", label: "Organization", icon: iconBuilding },
     { id: "shift-categories", label: "Shift Categories", icon: iconTag },
     { id: "shift-codes", label: "Shift Codes", icon: iconCalendar },
     { id: "indicators", label: "Indicators", icon: iconIndicator },
@@ -2612,7 +2652,7 @@ export default function SettingsPage({
     { id: "impersonation", label: "Impersonation", icon: iconImpersonate },
   ] : [];
 
-  const allLinks = [...companyLinks, ...gridmasterLinks];
+  const allLinks = [...orgLinks, ...gridmasterLinks];
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
@@ -2644,15 +2684,15 @@ export default function SettingsPage({
       {/* Content */}
       <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px" }}>
 
-        {activeSection === "company" && canManageCompany && (
+        {activeSection === "organization" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <Section title="Company Details">
-              <CompanySettings company={company} onSave={onCompanySave} />
+            <Section title="Organization Details">
+              <OrganizationSettings organization={organization} onSave={onOrganizationSave} />
             </Section>
             <Section title={focusAreaLabel}>
               <FocusAreasSettings
                 focusAreas={focusAreas}
-                companyId={company.id}
+                orgId={organization.id}
                 label={focusAreaLabel.replace(/s$/, "")}
                 onChange={onFocusAreasChange}
               />
@@ -2660,24 +2700,24 @@ export default function SettingsPage({
           </div>
         )}
 
-        {activeSection === "shift-categories" && canManageCompany && (
+        {activeSection === "shift-categories" && canManageOrg && (
           <Section title="Shift Categories">
             <ShiftCategoriesSettings
               shiftCategories={shiftCategories}
               focusAreas={focusAreas}
-              companyId={company.id}
+              orgId={organization.id}
               onChange={onShiftCategoriesChange}
             />
           </Section>
         )}
 
-        {activeSection === "shift-codes" && canManageCompany && (
+        {activeSection === "shift-codes" && canManageOrg && (
           <Section title="Shift Codes & Off Days">
             <ShiftCodesSettings
               shiftCodes={shiftCodes}
               focusAreas={focusAreas}
               shiftCategories={shiftCategories}
-              companyId={company.id}
+              orgId={organization.id}
               certifications={certifications}
               certificationLabel={certificationLabel}
               focusAreaLabel={focusAreaLabel}
@@ -2686,17 +2726,17 @@ export default function SettingsPage({
           </Section>
         )}
 
-        {activeSection === "indicators" && canManageCompany && (
+        {activeSection === "indicators" && canManageOrg && (
           <Section title="Indicators">
             <IndicatorTypesSettings
               indicatorTypes={indicatorTypes}
-              companyId={company.id}
+              orgId={organization.id}
               onChange={onIndicatorTypesChange}
             />
           </Section>
         )}
 
-        {activeSection === "staff-config" && canManageCompany && (
+        {activeSection === "staff-config" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <Section title={certificationLabel}>
               <StringListSettings
@@ -2705,7 +2745,7 @@ export default function SettingsPage({
                 placeholder="e.g. RN"
                 onSave={async (updated) => {
                   try {
-                    const saved = await db.saveCertifications(company.id, updated, certifications);
+                    const saved = await db.saveCertifications(organization.id, updated, certifications);
                     onCertificationsChange(saved);
                     toast.success("Certifications saved");
                   } catch (err) {
@@ -2718,12 +2758,12 @@ export default function SettingsPage({
             <Section title={roleLabel}>
               <StringListSettings
                 label={`Define the ${roleLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
-                items={companyRoles}
+                items={orgRoles}
                 placeholder="e.g. Charge Nurse"
                 onSave={async (updated) => {
                   try {
-                    const saved = await db.saveCompanyRoles(company.id, updated, companyRoles);
-                    onCompanyRolesChange(saved);
+                    const saved = await db.saveOrganizationRoles(organization.id, updated, orgRoles);
+                    onOrgRolesChange(saved);
                     toast.success("Roles saved");
                   } catch (err) {
                     toast.error("Failed to save roles");
@@ -2737,7 +2777,7 @@ export default function SettingsPage({
 
         {activeSection === "users" && isSuperAdmin && (
           <Section title="User Management">
-            <UserManagementSettings companyId={company.id} isSuperAdmin={isSuperAdmin} />
+            <UserManagementSettings orgId={organization.id} isSuperAdmin={isSuperAdmin} />
           </Section>
         )}
 

@@ -80,7 +80,7 @@ export default function EnhancedImpersonation({
     if (!q) return users.slice(0, 20);
     return users.filter((u) =>
       (u.email ?? "").toLowerCase().includes(q) ||
-      (u.companyName ?? "").toLowerCase().includes(q)
+      (u.orgName ?? "").toLowerCase().includes(q)
     ).slice(0, 20);
   }, [users, search]);
 
@@ -145,7 +145,7 @@ export default function EnhancedImpersonation({
             </div>
             <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
               Impersonating <strong>{selectedUser?.email}</strong>
-              {selectedUser?.companyName && ` (${selectedUser.companyName})`}
+              {selectedUser?.orgName && ` (${selectedUser.orgName})`}
             </div>
             {countdown && (
               <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-info)", marginTop: 6, fontFamily: "var(--font-dm-mono), monospace" }}>
@@ -173,7 +173,7 @@ export default function EnhancedImpersonation({
               className="dg-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by email or company…"
+              placeholder="Search by email or organization…"
               style={{ marginBottom: 12 }}
             />
 
@@ -213,9 +213,9 @@ export default function EnhancedImpersonation({
                           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
                             {u.email ?? "No email"}
                           </div>
-                          {u.companyName && (
+                          {u.orgName && (
                             <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1 }}>
-                              {u.companyName} · {u.companyRole?.replace("_", " ") ?? "user"}
+                              {u.orgName} · {u.orgRole?.replace("_", " ") ?? "user"}
                             </div>
                           )}
                         </div>

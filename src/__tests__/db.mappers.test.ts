@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { rowToCompany, rowToFocusArea, rowToShiftCode } from "@/lib/db";
-import type { DbCompany, DbFocusArea, DbShiftCode } from "@/lib/db";
+import { rowToOrganization, rowToFocusArea, rowToShiftCode } from "@/lib/db";
+import type { DbOrganization, DbFocusArea, DbShiftCode } from "@/lib/db";
 
-// ── rowToCompany ──────────────────────────────────────────────────────────────────
+// ── rowToOrganization ──────────────────────────────────────────────────────────
 
-describe("rowToCompany", () => {
+describe("rowToOrganization", () => {
   it("maps all fields correctly with camelCase conversion", () => {
-    const row: DbCompany = {
+    const row: DbOrganization = {
       id: "org-123",
       name: "Sunrise Care",
       address: "123 Main St",
@@ -20,7 +20,7 @@ describe("rowToCompany", () => {
       archived_at: null,
     };
 
-    const result = rowToCompany(row);
+    const result = rowToOrganization(row);
 
     expect(result.id).toBe("org-123");
     expect(result.name).toBe("Sunrise Care");
@@ -30,7 +30,7 @@ describe("rowToCompany", () => {
   });
 
   it("maps employee_count: null to employeeCount: null", () => {
-    const row: DbCompany = {
+    const row: DbOrganization = {
       id: "org-456",
       name: "Sunset Clinic",
       address: "456 Oak Ave",
@@ -44,7 +44,7 @@ describe("rowToCompany", () => {
       archived_at: null,
     };
 
-    const result = rowToCompany(row);
+    const result = rowToOrganization(row);
 
     expect(result.employeeCount).toBeNull();
   });
@@ -56,7 +56,7 @@ describe("rowToFocusArea", () => {
   it("maps all fields correctly with camelCase conversion", () => {
     const row: DbFocusArea = {
       id: 7,
-      company_id: "org-abc",
+      org_id: "org-abc",
       name: "East Section",
       color_bg: "#ff0000",
       color_text: "#ffffff",
@@ -67,7 +67,7 @@ describe("rowToFocusArea", () => {
     const result = rowToFocusArea(row);
 
     expect(result.id).toBe(7);
-    expect(result.companyId).toBe("org-abc");
+    expect(result.orgId).toBe("org-abc");
     expect(result.name).toBe("East Section");
     expect(result.colorBg).toBe("#ff0000");
     expect(result.colorText).toBe("#ffffff");
@@ -78,7 +78,7 @@ describe("rowToFocusArea", () => {
   it("maps archived_at timestamp to archivedAt", () => {
     const row: DbFocusArea = {
       id: 8,
-      company_id: "org-abc",
+      org_id: "org-abc",
       name: "Archived Section",
       color_bg: "#ccc",
       color_text: "#000",
@@ -95,7 +95,7 @@ describe("rowToFocusArea", () => {
 
 const baseShiftCodeRow: DbShiftCode = {
   id: 1,
-  company_id: "company-1",
+  org_id: "org-1",
   label: "D",
   name: "Day",
   color: "#fff",
@@ -162,7 +162,7 @@ import * as fc from "fast-check";
 describe("rowToShiftCode — Property 9: field mapping correctness", () => {
   const arbDbShiftCode = fc.record({
     id: fc.integer({ min: 1 }),
-    company_id: fc.string({ minLength: 1 }),
+    org_id: fc.string({ minLength: 1 }),
     label: fc.string({ minLength: 1 }),
     name: fc.string({ minLength: 1 }),
     color: fc.string(),
@@ -208,7 +208,7 @@ import type { DbEmployee } from "@/lib/db";
 
 const baseEmployeeRow: DbEmployee = {
   id: "emp-1",
-  company_id: "company-1",
+  org_id: "org-1",
   name: "Alice Smith",
   status: "active",
   status_changed_at: null,
@@ -280,7 +280,7 @@ describe("employeeToRow", () => {
   it("maps all fields correctly to snake_case", () => {
     const result = employeeToRow(baseEmployee, "org-99");
 
-    expect(result.company_id).toBe("org-99");
+    expect(result.org_id).toBe("org-99");
     expect(result.name).toBe("Bob Jones");
     expect(result.certification_id).toBe(2);
     expect(result.role_ids).toEqual([1]);
@@ -291,13 +291,13 @@ describe("employeeToRow", () => {
     expect(result.contact_notes).toBe("Prefers text");
   });
 
-  it("uses the provided companyId as company_id", () => {
+  it("uses the provided orgId as org_id", () => {
     const result = employeeToRow(baseEmployee, "org-abc");
-    expect(result.company_id).toBe("org-abc");
+    expect(result.org_id).toBe("org-abc");
   });
 
   it("does not include id in the output", () => {
-    const result = employeeToRow(baseEmployee, "company-1");
+    const result = employeeToRow(baseEmployee, "org-1");
     expect("id" in result).toBe(false);
   });
 });
@@ -308,7 +308,7 @@ describe("employeeToRow", () => {
 describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
   const arbDbEmployee = fc.record({
     id: fc.uuid(),
-    company_id: fc.string({ minLength: 1 }),
+    org_id: fc.string({ minLength: 1 }),
     name: fc.string({ minLength: 1 }),
     status: fc.constantFrom("active" as const, "benched" as const, "terminated" as const),
     status_changed_at: fc.oneof(fc.constant(null as string | null), fc.constant("2026-01-01T00:00:00Z")),
@@ -331,7 +331,7 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
       fc.property(arbDbEmployee, (row) => {
         const employee1 = rowToEmployee(row);
         const reconstructedRow = {
-          ...employeeToRow(employee1, row.company_id),
+          ...employeeToRow(employee1, row.org_id),
           id: row.id,
           status: row.status,
           status_changed_at: row.status_changed_at,

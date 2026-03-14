@@ -62,22 +62,22 @@ export async function getServerUserClaims(): Promise<UserClaims | null> {
 
   const raw = decodeJwtPayload(session.access_token);
 
-  let companyId = typeof raw?.company_id === "string" ? raw.company_id : null;
-  let companySlug = typeof raw?.company_slug === "string" ? raw.company_slug : null;
+  let orgId = typeof raw?.org_id === "string" ? raw.org_id : null;
+  let orgSlug = typeof raw?.org_slug === "string" ? raw.org_slug : null;
 
   // Fallback to database query if JWT claims are missing
-  if (!companySlug) {
+  if (!orgSlug) {
     try {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("company_id, companies(slug)")
+        .select("org_id, organizations(slug)")
         .eq("id", user.id)
         .single();
 
       if (profile) {
-        companyId = profile.company_id;
-        const companies = profile.companies as any;
-        companySlug = Array.isArray(companies) ? companies[0]?.slug : companies?.slug || null;
+        orgId = profile.org_id;
+        const organizations = profile.organizations as any;
+        orgSlug = Array.isArray(organizations) ? organizations[0]?.slug : organizations?.slug || null;
       }
     } catch (err: any) {
       const isAbortError =
@@ -94,8 +94,8 @@ export async function getServerUserClaims(): Promise<UserClaims | null> {
   return {
     userId: user.id,
     email: user.email ?? null,
-    companyId,
-    companySlug,
+    orgId,
+    orgSlug,
   };
 }
 

@@ -10,7 +10,7 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface RegularSchedulePanelProps {
   employee: Employee;
-  companyId: string;
+  orgId: string;
   shiftCodes: ShiftCode[];
   /** Full code map (including archived) for resolving historical labels. */
   shiftCodeMap: Map<number, string>;
@@ -89,9 +89,9 @@ export function DayPicker({
           onClose();
         }}
         style={{
-          background: isActive ? bg : "#fff",
-          border: `1.5px solid ${isActive ? border : "#E2E8F0"}`,
-          borderRadius: 8,
+          background: isActive ? bg : "#F8FAFC",
+          border: isActive ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(0,0,0,0.1)",
+          borderRadius: 6,
           padding: "8px 10px",
           cursor: "pointer",
           textAlign: "left",
@@ -151,8 +151,8 @@ export function DayPicker({
             gap: 8,
             padding: "8px 12px",
             background: shiftCode ? shiftCode.color : "#F8FAFC",
-            border: `1.5px solid ${shiftCode ? shiftCode.border : open ? "#94A3B8" : "#E2E8F0"}`,
-            borderRadius: 8,
+            border: shiftCode ? "1px solid rgba(0,0,0,0.15)" : open ? "1.5px solid #94A3B8" : "1.5px solid #E2E8F0",
+            borderRadius: 6,
             cursor: "pointer",
             fontFamily: "inherit",
             transition: "border-color 120ms ease",
@@ -281,7 +281,7 @@ export function DayPicker({
 // ── Main panel ────────────────────────────────────────────────────────────────
 export default function RegularSchedulePanel({
   employee,
-  companyId,
+  orgId,
   shiftCodes,
   shiftCodeMap,
   focusAreas,
@@ -304,7 +304,7 @@ export default function RegularSchedulePanel({
   })();
 
   useEffect(() => {
-    db.fetchRegularShifts(companyId, employee.id, shiftCodeMap)
+    db.fetchRegularShifts(orgId, employee.id, shiftCodeMap)
       .then((rows) => {
         const map: Record<number, string> = {};
         for (const rs of rows) {
@@ -317,7 +317,7 @@ export default function RegularSchedulePanel({
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [employee.id, companyId]);
+  }, [employee.id, orgId]);
 
   const qualifiedShiftCodes = shiftCodes.filter((st) => {
     const certOk =
@@ -338,7 +338,7 @@ export default function RegularSchedulePanel({
         if (newLabel) {
           const sc = shiftCodes.find(s => s.label === newLabel);
           if (!sc) continue;
-          await db.upsertRegularShift(employee.id, companyId, day, sc.id, todayKey);
+          await db.upsertRegularShift(employee.id, orgId, day, sc.id, todayKey);
         } else {
           for (const rs of existing) {
             await db.deleteRegularShift(employee.id, rs.dayOfWeek, rs.effectiveFrom);

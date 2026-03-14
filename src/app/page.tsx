@@ -87,15 +87,15 @@ export default function RootPage() {
           if (isApexHost(parsed)) {
             const { data: profile } = await supabase
               .from("profiles")
-              .select("companies(slug)")
+              .select("organizations(slug)")
               .eq("id", session.user.id)
               .maybeSingle();
 
             const slug = (
               profile as {
-                companies?: { slug?: string | null } | null;
+                organizations?: { slug?: string | null } | null;
               } | null
-            )?.companies?.slug;
+            )?.organizations?.slug;
             if (slug) {
               const host = buildSubdomainHost(slug, parsed);
               window.location.replace(
