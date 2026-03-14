@@ -44,7 +44,7 @@ const generalShift: ShiftCode = {
   name: "Off",
   color: "#F1F5F9",
   border: "#CBD5E1",
-  text: "#64748B",
+  text:"#475569",
   sortOrder: 3,
   isGeneral: true,
 };

@@ -223,7 +223,7 @@ export default function ShiftEditPanel({
       shiftCodes.find((st) => st.label === label) ?? {
         color: "#F8FAFC",
         border: "#CBD5E1",
-        text: "#64748B",
+        text:"#475569",
       }
     );
   }

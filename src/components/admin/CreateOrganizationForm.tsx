@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { createOrganization, assignOrgRoleByEmail } from "@/lib/db";
 import type { Organization } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 const TIMEZONES = [
   "America/New_York",
@@ -206,17 +207,15 @@ export default function CreateOrganizationForm({
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={labelStyle}>Timezone</label>
-              <select
-                className="dg-input"
+              <CustomSelect
                 value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                style={{ cursor: "pointer" }}
-              >
-                <option value="">Select timezone…</option>
-                {TIMEZONES.map((tz) => (
-                  <option key={tz} value={tz}>{tz}</option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "Select timezone…" },
+                  ...TIMEZONES.map((tz) => ({ value: tz, label: tz })),
+                ]}
+                onChange={setTimezone}
+                style={{ width: "100%" }}
+              />
             </div>
           </div>
         </div>

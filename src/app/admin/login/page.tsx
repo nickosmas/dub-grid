@@ -114,7 +114,7 @@ export default function SuperAdminLoginPage() {
                   fontSize: "14px",
                   fontWeight: 500,
                   marginBottom: "6px",
-                  color: "#94A3B8",
+                  color:"#64748B",
                 }}
               >
                 Email
@@ -143,7 +143,7 @@ export default function SuperAdminLoginPage() {
                   fontSize: "14px",
                   fontWeight: 500,
                   marginBottom: "6px",
-                  color: "#94A3B8",
+                  color:"#64748B",
                 }}
               >
                 Password
@@ -201,7 +201,7 @@ export default function SuperAdminLoginPage() {
               marginTop: "24px",
               textAlign: "center",
               fontSize: "13px",
-              color: "#64748B",
+              color:"#475569",
               display: "flex",
               flexDirection: "column",
               gap: "8px",
@@ -214,7 +214,7 @@ export default function SuperAdminLoginPage() {
               style={{
                 background: "none",
                 border: "none",
-                color: "#94A3B8",
+                color:"#64748B",
                 cursor: "pointer",
                 padding: 0,
                 textDecoration: "underline",
@@ -228,7 +228,7 @@ export default function SuperAdminLoginPage() {
               style={{
                 background: "none",
                 border: "none",
-                color: "#64748B",
+                color:"#475569",
                 cursor: "pointer",
                 padding: 0,
                 textDecoration: "underline",

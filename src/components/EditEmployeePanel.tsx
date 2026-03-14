@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { Employee, FocusArea, NamedItem } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
@@ -195,21 +196,16 @@ export default function EditEmployeePanel({
 
           <div>
             <label style={labelStyle}>{certificationLabel.toUpperCase()}</label>
-            <select
-              className="dg-input"
-              value={form.certificationId ?? ""}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, certificationId: e.target.value ? Number(e.target.value) : null }))
-              }
+            <CustomSelect
+              value={form.certificationId != null ? String(form.certificationId) : ""}
+              options={[
+                { value: "", label: "— None —" },
+                ...certifications.map((d) => ({ value: String(d.id), label: d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name })),
+              ]}
+              onChange={(v) => setForm((p) => ({ ...p, certificationId: v ? Number(v) : null }))}
               disabled={readOnly}
-            >
-              <option value="">— None —</option>
-              {certifications.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name}
-                </option>
-              ))}
-            </select>
+              style={{ width: "100%" }}
+            />
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 "use client";
+import CustomSelect from "@/components/CustomSelect";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -690,10 +691,15 @@ function UsersTab({
             </div>
             <div style={{ minWidth: 120 }}>
               <label style={labelStyle}>Role</label>
-              <select className="dg-input" value={addRole} onChange={(e) => setAddRole(e.target.value as "admin" | "user")} style={{ cursor: "pointer" }}>
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
+              <CustomSelect
+                value={addRole}
+                options={[
+                  { value: "user", label: "User" },
+                  { value: "admin", label: "Admin" },
+                ]}
+                onChange={(v) => setAddRole(v as "admin" | "user")}
+                style={{ width: "100%" }}
+              />
             </div>
             <button type="submit" className="dg-btn dg-btn-primary" disabled={adding} style={{ fontSize: 12 }}>
               {adding ? "Adding…" : "Add"}
@@ -731,16 +737,17 @@ function UsersTab({
                       {u.orgRole === "super_admin" ? (
                         <RoleBadge role={u.orgRole} />
                       ) : (
-                        <select
-                          className="dg-input"
+                        <CustomSelect
                           value={u.orgRole}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value as OrganizationRole)}
+                          options={[
+                            { value: "user", label: "User" },
+                            { value: "admin", label: "Admin" },
+                          ]}
+                          onChange={(v) => handleRoleChange(u.id, v as OrganizationRole)}
                           disabled={changingRole === u.id}
-                          style={{ padding: "3px 8px", fontSize: 12, maxWidth: 120, cursor: "pointer" }}
-                        >
-                          <option value="user">User</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                          style={{ width: 130 }}
+                          fontSize={12}
+                        />
                       )}
                     </td>
                     <td style={{ ...tdStyle, fontSize: 11, color: "var(--color-text-muted)" }}>

@@ -40,7 +40,12 @@
       "Bash(supabase:*)",
       "Bash(ls:*)",
       "Bash(find:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(DATABASE_URL='postgresql://postgres.xpoylacxkbphnudsupuu:LeviVema1994!@aws-0-us-west-2.pooler.supabase.com:5432/postgres' npx tsx:*)",
+      "Bash(wc:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:blubaroN*#9575!@db.xpoylacxkbphnudsupuu.supabase.co:5432/postgres\" npx tsx:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:blubaroN%2A%239575%21@db.xpoylacxkbphnudsupuu.supabase.co:5432/postgres\" npx tsx:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.xpoylacxkbphnudsupuu:blubaroN%2A%239575%21@aws-0-us-west-1.pooler.supabase.com:5432/postgres\" npx tsx:*)"
     ]
   }
 }
