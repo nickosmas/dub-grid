@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchAllUsers } from "@/lib/db";
 import type { PlatformUser, Organization } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
@@ -126,57 +127,49 @@ export default function AllUsersView({
           placeholder="Search by email…"
           style={{ maxWidth: 280 }}
         />
-        <select
-          className="dg-input"
+        <CustomSelect
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          style={{ maxWidth: 160, cursor: "pointer" }}
-        >
-          <option value="all">All Roles</option>
-          <option value="gridmaster">Gridmaster</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="user">User</option>
-        </select>
-        <select
-          className="dg-input"
+          options={[
+            { value: "all", label: "All Roles" },
+            { value: "gridmaster", label: "Gridmaster" },
+            { value: "super_admin", label: "Super Admin" },
+            { value: "admin", label: "Admin" },
+            { value: "user", label: "User" },
+          ]}
+          onChange={setRoleFilter}
+          style={{ width: 160 }}
+        />
+        <CustomSelect
           value={orgFilter}
-          onChange={(e) => setOrgFilter(e.target.value)}
-          style={{ maxWidth: 200, cursor: "pointer" }}
-        >
-          <option value="all">All Organizations</option>
-          {organizations.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+          options={[
+            { value: "all", label: "All Organizations" },
+            ...organizations.map((c) => ({ value: c.id, label: c.name })),
+          ]}
+          onChange={setOrgFilter}
+          style={{ width: 200 }}
+        />
         <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
           {filtered.length} result{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      {/* Table */}
-      <div style={sectionStyle}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Platform Role</th>
-                <th style={thStyle}>Organization Role</th>
-                <th style={thStyle}>Organization</th>
-                <th style={thStyle}>Joined</th>
-                <th style={thStyle}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
+      {/* Table & Empty State */}
+      {filtered.length > 0 ? (
+        <div style={sectionStyle}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
-                    No users found
-                  </td>
+                  <th style={thStyle}>Email</th>
+                  <th style={thStyle}>Platform Role</th>
+                  <th style={thStyle}>Organization Role</th>
+                  <th style={thStyle}>Organization</th>
+                  <th style={thStyle}>Joined</th>
+                  <th style={thStyle}>Actions</th>
                 </tr>
-              ) : (
-                filtered.map((u) => (
+              </thead>
+              <tbody>
+                {filtered.map((u) => (
                   <tr key={u.id}>
                     <td style={{ ...tdStyle, fontWeight: 600, fontSize: 12 }}>
                       {u.email ?? "—"}
@@ -224,12 +217,39 @@ export default function AllUsersView({
                       )}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          style={{
+            padding: "48px 20px",
+            textAlign: "center",
+            background: "#fff",
+            borderRadius: 12,
+            border: "1px dashed var(--color-border)",
+            color: "var(--color-text-muted)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <div style={{ color: "var(--color-text-faint)", background: "#F8FAFC", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+              No users found
+            </div>
+            <div style={{ fontSize: 13 }}>
+              There are no matching users for these filters.
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

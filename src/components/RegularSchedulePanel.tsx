@@ -107,7 +107,7 @@ export function DayPicker({
         }}
       >
         {isOff ? (
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8" }}>— Off —</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color:"#64748B" }}>— Off —</div>
         ) : (
           <>
             <div style={{ fontWeight: 800, fontSize: 13, color: isActive ? text : border }}>
@@ -173,7 +173,7 @@ export function DayPicker({
                 )}
               </>
             ) : (
-              <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 500 }}>— Off —</span>
+              <span style={{ fontSize: 12, color:"#64748B", fontWeight: 500 }}>— Off —</span>
             )}
           </div>
           <svg

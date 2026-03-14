@@ -152,8 +152,8 @@ BEGIN
   INSERT INTO public.shift_codes
     (org_id, label, name, color, border_color, text_color, is_off_day, is_general, focus_area_id, sort_order, required_certification_ids, category_id)
   VALUES
-    (org, 'X',   'Off',     '#FDE68A', 'transparent', '#92400E', true,  false, NULL, 0, '{}', NULL),
-    (org, 'Ofc', 'Office',  '#FECACA', 'transparent', '#991B1B', false, true,  NULL, 1, '{}', NULL),
+    (org, 'X',   'Off',     '#E2E8F0', 'transparent', '#1E293B', true,  false, NULL, 0, '{}', NULL),
+    (org, 'Ofc', 'Office',  '#E2E8F0', 'transparent', '#1E293B', false, true,  NULL, 1, '{}', NULL),
     (org, '0.3', 'Partial', '#E2E8F0', 'transparent', '#1E293B', false, true,  NULL, 2, '{}', NULL)
   ON CONFLICT DO NOTHING;
 
@@ -164,7 +164,7 @@ BEGIN
     (org, 'D',   'Day',              '#FECACA', 'transparent', '#991B1B', false, false, fa_snw,  0, '{}', '07:00', '15:30', cat_snw_d),
     (org, 'Ds',  'Day (Supervisor)', '#FED7AA', 'transparent', '#9A3412', false, false, fa_snw,  1, '{}', '07:00', '15:30', cat_snw_d),
     (org, 'Dcn', 'Day (CN)',         '#C7D2FE', 'transparent', '#3730A3', false, false, fa_snw,  2, '{}', '07:00', '15:30', cat_snw_d),
-    (org, '(D)', 'Day (Float)',      '#FDE68A', 'transparent', '#92400E', false, true,  fa_snw,  3, '{}', '07:00', '15:30', cat_snw_d),
+    (org, '(D)', 'Day (Float)',      '#E2E8F0', 'transparent', '#1E293B', false, true,  fa_snw,  3, '{}', '07:00', '15:30', cat_snw_d),
     (org, 'E',   'Evening',              '#FECACA', 'transparent', '#991B1B', false, false, fa_snw, 10, '{}', '15:30', '00:00', cat_snw_e),
     (org, 'Es',  'Evening (Supervisor)', '#E9D5FF', 'transparent', '#6B21A8', false, false, fa_snw, 11, '{}', '15:30', '00:00', cat_snw_e),
     (org, 'Ecn', 'Evening (CN)',         '#DDD6FE', 'transparent', '#5B21B6', false, false, fa_snw, 12, '{}', '15:30', '00:00', cat_snw_e)
@@ -303,7 +303,8 @@ BEGIN
     (org, 'Christian Science Nurse III',  'CSN III', 1),
     (org, 'Christian Science Nurse II',   'CSN II',  2),
     (org, 'Christian Science Nurse I',   'CSN I',  2),
-    (org, 'Staff Nurse',    'STAFF',   3)
+    (org, 'Staff Nurse',    'STAFF',   3),
+    (org, 'Other',          'Other',   4)
   ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
 
   SELECT id INTO cert_jlcsn FROM public.certifications WHERE org_id = org AND name = 'Journal Listed Christian Science Nurse';
@@ -319,7 +320,7 @@ BEGIN
     (org, 'Assistant Director of Christian Science Nursing',                  'ADCSN',    0),
     (org, 'Assistant Director of Christian Science Nursing Training',                  'ADCSNT',    0),
     (org, 'Director of Visiting Christian Science Nursing',                 'DVCSN',   1),
-    (org, 'Supervisor ',                  'Supv',    2),
+    (org, 'Supervisor',                   'Supv',    2),
     (org, 'Mentor',                'Mentor',  3),
     (org, 'Christian Science Nurse',                    'CN',      4),
     (org, 'Sheltered Care Manager',             'SC Mgr',  5),
@@ -327,14 +328,14 @@ BEGIN
     (org, 'SC/Asst/Act/Cor',       'SC/Act. Cor', 7)
   ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
 
-  SELECT id INTO role_dcsn   FROM public.organization_roles WHERE org_id = org AND name = 'DCSN';
-  SELECT id INTO role_dvcsn  FROM public.organization_roles WHERE org_id = org AND name = 'DVCSN';
-  SELECT id INTO role_supv   FROM public.organization_roles WHERE org_id = org AND name = 'Supv';
-  SELECT id INTO role_mentor FROM public.organization_roles WHERE org_id = org AND name = 'Mentor';
-  SELECT id INTO role_cn     FROM public.organization_roles WHERE org_id = org AND name = 'CN';
-  SELECT id INTO role_scmgr  FROM public.organization_roles WHERE org_id = org AND name = 'SC. Mgr.';
-  SELECT id INTO role_actcor FROM public.organization_roles WHERE org_id = org AND name = 'Activity Coordinator';
-  SELECT id INTO role_scasst FROM public.organization_roles WHERE org_id = org AND name = 'SC/Asst/Act/Cor';
+  SELECT id INTO role_dcsn   FROM public.organization_roles WHERE org_id = org AND abbr = 'DCSN';
+  SELECT id INTO role_dvcsn  FROM public.organization_roles WHERE org_id = org AND abbr = 'DVCSN';
+  SELECT id INTO role_supv   FROM public.organization_roles WHERE org_id = org AND abbr = 'Supv';
+  SELECT id INTO role_mentor FROM public.organization_roles WHERE org_id = org AND abbr = 'Mentor';
+  SELECT id INTO role_cn     FROM public.organization_roles WHERE org_id = org AND abbr = 'CN';
+  SELECT id INTO role_scmgr  FROM public.organization_roles WHERE org_id = org AND abbr = 'SC Mgr';
+  SELECT id INTO role_actcor FROM public.organization_roles WHERE org_id = org AND abbr = 'Act Cor';
+  SELECT id INTO role_scasst FROM public.organization_roles WHERE org_id = org AND abbr = 'SC/Act. Cor';
 
   -- ── Focus Area IDs ──────────────────────────────────────────────────────────
   SELECT id INTO fa_snw  FROM public.focus_areas WHERE org_id = org AND name = 'Skilled Nursing';

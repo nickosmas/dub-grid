@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import Modal from "@/components/Modal";
 import { Employee, FocusArea, NamedItem } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 type RowEntry = {
   _id: string;
@@ -150,17 +151,16 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                 />
 
                 {/* Certification */}
-                <select
-                  className="dg-input"
-                  value={row.certificationId ?? ""}
-                  onChange={(e) => updateRow(row._id, { certificationId: e.target.value ? Number(e.target.value) : null })}
-                  style={{ fontSize: 12 }}
-                >
-                  <option value="">— None —</option>
-                  {certifications.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name}</option>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={row.certificationId != null ? String(row.certificationId) : ""}
+                  options={[
+                    { value: "", label: "— None —" },
+                    ...certifications.map((d) => ({ value: String(d.id), label: d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name })),
+                  ]}
+                  onChange={(v) => updateRow(row._id, { certificationId: v ? Number(v) : null })}
+                  style={{ width: "100%" }}
+                  fontSize={12}
+                />
 
                 {/* Focus Areas */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>

@@ -246,8 +246,8 @@ export default function RootPage() {
       <footer className="footer">
         <div className="nav-inner footer-inner">
           <div className="nav-brand" style={{ opacity: 0.6 }}>
-            <DubGridLogo size={24} color="#64748B" />
-            <DubGridWordmark fontSize={16} color="#64748B" />
+            <DubGridLogo size={24} color="#475569" />
+            <DubGridWordmark fontSize={16} color="#475569" />
           </div>
           <span className="footer-copy">
             © {new Date().getFullYear()} DubGrid. All rights reserved.

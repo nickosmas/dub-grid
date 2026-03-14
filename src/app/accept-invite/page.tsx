@@ -308,7 +308,7 @@ const headingStyle: React.CSSProperties = {
 
 const subtextStyle: React.CSSProperties = {
   fontSize: "16px",
-  color: "#64748B",
+  color:"#475569",
   lineHeight: 1.6,
   marginBottom: "24px",
 };

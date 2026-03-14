@@ -164,7 +164,7 @@ function DomainSelector() {
 
     const { protocol, port } = window.location;
     const portStr = port ? `:${port}` : "";
-    window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login`;
+    window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login?verified=1`;
   }
 
   return (
@@ -451,7 +451,7 @@ function GridmasterLogin() {
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#64748B",
+              color:"#475569",
             }}
           >
             Gridmaster Portal
@@ -497,7 +497,7 @@ function GridmasterLogin() {
                 fontSize: "13px",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color: "#94A3B8",
+                color:"#64748B",
               }}
             >
               Email
@@ -529,7 +529,7 @@ function GridmasterLogin() {
                 fontSize: "13px",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color: "#94A3B8",
+                color:"#64748B",
               }}
             >
               Password
@@ -586,10 +586,15 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
-  const [validating, setValidating] = useState(true);
+
+  // Skip re-validation if the DomainSelector already verified this slug
+  const alreadyVerified = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("verified") === "1";
+  const [validating, setValidating] = useState(!alreadyVerified);
 
   // Validate subdomain corresponds to a real organization on mount
   useEffect(() => {
+    if (alreadyVerified) return;
     let cancelled = false;
     async function validate() {
       try {
@@ -611,7 +616,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
     validate();
     return () => { cancelled = true; };
-  }, [orgSlug]);
+  }, [orgSlug, alreadyVerified]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

@@ -10,6 +10,7 @@ import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { usePermissions } from "@/hooks";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import CustomSelect from "@/components/CustomSelect";
 
 function PresetColorPicker({ valueBg, onChange }: { valueBg: string; onChange: (c: PredefinedColor) => void }) {
   const active = getPresetByBg(valueBg);
@@ -341,16 +342,15 @@ function OrganizationSettings({
       {/* Timezone */}
       <div>
         <label style={labelStyle}>TIME ZONE</label>
-        <select
+        <CustomSelect
           value={form.timezone}
-          onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-          style={{ ...inputStyle, maxWidth: 340 }}
-        >
-          <option value="">— Select a time zone —</option>
-          {TIMEZONES.map((tz) => (
-            <option key={tz.value} value={tz.value}>{tz.label}</option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "— Select a time zone —" },
+            ...TIMEZONES.map((tz) => ({ value: tz.value, label: tz.label })),
+          ]}
+          onChange={(v) => setForm((p) => ({ ...p, timezone: v }))}
+          style={{ width: "100%", maxWidth: 340 }}
+        />
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -383,65 +383,41 @@ function OrganizationSettings({
 // ── Focus Area row ────────────────────────────────────────────────────────────
 function FocusAreaRow({
   focusArea,
-  orgId,
-  onSaved,
   onDeleted,
+  onFormChange,
+  isDragging,
+  isDropTarget,
+  isReordering,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   focusArea: FocusArea & { isNew?: boolean };
-  orgId: string;
-  onSaved: (w: FocusArea) => void;
   onDeleted: (id: number) => void;
+  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  isReordering: boolean;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
 }) {
   const [form, setForm] = useState({
     name: focusArea.name,
     colorBg: focusArea.colorBg,
     colorText: focusArea.colorText,
   });
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isEditing, setIsEditing] = useState(!!focusArea.isNew);
 
-  const isModified =
-    form.name !== focusArea.name ||
-    form.colorBg !== focusArea.colorBg ||
-    form.colorText !== focusArea.colorText;
-
-  const handleSave = useCallback(async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      const saved = await db.upsertFocusArea({
-        id: focusArea.isNew ? undefined : focusArea.id,
-        orgId: orgId,
-        name: form.name.trim(),
-        colorBg: form.colorBg,
-        colorText: form.colorText,
-        sortOrder: focusArea.sortOrder,
-      }) as FocusArea;
-      onSaved(saved);
-      setIsEditing(false);
-      toast.success("Focus area saved");
-    } catch (err) {
-      toast.error("Failed to save focus area");
-      console.error('upsertFocusArea error:', err instanceof Error ? err.message : JSON.stringify(err), err);
-    } finally {
-      setSaving(false);
+  // Propagate form edits to parent for batch save
+  useEffect(() => {
+    if (isReordering) {
+      onFormChange(focusArea.id, form);
     }
-  }, [form, focusArea, orgId, onSaved]);
-
-  const handleCancel = useCallback(() => {
-    setForm({
-      name: focusArea.name,
-      colorBg: focusArea.colorBg,
-      colorText: focusArea.colorText,
-    });
-    if (focusArea.isNew) {
-      onDeleted(focusArea.id);
-    } else {
-      setIsEditing(false);
-    }
-  }, [focusArea, onDeleted]);
+  }, [form, isReordering]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = useCallback(async () => {
     if (focusArea.isNew) {
@@ -462,145 +438,99 @@ function FocusAreaRow({
     }
   }, [focusArea, onDeleted]);
 
-  if (!isEditing) {
+  // Read-only display mode
+  if (!isReordering) {
     return (
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "11px 0",
+          padding: "11px 12px",
           borderBottom: "1px solid var(--color-border-light)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            style={{
-              display: "inline-block",
-              padding: "3px 12px",
-              borderRadius: 20,
-              background: focusArea.colorBg,
-              border: "1px solid rgba(0,0,0,0.08)",
-              color: focusArea.colorText,
-              fontSize: 13,
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
-          </span>
-        </div>
-        <button
-          onClick={() => setIsEditing(true)}
+        <span
           style={{
-            background: "none",
-            border: "1px solid var(--color-border)",
-            borderRadius: 7,
-            color: "var(--color-text-primary)",
-            padding: "6px 12px",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
+            display: "inline-block",
+            padding: "3px 12px",
+            borderRadius: 20,
+            background: focusArea.colorBg,
+            border: "1px solid rgba(0,0,0,0.08)",
+            color: focusArea.colorText,
+            fontSize: 13,
+            fontWeight: 700,
             whiteSpace: "nowrap",
           }}
         >
-          Edit
-        </button>
+          {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
+        </span>
       </div>
     );
   }
 
+  // Edit / reorder mode — drag handle + inline editing
   return (
     <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={isReordering ? onDragOver : undefined}
+      onDrop={isReordering ? onDrop : undefined}
+      onDragEnd={isReordering ? onDragEnd : undefined}
       style={{
-        padding: "12px 0",
+        padding: "12px 12px",
+        borderTop: isDropTarget ? "2px solid #2563EB" : undefined,
         borderBottom: "1px solid var(--color-border-light)",
+        cursor: "grab",
+        opacity: isDragging ? 0.4 : 1,
+        userSelect: isReordering ? "none" : undefined,
+        transition: "opacity 0.15s",
       }}
     >
-      {/* Live preview */}
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        {/* Drag handle */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-faint)", flexShrink: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            <rect x="3" y="2" width="2" height="2" rx="1"/>
+            <rect x="9" y="2" width="2" height="2" rx="1"/>
+            <rect x="3" y="6" width="2" height="2" rx="1"/>
+            <rect x="9" y="6" width="2" height="2" rx="1"/>
+            <rect x="3" y="10" width="2" height="2" rx="1"/>
+            <rect x="9" y="10" width="2" height="2" rx="1"/>
+          </svg>
+        </div>
+
+        {/* Live preview badge */}
         <span
           style={{
             display: "inline-block",
-            padding: "5px 20px",
+            padding: "3px 12px",
             borderRadius: 20,
             background: form.colorBg,
             border: "1px solid rgba(0,0,0,0.08)",
             color: form.colorText,
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 700,
+            whiteSpace: "nowrap",
           }}
         >
           {form.name || "Preview"}
         </span>
-      </div>
 
-      {/* Name */}
-      <div style={{ marginBottom: 10 }}>
-        <label style={labelStyle}>NAME</label>
-        <input
-          value={form.name}
-          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-          placeholder="Area name"
-          style={inputStyle}
-          autoFocus
-        />
-      </div>
-
-      {/* Color */}
-      <div style={{ marginBottom: 12 }}>
-        <label style={labelStyle}>COLOR</label>
-        <PresetColorPicker
-          valueBg={form.colorBg}
-          onChange={(c) => setForm((p) => ({ ...p, colorBg: c.bg, colorText: c.text }))}
-        />
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button
-          onClick={handleSave}
-          disabled={!isModified || saving}
-          style={{
-            background: isModified ? "var(--color-accent-gradient)" : "#ccc",
-            border: "none",
-            color: "#fff",
-            borderRadius: 7,
-            padding: "7px 16px",
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: isModified ? "pointer" : "not-allowed",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
-        <button
-          onClick={handleCancel}
-          style={{
-            background: "none",
-            border: "1px solid var(--color-border)",
-            borderRadius: 7,
-            color: "var(--color-text-muted)",
-            padding: "7px 14px",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Cancel
-        </button>
         <div style={{ flex: 1 }} />
+
+        {/* Delete */}
         {!focusArea.isNew && (
           <button
-            onClick={() => setShowDeleteConfirm(true)}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
             disabled={deleting}
             style={{
               background: "none",
               border: "1px solid #FEE2E2",
               borderRadius: 7,
               color: "#EF4444",
-              padding: "7px 12px",
+              padding: "5px 10px",
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
@@ -609,6 +539,29 @@ function FocusAreaRow({
             {deleting ? "…" : "Delete"}
           </button>
         )}
+      </div>
+
+      {/* Name */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8, paddingLeft: 24 }}>
+        <label style={{ ...labelStyle, marginBottom: 0, minWidth: 48 }}>NAME</label>
+        <input
+          value={form.name}
+          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          draggable={false}
+          placeholder="Area name"
+          style={{ ...inputStyle, flex: 1 }}
+        />
+      </div>
+
+      {/* Color */}
+      <div style={{ paddingLeft: 24 }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <label style={labelStyle}>COLOR</label>
+        <PresetColorPicker
+          valueBg={form.colorBg}
+          onChange={(c) => setForm((p) => ({ ...p, colorBg: c.bg, colorText: c.text }))}
+        />
       </div>
 
       {showDeleteConfirm && (
@@ -641,7 +594,57 @@ function FocusAreasSettings({
 }) {
   const [localFocusAreas, setLocalFocusAreas] =
     useState<(FocusArea & { isNew?: boolean })[]>(focusAreas);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
   const nextTmpId = useRef(-1);
+
+  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })))
+    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })));
+
+  // Live preview: show items in dragged order without committing
+  const displayList = useMemo(() => {
+    if (!isEditing || draggedIdx === null || dragOverIdx === null) return localFocusAreas;
+    const list = [...localFocusAreas];
+    const [item] = list.splice(draggedIdx, 1);
+    list.splice(dragOverIdx, 0, item);
+    return list;
+  }, [isEditing, localFocusAreas, draggedIdx, dragOverIdx]);
+
+  const handleEnterEdit = () => {
+    setLocalFocusAreas([...focusAreas]);
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    setLocalFocusAreas([...focusAreas]);
+    setIsEditing(false);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const handleSaveAll = async () => {
+    setSaving(true);
+    try {
+      const withOrder = localFocusAreas.map((fa, i) => ({ ...fa, sortOrder: i }));
+      await Promise.all(
+        withOrder
+          .filter((fa) => !fa.isNew)
+          .map((fa) =>
+            db.upsertFocusArea({ id: fa.id, orgId, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText, sortOrder: fa.sortOrder }),
+          ),
+      );
+      setLocalFocusAreas(withOrder);
+      onChange(withOrder);
+      setIsEditing(false);
+      toast.success("Focus areas saved");
+    } catch {
+      toast.error("Failed to save focus areas");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleAdd = () => {
     const tmp: FocusArea & { isNew: boolean } = {
@@ -654,14 +657,13 @@ function FocusAreasSettings({
       isNew: true,
     };
     setLocalFocusAreas((prev) => [...prev, tmp]);
+    setIsEditing(true);
   };
 
-  const handleSaved = (saved: FocusArea) => {
-    const updated = localFocusAreas.map((w) =>
-      w.name === saved.name || w.id === saved.id ? saved : w,
+  const handleFormChange = (id: number, patch: { name: string; colorBg: string; colorText: string }) => {
+    setLocalFocusAreas((prev) =>
+      prev.map((fa) => (fa.id === id ? { ...fa, ...patch } : fa)),
     );
-    setLocalFocusAreas(updated);
-    onChange(updated);
   };
 
   const handleDeleted = (id: number) => {
@@ -670,18 +672,92 @@ function FocusAreasSettings({
     onChange(updated);
   };
 
+  // Drag handlers
+  const handleDragStart = (idx: number) => {
+    setDraggedIdx(idx);
+    setDragOverIdx(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIdx(targetIdx);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx) {
+      const list = [...localFocusAreas];
+      const [item] = list.splice(draggedIdx, 1);
+      list.splice(dragOverIdx, 0, item);
+      setLocalFocusAreas(list);
+    }
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: 4 }}>
-        {localFocusAreas.map((focusArea) => (
-          <FocusAreaRow
-            key={focusArea.id}
-            focusArea={focusArea}
-            orgId={orgId}
-            onSaved={handleSaved}
-            onDeleted={handleDeleted}
-          />
-        ))}
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        {!isEditing && (
+          <button
+            onClick={handleEnterEdit}
+            className="dg-btn"
+            style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Edit
+          </button>
+        )}
+        {isEditing && isDirty && (
+          <button onClick={handleSaveAll} disabled={saving} className="dg-btn dg-btn-primary" style={{ padding: "7px 14px" }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        )}
+        {isEditing && (
+          <button onClick={handleCancel} className="dg-btn" style={{ padding: "7px 14px" }}>
+            Cancel
+          </button>
+        )}
+      </div>
+
+      <div
+        style={{
+          borderRadius: 12,
+          border: isEditing ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
+          overflow: "hidden",
+          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : "0 1px 4px rgba(0,0,0,0.04)",
+          transition: "border-color 0.15s, box-shadow 0.15s",
+          marginBottom: 4,
+        }}
+      >
+        {displayList.map((focusArea, i) => {
+          const realIdx = localFocusAreas.findIndex((fa) => fa.id === focusArea.id);
+          return (
+            <FocusAreaRow
+              key={focusArea.id}
+              focusArea={focusArea}
+              onDeleted={handleDeleted}
+              onFormChange={handleFormChange}
+              isReordering={isEditing}
+              isDragging={isEditing && draggedIdx !== null && localFocusAreas[draggedIdx]?.id === focusArea.id}
+              isDropTarget={isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i}
+              onDragStart={() => handleDragStart(realIdx)}
+              onDragOver={(e) => handleDragOver(e, i)}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+            />
+          );
+        })}
       </div>
       <button
         onClick={handleAdd}
@@ -955,21 +1031,20 @@ function ShiftCodeRow({
               <label style={labelStyle}>
                 {focusAreaLabel.toUpperCase()} (leave blank for global)
               </label>
-              <select
-                value={form.focusAreaId ?? ""}
-                onChange={(e) =>
+              <CustomSelect
+                value={form.focusAreaId != null ? String(form.focusAreaId) : ""}
+                options={[
+                  { value: "", label: `— Global (no ${focusAreaLabel.toLowerCase()}) —` },
+                  ...focusAreas.map((w) => ({ value: String(w.id), label: w.name })),
+                ]}
+                onChange={(v) =>
                   setForm((p) => ({
                     ...p,
-                    focusAreaId: e.target.value ? Number(e.target.value) : null,
+                    focusAreaId: v ? Number(v) : null,
                   }))
                 }
-                style={{ ...inputStyle, marginTop: 4 }}
-              >
-                <option value="">— Global (no {focusAreaLabel.toLowerCase()}) —</option>
-                {focusAreas.map((w) => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
+                style={{ width: "100%", marginTop: 4 }}
+              />
             </div>
           )}
 
@@ -977,18 +1052,20 @@ function ShiftCodeRow({
           {!form.isOffDay && (
             <div>
               <label style={labelStyle}>SHIFT CATEGORY</label>
-              <select
-                value={form.categoryId ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value ? Number(e.target.value) : null }))}
-                style={{ ...inputStyle, marginTop: 4 }}
-              >
-                <option value="">— Generic (No Category) —</option>
-                {shiftCategories
-                  .filter(c => form.focusAreaId == null || c.focusAreaId == null || c.focusAreaId === form.focusAreaId)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>{c.name} {c.focusAreaId ? `(${focusAreas.find(w => w.id === c.focusAreaId)?.name})` : "(Global)"}</option>
-                  ))}
-              </select>
+              <CustomSelect
+                value={form.categoryId != null ? String(form.categoryId) : ""}
+                options={[
+                  { value: "", label: "— Generic (No Category) —" },
+                  ...shiftCategories
+                    .filter(c => form.focusAreaId == null || c.focusAreaId == null || c.focusAreaId === form.focusAreaId)
+                    .map((c) => ({
+                      value: String(c.id),
+                      label: `${c.name} ${c.focusAreaId ? `(${focusAreas.find(w => w.id === c.focusAreaId)?.name})` : "(Global)"}`
+                    })),
+                ]}
+                onChange={(v) => setForm((p) => ({ ...p, categoryId: v ? Number(v) : null }))}
+                style={{ width: "100%", marginTop: 4 }}
+              />
             </div>
           )}
 
@@ -1178,7 +1255,7 @@ function ShiftCodesSettings({
       name: "",
       color: isOffDay ? "#F1F5F9" : "#F8FAFC",
       border: "#CBD5E1",
-      text: "#64748B",
+      text:"#475569",
       isOffDay,
       focusAreaId: focusAreaId,
       sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
@@ -2415,19 +2492,16 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                   {ROLE_LABELS[user.orgRole] ?? user.orgRole}
                 </span>
                 {!isProtected && myRole === "super_admin" && (
-                  <select
+                  <CustomSelect
                     value={user.orgRole}
+                    options={[
+                      { value: "admin", label: "Promote to Admin" },
+                      { value: "user", label: "Reset to User" },
+                    ]}
+                    onChange={(v) => handleRoleChange(user.id, v as "admin" | "user")}
                     disabled={saving === user.id}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value as "admin" | "user")}
-                    style={{
-                      fontSize: 12, padding: "4px 8px",
-                      border: "1.5px solid var(--color-border)", borderRadius: 7,
-                      background: "#fff", cursor: "pointer",
-                    }}
-                  >
-                    <option value="admin">Promote to Admin</option>
-                    <option value="user">Reset to User</option>
-                  </select>
+                    fontSize={12}
+                  />
                 )}
                 {user.orgRole === "admin" && myRole === "super_admin" && (
                   <button

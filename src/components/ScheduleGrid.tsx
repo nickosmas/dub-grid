@@ -14,7 +14,7 @@ const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
   "CSN II": { bg: "#CCFBF1", text: "#0E7490" },   // Teal
   STAFF: { bg: "#F1F5F9", text: "#475569" },     // Slate
 };
-const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#94A3B8" };
+const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
 
 function getFocusAreaInitials(name: string): string {
   return name
@@ -173,11 +173,12 @@ const SectionBlock = memo(function SectionBlock({
     const entries = Object.entries(tally);
     if (entries.length === 0) return "-";
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {entries.map(([label, count]) => (
-          <div key={label} style={{ whiteSpace: "nowrap" }}>
+      <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
+        {entries.map(([label, count], ei) => (
+          <span key={label} style={{ whiteSpace: "nowrap" }}>
+            {ei > 0 && <span style={{ color: "var(--color-text-faint)", margin: "0 0.3em" }}>|</span>}
             {label}: {count}
-          </div>
+          </span>
         ))}
       </div>
     );
@@ -345,8 +346,6 @@ const SectionBlock = memo(function SectionBlock({
                 key={emp.id}
                 style={{
                   ...rowGrid,
-                  borderTop:
-                    ri === 0 ? "none" : "1px solid var(--color-border-light)",
                   background: rowBg,
                   opacity: isHighlighted ? 1 : 0.35,
                   transition: "opacity 0.15s",
@@ -366,6 +365,7 @@ const SectionBlock = memo(function SectionBlock({
                     justifyContent: "space-between",
                     gap: 8,
                     minWidth: 0,
+                    borderTop: ri > 0 ? "1px solid var(--color-border-light)" : undefined,
                     borderRight: "1px solid var(--color-border-light)",
                     boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                   }}
@@ -441,9 +441,11 @@ const SectionBlock = memo(function SectionBlock({
                         alignItems: "center",
                         justifyContent: "center",
                         position: "relative",
+                        borderTop: ri > 0 && !isSplit ? "1px solid var(--color-border-light)" : undefined,
                         borderLeft: isSplit
                           ? "2px solid var(--color-dark)"
                           : "1px solid var(--color-border-light)",
+                        boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 var(--color-border-light)" : undefined,
                         background: isToday
                           ? "var(--color-today-bg)"
                           : "transparent",
@@ -525,7 +527,7 @@ const SectionBlock = memo(function SectionBlock({
                                        position: "absolute",
                                        top: 2,
                                        left: 3,
-                                       fontSize: 7,
+                                       fontSize: 9,
                                        fontWeight: 800,
                                        lineHeight: 1,
                                        background: crossHomeFa.colorBg,
@@ -642,7 +644,7 @@ const SectionBlock = memo(function SectionBlock({
                                              position: "absolute",
                                              top: 2,
                                              left: 2,
-                                             fontSize: 6,
+                                             fontSize: 8,
                                              fontWeight: 800,
                                              lineHeight: 1,
                                              background: crossHomeFaLi.colorBg,
@@ -740,14 +742,15 @@ const SectionBlock = memo(function SectionBlock({
           })}
 
           {/* Count rows — one per active tally category for this section */}
-          {tallyRows.map((row, ci) => (
+          {tallyRows.map((row, ci) => {
+            const isLastRow = ci === tallyRows.length - 1;
+            return (
             <div
               key={row.id}
               style={{
                 ...rowGrid,
                 borderTop: ci === 0 ? "2px solid var(--color-dark)" : undefined,
                 background: "#fff",
-                borderBottom: "1px solid var(--color-border)",
               }}
             >
               <div
@@ -764,6 +767,7 @@ const SectionBlock = memo(function SectionBlock({
                   display: "flex",
                   alignItems: "center",
                   borderRight: "1px solid var(--color-border)",
+                  borderBottom: isLastRow ? undefined : "1px solid var(--color-border)",
                   boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                 }}
               >
@@ -782,12 +786,14 @@ const SectionBlock = memo(function SectionBlock({
                         splitAtIndex !== undefined && i === splitAtIndex
                           ? "2px solid var(--color-dark)"
                           : "1px solid var(--color-border)",
+                      borderBottom: isLastRow ? undefined : (splitAtIndex !== undefined && i === splitAtIndex ? undefined : "1px solid var(--color-border)"),
+                      boxShadow: isLastRow ? undefined : (splitAtIndex !== undefined && i === splitAtIndex ? "inset 0 -1px 0 var(--color-border)" : undefined),
                       fontSize: 10,
                       lineHeight: 1.3,
                       fontWeight: 700,
-                      color: hasCount ? "var(--color-text-secondary)" : "var(--color-text-faint)",
+                      color: hasCount ? "var(--color-text-secondary)" : "var(--color-text-subtle)",
                       display: "flex",
-                      flexDirection: "column",
+                      flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
@@ -797,7 +803,7 @@ const SectionBlock = memo(function SectionBlock({
                 );
               })}
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>
@@ -924,22 +930,31 @@ export default function ScheduleGrid({
       {renderedSections.length === 0 ? (
         <div
           style={{
-            padding: "40px",
+            padding: "48px 20px",
             textAlign: "center",
             background: "#fff",
             borderRadius: 12,
             border: "1px dashed var(--color-border)",
             color: "var(--color-text-muted)",
             marginTop: 34,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
           }}
         >
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
-            No shifts found for this period
+          <div style={{ color: "var(--color-text-faint)", background: "#F8FAFC", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
           </div>
-          <div style={{ fontSize: 13 }}>
-            {isEditMode
-              ? "No employees are assigned to this focus area. Add employees in the Staff view."
-              : "No shifts have been published for this period yet."}
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+              No shifts found for this period
+            </div>
+            <div style={{ fontSize: 13 }}>
+              {isEditMode
+                ? "No employees are assigned to this focus area. Add employees in the Staff view."
+                : "No shifts have been published for this period yet."}
+            </div>
           </div>
         </div>
       ) : (

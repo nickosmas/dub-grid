@@ -4,6 +4,14 @@ import { useMemo } from "react";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
 import { ViewMode } from "@/components/Header";
+import CustomSelect from "@/components/CustomSelect";
+
+const SPAN_OPTIONS = [
+  { value: 1 as const, label: "1 Week" },
+  { value: 2 as const, label: "2 Weeks" },
+  { value: "month" as const, label: "Month" },
+];
+
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -135,18 +143,8 @@ export default function Toolbar({
         </button>
       </div>
 
-      {/* Span toggle: 1W / 2W / M */}
-      <div className="dg-segment">
-        {([1, 2, "month"] as const).map((n) => (
-          <button
-            key={n}
-            onClick={() => onSpanChange(n)}
-            className={`dg-segment-btn${spanWeeks === n ? " active" : ""}`}
-          >
-            {n === "month" ? "M" : `${n}W`}
-          </button>
-        ))}
-      </div>
+      {/* Span selector */}
+      <CustomSelect value={spanWeeks} options={SPAN_OPTIONS} onChange={onSpanChange} />
 
       {/* Focus area filter */}
       {focusAreaOptions.length > 1 && (
@@ -202,20 +200,28 @@ export default function Toolbar({
       {/* ── RIGHT ZONE: Global actions ── */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
 
-        {/* Print — hidden for draft-only schedules, disabled while editing */}
-        {(!hasSavedDraft || hasMixedSchedule) && (
+        {/* Edit mode toggle — only for schedulers; hidden for draft-only saved drafts */}
+        {canEditShifts && onToggleEditMode && !hasMixedSchedule && (!hasSavedDraft) && !isEditMode && (
+          <button
+            onClick={onToggleEditMode}
+            className="dg-btn dg-btn-primary"
+          >
+            Edit
+          </button>
+        )}
+
+        {/* Print — hidden for draft-only schedules and while editing */}
+        {(!hasSavedDraft || hasMixedSchedule) && !isEditMode && (
           <button
             onClick={onPrintOpen}
-            disabled={isEditMode || !onPrintOpen}
+            disabled={!onPrintOpen}
             className="dg-btn dg-btn-ghost"
             style={{
               border: "1px solid var(--color-border)",
               borderRadius: 10,
               padding: "7px 12px",
-              opacity: isEditMode ? 0.4 : 1,
-              cursor: isEditMode ? "not-allowed" : "pointer",
             }}
-            title={isEditMode ? "Exit edit mode to print" : "Print / Export schedule"}
+            title="Print / Export schedule"
           >
             <svg
               width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -256,34 +262,6 @@ export default function Toolbar({
             </svg>
             {isApplyingRegular ? "Filling…" : "Auto Fill Shifts"}
           </button>
-        )}
-
-        {/* Edit mode toggle — only for schedulers; hidden for draft-only saved drafts */}
-        {canEditShifts && onToggleEditMode && !hasMixedSchedule && (!hasSavedDraft) && (
-          isEditMode ? (
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#B45309",
-                background: "#FEF3C7",
-                border: "1px solid #FCD34D",
-                borderRadius: 8,
-                padding: "5px 10px",
-                letterSpacing: "0.02em",
-                userSelect: "none",
-              }}
-            >
-              Edit Mode: ON
-            </span>
-          ) : (
-            <button
-              onClick={onToggleEditMode}
-              className="dg-btn dg-btn-primary"
-            >
-              Edit
-            </button>
-          )
         )}
       </div>
     </div>

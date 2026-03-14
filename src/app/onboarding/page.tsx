@@ -87,7 +87,7 @@ export default function OnboardingPage() {
         <p
           style={{
             fontSize: "16px",
-            color: "#64748B",
+            color:"#475569",
             lineHeight: 1.6,
             marginBottom: "40px",
           }}
@@ -137,7 +137,7 @@ export default function OnboardingPage() {
         </div>
         
         <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid #F1F5F9" }}>
-          <p style={{ fontSize: "14px", color: "#94A3B8" }}>
+          <p style={{ fontSize: "14px", color:"#64748B" }}>
             Setting up a new facility? <br />
             <span style={{ color: "#2563EB", fontWeight: 600, cursor: "pointer" }}>Contact sales</span>
           </p>

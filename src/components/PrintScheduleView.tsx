@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem } from "@/types";
-import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleNames } from "@/lib/utils";
+import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
 import { DAY_LABELS } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
@@ -20,14 +20,28 @@ const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
   "CSN II": { bg: "#CCFBF1", text: "#0E7490" },
   STAFF: { bg: "#F1F5F9", text: "#475569" },
 };
-const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#94A3B8" };
+const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
+
+function getFocusAreaInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 3);
+}
+
+function fmt12hShort(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
+}
 
 // ── Per-section print grid ─────────────────────────────────────────────────
 
 interface PrintSectionProps {
   sectionName: string;
   focusAreaId: number;
-  exclusiveLabels: string[];
   employees: Employee[];
   dates: Date[];
   shiftForKey: (empId: string, date: Date) => string | null;
@@ -37,6 +51,8 @@ interface PrintSectionProps {
   shiftCategories: ShiftCategory[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  focusAreas: FocusArea[];
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
   splitAtIndex?: number;
   fontSize: number;
 }
@@ -44,7 +60,6 @@ interface PrintSectionProps {
 function PrintSection({
   sectionName,
   focusAreaId,
-  exclusiveLabels,
   employees,
   dates,
   shiftForKey,
@@ -54,6 +69,8 @@ function PrintSection({
   shiftCategories,
   certifications,
   orgRoles,
+  focusAreas,
+  getCustomShiftTimes,
   splitAtIndex,
   fontSize,
 }: PrintSectionProps) {
@@ -141,14 +158,16 @@ function PrintSection({
 
       <div
         style={{
+          background: "#fff",
           border: "1px solid #CBD5E1",
-          borderRadius: 6,
+          borderRadius: 12,
           overflow: "hidden",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
         }}
       >
         {/* Header row */}
-        <div style={{ ...rowStyle, borderBottom: "2px solid #0F172A", background: "#F8FAFC" }}>
-          <div style={{ padding: "0.4em 0.8em", fontWeight: 700, fontSize: "0.85em", color: "#94A3B8", letterSpacing: "0.06em" }}>
+        <div style={{ ...rowStyle, borderBottom: "2px solid #0F172A" }}>
+          <div style={{ padding: "0.5em 0.8em", fontWeight: 700, fontSize: "0.85em", color:"#64748B", letterSpacing: "0.08em", borderRight: "1px solid #E2E8F0", background: "#F8FAFC" }}>
             STAFF NAME
           </div>
           {dates.map((date, i) => {
@@ -158,14 +177,14 @@ function PrintSection({
                 key={formatDateKey(date)}
                 style={{
                   textAlign: "center",
-                  padding: "0.35em 0",
+                  padding: "0.4em 0",
                   borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #E2E8F0",
                 }}
               >
-                <div style={{ fontSize: "0.75em", fontWeight: 600, color: "#94A3B8", letterSpacing: "0.04em" }}>
+                <div style={{ fontSize: "0.8em", fontWeight: 600, color:"#94A3B8", letterSpacing: "0.05em" }}>
                   {DAY_LABELS[date.getDay()]}
                 </div>
-                <div style={{ fontSize: "1em", fontWeight: 700, color: "#1E293B", lineHeight: 1.1, marginTop: "0.1em" }}>
+                <div style={{ fontSize: "1.2em", fontWeight: 700, color: "#1E293B", lineHeight: 1.2, marginTop: "0.05em" }}>
                   {date.getDate()}
                 </div>
               </div>
@@ -175,7 +194,6 @@ function PrintSection({
 
         {/* Employee rows */}
         {employees.map((emp, ri) => {
-          const rowBg = ri % 2 === 0 ? "#fff" : "#FAFBFC";
           const certAbbr = getCertAbbr(emp.certificationId, certifications);
           const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
@@ -184,8 +202,7 @@ function PrintSection({
               key={emp.id}
               style={{
                 ...rowStyle,
-                background: rowBg,
-                borderTop: ri === 0 ? "none" : "1px solid #F1F5F9",
+                background: "#fff",
                 alignItems: "stretch",
                 breakInside: "avoid",
                 pageBreakInside: "avoid",
@@ -201,6 +218,8 @@ function PrintSection({
                   gap: "0.4em",
                   minWidth: 0,
                   height: cellH,
+                  borderTop: ri > 0 ? "1px solid #E2E8F0" : undefined,
+                  borderRight: "1px solid #E2E8F0",
                 }}
               >
                 <div style={{ minWidth: 0 }}>
@@ -221,8 +240,8 @@ function PrintSection({
                     </span>
                   </div>
                   {emp.roleIds.length > 0 && (
-                    <div style={{ fontSize: "0.8em", color: "#94A3B8", marginTop: "0.1em", whiteSpace: "nowrap" }}>
-                      {getRoleNames(emp.roleIds, orgRoles).join(", ")}
+                    <div style={{ fontSize: "0.8em", color:"#64748B", marginTop: "0.1em", whiteSpace: "nowrap" }}>
+                      {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
                     </div>
                   )}
                 </div>
@@ -234,9 +253,10 @@ function PrintSection({
                       background: dc.bg,
                       color: dc.text,
                       padding: "0.15em 0.5em",
-                      borderRadius: 12,
+                      borderRadius: 20,
                       whiteSpace: "nowrap",
                       flexShrink: 0,
+                      letterSpacing: "0.01em",
                     }}
                   >
                     {certAbbr}
@@ -249,7 +269,7 @@ function PrintSection({
                 const isSplit = splitAtIndex !== undefined && di === splitAtIndex;
                 const shiftCode = shiftForKey(emp.id, date);
                 const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
-                const shiftStyle = shiftCode ? getStyleByIdOrLabel(shiftCode, cellCodeIds[0]) : null;
+                const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
 
                 return (
                   <div
@@ -259,90 +279,160 @@ function PrintSection({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: "0.3em 0.25em",
-                      boxSizing: "border-box",
-                      borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #F1F5F9",
+                      position: "relative",
+                      borderTop: ri > 0 && !isSplit ? "1px solid #E2E8F0" : undefined,
+                      boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #E2E8F0" : undefined,
+                      borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #E2E8F0",
                     }}
                   >
                     {shiftCode && shiftCode !== "OFF" ? (
                       (() => {
                         const labels = shiftCode.split("/");
                         if (labels.length === 1) {
-                          const style = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
-                          const isCross =
-                            exclusiveLabels.length > 0 &&
-                            !exclusiveLabels.includes(labels[0]) &&
-                            labels[0] !== "X" &&
-                            style !== null;
+                          const label = labels[0];
+                          const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
+                          const codeEntry0 = cellCodeIds[0] != null ? shiftCodeById.get(cellCodeIds[0]) : undefined;
+                          const isCross = label !== "X" && codeEntry0?.focusAreaId != null
+                            && codeEntry0.focusAreaId !== focusAreaId;
+                          const crossHomeFa = isCross
+                            ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
+                            : undefined;
                           return (
                             <div
                               style={{
-                                width: "100%",
-                                height: "100%",
-                                background: style.color,
+                                position: "absolute",
+                                top: customTimes ? "0.25em" : "0.5em",
+                                right: "0.5em",
+                                bottom: customTimes ? "0.25em" : "0.5em",
+                                left: "0.5em",
+                                background: isCross ? "#ffffff" : style.color,
                                 border: `1px solid ${borderColor(style.text)}`,
                                 borderRadius: 4,
-                                fontWeight: 700,
                                 color: style.text,
                                 display: "flex",
+                                flexDirection: "column",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                opacity: isCross ? 0.35 : 1,
+                                overflow: "hidden",
                               }}
                             >
-                              {labels[0]}
+                              {isCross && crossHomeFa && (
+                                <span
+                                  style={{
+                                    position: "absolute",
+                                    top: "0.25em",
+                                    left: "0.35em",
+                                    fontSize: "1em",
+                                    fontWeight: 800,
+                                    lineHeight: 1,
+                                    background: crossHomeFa.colorBg,
+                                    color: crossHomeFa.colorText,
+                                    borderRadius: 3,
+                                    padding: "0.1em 0.3em",
+                                    letterSpacing: "0.02em",
+                                  }}
+                                >
+                                  {getFocusAreaInitials(crossHomeFa.name)}
+                                </span>
+                              )}
+                              <span style={{ fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                              {customTimes && (
+                                <span style={{
+                                  fontSize: "0.75em",
+                                  fontWeight: 500,
+                                  lineHeight: 1,
+                                  marginTop: "0.3em",
+                                  opacity: 0.7,
+                                  letterSpacing: "0.02em",
+                                }}>
+                                  {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
+                                </span>
+                              )}
                             </div>
                           );
                         }
+
                         const firstStyle = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
                         return (
                           <div
                             style={{
-                              width: "100%",
-                              height: "100%",
-                              display: "flex",
-                              borderRadius: 4,
-                              overflow: "hidden",
-                              border: firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)",
+                              position: "absolute",
+                              top: "0.5em",
+                              right: "0.5em",
+                              bottom: "0.5em",
+                              left: "0.5em",
                             }}
                           >
-                            {labels.map((label, li) => {
-                              const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
-                              const isCross =
-                                exclusiveLabels.length > 0 &&
-                                !exclusiveLabels.includes(label) &&
-                                label !== "X" &&
-                                style !== null;
-                              return (
-                                <div
-                                  key={li}
-                                  style={{
-                                    flex: 1,
-                                    background: style.color,
-                                    color: style.text,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontWeight: 800,
-                                    fontSize: "0.85em",
-                                    opacity: isCross ? 0.35 : 1,
-                                    borderRight:
-                                      li < labels.length - 1
-                                        ? `1px solid rgba(0,0,0,0.1)`
-                                        : "none",
-                                  }}
-                                >
-                                  {label}
-                                </div>
-                              );
-                            })}
+                            <div
+                              style={{
+                                display: "flex",
+                                borderRadius: 4,
+                                overflow: "hidden",
+                                border: firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)",
+                                width: "100%",
+                                height: "100%",
+                              }}
+                            >
+                              {labels.map((label, li) => {
+                                const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
+                                const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                                const isCross = label !== "X"
+                                  && codeEntryLi?.focusAreaId != null
+                                  && codeEntryLi.focusAreaId !== focusAreaId;
+                                const crossHomeFaLi = isCross
+                                  ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
+                                  : undefined;
+
+                                return (
+                                  <div
+                                    key={li}
+                                    style={{
+                                      flex: 1,
+                                      background: isCross ? "#ffffff" : style.color,
+                                      color: style.text,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontWeight: 800,
+                                      fontSize: "0.85em",
+                                      borderRight:
+                                        li < labels.length - 1
+                                          ? `1px solid rgba(0,0,0,0.1)`
+                                          : "none",
+                                      position: "relative",
+                                    }}
+                                  >
+                                    {isCross && crossHomeFaLi && (
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          top: "0.2em",
+                                          left: "0.2em",
+                                          fontSize: "0.85em",
+                                          fontWeight: 800,
+                                          lineHeight: 1,
+                                          background: crossHomeFaLi.colorBg,
+                                          color: crossHomeFaLi.colorText,
+                                          borderRadius: 3,
+                                          padding: "0.1em 0.2em",
+                                          letterSpacing: "0.02em",
+                                        }}
+                                      >
+                                        {getFocusAreaInitials(crossHomeFaLi.name)}
+                                      </span>
+                                    )}
+                                    {label}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         );
                       })()
                     ) : (
                       <div
                         style={{
-                          width: "1em",
+                          width: "1.2em",
                           height: "0.18em",
                           background: shiftCode === "OFF" ? "#CBD5E1" : "#E2E8F0",
                           borderRadius: 2,
@@ -397,7 +487,7 @@ function TallyRow({
         display: "grid",
         gridTemplateColumns: gridTemplate,
         background: bgColor,
-        borderTop: isFirst ? "2px solid #0F172A" : "1px solid #E2E8F0",
+        borderTop: isFirst ? "2px solid #0F172A" : undefined,
       }}
     >
       <div
@@ -410,6 +500,8 @@ function TallyRow({
           display: "flex",
           alignItems: "center",
           height,
+          borderRight: "1px solid #CBD5E1",
+          borderTop: !isFirst ? "1px solid #CBD5E1" : undefined,
         }}
       >
         {label}
@@ -423,24 +515,26 @@ function TallyRow({
             style={{
               textAlign: "center",
               padding: "0.2em 0.2em",
-              borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #E2E8F0",
+              borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #CBD5E1",
+              borderTop: !isFirst ? "1px solid #CBD5E1" : undefined,
               fontSize: "0.8em",
               fontWeight: 700,
-              color: entries.length > 0 ? "#1E293B" : "#CBD5E1",
+              color: entries.length > 0 ? "#1E293B" : "#94A3B8",
               display: "flex",
-              flexDirection: "column",
+              flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              lineHeight: 1.2,
+              lineHeight: 1.3,
               height,
             }}
           >
             {entries.length === 0
-              ? "—"
-              : entries.map(([lbl, cnt]) => (
-                  <div key={lbl} style={{ whiteSpace: "nowrap" }}>
+              ? "-"
+              : entries.map(([lbl, cnt], ei) => (
+                  <span key={lbl} style={{ whiteSpace: "nowrap" }}>
+                    {ei > 0 && <span style={{ color:"#94A3B8", margin: "0 0.3em" }}>|</span>}
                     {lbl}: {cnt}
-                  </div>
+                  </span>
                 ))}
           </div>
         );
@@ -467,6 +561,7 @@ interface PrintScheduleViewProps {
   shiftForKey: (empId: string, date: Date) => string | null;
   shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
   onClose: () => void;
   focusAreaLabel?: string;
 }
@@ -485,6 +580,7 @@ export default function PrintScheduleView({
   shiftForKey,
   shiftCodeIdsForKey,
   getShiftStyle,
+  getCustomShiftTimes,
   onClose,
   focusAreaLabel = "Focus Areas",
 }: PrintScheduleViewProps) {
@@ -525,26 +621,15 @@ export default function PrintScheduleView({
     [focusAreas, selectedWings],
   );
 
-  // Exclusive labels per section
-  const exclusiveLabelsPerSection = useMemo(() => {
+  // Exclusive code IDs per section (matches ScheduleGrid approach)
+  const exclusiveCodeIdsPerSection = useMemo(() => {
     return Object.fromEntries(
       printFocusAreas.map((w) => [
         w.name,
-        shiftCodes.filter((st) => st.focusAreaId === w.id).map((st) => st.label),
+        new Set(shiftCodes.filter((st) => st.focusAreaId === w.id).map((st) => st.id)),
       ]),
     );
   }, [printFocusAreas, shiftCodes]);
-
-  // General shift labels (not focus-area-specific)
-  const generalShiftLabels = useMemo(
-    () =>
-      new Set(
-        shiftCodes
-          .filter((st) => st.isGeneral || st.focusAreaId == null)
-          .map((st) => st.label),
-      ),
-    [shiftCodes],
-  );
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -619,14 +704,14 @@ export default function PrintScheduleView({
           </div>
           {orgName && (
             <>
-              <span style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+              <span style={{ color:"#94A3B8", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", lineHeight: 1 }}>
                 {orgName}
               </span>
             </>
           )}
-          <span style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#64748B", lineHeight: 1 }}>
+          <span style={{ color:"#94A3B8", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color:"#475569", lineHeight: 1 }}>
             {dateRangeLabel}
           </span>
         </div>
@@ -641,10 +726,10 @@ export default function PrintScheduleView({
           <span
             style={{
               fontSize: 12,
-              color: "#94A3B8",
+              color:"#64748B",
             }}
           >
-            Font: {fontSize}px · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} · {selectedWings.length === focusAreas.length ? `All ${focusAreaLabel.toLowerCase()}` : selectedWings.join(", ")}
+            {fontSize <= 7 ? "Small" : fontSize >= 9 ? "Large" : "Medium"} · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} · {selectedWings.length === focusAreas.length ? `All ${focusAreaLabel.toLowerCase()}` : selectedWings.join(", ")}
           </span>
           <button
             onClick={handlePrint}
@@ -715,7 +800,7 @@ export default function PrintScheduleView({
                 
                 {orgName && (
                   <>
-                    <span style={{ color: "#CBD5E1", fontSize: "1.4em", fontWeight: 300, userSelect: "none", alignSelf: "center", marginTop: "-0.1em" }}>|</span>
+                    <span style={{ color: "#94A3B8", fontSize: "1.4em", fontWeight: 300, userSelect: "none", alignSelf: "center", marginTop: "-0.1em" }}>|</span>
                     <span
                       style={{
                         fontSize: "1.4em",
@@ -734,7 +819,7 @@ export default function PrintScheduleView({
                 style={{
                   fontSize: "1.1em",
                   fontWeight: 600,
-                  color: "#64748B",
+                  color:"#475569",
                 }}
               >
                 Schedule — {dateRangeLabel}
@@ -743,7 +828,7 @@ export default function PrintScheduleView({
             <div
               style={{
                 fontSize: "0.9em",
-                color: "#94A3B8",
+                color:"#64748B",
                 textAlign: "right",
               }}
             >
@@ -753,14 +838,15 @@ export default function PrintScheduleView({
 
           {/* Focus area sections */}
           {printFocusAreas.map((focusArea) => {
-            const exclusiveLabels = exclusiveLabelsPerSection[focusArea.name] ?? [];
+            const exclusiveCodeIds = exclusiveCodeIdsPerSection[focusArea.name] ?? new Set<number>();
             const homeEmps = employees.filter((e) => e.focusAreaIds.includes(focusArea.id));
             const guestEmps = allEmployees.filter(
               (e) =>
+                e.focusAreaIds.length > 0 &&
                 !e.focusAreaIds.includes(focusArea.id) &&
                 dates.some((date) => {
-                  const shift = shiftForKey(e.id, date);
-                  return shift !== null && exclusiveLabels.includes(shift);
+                  const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+                  return codeIds.some((id) => exclusiveCodeIds.has(id));
                 }),
             );
             const sectionEmps = [...homeEmps, ...guestEmps];
@@ -771,7 +857,6 @@ export default function PrintScheduleView({
                 key={focusArea.name}
                 sectionName={focusArea.name}
                 focusAreaId={focusArea.id}
-                exclusiveLabels={exclusiveLabels}
                 employees={sectionEmps}
                 dates={dates}
                 shiftForKey={shiftForKey}
@@ -781,6 +866,8 @@ export default function PrintScheduleView({
                 shiftCategories={shiftCategories}
                 certifications={certifications}
                 orgRoles={orgRoles}
+                focusAreas={focusAreas}
+                getCustomShiftTimes={getCustomShiftTimes}
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
               />
@@ -834,7 +921,7 @@ export default function PrintScheduleView({
                     >
                       {s.label}
                     </span>
-                    <span style={{ fontSize: "0.9em", color: "#64748B" }}>
+                    <span style={{ fontSize: "0.9em", color:"#475569" }}>
                       {s.name}
                     </span>
                   </div>

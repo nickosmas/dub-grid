@@ -12,16 +12,16 @@
   --color-surface-overlay: #F1F5F9;
 
   /* Borders */
-  --color-border: #E2E8F0;
-  --color-border-light: #F1F5F9;
+  --color-border: #CBD5E1;
+  --color-border-light: #E2E8F0;
   --color-border-focus: #38BDF8;
 
   /* Text */
   --color-text-primary: #0F172A;
   --color-text-secondary: #1E293B;
-  --color-text-muted: #64748B;
-  --color-text-subtle: #94A3B8;
-  --color-text-faint: #CBD5E1;
+  --color-text-muted: #475569;
+  --color-text-subtle: #64748B;
+  --color-text-faint: #94A3B8;
   --color-text-inverse: #FFFFFF;
 
   /* Brand Accent */
