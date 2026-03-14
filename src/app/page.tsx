@@ -104,7 +104,8 @@ export default function RootPage() {
               return;
             }
           }
-          router.replace("/schedule");
+          // Use full page navigation so the middleware sees refreshed cookies
+          window.location.replace("/schedule");
         } else {
           setReady(true);
         }
