@@ -44,7 +44,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { role, companyId, isLoading } = usePermissions();
+  const { role, orgId, isLoading } = usePermissions();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
 
@@ -190,11 +190,11 @@ export default function ProfilePage() {
               <Field label="First name" value={firstName} />
               <Field label="Last name" value={lastName} />
               <Field label="Email" value={user?.email} />
-              <Field label="Company role" value={ROLE_LABELS[role] ?? "User"} />
+              <Field label="Organization role" value={ROLE_LABELS[role] ?? "User"} />
               {role === "gridmaster" && (
                 <Field label="Platform role" value="Gridmaster" />
               )}
-              <Field label="Company ID" value={companyId} />
+              <Field label="Organization ID" value={orgId} />
               <Field label="Member since" value={createdAt} />
               <Field label="Last sign in" value={lastSignIn} />
             </div>

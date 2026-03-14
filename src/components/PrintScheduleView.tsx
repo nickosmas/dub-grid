@@ -7,6 +7,7 @@ import { DAY_LABELS } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { borderColor } from "@/lib/colors";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -35,7 +36,7 @@ interface PrintSectionProps {
   shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
   certifications: NamedItem[];
-  companyRoles: NamedItem[];
+  orgRoles: NamedItem[];
   splitAtIndex?: number;
   fontSize: number;
 }
@@ -52,7 +53,7 @@ function PrintSection({
   shiftCodes,
   shiftCategories,
   certifications,
-  companyRoles,
+  orgRoles,
   splitAtIndex,
   fontSize,
 }: PrintSectionProps) {
@@ -221,7 +222,7 @@ function PrintSection({
                   </div>
                   {emp.roleIds.length > 0 && (
                     <div style={{ fontSize: "0.8em", color: "#94A3B8", marginTop: "0.1em", whiteSpace: "nowrap" }}>
-                      {getRoleNames(emp.roleIds, companyRoles).join(", ")}
+                      {getRoleNames(emp.roleIds, orgRoles).join(", ")}
                     </div>
                   )}
                 </div>
@@ -279,7 +280,7 @@ function PrintSection({
                                 width: "100%",
                                 height: "100%",
                                 background: style.color,
-                                border: `1px solid ${style.border}`,
+                                border: `1px solid ${borderColor(style.text)}`,
                                 borderRadius: 4,
                                 fontWeight: 700,
                                 color: style.text,
@@ -302,7 +303,7 @@ function PrintSection({
                               display: "flex",
                               borderRadius: 4,
                               overflow: "hidden",
-                              border: `1px solid ${firstStyle?.border || "#CBD5E1"}`,
+                              border: firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)",
                             }}
                           >
                             {labels.map((label, li) => {
@@ -327,7 +328,7 @@ function PrintSection({
                                     opacity: isCross ? 0.35 : 1,
                                     borderRight:
                                       li < labels.length - 1
-                                        ? `1px solid ${style.border}`
+                                        ? `1px solid rgba(0,0,0,0.1)`
                                         : "none",
                                   }}
                                 >
@@ -462,7 +463,7 @@ interface PrintScheduleViewProps {
   shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
   certifications: NamedItem[];
-  companyRoles: NamedItem[];
+  orgRoles: NamedItem[];
   shiftForKey: (empId: string, date: Date) => string | null;
   shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
@@ -480,7 +481,7 @@ export default function PrintScheduleView({
   shiftCodes,
   shiftCategories,
   certifications,
-  companyRoles,
+  orgRoles,
   shiftForKey,
   shiftCodeIdsForKey,
   getShiftStyle,
@@ -779,7 +780,7 @@ export default function PrintScheduleView({
                 shiftCodes={shiftCodes}
                 shiftCategories={shiftCategories}
                 certifications={certifications}
-                companyRoles={companyRoles}
+                orgRoles={orgRoles}
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
               />
@@ -820,7 +821,7 @@ export default function PrintScheduleView({
                     <span
                       style={{
                         background: s.color,
-                        border: `1px solid ${s.border}`,
+                        border: `1px solid ${borderColor(s.text)}`,
                         color: s.text,
                         borderRadius: 4,
                         padding: "0.15em 0.5em",

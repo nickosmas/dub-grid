@@ -7,11 +7,11 @@ const mockSignOut = vi.fn();
 
 const mockPermissions = {
   role: "admin",
-  companyId: "company-1",
+  orgId: "org-1",
   level: 3,
   isLoading: false,
   isGridmaster: false,
-  canManageCompany: true,
+  canManageOrg: true,
   canEditShifts: true,
   canEditNotes: true,
   atLeast: (r: string) => {

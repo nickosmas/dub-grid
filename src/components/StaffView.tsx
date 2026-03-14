@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { getInitials, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
+import { borderColor } from "@/lib/colors";
 import { Employee, FocusArea, ShiftCode, RegularShift, NamedItem } from "@/types";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
 import * as db from "@/lib/db";
@@ -25,7 +26,7 @@ interface StaffViewProps {
   onActivate: (empId: string) => void;
   onAdd: () => void;
   onRegularSchedule?: (emp: Employee) => void;
-  companyId?: string;
+  orgId?: string;
   shiftCodes?: ShiftCode[];
   /** Full code map (including archived) for resolving historical labels. */
   shiftCodeMap?: Map<number, string>;
@@ -488,9 +489,7 @@ function MembersSection({
                   alignItems: "center",
                   background: isExpanded
                     ? "#EFF6FF"
-                    : i % 2 === 0
-                      ? "#fff"
-                      : "var(--color-row-alt)",
+                    : "#fff",
                   cursor: isReordering ? "grab" : "pointer",
                   transition: "background 0.15s, opacity 0.15s",
                   opacity: isDragging ? 0.4 : 1,
@@ -503,7 +502,7 @@ function MembersSection({
                 }}
                 onMouseLeave={(e) => {
                   if (!isExpanded && !isReordering)
-                    e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "var(--color-row-alt)";
+                    e.currentTarget.style.background = "#fff";
                 }}
               >
                 {isReordering && (
@@ -668,7 +667,7 @@ function MembersSection({
 // ── Regular Schedule section ──────────────────────────────────────────────────
 function RegularScheduleSection({
   employees,
-  companyId,
+  orgId,
   shiftCodes,
   shiftCodeMap,
   canEdit,
@@ -676,7 +675,7 @@ function RegularScheduleSection({
   certifications,
 }: {
   employees: Employee[];
-  companyId: string;
+  orgId: string;
   shiftCodes: ShiftCode[];
   shiftCodeMap: Map<number, string>;
   canEdit: boolean;
@@ -694,7 +693,7 @@ function RegularScheduleSection({
 
   useEffect(() => {
     employees.forEach((emp) => {
-      db.fetchRegularShifts(companyId, emp.id, shiftCodeMap)
+      db.fetchRegularShifts(orgId, emp.id, shiftCodeMap)
         .then((rows) => {
           const map: Record<number, string> = {};
           for (const rs of rows) {
@@ -707,7 +706,7 @@ function RegularScheduleSection({
           setLoadedIds((prev) => new Set([...prev, emp.id]));
         });
     });
-  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function getTodayKey() {
     const now = new Date();
@@ -744,7 +743,7 @@ function RegularScheduleSection({
         if (newLabel) {
           const sc = shiftCodes.find(s => s.label === newLabel);
           if (!sc) continue;
-          await db.upsertRegularShift(empId, companyId, day, sc.id, todayKey);
+          await db.upsertRegularShift(empId, orgId, day, sc.id, todayKey);
         } else {
           for (const rs of dayExisting) {
             await db.deleteRegularShift(empId, rs.dayOfWeek, rs.effectiveFrom);
@@ -810,7 +809,7 @@ function RegularScheduleSection({
                   alignItems: "center",
                   gap: 16,
                   padding: "12px 20px",
-                  background: isExpanded ? "#EFF6FF" : i % 2 === 0 ? "#fff" : "var(--color-row-alt)",
+                  background: isExpanded ? "#EFF6FF" : "#fff",
                   cursor: canEdit ? "pointer" : "default",
                   borderLeft: isExpanded ? "4px solid #2563EB" : "4px solid transparent",
                   paddingLeft: "calc(20px - 4px)",
@@ -827,7 +826,7 @@ function RegularScheduleSection({
                 }}
                 onMouseLeave={(e) => {
                   if (!isExpanded)
-                    e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "var(--color-row-alt)";
+                    e.currentTarget.style.background = "#fff";
                 }}
               >
                 {/* Avatar + name */}
@@ -868,12 +867,14 @@ function RegularScheduleSection({
                         </div>
                         <div
                           style={{
-                            width: 34, height: 26, borderRadius: 5,
+                            width: 34, height: 26,
                             background: st ? st.color : "#F8FAFC",
-                            border: `1.5px solid ${st ? st.border : "#E2E8F0"}`,
+                            border: st ? `1px solid ${borderColor(st.text)}` : "1px solid rgba(0,0,0,0.15)",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 10, fontWeight: 800,
-                            color: st ? st.text : "#CBD5E1",
+                            color: st ? st.text : "#64748B",
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 700,
                           }}
                         >
                           {loaded ? (st ? st.label : "—") : "·"}
@@ -1213,7 +1214,7 @@ export default function StaffView({
   onActivate,
   onAdd,
   onRegularSchedule,
-  companyId,
+  orgId,
   shiftCodes,
   shiftCodeMap,
   canEditShifts,
@@ -1231,7 +1232,7 @@ export default function StaffView({
 
   const links: { id: StaffSection; label: string; icon: React.ReactNode }[] = [
     { id: "members", label: "Members", icon: iconUsers },
-    ...(companyId ? [{ id: "regular-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
+    ...(orgId ? [{ id: "regular-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
     { id: "focus-areas", label: focusAreaLabel, icon: iconGrid },
     { id: "certifications", label: certificationLabel, icon: iconCert },
     { id: "roles", label: roleLabel, icon: iconTag },
@@ -1289,10 +1290,10 @@ export default function StaffView({
           />
         )}
 
-        {activeSection === "regular-schedule" && companyId && (
+        {activeSection === "regular-schedule" && orgId && (
           <RegularScheduleSection
             employees={employees}
-            companyId={companyId}
+            orgId={orgId}
             shiftCodes={shiftCodes ?? []}
             shiftCodeMap={shiftCodeMap ?? new Map()}
             canEdit={canEditShifts ?? false}

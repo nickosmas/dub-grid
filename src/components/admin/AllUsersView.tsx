@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { fetchAllUsers } from "@/lib/db";
-import type { PlatformUser, Company } from "@/types";
+import type { PlatformUser, Organization } from "@/types";
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
@@ -59,12 +59,12 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function AllUsersView({
-  companies,
-  onNavigateToCompany,
+  organizations,
+  onNavigateToOrg,
   onImpersonate,
 }: {
-  companies: Company[];
-  onNavigateToCompany: (companyId: string) => void;
+  organizations: Organization[];
+  onNavigateToOrg: (orgId: string) => void;
   onImpersonate: (userId: string) => void;
 }) {
   const [users, setUsers] = useState<PlatformUser[]>([]);
@@ -72,7 +72,7 @@ export default function AllUsersView({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [orgFilter, setOrgFilter] = useState<string>("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -90,12 +90,12 @@ export default function AllUsersView({
       if (q && !(u.email ?? "").toLowerCase().includes(q)) return false;
       if (roleFilter !== "all") {
         if (roleFilter === "gridmaster" && u.platformRole !== "gridmaster") return false;
-        if (roleFilter !== "gridmaster" && u.companyRole !== roleFilter) return false;
+        if (roleFilter !== "gridmaster" && u.orgRole !== roleFilter) return false;
       }
-      if (companyFilter !== "all" && u.companyId !== companyFilter) return false;
+      if (orgFilter !== "all" && u.orgId !== orgFilter) return false;
       return true;
     });
-  }, [users, search, roleFilter, companyFilter]);
+  }, [users, search, roleFilter, orgFilter]);
 
   if (loading) {
     return (
@@ -140,12 +140,12 @@ export default function AllUsersView({
         </select>
         <select
           className="dg-input"
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
+          value={orgFilter}
+          onChange={(e) => setOrgFilter(e.target.value)}
           style={{ maxWidth: 200, cursor: "pointer" }}
         >
-          <option value="all">All Companies</option>
-          {companies.map((c) => (
+          <option value="all">All Organizations</option>
+          {organizations.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
@@ -162,8 +162,8 @@ export default function AllUsersView({
               <tr>
                 <th style={thStyle}>Email</th>
                 <th style={thStyle}>Platform Role</th>
-                <th style={thStyle}>Company Role</th>
-                <th style={thStyle}>Company</th>
+                <th style={thStyle}>Organization Role</th>
+                <th style={thStyle}>Organization</th>
                 <th style={thStyle}>Joined</th>
                 <th style={thStyle}>Actions</th>
               </tr>
@@ -185,12 +185,12 @@ export default function AllUsersView({
                       {u.platformRole !== "none" && <RoleBadge role={u.platformRole} />}
                     </td>
                     <td style={tdStyle}>
-                      {u.companyRole && <RoleBadge role={u.companyRole} />}
+                      {u.orgRole && <RoleBadge role={u.orgRole} />}
                     </td>
                     <td style={tdStyle}>
-                      {u.companyName ? (
+                      {u.orgName ? (
                         <button
-                          onClick={() => u.companyId && onNavigateToCompany(u.companyId)}
+                          onClick={() => u.orgId && onNavigateToOrg(u.orgId)}
                           style={{
                             background: "none",
                             border: "none",
@@ -203,7 +203,7 @@ export default function AllUsersView({
                             textDecoration: "underline",
                           }}
                         >
-                          {u.companyName}
+                          {u.orgName}
                         </button>
                       ) : (
                         <span style={{ color: "var(--color-text-muted)" }}>—</span>

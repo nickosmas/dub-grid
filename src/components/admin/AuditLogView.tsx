@@ -59,10 +59,10 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function AuditLogView({
-  companyId,
+  orgId,
   title,
 }: {
-  companyId?: string;
+  orgId?: string;
   title?: string;
 }) {
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
@@ -75,12 +75,12 @@ export default function AuditLogView({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchAuditLog({ companyId, limit: PAGE_SIZE, offset: page * PAGE_SIZE })
+    fetchAuditLog({ orgId, limit: PAGE_SIZE, offset: page * PAGE_SIZE })
       .then((data) => { if (!cancelled) setEntries(data); })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [companyId, page]);
+  }, [orgId, page]);
 
   return (
     <>
@@ -109,13 +109,13 @@ export default function AuditLogView({
                     <th style={thStyle}>Target User</th>
                     <th style={thStyle}>Change</th>
                     <th style={thStyle}>Changed By</th>
-                    {!companyId && <th style={thStyle}>Company</th>}
+                    {!orgId && <th style={thStyle}>Organization</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {entries.length === 0 ? (
                     <tr>
-                      <td colSpan={companyId ? 4 : 5} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
+                      <td colSpan={orgId ? 4 : 5} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
                         No audit log entries
                       </td>
                     </tr>
@@ -142,9 +142,9 @@ export default function AuditLogView({
                           <td style={{ ...tdStyle, fontSize: 12, color: "var(--color-text-muted)" }}>
                             {e.changedByEmail ?? e.changedById.slice(0, 8) + "…"}
                           </td>
-                          {!companyId && (
+                          {!orgId && (
                             <td style={{ ...tdStyle, fontSize: 12, color: "var(--color-text-muted)" }}>
-                              {e.companyName ?? "—"}
+                              {e.orgName ?? "—"}
                             </td>
                           )}
                         </tr>

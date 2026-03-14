@@ -78,11 +78,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         duration={6000}
         toastOptions={{
           style: {
-            padding: "16px 24px",
             fontSize: "15px",
-            fontWeight: 700,
-            borderRadius: "10px",
-            width: "min(calc(100vw - 48px), 800px)",
+            fontWeight: 600,
+            borderRadius: "12px",
+            width: "min(calc(100vw - 48px), 720px)",
+            maxWidth: "100%",
           },
         }}
       />

@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { Employee, ShiftCategory, ShiftCode, FocusArea } from "@/types";
+import { borderColor } from "@/lib/colors";
 
 interface MonthViewProps {
   monthStart: Date;
@@ -310,21 +311,19 @@ export default function MonthView({
                               gap: 5,
                             }}
                           >
-                            <span
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 700,
-                                background: s.color,
-                                color: s.text,
-                                border: `1px solid ${s.border}`,
-                                borderRadius: 3,
-                                padding: "0 4px",
-                                lineHeight: "15px",
-                                flexShrink: 0,
-                              }}
-                            >
-                              {shift}
-                            </span>
+                            <div
+                                key={ni}
+                                style={{
+                                  background: s.color,
+                                  border: `1px solid ${borderColor(s.text)}`,
+                                  borderRadius: 4,
+                                  padding: "2px 6px",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: s.text,
+                                }}
+                              >{shift}
+                            </div>
                             <span
                               style={{
                                 fontSize: 10.5,

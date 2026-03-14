@@ -27,7 +27,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 function makeShiftCode(overrides: Partial<ShiftCode> = {}): ShiftCode {
   return {
     id: 1,
-    companyId: "org1",
+    orgId: "org1",
     label: "D",
     name: "Day",
     color: "#fff",

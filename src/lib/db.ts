@@ -4,7 +4,7 @@ import {
   Employee,
   EmployeeStatus,
   ShiftMap,
-  Company,
+  Organization,
   FocusArea,
   ShiftCategory,
   ShiftCode,
@@ -14,8 +14,10 @@ import {
   RegularShift,
   ShiftSeries,
   SeriesFrequency,
-  CompanyUser,
+  OrganizationUser,
   NamedItem,
+  Invitation,
+  AssignableOrganizationRole,
 } from "@/types";
 
 // ── Optimistic Locking Error ──────────────────────────────────────────────────
@@ -41,7 +43,7 @@ export interface ShiftV2 {
   date: string;
   shiftLabel: string;
   shiftCodeIds: number[];
-  companyId: string | null;
+  orgId: string | null;
   userId: string | null;
   version: number;
   createdBy: string | null;
@@ -55,7 +57,7 @@ export interface ShiftV2Insert {
   date: string;
   shiftLabel: string;
   shiftCodeIds: number[];
-  companyId?: string | null;
+  orgId?: string | null;
   userId?: string | null;
   createdBy?: string | null;
 }
@@ -73,7 +75,7 @@ interface DbShiftV2 {
   draft_shift_code_ids: number[];
   published_shift_code_ids: number[];
   draft_is_delete: boolean;
-  company_id: string | null;
+  org_id: string | null;
   user_id: string | null;
   version: number;
   created_by: string | null;
@@ -96,7 +98,7 @@ function rowToShiftV2(row: DbShiftV2, codeMap: Map<number, string>): ShiftV2 {
     date: row.date,
     shiftLabel: resolveCodeLabels(effectiveIds, codeMap),
     shiftCodeIds: effectiveIds,
-    companyId: row.company_id,
+    orgId: row.org_id,
     userId: row.user_id,
     version: row.version,
     createdBy: row.created_by,
@@ -108,7 +110,7 @@ function rowToShiftV2(row: DbShiftV2, codeMap: Map<number, string>): ShiftV2 {
 
 // ── DB row shapes ─────────────────────────────────────────────────────────────
 
-export interface DbCompany {
+export interface DbOrganization {
   id: string;
   name: string;
   slug: string | null;
@@ -124,7 +126,7 @@ export interface DbCompany {
 
 export interface DbFocusArea {
   id: number;
-  company_id: string;
+  org_id: string;
   name: string;
   color_bg: string;
   color_text: string;
@@ -134,7 +136,7 @@ export interface DbFocusArea {
 
 interface DbShiftCategory {
   id: number;
-  company_id: string;
+  org_id: string;
   name: string;
   color: string;
   start_time: string | null;
@@ -146,7 +148,7 @@ interface DbShiftCategory {
 
 export interface DbShiftCode {
   id: number;
-  company_id: string;
+  org_id: string;
   label: string;
   name: string;
   color: string;
@@ -165,7 +167,7 @@ export interface DbShiftCode {
 
 export interface DbEmployee {
   id: string;
-  company_id: string;
+  org_id: string;
   name: string;
   status: EmployeeStatus;
   status_changed_at: string | null;
@@ -194,7 +196,7 @@ interface DbShift {
 
 interface DbScheduleNote {
   id: number;
-  company_id: string;
+  org_id: string;
   emp_id: string;
   date: string;
   note_type: NoteType;
@@ -207,11 +209,11 @@ interface DbScheduleNote {
 
 // ── Mapping helpers ───────────────────────────────────────────────────────────
 
-// ── Named Item (certifications / company_roles) ─────────────────────────────
+// ── Named Item (certifications / organization_roles) ─────────────────────────
 
 interface DbNamedItem {
   id: number;
-  company_id: string;
+  org_id: string;
   name: string;
   abbr: string;
   sort_order: number;
@@ -221,7 +223,7 @@ interface DbNamedItem {
 function rowToNamedItem(row: DbNamedItem): NamedItem {
   return {
     id: row.id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     name: row.name,
     abbr: row.abbr,
     sortOrder: row.sort_order,
@@ -229,7 +231,7 @@ function rowToNamedItem(row: DbNamedItem): NamedItem {
   };
 }
 
-export function rowToCompany(row: DbCompany): Company {
+export function rowToOrganization(row: DbOrganization): Organization {
   return {
     id: row.id,
     name: row.name,
@@ -248,7 +250,7 @@ export function rowToCompany(row: DbCompany): Company {
 export function rowToFocusArea(row: DbFocusArea): FocusArea {
   return {
     id: row.id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     name: row.name,
     colorBg: row.color_bg,
     colorText: row.color_text,
@@ -260,7 +262,7 @@ export function rowToFocusArea(row: DbFocusArea): FocusArea {
 function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
   return {
     id: row.id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     name: row.name,
     color: row.color,
     startTime: row.start_time ?? null,
@@ -274,7 +276,7 @@ function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
 export function rowToShiftCode(row: DbShiftCode): ShiftCode {
   return {
     id: row.id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     label: row.label,
     name: row.name,
     color: row.color,
@@ -310,9 +312,9 @@ export function rowToEmployee(row: DbEmployee): Employee {
   };
 }
 
-export function employeeToRow(emp: Omit<Employee, "id">, companyId: string): Omit<DbEmployee, "id" | "status" | "status_changed_at" | "status_note" | "archived_at"> {
+export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<DbEmployee, "id" | "status" | "status_changed_at" | "status_note" | "archived_at"> {
   return {
-    company_id: companyId,
+    org_id: orgId,
     name: emp.name,
     certification_id: emp.certificationId,
     role_ids: emp.roleIds ?? [],
@@ -324,11 +326,11 @@ export function employeeToRow(emp: Omit<Employee, "id">, companyId: string): Omi
   };
 }
 
-// ── Company ──────────────────────────────────────────────────────────────────
+// ── Organization ──────────────────────────────────────────────────────────────
 
-export async function fetchUserCompany(): Promise<Company | null> {
+export async function fetchUserOrganization(): Promise<Organization | null> {
   const { data, error } = await supabase
-    .from("companies")
+    .from("organizations")
     .select("*")
     .limit(1)
     .single();
@@ -337,18 +339,18 @@ export async function fetchUserCompany(): Promise<Company | null> {
     if (error.code === 'PGRST116') {
       return null;
     }
-    throw new Error(`fetchUserCompany error: ${error.message} (code: ${error.code})`);
+    throw new Error(`fetchUserOrganization error: ${error.message} (code: ${error.code})`);
   }
   if (!data) return null;
 
-  return rowToCompany(data as DbCompany);
+  return rowToOrganization(data as DbOrganization);
 }
 
 
 
-export async function updateCompany(org: Company): Promise<void> {
+export async function updateOrganization(org: Organization): Promise<void> {
   const { error } = await supabase
-    .from("companies")
+    .from("organizations")
     .update({
       name: org.name,
       address: org.address,
@@ -365,11 +367,11 @@ export async function updateCompany(org: Company): Promise<void> {
 
 // ── Certifications ───────────────────────────────────────────────────────────
 
-export async function fetchCertifications(companyId: string, includeArchived = false): Promise<NamedItem[]> {
+export async function fetchCertifications(orgId: string, includeArchived = false): Promise<NamedItem[]> {
   let query = supabase
     .from("certifications")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
@@ -377,7 +379,7 @@ export async function fetchCertifications(companyId: string, includeArchived = f
 }
 
 export async function saveCertifications(
-  companyId: string,
+  orgId: string,
   items: NamedItem[],
   existing: NamedItem[],
 ): Promise<NamedItem[]> {
@@ -394,41 +396,63 @@ export async function saveCertifications(
     if (error) throw error;
   }
 
-  // Upsert all items
-  const results: NamedItem[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const row = { company_id: companyId, name: item.name, abbr: item.abbr, sort_order: i };
-    if (item.id && existingIds.has(item.id)) {
-      const { data, error } = await supabase
-        .from("certifications").update(row).eq("id", item.id).select().single();
-      if (error) throw error;
-      results.push(rowToNamedItem(data as DbNamedItem));
-    } else {
-      const { data, error } = await supabase
-        .from("certifications").insert(row).select().single();
-      if (error) throw error;
-      results.push(rowToNamedItem(data as DbNamedItem));
-    }
+  // Batch upsert: update existing + insert new in two bulk operations
+  const toUpdate = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id && existingIds.has(item.id));
+  const toInsert = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => !item.id || !existingIds.has(item.id));
+
+  if (toUpdate.length > 0) {
+    const { error } = await supabase
+      .from("certifications")
+      .upsert(
+        toUpdate.map(({ item, sortOrder }) => ({
+          id: item.id,
+          org_id: orgId,
+          name: item.name,
+          abbr: item.abbr,
+          sort_order: sortOrder,
+          archived_at: null,
+        })),
+        { onConflict: "id" },
+      );
+    if (error) throw error;
   }
-  return results;
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase
+      .from("certifications")
+      .insert(
+        toInsert.map(({ item, sortOrder }) => ({
+          org_id: orgId,
+          name: item.name,
+          abbr: item.abbr,
+          sort_order: sortOrder,
+        })),
+      );
+    if (error) throw error;
+  }
+
+  return fetchCertifications(orgId);
 }
 
-// ── Company Roles ────────────────────────────────────────────────────────────
+// ── Organization Roles ──────────────────────────────────────────────────────
 
-export async function fetchCompanyRoles(companyId: string, includeArchived = false): Promise<NamedItem[]> {
+export async function fetchOrganizationRoles(orgId: string, includeArchived = false): Promise<NamedItem[]> {
   let query = supabase
-    .from("company_roles")
+    .from("organization_roles")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return (data as DbNamedItem[]).map(rowToNamedItem);
 }
 
-export async function saveCompanyRoles(
-  companyId: string,
+export async function saveOrganizationRoles(
+  orgId: string,
   items: NamedItem[],
   existing: NamedItem[],
 ): Promise<NamedItem[]> {
@@ -439,37 +463,59 @@ export async function saveCompanyRoles(
   const toDelete = existing.filter((e) => !newIds.has(e.id));
   if (toDelete.length > 0) {
     const { error } = await supabase
-      .from("company_roles")
+      .from("organization_roles")
       .update({ archived_at: new Date().toISOString() })
       .in("id", toDelete.map((d) => d.id));
     if (error) throw error;
   }
 
-  // Upsert all items
-  const results: NamedItem[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const row = { company_id: companyId, name: item.name, abbr: item.abbr, sort_order: i };
-    if (item.id && existingIds.has(item.id)) {
-      const { data, error } = await supabase
-        .from("company_roles").update(row).eq("id", item.id).select().single();
-      if (error) throw error;
-      results.push(rowToNamedItem(data as DbNamedItem));
-    } else {
-      const { data, error } = await supabase
-        .from("company_roles").insert(row).select().single();
-      if (error) throw error;
-      results.push(rowToNamedItem(data as DbNamedItem));
-    }
+  // Batch upsert: update existing + insert new in two bulk operations
+  const toUpdate = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id && existingIds.has(item.id));
+  const toInsert = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => !item.id || !existingIds.has(item.id));
+
+  if (toUpdate.length > 0) {
+    const { error } = await supabase
+      .from("organization_roles")
+      .upsert(
+        toUpdate.map(({ item, sortOrder }) => ({
+          id: item.id,
+          org_id: orgId,
+          name: item.name,
+          abbr: item.abbr,
+          sort_order: sortOrder,
+          archived_at: null,
+        })),
+        { onConflict: "id" },
+      );
+    if (error) throw error;
   }
-  return results;
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase
+      .from("organization_roles")
+      .insert(
+        toInsert.map(({ item, sortOrder }) => ({
+          org_id: orgId,
+          name: item.name,
+          abbr: item.abbr,
+          sort_order: sortOrder,
+        })),
+      );
+    if (error) throw error;
+  }
+
+  return fetchOrganizationRoles(orgId);
 }
 
-// ── Company Users (for user management panel) ────────────────────────────────
+// ── Organization Users (for user management panel) ──────────────────────────
 
-export async function fetchCompanyUsers(companyId: string): Promise<CompanyUser[]> {
-  const { data, error } = await supabase.rpc("get_company_users", {
-    p_company_id: companyId,
+export async function fetchOrganizationUsers(orgId: string): Promise<OrganizationUser[]> {
+  const { data, error } = await supabase.rpc("get_org_users", {
+    p_org_id: orgId,
   });
   if (error) throw error;
   return (data ?? []).map((row: any) => ({
@@ -477,7 +523,7 @@ export async function fetchCompanyUsers(companyId: string): Promise<CompanyUser[
     email: (row.email as string | null) ?? null,
     firstName: (row.first_name as string | null) ?? null,
     lastName: (row.last_name as string | null) ?? null,
-    companyRole: (row.company_role as string ?? "user") as import("@/types").CompanyRole,
+    orgRole: (row.org_role as string ?? "user") as import("@/types").OrganizationRole,
     platformRole: (row.platform_role as string) as import("@/types").PlatformRole,
     adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
     createdAt: row.created_at as string,
@@ -487,19 +533,19 @@ export async function fetchCompanyUsers(companyId: string): Promise<CompanyUser[
 export async function updateAdminPermissions(
   userId: string,
   permissions: import("@/types").AdminPermissions | null,
-  companyId: string,
+  orgId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from("company_memberships")
+    .from("organization_memberships")
     .update({ admin_permissions: permissions })
     .eq("user_id", userId)
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (error) throw error;
 }
 
-export async function changeCompanyUserRole(
+export async function changeOrganizationUserRole(
   targetUserId: string,
-  newRole: import("@/types").AssignableCompanyRole
+  newRole: import("@/types").AssignableOrganizationRole
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -515,11 +561,11 @@ export async function changeCompanyUserRole(
 
 // ── Focus Areas ──────────────────────────────────────────────────────────────
 
-export async function fetchFocusAreas(companyId: string, includeArchived = false): Promise<FocusArea[]> {
+export async function fetchFocusAreas(orgId: string, includeArchived = false): Promise<FocusArea[]> {
   let query = supabase
     .from("focus_areas")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
@@ -528,7 +574,7 @@ export async function fetchFocusAreas(companyId: string, includeArchived = false
 
 export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: number }): Promise<FocusArea> {
   const row = {
-    company_id: focusArea.companyId,
+    org_id: focusArea.orgId,
     name: focusArea.name,
     color_bg: focusArea.colorBg,
     color_text: focusArea.colorText,
@@ -578,22 +624,22 @@ export async function deleteFocusArea(focusAreaId: number): Promise<void> {
 
 // ── Shift Codes ───────────────────────────────────────────────────────────────
 
-export async function fetchShiftCodes(companyId: string, includeArchived = false): Promise<ShiftCode[]> {
+export async function fetchShiftCodes(orgId: string, includeArchived = false): Promise<ShiftCode[]> {
   let query = supabase
     .from("shift_codes")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return (data as DbShiftCode[]).map(rowToShiftCode);
 }
 
-export async function fetchShiftCategories(companyId: string, includeArchived = false): Promise<ShiftCategory[]> {
+export async function fetchShiftCategories(orgId: string, includeArchived = false): Promise<ShiftCategory[]> {
   let query = supabase
     .from("shift_categories")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
@@ -604,7 +650,7 @@ export async function upsertShiftCategory(
   cat: Omit<ShiftCategory, "id"> & { id?: number }
 ): Promise<ShiftCategory> {
   const row = {
-    company_id: cat.companyId,
+    org_id: cat.orgId,
     name: cat.name,
     color: cat.color,
     start_time: cat.startTime ?? null,
@@ -643,7 +689,7 @@ export async function upsertShiftCode(
   st: Omit<ShiftCode, "id"> & { id?: number }
 ): Promise<ShiftCode> {
   const row = {
-    company_id: st.companyId,
+    org_id: st.orgId,
     label: st.label,
     name: st.name,
     color: st.color,
@@ -693,13 +739,13 @@ export async function deleteShiftCode(id: number): Promise<void> {
 // ── Employees ─────────────────────────────────────────────────────────────────
 
 export async function fetchEmployees(
-  companyId: string,
+  orgId: string,
   statuses?: EmployeeStatus[],
 ): Promise<Employee[]> {
   let query = supabase
     .from("employees")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   // Terminated employees have archived_at set, so skip the filter when fetching them
   const includesTerminated = statuses?.includes("terminated");
   if (!includesTerminated) {
@@ -715,21 +761,21 @@ export async function fetchEmployees(
 
 export async function insertEmployee(
   data: Omit<Employee, "id">,
-  companyId: string,
+  orgId: string,
 ): Promise<Employee> {
   const { data: row, error } = await supabase
     .from("employees")
-    .insert(employeeToRow(data, companyId))
+    .insert(employeeToRow(data, orgId))
     .select()
     .single();
   if (error) throw error;
   return rowToEmployee(row as DbEmployee);
 }
 
-export async function updateEmployee(emp: Employee, companyId: string): Promise<void> {
+export async function updateEmployee(emp: Employee, orgId: string): Promise<void> {
   const { error } = await supabase
     .from("employees")
-    .update(employeeToRow(emp, companyId))
+    .update(employeeToRow(emp, orgId))
     .eq("id", emp.id);
   if (error) throw error;
 }
@@ -784,14 +830,14 @@ export async function terminateEmployee(empId: string): Promise<void> {
 // ── Shifts ────────────────────────────────────────────────────────────────────
 
 export async function fetchShifts(
-  companyId: string,
+  orgId: string,
   isScheduler: boolean,
   shiftCodeMap: Map<number, string>,
 ): Promise<ShiftMap> {
   const { data, error } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, series_id, from_regular, custom_start_time, custom_end_time, employees!inner(company_id)")
-    .eq("employees.company_id", companyId);
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, series_id, from_regular, custom_start_time, custom_end_time, employees!inner(org_id)")
+    .eq("employees.org_id", orgId);
   if (error) throw error;
   const map: ShiftMap = {};
   for (const row of data as DbShift[]) {
@@ -826,7 +872,7 @@ export async function upsertShift(
   empId: string,
   date: string,
   shiftCodeIds: number[],
-  companyId?: string | null,
+  orgId?: string | null,
   customStartTime?: string | null,
   customEndTime?: string | null,
 ): Promise<void> {
@@ -836,7 +882,7 @@ export async function upsertShift(
     draft_shift_code_ids: shiftCodeIds,
     draft_is_delete: false,
   };
-  if (companyId) payload.company_id = companyId;
+  if (orgId) payload.org_id = orgId;
   if (customStartTime !== undefined) payload.custom_start_time = customStartTime;
   if (customEndTime !== undefined) payload.custom_end_time = customEndTime;
   const { error } = await supabase
@@ -851,12 +897,12 @@ export async function upsertShiftTimes(
   date: string,
   customStartTime: string | null,
   customEndTime: string | null,
-  companyId: string,
+  orgId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("shifts")
     .upsert(
-      { emp_id: empId, date, company_id: companyId, custom_start_time: customStartTime, custom_end_time: customEndTime },
+      { emp_id: empId, date, org_id: orgId, custom_start_time: customStartTime, custom_end_time: customEndTime },
       { onConflict: "emp_id,date" },
     );
   if (error) throw error;
@@ -874,12 +920,12 @@ export async function deleteShift(empId: string, date: string): Promise<void> {
 }
 
 export async function publishSchedule(
-  companyId: string,
+  orgId: string,
   startDate: Date,
   endDate: Date
 ): Promise<void> {
   const { error } = await supabase.rpc("publish_schedule", {
-    p_company_id: companyId,
+    p_org_id: orgId,
     p_start_date: startDate.toISOString().split("T")[0],
     p_end_date: endDate.toISOString().split("T")[0],
   });
@@ -887,7 +933,7 @@ export async function publishSchedule(
 }
 
 export async function discardScheduleDrafts(
-  companyId: string,
+  orgId: string,
   startDate: Date,
   endDate: Date
 ): Promise<void> {
@@ -897,8 +943,8 @@ export async function discardScheduleDrafts(
   // 1. Fetch all shifts in the date range (filter by org via employees join)
   const { data: shifts, error: fetchError } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, employees!inner(company_id)")
-    .eq("employees.company_id", companyId)
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, employees!inner(org_id)")
+    .eq("employees.org_id", orgId)
     .gte("date", startStr)
     .lte("date", endStr);
 
@@ -953,7 +999,7 @@ export async function discardScheduleDrafts(
   const { error: noteDeleteError } = await supabase
     .from("schedule_notes")
     .delete()
-    .eq("company_id", companyId)
+    .eq("org_id", orgId)
     .gte("date", startStr)
     .lte("date", endStr)
     .eq("status", "draft");
@@ -963,7 +1009,7 @@ export async function discardScheduleDrafts(
   const { error: noteRevertError } = await supabase
     .from("schedule_notes")
     .update({ status: "published" })
-    .eq("company_id", companyId)
+    .eq("org_id", orgId)
     .gte("date", startStr)
     .lte("date", endStr)
     .eq("status", "draft_deleted");
@@ -973,16 +1019,16 @@ export async function discardScheduleDrafts(
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────
 
-export async function fetchScheduleNotes(companyId: string): Promise<ScheduleNote[]> {
+export async function fetchScheduleNotes(orgId: string): Promise<ScheduleNote[]> {
   const { data, error } = await supabase
     .from("schedule_notes")
-    .select("id, company_id, emp_id, date, note_type, focus_area_id, status, created_by, created_at, updated_at")
-    .eq("company_id", companyId);
+    .select("id, org_id, emp_id, date, note_type, focus_area_id, status, created_by, created_at, updated_at")
+    .eq("org_id", orgId);
   if (error) throw error;
 
   return (data as DbScheduleNote[]).map((row) => ({
     id: row.id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     empId: row.emp_id,
     date: row.date,
     noteType: row.note_type,
@@ -995,7 +1041,7 @@ export async function fetchScheduleNotes(companyId: string): Promise<ScheduleNot
 }
 
 export async function upsertScheduleNote(
-  companyId: string,
+  orgId: string,
   empId: string,
   date: string,
   noteType: NoteType,
@@ -1011,7 +1057,7 @@ export async function upsertScheduleNote(
 
   const { error } = await supabase.from("schedule_notes").upsert(
     {
-      company_id: companyId,
+      org_id: orgId,
       emp_id: empId,
       date,
       note_type: noteType,
@@ -1058,7 +1104,7 @@ export async function deleteScheduleNote(
 
 interface DbIndicatorType {
   id: number;
-  company_id: string;
+  org_id: string;
   name: string;
   color: string;
   sort_order: number;
@@ -1068,7 +1114,7 @@ interface DbIndicatorType {
 function rowToIndicatorType(row: DbIndicatorType): IndicatorType {
   return {
     id: row.id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     name: row.name,
     color: row.color,
     sortOrder: row.sort_order,
@@ -1076,11 +1122,11 @@ function rowToIndicatorType(row: DbIndicatorType): IndicatorType {
   };
 }
 
-export async function fetchIndicatorTypes(companyId: string, includeArchived = false): Promise<IndicatorType[]> {
+export async function fetchIndicatorTypes(orgId: string, includeArchived = false): Promise<IndicatorType[]> {
   let query = supabase
     .from("indicator_types")
     .select("*")
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
@@ -1091,7 +1137,7 @@ export async function upsertIndicatorType(
   indicator: Omit<IndicatorType, "id"> & { id?: number }
 ): Promise<IndicatorType> {
   const row = {
-    company_id: indicator.companyId,
+    org_id: indicator.orgId,
     name: indicator.name,
     color: indicator.color,
     sort_order: indicator.sortOrder,
@@ -1197,7 +1243,7 @@ export async function insertShiftV2(
     date: shift.date,
     draft_shift_code_ids: shift.shiftCodeIds,
     draft_is_delete: false,
-    company_id: shift.companyId ?? null,
+    org_id: shift.orgId ?? null,
     user_id: shift.userId ?? null,
     created_by: shift.createdBy ?? null,
   };
@@ -1241,15 +1287,15 @@ export async function fetchShiftV2(
 
 // ── RBAC helper operations ───────────────────────────────────────────────────
 
-export async function assignCompanyRoleByEmail(
-  companyId: string,
+export async function assignOrgRoleByEmail(
+  orgId: string,
   email: string,
   role: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("assign_company_role_by_email", {
+  const { error } = await supabase.rpc("assign_org_role_by_email", {
     p_email: email,
-    p_company_id: companyId,
-    p_company_role: role,
+    p_org_id: orgId,
+    p_org_role: role,
   });
   if (error) throw error;
 }
@@ -1297,12 +1343,82 @@ export async function endImpersonation(sessionId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function forceLogoutUser(targetUserId: string): Promise<void> {
+  const { error } = await supabase.rpc("force_logout_user", {
+    p_target_user_id: targetUserId,
+  });
+  if (error) throw error;
+}
+
+// ── Invitations ───────────────────────────────────────────────────────────────
+
+export async function sendInvitation(
+  email: string,
+  role: AssignableOrganizationRole,
+  orgId: string,
+): Promise<{ invitationId: string; token: string; expiresAt: string }> {
+  const { data, error } = await supabase.rpc("send_invitation", {
+    p_email: email,
+    p_role: role,
+    p_org_id: orgId,
+  });
+  if (error) throw error;
+  return {
+    invitationId: data.invitation_id,
+    token: data.token,
+    expiresAt: data.expires_at,
+  };
+}
+
+export async function acceptInvitation(
+  token: string,
+): Promise<{ status: string; orgId: string; role: string }> {
+  const { data, error } = await supabase.rpc("accept_invitation", {
+    p_token: token,
+  });
+  if (error) throw error;
+  return {
+    status: data.status,
+    orgId: data.org_id,
+    role: data.role,
+  };
+}
+
+export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    orgId: row.org_id as string,
+    invitedBy: (row.invited_by as string) ?? null,
+    email: row.email as string,
+    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
+    token: row.token as string,
+    expiresAt: row.expires_at as string,
+    acceptedAt: (row.accepted_at as string) ?? null,
+    revokedAt: (row.revoked_at as string) ?? null,
+    createdAt: row.created_at as string,
+  }));
+}
+
+export async function revokeInvitation(invitationId: string): Promise<void> {
+  const { error } = await supabase
+    .from("invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", invitationId);
+  if (error) throw error;
+}
+
 // ── Regular Shifts ────────────────────────────────────────────────────────────
 
 interface DbRegularShift {
   id: string;
   emp_id: string;
-  company_id: string;
+  org_id: string;
   day_of_week: number;
   shift_code_id: number;
   effective_from: string;
@@ -1316,7 +1432,7 @@ function rowToRegularShift(row: DbRegularShift, codeMap: Map<number, string>): R
   return {
     id: row.id,
     empId: row.emp_id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     dayOfWeek: row.day_of_week,
     shiftCodeId: row.shift_code_id,
     shiftLabel: codeMap.get(row.shift_code_id) ?? '?',
@@ -1329,7 +1445,7 @@ function rowToRegularShift(row: DbRegularShift, codeMap: Map<number, string>): R
 }
 
 export async function fetchRegularShifts(
-  companyId: string,
+  orgId: string,
   empId?: string,
   shiftCodeMap?: Map<number, string>,
   includeArchived = false,
@@ -1337,7 +1453,7 @@ export async function fetchRegularShifts(
   let query = supabase
     .from("regular_shifts")
     .select("*")
-    .eq("company_id", companyId)
+    .eq("org_id", orgId)
     .order("day_of_week");
   if (!includeArchived) query = query.is("archived_at", null);
   if (empId) query = query.eq("emp_id", empId);
@@ -1348,7 +1464,7 @@ export async function fetchRegularShifts(
 
 export async function upsertRegularShift(
   empId: string,
-  companyId: string,
+  orgId: string,
   dayOfWeek: number,
   shiftCodeId: number,
   effectiveFrom: string,
@@ -1369,7 +1485,7 @@ export async function upsertRegularShift(
   if (!data || data.length === 0) {
     const { error: insertError } = await supabase
       .from("regular_shifts")
-      .insert({ emp_id: empId, company_id: companyId, day_of_week: dayOfWeek, shift_code_id: shiftCodeId, effective_from: effectiveFrom });
+      .insert({ emp_id: empId, org_id: orgId, day_of_week: dayOfWeek, shift_code_id: shiftCodeId, effective_from: effectiveFrom });
     if (insertError) throw new Error(insertError.message);
   }
 }
@@ -1390,7 +1506,7 @@ export async function deleteRegularShift(empId: string, dayOfWeek: number, effec
  * Returns keys of newly created shifts.
  */
 export async function applyRegularSchedules(
-  companyId: string,
+  orgId: string,
   startDate: Date,
   endDate: Date,
   regularShifts: RegularShift[],
@@ -1403,7 +1519,7 @@ export async function applyRegularSchedules(
     byEmp[rs.empId].push(rs);
   }
 
-  const toInsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; draft_is_delete: boolean; company_id: string; from_regular: boolean }[] = [];
+  const toInsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; draft_is_delete: boolean; org_id: string; from_regular: boolean }[] = [];
   const generated: { empId: string; date: string; label: string }[] = [];
 
   const current = new Date(startDate);
@@ -1446,7 +1562,7 @@ export async function applyRegularSchedules(
       }
 
       if (regular) {
-        toInsert.push({ emp_id: empId, date: dateKey, draft_shift_code_ids: [regular.shiftCodeId], draft_is_delete: false, company_id: companyId, from_regular: true });
+        toInsert.push({ emp_id: empId, date: dateKey, draft_shift_code_ids: [regular.shiftCodeId], draft_is_delete: false, org_id: orgId, from_regular: true });
         generated.push({ empId, date: dateKey, label: regular.shiftLabel });
       }
     }
@@ -1468,24 +1584,24 @@ export async function applyRegularSchedules(
 
 export interface DraftSession {
   id: string;
-  companyId: string;
+  orgId: string;
   savedBy: string;
   startDate: string;
   endDate: string;
   savedAt: string;
 }
 
-export async function getDraftSession(companyId: string): Promise<DraftSession | null> {
+export async function getDraftSession(orgId: string): Promise<DraftSession | null> {
   const { data, error } = await supabase
     .from("schedule_draft_sessions")
     .select("*")
-    .eq("company_id", companyId)
+    .eq("org_id", orgId)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return {
     id: data.id,
-    companyId: data.company_id,
+    orgId: data.org_id,
     savedBy: data.saved_by,
     startDate: data.start_date,
     endDate: data.end_date,
@@ -1494,7 +1610,7 @@ export async function getDraftSession(companyId: string): Promise<DraftSession |
 }
 
 export async function saveDraftSession(
-  companyId: string,
+  orgId: string,
   savedBy: string,
   startDate: Date,
   endDate: Date,
@@ -1503,22 +1619,22 @@ export async function saveDraftSession(
     .from("schedule_draft_sessions")
     .upsert(
       {
-        company_id: companyId,
+        org_id: orgId,
         saved_by: savedBy,
         start_date: startDate.toISOString().split("T")[0],
         end_date: endDate.toISOString().split("T")[0],
         saved_at: new Date().toISOString(),
       },
-      { onConflict: "company_id" },
+      { onConflict: "org_id" },
     );
   if (error) throw error;
 }
 
-export async function deleteDraftSession(companyId: string): Promise<void> {
+export async function deleteDraftSession(orgId: string): Promise<void> {
   const { error } = await supabase
     .from("schedule_draft_sessions")
     .delete()
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (error) throw error;
 }
 
@@ -1527,7 +1643,7 @@ export async function deleteDraftSession(companyId: string): Promise<void> {
 interface DbShiftSeries {
   id: string;
   emp_id: string;
-  company_id: string;
+  org_id: string;
   shift_code_id: number;
   frequency: SeriesFrequency;
   days_of_week: number[] | null;
@@ -1543,7 +1659,7 @@ function rowToShiftSeries(row: DbShiftSeries, codeMap: Map<number, string>): Shi
   return {
     id: row.id,
     empId: row.emp_id,
-    companyId: row.company_id,
+    orgId: row.org_id,
     shiftCodeId: row.shift_code_id,
     shiftLabel: codeMap.get(row.shift_code_id) ?? '?',
     frequency: row.frequency,
@@ -1601,7 +1717,7 @@ function generateSeriesDates(
 
 export async function createShiftSeries(
   empId: string,
-  companyId: string,
+  orgId: string,
   shiftCodeId: number,
   shiftLabel: string,
   frequency: SeriesFrequency,
@@ -1620,7 +1736,7 @@ export async function createShiftSeries(
     .insert({
       id,
       emp_id: empId,
-      company_id: companyId,
+      org_id: orgId,
       shift_code_id: shiftCodeId,
       frequency,
       days_of_week: daysOfWeek,
@@ -1638,7 +1754,7 @@ export async function createShiftSeries(
       date,
       draft_shift_code_ids: [shiftCodeId],
       draft_is_delete: false,
-      company_id: companyId,
+      org_id: orgId,
       series_id: id,
     }));
     const { error: insertError } = await supabase
@@ -1651,7 +1767,7 @@ export async function createShiftSeries(
   return {
     id,
     empId,
-    companyId: companyId,
+    orgId,
     shiftCodeId,
     shiftLabel,
     frequency,
@@ -1701,24 +1817,24 @@ export async function deleteShiftSeries(seriesId: string): Promise<void> {
 
 // ── Gridmaster: Tenant Management ─────────────────────────────────────────────
 
-export async function fetchAllCompanies(): Promise<Company[]> {
+export async function fetchAllOrganizations(): Promise<Organization[]> {
   const { data, error } = await supabase
-    .from("companies")
+    .from("organizations")
     .select("*")
     .order("name");
   if (error) throw error;
-  return (data ?? []).map((row: any) => rowToCompany(row as DbCompany));
+  return (data ?? []).map((row: any) => rowToOrganization(row as DbOrganization));
 }
 
 export interface TenantStats {
-  companyId: string;
+  orgId: string;
   userCount: number;
   employeeCount: number;
 }
 
-export async function createCompany(data: Omit<Company, 'id'>): Promise<Company> {
+export async function createOrganization(data: Omit<Organization, 'id'>): Promise<Organization> {
   const { data: row, error } = await supabase
-    .from("companies")
+    .from("organizations")
     .insert({
       name: data.name,
       slug: data.slug || null,
@@ -1732,22 +1848,22 @@ export async function createCompany(data: Omit<Company, 'id'>): Promise<Company>
     .select()
     .single();
   if (error) throw error;
-  return rowToCompany(row as DbCompany);
+  return rowToOrganization(row as DbOrganization);
 }
 
-export async function archiveCompany(companyId: string): Promise<void> {
+export async function archiveOrganization(orgId: string): Promise<void> {
   const { error } = await supabase
-    .from("companies")
+    .from("organizations")
     .update({ archived_at: new Date().toISOString() })
-    .eq("id", companyId);
+    .eq("id", orgId);
   if (error) throw error;
 }
 
-export async function restoreCompany(companyId: string): Promise<void> {
+export async function restoreOrganization(orgId: string): Promise<void> {
   const { error } = await supabase
-    .from("companies")
+    .from("organizations")
     .update({ archived_at: null })
-    .eq("id", companyId);
+    .eq("id", orgId);
   if (error) throw error;
 }
 
@@ -1760,21 +1876,21 @@ export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]>
     firstName: null, // auth.users doesn't expose first_name; profiles may be joined separately
     lastName: null,
     platformRole: (row.platform_role as string ?? 'none') as import("@/types").PlatformRole,
-    companyRole: (row.company_role as string | null) as import("@/types").CompanyRole | null,
-    companyId: (row.org_id as string | null) ?? null,       // RPC returns org_id (legacy column name)
-    companyName: (row.org_name as string | null) ?? null,   // RPC returns org_name (legacy column name)
+    orgRole: (row.org_role as string | null) as import("@/types").OrganizationRole | null,
+    orgId: (row.org_id as string | null) ?? null,
+    orgName: (row.org_name as string | null) ?? null,
     createdAt: row.created_at as string,
     lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
   }));
 }
 
 export async function fetchAuditLog(options?: {
-  companyId?: string;
+  orgId?: string;
   limit?: number;
   offset?: number;
 }): Promise<import("@/types").AuditLogEntry[]> {
   const { data, error } = await supabase.rpc("get_audit_log", {
-    p_company_id: options?.companyId ?? null,
+    p_org_id: options?.orgId ?? null,
     p_limit: options?.limit ?? 50,
     p_offset: options?.offset ?? 0,
   });
@@ -1788,25 +1904,25 @@ export async function fetchAuditLog(options?: {
     fromRole: row.from_role as string,
     toRole: row.to_role as string,
     createdAt: row.created_at as string,
-    companyId: (row.company_id as string | null) ?? null,
-    companyName: (row.company_name as string | null) ?? null,
+    orgId: (row.org_id as string | null) ?? null,
+    orgName: (row.org_name as string | null) ?? null,
   }));
 }
 
-export async function fetchCompanyMemberships(
-  companyId: string,
-): Promise<import("@/types").CompanyMembership[]> {
+export async function fetchOrganizationMemberships(
+  orgId: string,
+): Promise<import("@/types").OrganizationMembership[]> {
   const { data, error } = await supabase
-    .from("company_memberships")
-    .select("id, user_id, company_id, company_role, admin_permissions, joined_at")
-    .eq("company_id", companyId)
+    .from("organization_memberships")
+    .select("id, user_id, org_id, org_role, admin_permissions, joined_at")
+    .eq("org_id", orgId)
     .order("joined_at");
   if (error) throw error;
   return (data ?? []).map((row: any) => ({
     id: row.id as number,
     userId: row.user_id as string,
-    companyId: row.company_id as string,
-    companyRole: row.company_role as import("@/types").CompanyRole,
+    orgId: row.org_id as string,
+    orgRole: row.org_role as import("@/types").OrganizationRole,
     adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
     joinedAt: row.joined_at as string,
     email: null,
@@ -1815,23 +1931,23 @@ export async function fetchCompanyMemberships(
   }));
 }
 
-export async function removeUserFromCompany(
+export async function removeUserFromOrganization(
   userId: string,
-  companyId: string,
+  orgId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from("company_memberships")
+    .from("organization_memberships")
     .delete()
     .eq("user_id", userId)
-    .eq("company_id", companyId);
+    .eq("org_id", orgId);
   if (error) throw error;
 }
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {
   const [{ data: profileData, error: pErr }, { data: empData, error: eErr }] =
     await Promise.all([
-      supabase.from("profiles").select("company_id").neq("platform_role", "gridmaster"),
-      supabase.from("employees").select("company_id").is("archived_at", null),
+      supabase.from("profiles").select("org_id").neq("platform_role", "gridmaster"),
+      supabase.from("employees").select("org_id").is("archived_at", null),
     ]);
   if (pErr) throw pErr;
   if (eErr) throw eErr;
@@ -1839,17 +1955,17 @@ export async function fetchTenantStats(): Promise<TenantStats[]> {
   const statsMap = new Map<string, TenantStats>();
 
   for (const row of profileData ?? []) {
-    const cid = row.company_id;
+    const cid = row.org_id;
     if (!cid) continue;
-    const entry = statsMap.get(cid) ?? { companyId: cid, userCount: 0, employeeCount: 0 };
+    const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
     entry.userCount++;
     statsMap.set(cid, entry);
   }
 
   for (const row of empData ?? []) {
-    const cid = row.company_id;
+    const cid = row.org_id;
     if (!cid) continue;
-    const entry = statsMap.get(cid) ?? { companyId: cid, userCount: 0, employeeCount: 0 };
+    const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
     entry.employeeCount++;
     statsMap.set(cid, entry);
   }
