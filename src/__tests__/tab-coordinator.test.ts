@@ -547,35 +547,35 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-type CompanyRole = "admin" | "scheduler" | "supervisor" | "user";
+type OrganizationRole = "admin" | "scheduler" | "supervisor" | "user";
 type PlatformRole = "gridmaster" | "none";
 
-const VALID_COMPANY_ROLES: CompanyRole[] = ["admin", "scheduler", "supervisor", "user"];
+const VALID_ORG_ROLES: OrganizationRole[] = ["admin", "scheduler", "supervisor", "user"];
 
 function extractClaims(accessToken: string): {
   platformRole: PlatformRole;
-  companyRole: CompanyRole | null;
-  companyId: string | null;
-  companySlug: string | null;
+  orgRole: OrganizationRole | null;
+  orgId: string | null;
+  orgSlug: string | null;
 } {
   const raw = decodeJwtPayload(accessToken);
 
   const platformRole: PlatformRole =
     raw?.platform_role === "gridmaster" ? "gridmaster" : "none";
 
-  const companyRoleRaw = raw?.company_role as string | undefined;
-  const normalizedCompanyRole = companyRoleRaw === "sovereign" ? "admin" : companyRoleRaw;
-  const companyRole: CompanyRole | null =
-    normalizedCompanyRole && VALID_COMPANY_ROLES.includes(normalizedCompanyRole as CompanyRole)
-      ? (normalizedCompanyRole as CompanyRole)
+  const orgRoleRaw = raw?.org_role as string | undefined;
+  const normalizedOrganizationRole = orgRoleRaw === "sovereign" ? "admin" : orgRoleRaw;
+  const orgRole: OrganizationRole | null =
+    normalizedOrganizationRole && VALID_ORG_ROLES.includes(normalizedOrganizationRole as OrganizationRole)
+      ? (normalizedOrganizationRole as OrganizationRole)
       : null;
 
-  const companyId =
-    typeof raw?.company_id === "string" && raw.company_id ? raw.company_id : null;
-  const companySlug =
-    typeof raw?.company_slug === "string" && raw.company_slug ? raw.company_slug : null;
+  const orgId =
+    typeof raw?.org_id === "string" && raw.org_id ? raw.org_id : null;
+  const orgSlug =
+    typeof raw?.org_slug === "string" && raw.org_slug ? raw.org_slug : null;
 
-  return { platformRole, companyRole, companyId, companySlug };
+  return { platformRole, orgRole, orgId, orgSlug };
 }
 
 /**
@@ -627,7 +627,7 @@ describe("Feature: supabase-multi-tab-refresh-fix, Property 5: RBAC claims re-ex
       fc.constant("other-value"), // should map to "none"
     );
 
-    const companyRoleArb = fc.oneof(
+    const orgRoleArb = fc.oneof(
       fc.constantFrom("admin", "scheduler", "supervisor", "user"),
       fc.constant("sovereign"), // should normalize to "admin"
       fc.constant("unknown-role"), // should map to null
@@ -644,10 +644,10 @@ describe("Feature: supabase-multi-tab-refresh-fix, Property 5: RBAC claims re-ex
     fc.assert(
       fc.property(
         platformRoleArb,
-        companyRoleArb,
+        orgRoleArb,
         nullableUuidArb,
         nullableSlugArb,
-        (platform_role, company_role, company_id, company_slug) => {
+        (platform_role, org_role, org_id, org_slug) => {
           // Step 1 & 2: Build a fake JWT embedding the RBAC claims
           const jwtPayload: Record<string, unknown> = {
             sub: "user-123",
@@ -656,9 +656,9 @@ describe("Feature: supabase-multi-tab-refresh-fix, Property 5: RBAC claims re-ex
 
           // Only embed non-empty claim values (mirrors real JWT behaviour)
           if (platform_role) jwtPayload.platform_role = platform_role;
-          if (company_role) jwtPayload.company_role = company_role;
-          if (company_id) jwtPayload.company_id = company_id;
-          if (company_slug) jwtPayload.company_slug = company_slug;
+          if (org_role) jwtPayload.org_role = org_role;
+          if (org_id) jwtPayload.org_id = org_id;
+          if (org_slug) jwtPayload.org_slug = org_slug;
 
           const accessToken = buildFakeJwt(jwtPayload);
 
@@ -682,9 +682,9 @@ describe("Feature: supabase-multi-tab-refresh-fix, Property 5: RBAC claims re-ex
           // Step 6: Assert they match
           return (
             claimsFromOriginal.platformRole === claimsFromDeserialized.platformRole &&
-            claimsFromOriginal.companyRole === claimsFromDeserialized.companyRole &&
-            claimsFromOriginal.companyId === claimsFromDeserialized.companyId &&
-            claimsFromOriginal.companySlug === claimsFromDeserialized.companySlug
+            claimsFromOriginal.orgRole === claimsFromDeserialized.orgRole &&
+            claimsFromOriginal.orgId === claimsFromDeserialized.orgId &&
+            claimsFromOriginal.orgSlug === claimsFromDeserialized.orgSlug
           );
         },
       ),

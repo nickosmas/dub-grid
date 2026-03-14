@@ -5,21 +5,21 @@ import * as fc from "fast-check";
 import StaffView from "@/components/StaffView";
 import { Employee, FocusArea, NamedItem } from "@/types";
 const DESIGNATIONS: NamedItem[] = [
-  { id: 1, companyId: "company-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
-  { id: 2, companyId: "company-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
-  { id: 3, companyId: "company-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
-  { id: 4, companyId: "company-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
-  { id: 5, companyId: "company-1", name: "—", abbr: "—", sortOrder: 4 },
+  { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
+  { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
+  { id: 3, orgId: "org-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
+  { id: 4, orgId: "org-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
+  { id: 5, orgId: "org-1", name: "—", abbr: "—", sortOrder: 4 },
 ];
 const ROLES: NamedItem[] = [
-  { id: 1, companyId: "company-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },
-  { id: 2, companyId: "company-1", name: "DVCSN", abbr: "DVCSN", sortOrder: 1 },
-  { id: 3, companyId: "company-1", name: "Supv", abbr: "Supv", sortOrder: 2 },
-  { id: 4, companyId: "company-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
-  { id: 5, companyId: "company-1", name: "CN", abbr: "CN", sortOrder: 4 },
-  { id: 6, companyId: "company-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
-  { id: 7, companyId: "company-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
-  { id: 8, companyId: "company-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
+  { id: 1, orgId: "org-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },
+  { id: 2, orgId: "org-1", name: "DVCSN", abbr: "DVCSN", sortOrder: 1 },
+  { id: 3, orgId: "org-1", name: "Supv", abbr: "Supv", sortOrder: 2 },
+  { id: 4, orgId: "org-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
+  { id: 5, orgId: "org-1", name: "CN", abbr: "CN", sortOrder: 4 },
+  { id: 6, orgId: "org-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
+  { id: 7, orgId: "org-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
+  { id: 8, orgId: "org-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
 ];
 
 vi.mock("@/components/EditEmployeePanel", () => ({
@@ -29,7 +29,7 @@ vi.mock("@/components/EditEmployeePanel", () => ({
 const focusAreas: FocusArea[] = [
   {
     id: 1,
-    companyId: "company-1",
+    orgId: "org-1",
     name: "North",
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",

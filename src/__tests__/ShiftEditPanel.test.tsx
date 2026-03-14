@@ -15,7 +15,7 @@ const modal: EditModalState = {
 
 const northShift: ShiftCode = {
   id: 1,
-  companyId: "company-1",
+  orgId: "org-1",
   label: "D",
   name: "Day",
   color: "#DBEAFE",
@@ -27,7 +27,7 @@ const northShift: ShiftCode = {
 
 const southShift: ShiftCode = {
   id: 2,
-  companyId: "company-1",
+  orgId: "org-1",
   label: "E",
   name: "Eve",
   color: "#FEF3C7",
@@ -39,7 +39,7 @@ const southShift: ShiftCode = {
 
 const generalShift: ShiftCode = {
   id: 3,
-  companyId: "company-1",
+  orgId: "org-1",
   label: "X",
   name: "Off",
   color: "#F1F5F9",
@@ -52,13 +52,13 @@ const generalShift: ShiftCode = {
 const shiftCodes = [northShift, southShift, generalShift];
 
 const certifications: NamedItem[] = [
-  { id: 1, name: "JLCSN", companyId: "company-1", abbr: "JLCSN", sortOrder: 0 },
-  { id: 2, name: "CSN II", companyId: "company-1", abbr: "CSN2", sortOrder: 1 },
+  { id: 1, name: "JLCSN", orgId: "org-1", abbr: "JLCSN", sortOrder: 0 },
+  { id: 2, name: "CSN II", orgId: "org-1", abbr: "CSN2", sortOrder: 1 },
 ];
 
 const focusAreas: FocusArea[] = [
-  { id: 1, companyId: "company-1", name: "North", colorBg: "#EFF6FF", colorText: "#1E40AF", sortOrder: 0 },
-  { id: 2, companyId: "company-1", name: "South", colorBg: "#FEF3C7", colorText: "#92400E", sortOrder: 1 },
+  { id: 1, orgId: "org-1", name: "North", colorBg: "#EFF6FF", colorText: "#1E40AF", sortOrder: 0 },
+  { id: 2, orgId: "org-1", name: "South", colorBg: "#FEF3C7", colorText: "#92400E", sortOrder: 1 },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ describe("ShiftEditPanel", () => {
   describe("Qualification filtering", () => {
     const restrictedShift: ShiftCode = {
       id: 4,
-      companyId: "company-1",
+      orgId: "org-1",
       label: "JL",
       name: "JLCSN Day",
       color: "#EDE9FE",

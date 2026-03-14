@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceKey) {
-    // If we lack the service key in local dev, RLS blocks anonymous read of companies.
+    // If we lack the service key in local dev, RLS blocks anonymous read of organizations.
     // Rather than failing validation, we assume the domain is valid to allow the login flow.
     return NextResponse.json({ valid: true });
   }
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const supabase = createClient(url, serviceKey);
 
   const { data, error } = await supabase
-    .from("companies")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .maybeSingle();

@@ -4,13 +4,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
 import { decodeJwt } from "jose";
+import { toast } from "sonner";
 
 import { parseHost } from "@/lib/subdomain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function getCompanySlug(): string | null {
+function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
   const parsed = parseHost(window.location.host);
   return parsed.subdomain;
@@ -106,15 +107,11 @@ function Card({ children }: { children: React.ReactNode }) {
 function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function showToast(msg: string) {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast(msg);
-    toastTimerRef.current = setTimeout(() => setToast(""), 4000);
+    toast.error(msg);
   }
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
@@ -222,9 +219,8 @@ function DomainSelector() {
               onChange={(e) => {
                 setSlug(e.target.value);
                 setError("");
-                if (toast) setToast("");
               }}
-              placeholder="yourcompany"
+              placeholder="yourorg"
               style={{
                 flex: 1,
                 padding: "13px 14px 13px 16px",
@@ -355,8 +351,8 @@ function DomainSelector() {
               }}
             >
               Your subdomain is the first part of your workspace URL (e.g.{" "}
-              <strong>yourcompany</strong>.{baseDomain}). If you don&apos;t know
-              it, contact your company administrator.
+              <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know
+              it, contact your organization administrator.
             </p>
             <button
               type="button"
@@ -379,71 +375,6 @@ function DomainSelector() {
         </div>
       )}
 
-      {/* Toast notification */}
-      {toast && (
-        <div
-          style={{
-            position: "fixed",
-            top: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "14px 20px",
-            background: "#1F2937",
-            color: "#F9FAFB",
-            borderRadius: "12px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-            fontSize: "14px",
-            fontWeight: 500,
-            lineHeight: 1.4,
-            maxWidth: "420px",
-            animation: "toast-slide-in 0.3s ease-out",
-          }}
-        >
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "22px",
-              height: "22px",
-              borderRadius: "50%",
-              background: "#EF4444",
-              flexShrink: 0,
-              fontSize: "13px",
-              fontWeight: 700,
-            }}
-          >
-            !
-          </span>
-          <span style={{ flex: 1 }}>{toast}</span>
-          <button
-            type="button"
-            onClick={() => setToast("")}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#9CA3AF",
-              fontSize: "18px",
-              cursor: "pointer",
-              padding: "0 0 0 4px",
-              lineHeight: 1,
-            }}
-            aria-label="Dismiss"
-          >
-            &times;
-          </button>
-        </div>
-      )}
-      <style>{`
-        @keyframes toast-slide-in {
-          from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `}</style>
     </PageShell>
   );
 }
@@ -647,9 +578,9 @@ function GridmasterLogin() {
   );
 }
 
-// ── Step 2: Email + password (company subdomain) ────────────────────────────────
+// ── Step 2: Email + password (organization subdomain) ───────────────────────────
 
-function CompanyLogin({ companySlug }: { companySlug: string }) {
+function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -657,12 +588,12 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
   const [isError, setIsError] = useState(false);
   const [validating, setValidating] = useState(true);
 
-  // Validate subdomain corresponds to a real company on mount
+  // Validate subdomain corresponds to a real organization on mount
   useEffect(() => {
     let cancelled = false;
     async function validate() {
       try {
-        const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(companySlug)}`);
+        const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`);
         const { valid } = await res.json();
         if (!cancelled && !valid) {
           // Redirect to apex login with error hint
@@ -680,7 +611,7 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
     }
     validate();
     return () => { cancelled = true; };
-  }, [companySlug]);
+  }, [orgSlug]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -695,7 +626,7 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
       });
       if (error) throw error;
 
-      // Verify the user belongs to this company's workspace
+      // Verify the user belongs to this organization's workspace
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const claims = decodeJwt(session.access_token);
@@ -703,23 +634,55 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
 
         if (!isGridmaster) {
           // Try JWT claim first, fall back to DB lookup if hook isn't configured
-          let userSlug = typeof claims.company_slug === "string" ? claims.company_slug : null;
+          let userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
 
           if (!userSlug) {
             const { data: profile } = await supabase
               .from("profiles")
-              .select("company_id, companies(slug)")
+              .select("org_id, organizations(slug)")
               .eq("id", session.user.id)
               .maybeSingle();
-            userSlug = (profile?.companies as { slug: string } | null)?.slug ?? null;
+            userSlug = (profile?.organizations as { slug: string } | null)?.slug ?? null;
           }
 
-          if (userSlug !== companySlug) {
-            await supabase.auth.signOut();
-            setMessage("Your account is not associated with this workspace.");
-            setIsError(true);
-            setLoading(false);
-            return;
+          if (userSlug !== orgSlug) {
+            // Check if the user is a member of the requested orgSlug
+            const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
+            
+            if (rpcError || !orgs) {
+              await supabase.auth.signOut();
+              setMessage("Unable to verify workspace access.");
+              setIsError(true);
+              setLoading(false);
+              return;
+            }
+
+            const targetOrg = orgs.find((o: any) => o.org_slug === orgSlug);
+
+            if (targetOrg) {
+              // User is a member, switch active organization
+              const { error: switchError } = await supabase.rpc("switch_org", { 
+                target_org_id: targetOrg.org_id 
+              });
+
+              if (switchError) {
+                await supabase.auth.signOut();
+                setMessage("Failed to switch workspace context.");
+                setIsError(true);
+                setLoading(false);
+                return;
+              }
+
+              // Refresh the session so JWT claims (org_slug, org_id) are updated
+              await supabase.auth.refreshSession();
+            } else {
+              // Not a member of the requested org
+              await supabase.auth.signOut();
+              setMessage("Your account is not associated with this workspace.");
+              setIsError(true);
+              setLoading(false);
+              return;
+            }
           }
         }
       }
@@ -773,7 +736,7 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
           <DubGridWordmark />
         </div>
 
-        {/* Company badge */}
+        {/* Organization badge */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <span
             style={{
@@ -788,7 +751,7 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
               letterSpacing: "0.01em",
             }}
           >
-            {companySlug}.{baseDomain}
+            {orgSlug}.{baseDomain}
           </span>
         </div>
 
@@ -970,13 +933,13 @@ function CompanyLogin({ companySlug }: { companySlug: string }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-  const [companySlug, setCompanySlug] = useState<string | null>(null);
+  const [orgSlug, setOrgSlug] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const slug = getCompanySlug();
-    console.log("[Login] Detected company slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
-    setCompanySlug(slug);
+    const slug = getOrgSlug();
+    console.log("[Login] Detected org slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
+    setOrgSlug(slug);
     setMounted(true);
   }, []);
 
@@ -985,10 +948,10 @@ export default function LoginPage() {
 
   return (
     <PublicRoute>
-      {companySlug === "gridmaster" ? (
+      {orgSlug === "gridmaster" ? (
         <GridmasterLogin />
-      ) : companySlug ? (
-        <CompanyLogin companySlug={companySlug} />
+      ) : orgSlug ? (
+        <OrgLogin orgSlug={orgSlug} />
       ) : (
         <DomainSelector />
       )}

@@ -45,12 +45,14 @@ BEGIN
     WHERE id = gm_user_id;
   END IF;
 
-  -- Assign as gridmaster — no company affiliation, no company_role (dropped in migration 088)
-  INSERT INTO public.profiles (id, company_id, platform_role)
-  VALUES (gm_user_id, NULL, 'gridmaster')
+  -- Assign as gridmaster — no organization affiliation, no org_role (dropped in migration 088)
+  INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name)
+  VALUES (gm_user_id, NULL, 'gridmaster', 'Nicodamus', 'Kosmas')
   ON CONFLICT (id) DO UPDATE
     SET platform_role = 'gridmaster',
-        company_id   = NULL,
+        org_id       = NULL,
+        first_name   = 'Nicodamus',
+        last_name    = 'Kosmas',
         updated_at   = NOW();
 
   RAISE NOTICE 'Successfully added nicokosmas.dev@gmail.com as gridmaster.';

@@ -81,7 +81,7 @@ export default function OnboardingPage() {
             letterSpacing: "-0.03em",
           }}
         >
-          Pending Company Assignment
+          Pending Organization Assignment
         </h1>
 
         <p
@@ -93,7 +93,7 @@ export default function OnboardingPage() {
           }}
         >
           Your account has been successfully created, but you haven&apos;t been
-          assigned to a company yet. Please contact your administrator and
+          assigned to an organization yet. Please contact your administrator and
           ask them to invite you to their workspace.
         </p>
 
