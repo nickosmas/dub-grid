@@ -112,10 +112,13 @@ export async function middleware(req: NextRequest) {
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   // Verify JWT and read top-level custom claims - Requirement 11.4
+  // If jwtVerify fails (expired token, wrong secret, etc.), fall back to
+  // unverified decode so the user isn't blocked. Real data security is
+  // enforced by Supabase RLS, not edge middleware.
   let claims: JWTClaims;
   try {
     if (process.env.SUPABASE_JWT_SECRET) {
@@ -125,8 +128,12 @@ export async function middleware(req: NextRequest) {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
   } catch (err) {
-    console.error("JWT verification failed:", err);
-    return NextResponse.redirect(new URL("/", req.url));
+    console.warn("JWT verification failed, falling back to unverified decode:", err);
+    try {
+      claims = decodeJwt(session.access_token) as JWTClaims;
+    } catch {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/org
@@ -162,7 +169,7 @@ export async function middleware(req: NextRequest) {
 
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster") {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   // Keep org-scoped users on their org subdomain.

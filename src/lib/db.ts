@@ -545,7 +545,7 @@ export async function updateAdminPermissions(
 
 export async function changeOrganizationUserRole(
   targetUserId: string,
-  newRole: import("@/types").AssignableOrganizationRole
+  newRole: import("@/types").OrganizationRole
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");

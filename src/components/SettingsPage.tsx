@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, AdminPermissions, NamedItem } from "@/types";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem } from "@/types";
 import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
@@ -2327,6 +2327,9 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
 /** Permissions that are always on and cannot be toggled off. */
 const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule", "canViewStaff"]);
 
+/** Permissions that only super_admin can hold — hidden from admin permissions editor. */
+const SUPER_ADMIN_ONLY = new Set<keyof AdminPermissions>(["canManageOrgSettings"]);
+
 function emptyAdminPerms(): AdminPermissions {
   return {
     canViewSchedule: true,
@@ -2355,6 +2358,12 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [editingPerms, setEditingPerms] = useState<Record<string, AdminPermissions>>({});
   const [savingPerms, setSavingPerms] = useState<string | null>(null);
+  const [roleChangeConfirm, setRoleChangeConfirm] = useState<{
+    userId: string; userName: string; from: OrganizationRole; to: OrganizationRole;
+  } | null>(null);
+  const [resetPermsConfirm, setResetPermsConfirm] = useState<{
+    userId: string; userName: string;
+  } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -2364,7 +2373,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     return () => { mounted = false; };
   }, [orgId]);
 
-  const handleRoleChange = async (userId: string, newRole: "admin" | "user") => {
+  const handleRoleChange = async (userId: string, newRole: OrganizationRole) => {
     setSaving(userId);
     setError(null);
     try {
@@ -2378,6 +2387,18 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     } finally {
       setSaving(null);
     }
+  };
+
+  const requestRoleChange = (user: OrganizationUser, newRole: OrganizationRole) => {
+    if (newRole === user.orgRole) return;
+    const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+    setRoleChangeConfirm({ userId: user.id, userName: displayName, from: user.orgRole, to: newRole });
+  };
+
+  const confirmRoleChange = () => {
+    if (!roleChangeConfirm) return;
+    handleRoleChange(roleChangeConfirm.userId, roleChangeConfirm.to);
+    setRoleChangeConfirm(null);
   };
 
   const openPermissions = (user: OrganizationUser) => {
@@ -2418,6 +2439,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
       const cleared = emptyAdminPerms();
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: null } : u));
       setEditingPerms((prev) => ({ ...prev, [userId]: cleared }));
+      setResetPermsConfirm(null);
       toast.success("Permissions reset");
     } catch (e) {
       toast.error("Failed to reset permissions");
@@ -2439,9 +2461,38 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
   };
 
+  const ROLE_ORDER: Record<string, number> = { super_admin: 0, admin: 1, user: 2 };
+
+  const sortedUsers = [...users].sort((a, b) => {
+    const ra = ROLE_ORDER[a.orgRole] ?? 3;
+    const rb = ROLE_ORDER[b.orgRole] ?? 3;
+    if (ra !== rb) return ra - rb;
+    const nameA = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "";
+    const nameB = [b.firstName, b.lastName].filter(Boolean).join(" ") || b.email || "";
+    return nameA.localeCompare(nameB);
+  });
+
   if (loading) {
     return <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Loading users…</p>;
   }
+
+  const roleChangeMessage = roleChangeConfirm ? (() => {
+    const toLabel = ROLE_LABELS[roleChangeConfirm.to] ?? roleChangeConfirm.to;
+    const fromLabel = ROLE_LABELS[roleChangeConfirm.from] ?? roleChangeConfirm.from;
+    if (roleChangeConfirm.to === "super_admin") {
+      return `Promote "${roleChangeConfirm.userName}" to Super Admin? They will have full control over this organization.`;
+    }
+    if (roleChangeConfirm.to === "admin") {
+      return `Promote "${roleChangeConfirm.userName}" from ${fromLabel} to Admin? You can configure their permissions afterward.`;
+    }
+    return `Change "${roleChangeConfirm.userName}" from ${fromLabel} to ${toLabel}? They will lose any admin permissions.`;
+  })() : "";
+
+  const roleChangeVariant: "danger" | "warning" | "info" = roleChangeConfirm
+    ? roleChangeConfirm.to === "super_admin" ? "warning"
+      : roleChangeConfirm.to === "user" && roleChangeConfirm.from !== "user" ? "warning"
+      : "info"
+    : "info";
 
   return (
     <div>
@@ -2454,10 +2505,10 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column" }}>
-        {users.map((user) => {
+        {sortedUsers.map((user) => {
           const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
           const roleColor = ROLE_COLORS[user.orgRole] ?? ROLE_COLORS.user;
-          const isProtected = user.orgRole === "super_admin" || user.platformRole === "gridmaster";
+          const isSuperAdminUser = user.orgRole === "super_admin";
           const isExpanded = expandedUserId === user.id;
           const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
           const perms = editingPerms[user.id] ?? savedPerms;
@@ -2467,8 +2518,14 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
 
           return (
             <div key={user.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
-              {/* User row */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
+              {/* Collapsed row */}
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 0", cursor: "pointer",
+                }}
+                onClick={() => openPermissions(user)}
+              >
                 <div style={{
                   width: 34, height: 34, borderRadius: "50%",
                   background: "var(--color-accent-gradient)",
@@ -2478,11 +2535,11 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                   {(displayName !== "—" ? displayName : "?")[0].toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
                     {displayName}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                    {user.email ?? "—"} · Joined {new Date(user.createdAt).toLocaleDateString()}
+                    {user.email ?? "—"}
                   </div>
                 </div>
                 <span style={{
@@ -2491,125 +2548,182 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                 }}>
                   {ROLE_LABELS[user.orgRole] ?? user.orgRole}
                 </span>
-                {!isProtected && myRole === "super_admin" && (
-                  <CustomSelect
-                    value={user.orgRole}
-                    options={[
-                      { value: "admin", label: "Promote to Admin" },
-                      { value: "user", label: "Reset to User" },
-                    ]}
-                    onChange={(v) => handleRoleChange(user.id, v as "admin" | "user")}
-                    disabled={saving === user.id}
-                    fontSize={12}
-                  />
-                )}
-                {user.orgRole === "admin" && myRole === "super_admin" && (
-                  <button
-                    onClick={() => openPermissions(user)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 5,
-                      fontSize: 12, padding: "4px 10px",
-                      border: "1.5px solid var(--color-border)", borderRadius: 7,
-                      background: isExpanded ? "var(--color-surface-overlay)" : "#fff",
-                      color: "var(--color-text-secondary)",
-                      cursor: "pointer", fontFamily: "inherit",
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-                    </svg>
-                    Permissions
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                      style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 150ms" }}>
-                      <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                  </button>
-                )}
-                {saving === user.id && (
-                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Saving…</span>
-                )}
+                <span style={{
+                  fontSize: 14, color: "var(--color-text-faint)",
+                  transform: isExpanded ? "rotate(180deg)" : "none",
+                  transition: "transform 0.15s",
+                }}>
+                  ▾
+                </span>
               </div>
 
-              {/* Permissions panel */}
-              {isExpanded && user.orgRole === "admin" && (
-                <div style={{
-                  marginBottom: 10, padding: "16px 20px",
-                  background: "var(--color-surface-subtle, #F9FAFB)",
-                  border: "1px solid var(--color-border-light)",
-                  borderTop: "none", borderRadius: "0 0 10px 10px",
-                }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "16px 28px" }}>
-                    {PERM_GROUPS.map((group) => (
-                      <div key={group.label}>
-                        <div style={{
-                          fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
-                          color: "var(--color-text-subtle)", textTransform: "uppercase", marginBottom: 8,
-                        }}>
-                          {group.label}
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                          {group.keys.map((key) => {
-                            const alwaysOn = ALWAYS_ON.has(key);
-                            return (
-                              <label key={key} style={{
-                                display: "flex", alignItems: "center", gap: 8,
-                                cursor: alwaysOn ? "default" : "pointer",
-                                opacity: alwaysOn ? 0.45 : 1,
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={perms[key] ?? false}
-                                  disabled={alwaysOn || savingPerms === user.id}
-                                  onChange={(e) => handlePermToggle(user.id, key, e.target.checked)}
-                                  style={{ width: 14, height: 14, accentColor: "#2563EB", cursor: alwaysOn ? "default" : "pointer", flexShrink: 0 }}
-                                />
-                                <span style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
-                                  {PERM_LABELS[key]}
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
+              {/* Expanded edit panel */}
+              {isExpanded && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: "#EFF6FF",
+                    borderLeft: "3px solid #2563EB",
+                    borderRadius: "0 0 8px 0",
+                    padding: "12px 16px 12px 41px",
+                    marginBottom: 6,
+                    display: "flex", flexDirection: "column", gap: 12,
+                  }}
+                >
+                  {/* Role selector */}
+                  {myRole === "super_admin" && !isSuperAdminUser && (
+                    <div>
+                      <label style={labelStyle}>ROLE</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <CustomSelect
+                          value={user.orgRole}
+                          options={[
+                            { value: "user", label: "User" },
+                            { value: "admin", label: "Admin" },
+                            { value: "super_admin", label: "Super Admin" },
+                          ]}
+                          onChange={(v) => requestRoleChange(user, v as OrganizationRole)}
+                          disabled={saving === user.id}
+                          style={{ width: 160 }}
+                          fontSize={12}
+                        />
+                        {saving === user.id && (
+                          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Saving…</span>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
-                    <button
-                      onClick={() => handlePermsSave(user.id)}
-                      disabled={savingPerms === user.id}
-                      style={{
-                        fontSize: 12, fontWeight: 600, padding: "6px 14px",
-                        background: "#2563EB", color: "#fff", border: "none", borderRadius: 7,
-                        cursor: savingPerms === user.id ? "not-allowed" : "pointer",
-                        fontFamily: "inherit", opacity: savingPerms === user.id ? 0.6 : 1,
-                      }}
-                    >
-                      {savingPerms === user.id ? "Saving…" : "Save Permissions"}
-                    </button>
-                    <button
-                      onClick={() => handlePermsReset(user.id)}
-                      disabled={savingPerms === user.id}
-                      style={{
-                        fontSize: 12, fontWeight: 500, padding: "6px 14px",
-                        background: "transparent", color: "var(--color-text-muted)",
-                        border: "1.5px solid var(--color-border)", borderRadius: 7,
-                        cursor: savingPerms === user.id ? "not-allowed" : "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      Reset All
-                    </button>
-                    {hasUnsavedChanges && (
-                      <span style={{ fontSize: 11, color: "#D97706" }}>Unsaved changes</span>
-                    )}
-                  </div>
+                  {/* Permissions (admin only) */}
+                  {user.orgRole === "admin" && myRole === "super_admin" && (
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        {PERM_GROUPS.map((group) => {
+                          const keys = group.keys.filter((k) => !SUPER_ADMIN_ONLY.has(k));
+                          if (keys.length === 0) return null;
+                          return (
+                          <div key={group.label}>
+                            <label style={labelStyle}>{group.label}</label>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              {keys.map((key) => {
+                                const alwaysOn = ALWAYS_ON.has(key);
+                                const isOn = perms[key] ?? false;
+                                const toggleDisabled = alwaysOn || savingPerms === user.id;
+                                return (
+                                  <div
+                                    key={key}
+                                    role="button"
+                                    tabIndex={toggleDisabled ? -1 : 0}
+                                    onClick={() => { if (!toggleDisabled) handlePermToggle(user.id, key, !isOn); }}
+                                    onKeyDown={(e) => { if (!toggleDisabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handlePermToggle(user.id, key, !isOn); } }}
+                                    style={{
+                                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                                      padding: "7px 10px", borderRadius: 8,
+                                      cursor: toggleDisabled ? "default" : "pointer",
+                                      opacity: alwaysOn ? 0.5 : 1,
+                                      transition: "background 100ms ease",
+                                    }}
+                                    onMouseEnter={(e) => { if (!toggleDisabled) e.currentTarget.style.background = "var(--color-border-light)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                  >
+                                    <span style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
+                                      {PERM_LABELS[key]}
+                                    </span>
+                                    <div style={{
+                                      position: "relative", width: 34, height: 20, borderRadius: 10, flexShrink: 0,
+                                      background: isOn ? "#2563EB" : "#CBD5E1",
+                                      transition: "background 150ms ease",
+                                    }}>
+                                      <div style={{
+                                        position: "absolute",
+                                        top: 2, left: isOn ? 16 : 2,
+                                        width: 16, height: 16, borderRadius: "50%",
+                                        background: "#fff",
+                                        boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                        transition: "left 150ms ease",
+                                      }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          );
+                        })}
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
+                        <button
+                          onClick={() => handlePermsSave(user.id)}
+                          disabled={savingPerms === user.id}
+                          className="dg-btn dg-btn-primary"
+                          style={{ padding: "7px 14px" }}
+                        >
+                          {savingPerms === user.id ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+                            setResetPermsConfirm({ userId: user.id, userName: name });
+                          }}
+                          disabled={savingPerms === user.id}
+                          className="dg-btn"
+                          style={{ padding: "7px 14px" }}
+                        >
+                          Reset All
+                        </button>
+                        {hasUnsavedChanges && (
+                          <span style={{ fontSize: 11, color: "#D97706" }}>Unsaved changes</span>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Info for super_admin users */}
+                  {isSuperAdminUser && (
+                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
+                      Super Admins have full access to all organization features.
+                    </p>
+                  )}
+
+                  {/* Info for regular users */}
+                  {user.orgRole === "user" && myRole === "super_admin" && (
+                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
+                      Users have read-only access. Promote to Admin to configure permissions.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Role change confirmation */}
+      {roleChangeConfirm && (
+        <ConfirmDialog
+          title="Change Role"
+          message={roleChangeMessage}
+          confirmLabel="Confirm"
+          variant={roleChangeVariant}
+          isLoading={saving === roleChangeConfirm.userId}
+          onConfirm={confirmRoleChange}
+          onCancel={() => setRoleChangeConfirm(null)}
+        />
+      )}
+
+      {/* Reset permissions confirmation */}
+      {resetPermsConfirm && (
+        <ConfirmDialog
+          title="Reset Permissions"
+          message={`Reset all admin permissions for "${resetPermsConfirm.userName}"? All custom permissions will be cleared.`}
+          confirmLabel="Reset"
+          variant="warning"
+          isLoading={savingPerms === resetPermsConfirm.userId}
+          onConfirm={() => handlePermsReset(resetPermsConfirm.userId)}
+          onCancel={() => setResetPermsConfirm(null)}
+        />
+      )}
     </div>
   );
 }
