@@ -64,9 +64,11 @@ interface SettingsPageProps {
 function Section({
   title,
   children,
+  maxWidth = 860,
 }: {
   title: string;
   children: React.ReactNode;
+  maxWidth?: number;
 }) {
   return (
     <div
@@ -77,7 +79,7 @@ function Section({
         overflow: "hidden",
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
         width: "100%",
-        maxWidth: 860,
+        maxWidth,
       }}
     >
       <div
@@ -2965,7 +2967,7 @@ export default function SettingsPage({
         )}
 
         {activeSection === "users" && isSuperAdmin && (
-          <Section title="User Management">
+          <Section title="User Management" maxWidth={1100}>
             <UserManagementSettings orgId={organization.id} isSuperAdmin={isSuperAdmin} />
           </Section>
         )}
