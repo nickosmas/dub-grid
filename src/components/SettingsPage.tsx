@@ -76,6 +76,7 @@ function Section({
         border: "1px solid var(--color-border)",
         overflow: "hidden",
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        width: "100%",
         maxWidth: 860,
       }}
     >
@@ -2870,10 +2871,10 @@ export default function SettingsPage({
       </aside>
 
       {/* Content */}
-      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px" }}>
+      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
         {activeSection === "organization" && canManageOrg && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
             <Section title="Organization Details">
               <OrganizationSettings organization={organization} onSave={onOrganizationSave} />
             </Section>
@@ -2925,7 +2926,7 @@ export default function SettingsPage({
         )}
 
         {activeSection === "staff-config" && canManageOrg && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
             <Section title={certificationLabel}>
               <StringListSettings
                 label={`Define the ${certificationLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
