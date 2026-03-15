@@ -315,7 +315,7 @@ function MembersSection({
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
       {/* Status tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
         {tabItems.map((tab) => {
@@ -774,7 +774,7 @@ function RegularScheduleSection({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
       <div>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
           Recurring Shifts
@@ -1008,7 +1008,7 @@ function FocusAreasSection({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 860 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
       <div>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
           {focusAreaLabel}
@@ -1124,7 +1124,7 @@ function NamedItemsSection({
   const defaultPill = pillStyle ?? { bg: "var(--color-dark)", text: "#fff" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 860 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
       <div>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
           {label}
@@ -1281,7 +1281,7 @@ export default function StaffView({
       </aside>
 
       {/* Content */}
-      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px" }}>
+      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
         {activeSection === "members" && (
           <MembersSection
             employees={employees}
