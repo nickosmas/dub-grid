@@ -12,9 +12,8 @@ const mockPermissions = {
   isLoading: false,
   isGridmaster: false,
   canManageOrg: true,
-  canEditSchedule: true,
-  canAddNotes: true,
-  canRead: true,
+  canEditShifts: true,
+  canEditNotes: true,
   atLeast: (r: string) => {
     const levels: Record<string, number> = {
       gridmaster: 4,
@@ -40,6 +39,19 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null }),
+    }),
+  },
+}));
+
 function setupAuth(isSuperAdmin = false) {
   // empty
 }
@@ -57,7 +69,8 @@ beforeEach(() => {
 describe("Header rendering", () => {
   it('renders orgName with "/" prefix when provided', () => {
     render(<Header {...defaultProps} orgName="Acme Corp" />);
-    expect(screen.getByText("/ Acme Corp")).toBeInTheDocument();
+    // The component renders orgName in a <span> next to a "|" separator (not "/" prefix)
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
   });
 
   it("does NOT render org name when omitted", () => {
@@ -81,26 +94,27 @@ describe("Header active nav button", () => {
   it("active nav button (schedule) has non-transparent background", () => {
     render(<Header {...defaultProps} viewMode="schedule" />);
     const btn = screen.getByRole("button", { name: /Schedule/i });
-    expect(btn.style.background).not.toBe("transparent");
-    expect(btn.style.background).toBe("var(--color-border-light)");
+    // Active state is applied via CSS class "active" on "dg-nav-tab", not inline style
+    expect(btn.className).toContain("active");
   });
 
   it("active nav button (staff) has non-transparent background", () => {
     render(<Header {...defaultProps} viewMode="staff" />);
     const btn = screen.getByRole("button", { name: /Staff/i });
-    expect(btn.style.background).toBe("var(--color-border-light)");
+    expect(btn.className).toContain("active");
   });
 
   it("active nav button (settings) has non-transparent background", () => {
     render(<Header {...defaultProps} viewMode="settings" />);
     const btn = screen.getByRole("button", { name: /Settings/i });
-    expect(btn.style.background).toBe("var(--color-border-light)");
+    expect(btn.className).toContain("active");
   });
 
   it("inactive nav buttons have transparent background", () => {
     render(<Header {...defaultProps} viewMode="schedule" />);
     const staffBtn = screen.getByRole("button", { name: /Staff/i });
-    expect(staffBtn.style.background).toBe("transparent");
+    // Inactive buttons do not have the "active" class
+    expect(staffBtn.className).not.toContain("active");
   });
 });
 

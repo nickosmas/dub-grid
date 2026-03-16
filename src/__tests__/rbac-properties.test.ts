@@ -10,9 +10,9 @@ import * as fc from "fast-check";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type OrgRole = "admin" | "scheduler" | "supervisor" | "user";
+type OrganizationRole = "super_admin" | "admin" | "user";
 type PromotableRole = "admin" | "gridmaster";
-type AllRoles = OrgRole | "gridmaster";
+type AllRoles = OrganizationRole | "gridmaster";
 
 interface RoleChangeResult {
   status: "success" | "already_applied";
@@ -164,11 +164,11 @@ function createMockRoleChangeSystem() {
 // ── Arbitraries ───────────────────────────────────────────────────────────────
 
 const arbUuid = fc.uuid();
-const arbOrgRole = fc.constantFrom<OrgRole>("admin", "scheduler", "supervisor", "user");
+const arbOrgRole = fc.constantFrom<OrganizationRole>("super_admin", "admin", "user");
 const arbIdempotencyKey = fc.uuid();
 const arbPromotableRole = fc.constantFrom<PromotableRole>("admin", "gridmaster");
-const arbNonPromotableRole = fc.constantFrom<OrgRole>("scheduler", "supervisor", "user");
-const arbAllRoles = fc.constantFrom<AllRoles>("admin", "scheduler", "supervisor", "user", "gridmaster");
+const arbNonPromotableOrgRole = fc.constantFrom<OrganizationRole>("user");
+const arbAllRoles = fc.constantFrom<AllRoles>("super_admin", "admin", "user", "gridmaster");
 
 // ── Property Tests ────────────────────────────────────────────────────────────
 
@@ -616,7 +616,7 @@ describe("RBAC Property Tests", () => {
             mockSystem.setUserRole(targetUserId, roles[0]);
 
             // Perform sequential role changes and track expected transitions
-            const expectedTransitions: Array<{ from: OrgRole; to: OrgRole; key: string }> = [];
+            const expectedTransitions: Array<{ from: OrganizationRole; to: OrganizationRole; key: string }> = [];
             let currentRole = roles[0];
 
             for (let i = 1; i < roles.length && i <= keys.length; i++) {
@@ -826,7 +826,7 @@ describe("RBAC Property Tests", () => {
           arbUuid,
           arbUuid,
           arbOrgRole,
-          arbNonPromotableRole,
+          arbNonPromotableOrgRole,
           arbIdempotencyKey,
           (targetUserId, adminCallerId, initialRole, newRole, idempotencyKey) => {
             mockSystem.reset();
@@ -1810,7 +1810,7 @@ describe("RBAC Property Tests", () => {
     }
 
     const invitations: Invitation[] = [];
-    const callerRoles: Map<string, OrgRole> = new Map();
+    const callerRoles: Map<string, OrganizationRole> = new Map();
     const callerOrgIds: Map<string, string> = new Map();
 
     class InvalidRoleError extends Error {
@@ -1898,7 +1898,7 @@ describe("RBAC Property Tests", () => {
     return {
       sendInvitation,
       isValidInvitableRole,
-      setCallerRole: (userId: string, role: OrgRole) => callerRoles.set(userId, role),
+      setCallerRole: (userId: string, role: OrganizationRole) => callerRoles.set(userId, role),
       setCallerOrgId: (userId: string, orgId: string) => callerOrgIds.set(userId, orgId),
       getInvitations: () => [...invitations],
       getInvitationByToken: (token: string) => invitations.find((i) => i.token === token),
@@ -2693,9 +2693,9 @@ interface Permissions {
   level: number;
   isGridmaster: boolean;
   canManageOrg: boolean;
-  canEditSchedule: boolean;
-  canAddNotes: boolean;
-  canRead: boolean;
+  canEditShifts: boolean;
+  canEditNotes: boolean;
+  canViewSchedule: boolean;
   atLeast: (role: string) => boolean;
 }
 
@@ -2714,9 +2714,9 @@ function getPermissionsFromSession(session: MockSession | null): Permissions {
     level,
     isGridmaster: level >= 4,
     canManageOrg: level >= 3,
-    canEditSchedule: level >= 2,
-    canAddNotes: level >= 1,
-    canRead: level >= 0,
+    canEditShifts: level >= 2,
+    canEditNotes: level >= 1,
+    canViewSchedule: level >= 0,
     atLeast: (r: string) => level >= (ROLE_LEVEL[r] ?? 0),
   };
 }
@@ -2746,8 +2746,8 @@ describe("Property 24: usePermissions Hook Correctness", () => {
    * **Validates: Requirements 9.2, 9.3**
    *
    * For any JWT claims containing platform_role and org_role, the usePermissions hook
-   * should return correct boolean values for isGridmaster, canManageOrg, canEditSchedule,
-   * canAddNotes based on the role hierarchy, and atLeast(role) should return true if and
+   * should return correct boolean values for isGridmaster, canManageOrg, canEditShifts,
+   * canEditNotes based on the role hierarchy, and atLeast(role) should return true if and
    * only if the user's level is >= the specified role's level.
    *
    * Role hierarchy:
@@ -2784,39 +2784,39 @@ describe("Property 24: usePermissions Hook Correctness", () => {
     );
   });
 
-  it("canEditSchedule is true if and only if level >= 2", () => {
+  it("canEditShifts is true if and only if level >= 2", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canEditSchedule should be true when level >= 2 (scheduler, admin, or gridmaster)
+        // canEditShifts should be true when level >= 2 (scheduler, admin, or gridmaster)
         const expectedCanEditSchedule = permissions.level >= 2;
-        expect(permissions.canEditSchedule).toBe(expectedCanEditSchedule);
+        expect(permissions.canEditShifts).toBe(expectedCanEditSchedule);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("canAddNotes is true if and only if level >= 1", () => {
+  it("canEditNotes is true if and only if level >= 1", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canAddNotes should be true when level >= 1 (supervisor, scheduler, admin, or gridmaster)
+        // canEditNotes should be true when level >= 1 (supervisor, scheduler, admin, or gridmaster)
         const expectedCanAddNotes = permissions.level >= 1;
-        expect(permissions.canAddNotes).toBe(expectedCanAddNotes);
+        expect(permissions.canEditNotes).toBe(expectedCanAddNotes);
       }),
       { numRuns: 100 }
     );
   });
 
-  it("canRead is always true (level >= 0)", () => {
+  it("canViewSchedule is always true (level >= 0)", () => {
     fc.assert(
       fc.property(arbMockSession, (session) => {
         const permissions = getPermissionsFromSession(session);
 
-        // canRead should always be true since all roles have level >= 0
-        expect(permissions.canRead).toBe(true);
+        // canViewSchedule should always be true since all roles have level >= 0
+        expect(permissions.canViewSchedule).toBe(true);
       }),
       { numRuns: 100 }
     );
@@ -2856,8 +2856,8 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.level).toBe(4);
         expect(permissions.isGridmaster).toBe(true);
         expect(permissions.canManageOrg).toBe(true);
-        expect(permissions.canEditSchedule).toBe(true);
-        expect(permissions.canAddNotes).toBe(true);
+        expect(permissions.canEditShifts).toBe(true);
+        expect(permissions.canEditNotes).toBe(true);
       }),
       { numRuns: 100 }
     );
@@ -2902,9 +2902,9 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.level).toBe(0);
         expect(permissions.isGridmaster).toBe(false);
         expect(permissions.canManageOrg).toBe(false);
-        expect(permissions.canEditSchedule).toBe(false);
-        expect(permissions.canAddNotes).toBe(false);
-        expect(permissions.canRead).toBe(true);
+        expect(permissions.canEditShifts).toBe(false);
+        expect(permissions.canEditNotes).toBe(false);
+        expect(permissions.canViewSchedule).toBe(true);
       }),
       { numRuns: 100 }
     );
@@ -2957,9 +2957,9 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         // All boolean helpers should be consistent with the level
         expect(permissions.isGridmaster).toBe(permissions.level >= 4);
         expect(permissions.canManageOrg).toBe(permissions.level >= 3);
-        expect(permissions.canEditSchedule).toBe(permissions.level >= 2);
-        expect(permissions.canAddNotes).toBe(permissions.level >= 1);
-        expect(permissions.canRead).toBe(permissions.level >= 0);
+        expect(permissions.canEditShifts).toBe(permissions.level >= 2);
+        expect(permissions.canEditNotes).toBe(permissions.level >= 1);
+        expect(permissions.canViewSchedule).toBe(permissions.level >= 0);
       }),
       { numRuns: 100 }
     );
@@ -3011,24 +3011,24 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         // If a higher permission is true, all lower permissions must also be true
         if (permissions.isGridmaster) {
           expect(permissions.canManageOrg).toBe(true);
-          expect(permissions.canEditSchedule).toBe(true);
-          expect(permissions.canAddNotes).toBe(true);
-          expect(permissions.canRead).toBe(true);
+          expect(permissions.canEditShifts).toBe(true);
+          expect(permissions.canEditNotes).toBe(true);
+          expect(permissions.canViewSchedule).toBe(true);
         }
 
         if (permissions.canManageOrg) {
-          expect(permissions.canEditSchedule).toBe(true);
-          expect(permissions.canAddNotes).toBe(true);
-          expect(permissions.canRead).toBe(true);
+          expect(permissions.canEditShifts).toBe(true);
+          expect(permissions.canEditNotes).toBe(true);
+          expect(permissions.canViewSchedule).toBe(true);
         }
 
-        if (permissions.canEditSchedule) {
-          expect(permissions.canAddNotes).toBe(true);
-          expect(permissions.canRead).toBe(true);
+        if (permissions.canEditShifts) {
+          expect(permissions.canEditNotes).toBe(true);
+          expect(permissions.canViewSchedule).toBe(true);
         }
 
-        if (permissions.canAddNotes) {
-          expect(permissions.canRead).toBe(true);
+        if (permissions.canEditNotes) {
+          expect(permissions.canViewSchedule).toBe(true);
         }
       }),
       { numRuns: 100 }
@@ -3197,7 +3197,7 @@ describe("Property 27: Middleware Route Protection", () => {
 
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-  const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+  const arbOrgRole = fc.constantFrom("super_admin", "admin", "user", undefined);
   const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for settings paths
@@ -3257,7 +3257,7 @@ describe("Property 27: Middleware Route Protection", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
-          fc.constantFrom("admin", "scheduler", "supervisor", "user"),
+          fc.constantFrom("super_admin", "admin", "user"),
           arbOrgId,
           (platformRole, orgRole, orgId) => {
             const claims = {
@@ -3300,9 +3300,8 @@ describe("Property 27: Middleware Route Protection", () => {
       fc.assert(
         fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
           expect(getRoleLevel("gridmaster")).toBe(4);
-          expect(getRoleLevel("admin")).toBe(3);
-          expect(getRoleLevel("scheduler")).toBe(2);
-          expect(getRoleLevel("supervisor")).toBe(1);
+          expect(getRoleLevel("super_admin")).toBe(3);
+          expect(getRoleLevel("admin")).toBe(2);
           expect(getRoleLevel("user")).toBe(0);
         }),
         { numRuns: 100 }
@@ -3312,7 +3311,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("returns 0 for unknown roles", () => {
       // List of Object prototype properties to exclude from testing
       const objectPrototypeProps = Object.getOwnPropertyNames(Object.prototype);
-      const knownRoles = ["gridmaster", "admin", "scheduler", "supervisor", "user"];
+      const knownRoles = ["gridmaster", "super_admin", "admin", "user"];
       const excludedStrings = [...objectPrototypeProps, ...knownRoles];
 
       fc.assert(
@@ -3331,7 +3330,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level < 3 are redirected from /settings to /dashboard", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("scheduler", "supervisor", "user"),
+          fc.constantFrom("admin", "user"),
           arbSettingsPath,
           (orgRole, settingsPath) => {
             const claims = {
@@ -3358,14 +3357,14 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level >= 3 can access /settings routes", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("admin", "gridmaster"),
+          fc.constantFrom("super_admin", "gridmaster"),
           arbSettingsPath,
           (role, settingsPath) => {
-            // For admin, use org_role; for gridmaster, use platform_role
+            // For super_admin, use org_role; for gridmaster, use platform_role
             const claims =
               role === "gridmaster"
                 ? { platform_role: "gridmaster", org_role: undefined, org_id: "test-org-id" }
-                : { platform_role: "none", org_role: "admin", org_id: "test-org-id" };
+                : { platform_role: "none", org_role: "super_admin", org_id: "test-org-id" };
 
             const effectiveRole = calculateEffectiveRole(claims);
             const level = getRoleLevel(effectiveRole);
@@ -3410,7 +3409,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level < 2 are redirected from /schedule to /view", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("supervisor", "user"),
+          fc.constantFrom("user"),
           arbSchedulePath,
           (orgRole, schedulePath) => {
             const claims = {
@@ -3437,7 +3436,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level >= 2 can access /schedule routes", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("scheduler", "admin", "gridmaster"),
+          fc.constantFrom("admin", "gridmaster"),
           arbSchedulePath,
           (role, schedulePath) => {
             // Build claims based on role
@@ -3502,10 +3501,10 @@ describe("Property 27: Middleware Route Protection", () => {
   });
 
   describe("role level boundaries", () => {
-    it("level 2 (scheduler) can access /schedule but not /settings", () => {
+    it("level 2 (admin) can access /schedule but not /settings", () => {
       fc.assert(
         fc.property(arbSettingsPath, arbSchedulePath, (settingsPath, schedulePath) => {
-          const level = 2; // scheduler level
+          const level = 2; // admin level
 
           // Should be redirected from /settings
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
@@ -3519,10 +3518,10 @@ describe("Property 27: Middleware Route Protection", () => {
       );
     });
 
-    it("level 3 (admin) can access both /settings and /schedule", () => {
+    it("level 3 (super_admin) can access both /settings and /schedule", () => {
       fc.assert(
         fc.property(arbSettingsPath, arbSchedulePath, (settingsPath, schedulePath) => {
-          const level = 3; // admin level
+          const level = 3; // super_admin level
 
           // Should be able to access /settings
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
@@ -3531,23 +3530,6 @@ describe("Property 27: Middleware Route Protection", () => {
           // Should be able to access /schedule
           const scheduleRedirect = simulateRouteProtection(level, schedulePath);
           expect(scheduleRedirect).toBeNull();
-        }),
-        { numRuns: 100 }
-      );
-    });
-
-    it("level 1 (supervisor) cannot access /settings or /schedule", () => {
-      fc.assert(
-        fc.property(arbSettingsPath, arbSchedulePath, (settingsPath, schedulePath) => {
-          const level = 1; // supervisor level
-
-          // Should be redirected from /settings
-          const settingsRedirect = simulateRouteProtection(level, settingsPath);
-          expect(settingsRedirect).toBe("/dashboard");
-
-          // Should be redirected from /schedule
-          const scheduleRedirect = simulateRouteProtection(level, schedulePath);
-          expect(scheduleRedirect).toBe("/view");
         }),
         { numRuns: 100 }
       );
@@ -3642,7 +3624,7 @@ describe("Property 28: Middleware Header Injection", () => {
 
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-  const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+  const arbOrgRole = fc.constantFrom("super_admin", "admin", "user", undefined);
   const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for JWT claims
@@ -4802,8 +4784,8 @@ function createMockShiftRLSSystem() {
     endTime?: string;
   }
 
-  type OrgRole = "admin" | "scheduler" | "supervisor" | "user";
-  type AllRoles = OrgRole | "gridmaster";
+  type OrganizationRole = "admin" | "scheduler" | "supervisor" | "user";
+  type AllRoles = OrganizationRole | "gridmaster";
 
   // Role hierarchy levels
   const ROLE_LEVEL: Record<AllRoles, number> = {

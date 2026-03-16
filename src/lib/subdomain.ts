@@ -16,22 +16,37 @@ export function parseHost(hostWithPort: string): ParsedHost {
 
   const labels = hostname.split(".").filter(Boolean);
 
+  // 1. Anchor with NEXT_PUBLIC_BASE_DOMAIN if available
+  const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
+  if (baseDomain && (hostname === baseDomain || hostname.endsWith("." + baseDomain))) {
+    const subdomainPart = hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));
+    const isReserved = subdomainPart === "www" || subdomainPart === "login";
+
+    return {
+      subdomain: isReserved ? null : subdomainPart,
+      rootDomain: baseDomain,
+      port,
+      hostname,
+    };
+  }
+
+  // 2. Fallback to Localhost logic
   if (hostname === "localhost") {
     return { subdomain: null, rootDomain: "localhost", port, hostname };
   }
 
   // Local development subdomains like ardenwood.localhost
   if (labels.length === 2 && labels[1] === "localhost") {
+    const isReserved = labels[0] === "www" || labels[0] === "login";
     return {
-      subdomain: labels[0],
+      subdomain: isReserved ? null : labels[0],
       rootDomain: "localhost",
       port,
       hostname,
     };
   }
 
-  // Vercel project domains (e.g. dub-grid.vercel.app) should be treated as apex.
-  // Tenant hosts on Vercel can still use a leading label (e.g. tenant.dub-grid.vercel.app).
+  // 3. Fallback to Vercel logic (for non-anchored previews)
   const isVercelApp = labels.length >= 2 && labels[labels.length - 2] === "vercel" && labels[labels.length - 1] === "app";
   if (isVercelApp) {
     if (labels.length === 3) {
@@ -53,9 +68,9 @@ export function parseHost(hostWithPort: string): ParsedHost {
     }
   }
 
-  // "www" is a canonical alias for the apex, not a tenant subdomain.
-  // e.g. www.dubgrid.com → rootDomain: dubgrid.com, subdomain: null
-  if (labels.length === 3 && labels[0] === "www") {
+  // 4. General heuristic (last resort)
+  const isReserved = labels[0] === "www" || labels[0] === "login";
+  if (labels.length === 3 && isReserved) {
     return {
       subdomain: null,
       rootDomain: labels.slice(1).join("."),

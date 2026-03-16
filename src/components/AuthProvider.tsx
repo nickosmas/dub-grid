@@ -43,22 +43,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       setIsLoading(false);
-
-      if (event === "SIGNED_OUT" || !session) {
-        const path = window.location.pathname;
-        const isPublicRoute =
-          path === "/" ||
-          path === "/login" ||
-          path.startsWith("/login") ||
-          path === "/privacy" ||
-          path === "/terms";
-        if (!isPublicRoute) {
-          window.location.replace("/");
-        }
-      }
+      // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
+      // and ProtectedRoute handles session-expiry redirects to /login.
     });
 
     return () => {
@@ -72,7 +61,20 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   return (
     <AuthContext.Provider value={{ user, signOut, isLoading }}>
-      <Toaster position="top-center" richColors />
+      <Toaster
+        position="top-center"
+        closeButton
+        duration={6000}
+        toastOptions={{
+          style: {
+            fontSize: "15px",
+            fontWeight: 600,
+            borderRadius: "12px",
+            width: "min(calc(100vw - 48px), 720px)",
+            maxWidth: "100%",
+          },
+        }}
+      />
       {children}
     </AuthContext.Provider>
   );

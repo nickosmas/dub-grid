@@ -80,22 +80,9 @@ export function useRoleChange() {
       // Return context with the snapshotted value
       return { prev };
     },
-    onSuccess: async (data: RoleChangeResult, vars: RoleChangeParams) => {
-      // Invalidate target user's sessions to force fresh JWT with new role.
-      // This prevents the stale-JWT race condition (RBAC Design §3.1).
-      if (data.status === "success") {
-        try {
-          await supabase.functions.invoke("invalidate-user-session", {
-            body: {
-              target_user_id: vars.targetUserId,
-              reason: "role_change",
-            },
-          });
-        } catch {
-          // Best-effort: the role change already succeeded in the DB.
-          // The user will get fresh claims on their next token refresh.
-        }
-      }
+    onSuccess: async () => {
+      // The change_user_role RPC already inserts a jwt_refresh_locks row,
+      // which forces the target user to re-authenticate and get fresh claims.
     },
     onError: (_err, _vars, ctx) => {
       // Rollback to the previous value on error

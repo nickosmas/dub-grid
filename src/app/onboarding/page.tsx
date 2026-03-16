@@ -81,19 +81,20 @@ export default function OnboardingPage() {
             letterSpacing: "-0.03em",
           }}
         >
-          Almost there!
+          Pending Organization Assignment
         </h1>
 
         <p
           style={{
             fontSize: "16px",
-            color: "#64748B",
+            color:"#475569",
             lineHeight: 1.6,
             marginBottom: "40px",
           }}
         >
-          Your account is ready, but it hasn't been linked to an organization yet. 
-          Please contact your administrator to be added to your workspace.
+          Your account has been successfully created, but you haven&apos;t been
+          assigned to an organization yet. Please contact your administrator and
+          ask them to invite you to their workspace.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -136,7 +137,7 @@ export default function OnboardingPage() {
         </div>
         
         <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid #F1F5F9" }}>
-          <p style={{ fontSize: "14px", color: "#94A3B8" }}>
+          <p style={{ fontSize: "14px", color:"#64748B" }}>
             Setting up a new facility? <br />
             <span style={{ color: "#2563EB", fontWeight: 600, cursor: "pointer" }}>Contact sales</span>
           </p>

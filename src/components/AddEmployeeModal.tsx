@@ -2,60 +2,61 @@
 
 import { useState, useCallback, useRef } from "react";
 import Modal from "@/components/Modal";
-import { Employee, Wing } from "@/types";
+import { Employee, FocusArea, NamedItem } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 type RowEntry = {
   _id: string;
   name: string;
-  designation: string;
-  wings: string[];
-  fteWeight: string;
+  certificationId: number | null;
+  focusAreaIds: number[];
 };
 
-function makeRow(designation: string, wings: string[]): RowEntry {
+function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEntry {
   return {
     _id: Math.random().toString(36).slice(2),
     name: "",
-    designation,
-    wings,
-    fteWeight: "1.0",
+    certificationId,
+    focusAreaIds,
   };
 }
 
 interface AddEmployeeModalProps {
-  wings: Wing[];
-  skillLevels: string[];
-  roles: string[];
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
+  focusAreaLabel?: string;
+  certificationLabel?: string;
   onAdd: (employees: Omit<Employee, "id" | "seniority">[]) => void;
   onClose: () => void;
 }
 
-export default function AddEmployeeModal({ wings, skillLevels, onAdd, onClose }: AddEmployeeModalProps) {
-  const defaultDesig = skillLevels[0] ?? "STAFF";
-  const defaultWings = wings.length > 0 ? [wings[0].name] : [];
+export default function AddEmployeeModal({ focusAreas, certifications, focusAreaLabel = "Focus Areas", certificationLabel = "Certification", onAdd, onClose }: AddEmployeeModalProps) {
+  const defaultCertId: number | null = null;
+  const defaultFocusAreaIds = focusAreas.length > 0 ? [focusAreas[0].id] : [];
 
   const [rows, setRows] = useState<RowEntry[]>(() => [
-    makeRow(defaultDesig, defaultWings),
-    makeRow(defaultDesig, defaultWings),
-    makeRow(defaultDesig, defaultWings),
+    makeRow(defaultCertId, defaultFocusAreaIds),
+    makeRow(defaultCertId, defaultFocusAreaIds),
+    makeRow(defaultCertId, defaultFocusAreaIds),
   ]);
 
   const lastNameRef = useRef<HTMLInputElement | null>(null);
 
-  const validRows = rows.filter((r) => r.name.trim() && r.wings.length > 0);
+  const validRows = rows.filter((r) => r.name.trim() && r.focusAreaIds.length > 0);
 
   const updateRow = useCallback((id: string, patch: Partial<Omit<RowEntry, "_id">>) => {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
   }, []);
 
-  const toggleWing = useCallback((id: string, wingName: string) => {
+  const toggleFocusArea = useCallback((id: string, focusAreaId: number) => {
     setRows((prev) =>
       prev.map((r) => {
         if (r._id !== id) return r;
-        const wings = r.wings.includes(wingName)
-          ? r.wings.filter((w) => w !== wingName)
-          : [...r.wings, wingName];
-        return { ...r, wings };
+        const focusAreaIds = r.focusAreaIds.includes(focusAreaId)
+          ? r.focusAreaIds.filter((fId) => fId !== focusAreaId)
+          : [...r.focusAreaIds, focusAreaId];
+        return { ...r, focusAreaIds };
       }),
     );
   }, []);
@@ -63,11 +64,11 @@ export default function AddEmployeeModal({ wings, skillLevels, onAdd, onClose }:
   const addRow = useCallback(() => {
     setRows((prev) => {
       const last = prev[prev.length - 1];
-      return [...prev, makeRow(last?.designation ?? defaultDesig, last?.wings ?? defaultWings)];
+      return [...prev, makeRow(last?.certificationId ?? defaultCertId, last?.focusAreaIds ?? defaultFocusAreaIds)];
     });
     // Focus the new row's name input on next tick
     setTimeout(() => lastNameRef.current?.focus(), 0);
-  }, [defaultDesig, defaultWings]);
+  }, [defaultCertId, defaultFocusAreaIds]);
 
   const removeRow = useCallback((id: string) => {
     setRows((prev) => (prev.length > 1 ? prev.filter((r) => r._id !== id) : prev));
@@ -78,13 +79,15 @@ export default function AddEmployeeModal({ wings, skillLevels, onAdd, onClose }:
     onAdd(
       validRows.map((r) => ({
         name: r.name.trim(),
-        designation: r.designation,
-        wings: r.wings,
-        roles: [],
-        fteWeight: parseFloat(r.fteWeight) || 1.0,
+        certificationId: r.certificationId,
+        focusAreaIds: r.focusAreaIds,
+        roleIds: [],
         phone: "",
         email: "",
         contactNotes: "",
+        status: "active" as const,
+        statusChangedAt: null,
+        statusNote: "",
       })),
     );
   }, [validRows, onAdd]);
@@ -111,7 +114,7 @@ export default function AddEmployeeModal({ wings, skillLevels, onAdd, onClose }:
             marginBottom: 4,
           }}
         >
-          {["NAME", "DESIGNATION", "WINGS", ""].map((h) => (
+          {["NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h) => (
             <div key={h} style={labelStyle}>{h}</div>
           ))}
         </div>
@@ -147,30 +150,30 @@ export default function AddEmployeeModal({ wings, skillLevels, onAdd, onClose }:
                   style={{ fontSize: 13 }}
                 />
 
-                {/* Designation */}
-                <select
-                  className="dg-input"
-                  value={row.designation}
-                  onChange={(e) => updateRow(row._id, { designation: e.target.value })}
-                  style={{ fontSize: 12 }}
-                >
-                  {skillLevels.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                {/* Certification */}
+                <CustomSelect
+                  value={row.certificationId != null ? String(row.certificationId) : ""}
+                  options={[
+                    { value: "", label: "— None —" },
+                    ...certifications.map((d) => ({ value: String(d.id), label: d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name })),
+                  ]}
+                  onChange={(v) => updateRow(row._id, { certificationId: v ? Number(v) : null })}
+                  style={{ width: "100%" }}
+                  fontSize={12}
+                />
 
-                {/* Wings */}
+                {/* Focus Areas */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                  {wings.map((wing) => {
-                    const active = row.wings.includes(wing.name);
+                  {focusAreas.map((focusArea) => {
+                    const active = row.focusAreaIds.includes(focusArea.id);
                     return (
                       <button
-                        key={wing.id}
-                        onClick={() => toggleWing(row._id, wing.name)}
+                        key={focusArea.id}
+                        onClick={() => toggleFocusArea(row._id, focusArea.id)}
                         style={{
-                          background: active ? wing.colorBg : "var(--color-border-light)",
-                          color: active ? wing.colorText : "var(--color-text-muted)",
-                          border: active ? `1.5px solid ${wing.colorText}40` : "1.5px solid transparent",
+                          background: active ? focusArea.colorBg : "var(--color-border-light)",
+                          color: active ? focusArea.colorText : "var(--color-text-muted)",
+                          border: active ? `1.5px solid ${focusArea.colorText}40` : "1.5px solid transparent",
                           borderRadius: 20,
                           padding: "2px 8px",
                           fontSize: 11,
@@ -180,7 +183,7 @@ export default function AddEmployeeModal({ wings, skillLevels, onAdd, onClose }:
                           transition: "all 120ms ease",
                         }}
                       >
-                        {wing.name}
+                        {focusArea.name}
                       </button>
                     );
                   })}

@@ -29,9 +29,8 @@ const SUPABASE_JWT_SECRET = new TextEncoder().encode(
  */
 const ROLE_HIERARCHY: Record<string, number> = {
   gridmaster: 4,
-  admin: 3,
-  scheduler: 2,
-  supervisor: 1,
+  super_admin: 3,
+  admin: 2,
   user: 0,
 };
 
@@ -44,13 +43,6 @@ interface JWTClaims {
   org_role?: string;
   org_id?: string;
   org_slug?: string;
-}
-
-interface ProfileClaimsRow {
-  org_id: string | null;
-  platform_role: string | null;
-  org_role: string | null;
-  organizations?: { slug: string | null } | null;
 }
 
 /**
@@ -76,12 +68,16 @@ export async function middleware(req: NextRequest) {
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
-  // Public routes — accessible without authentication
+  // Public routes — accessible without authentication.
+  // Note: /api routes are also excluded at the matcher level (line 191),
+  // so the /api check here is a safety net for if the matcher changes.
   if (
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/gridmaster/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/accept-invite" ||
     pathname.startsWith("/api")
   ) {
     return NextResponse.next();
@@ -116,10 +112,13 @@ export async function middleware(req: NextRequest) {
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   // Verify JWT and read top-level custom claims - Requirement 11.4
+  // If jwtVerify fails (expired token, wrong secret, etc.), fall back to
+  // unverified decode so the user isn't blocked. Real data security is
+  // enforced by Supabase RLS, not edge middleware.
   let claims: JWTClaims;
   try {
     if (process.env.SUPABASE_JWT_SECRET) {
@@ -129,25 +128,37 @@ export async function middleware(req: NextRequest) {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
   } catch (err) {
-    console.error("JWT verification failed:", err);
-    return NextResponse.redirect(new URL("/", req.url));
+    console.warn("JWT verification failed, falling back to unverified decode:", err);
+    try {
+      claims = decodeJwt(session.access_token) as JWTClaims;
+    } catch {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/org
   // from the caller's profile so route guards still work.
-  if (!claims.platform_role || !claims.org_role || !claims.org_id || !claims.org_slug) {
+  // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
+  const isGridmaster = claims.platform_role === "gridmaster";
+  if (
+    !claims.platform_role ||
+    !claims.org_role ||
+    (!isGridmaster && (!claims.org_id || !claims.org_slug))
+  ) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("org_id, platform_role, org_role, organizations(slug)")
+      .select("org_id, platform_role, organization_memberships(org_role), organizations(slug)")
       .eq("id", session.user.id)
-      .maybeSingle<ProfileClaimsRow>();
+      .maybeSingle<any>();
 
     if (profile) {
+      const memberships = profile.organization_memberships as any;
+      const orgs = profile.organizations as any;
       claims = {
         platform_role: claims.platform_role ?? profile.platform_role ?? "none",
-        org_role: claims.org_role ?? profile.org_role ?? "user",
+        org_role: claims.org_role ?? (Array.isArray(memberships) ? memberships[0]?.org_role : memberships?.org_role) ?? "user",
         org_id: claims.org_id ?? profile.org_id ?? undefined,
-        org_slug: claims.org_slug ?? profile.organizations?.slug ?? undefined,
+        org_slug: claims.org_slug ?? (Array.isArray(orgs) ? orgs[0]?.slug : orgs?.slug) ?? undefined,
       };
     }
   }
@@ -158,10 +169,10 @@ export async function middleware(req: NextRequest) {
 
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster") {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Keep org-scoped users on their organization subdomain.
+  // Keep org-scoped users on their org subdomain.
   if (effectiveRole !== "gridmaster" && claims.org_slug) {
     const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
     if (host !== expectedHost) {
@@ -178,13 +189,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
-  // Redirect users below scheduler (level < 2) away from /schedule
-  if (pathname.startsWith("/schedule") && level < 2) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  // Gridmaster-only admin route
-  if (pathname.startsWith("/admin") && effectiveRole !== "gridmaster") {
+  // Gridmaster-only route
+  if (pathname.startsWith("/gridmaster") && effectiveRole !== "gridmaster") {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 

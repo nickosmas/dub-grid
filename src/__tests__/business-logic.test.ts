@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, filterAndSortEmployees } from "@/lib/schedule-logic";
-import { Employee, ShiftType } from "@/types";
+import { Employee, ShiftCode } from "@/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -10,11 +10,13 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: "emp-1",
     name: "Test Employee",
-    designation: "STAFF",
-    roles: [],
-    fteWeight: 1,
+    status: "active",
+    statusChangedAt: null,
+    statusNote: "",
+    certificationId: null,
+    roleIds: [],
     seniority: 1,
-    wings: ["A"],
+    focusAreaIds: [1],
     phone: "",
     email: "",
     contactNotes: "",
@@ -22,7 +24,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-function makeShiftType(overrides: Partial<ShiftType> = {}): ShiftType {
+function makeShiftCode(overrides: Partial<ShiftCode> = {}): ShiftCode {
   return {
     id: 1,
     orgId: "org1",
@@ -32,9 +34,15 @@ function makeShiftType(overrides: Partial<ShiftType> = {}): ShiftType {
     border: "#ccc",
     text: "#000",
     sortOrder: 1,
+    categoryId: null,
     ...overrides,
   };
 }
+
+// Category IDs used in tests
+const CAT_DAY = 1;
+const CAT_EVE = 2;
+const CAT_NIGHT = 3;
 
 // ── 7.1 ShiftMap key format unit tests ───────────────────────────────────────
 
@@ -89,129 +97,134 @@ describe("Property 10: ShiftMap key format validity", () => {
 describe("computeDailyTallies", () => {
   const date = new Date(2024, 0, 15);
 
-  it("returns all zeros when there are no employees", () => {
-    const result = computeDailyTallies([], date, () => null, () => makeShiftType(), []);
-    expect(result).toEqual({ day: {}, eve: {}, night: {} });
+  // Helper: build a Map<number, ShiftCode> from an array of shift codes
+  function buildCodeMap(...codes: ShiftCode[]): Map<number, ShiftCode> {
+    return new Map(codes.map((c) => [c.id, c]));
+  }
+
+  it("returns empty object when there are no employees", () => {
+    const result = computeDailyTallies([], date, () => [], new Map(), new Set());
+    expect(result).toEqual({});
   });
 
   it("counts day FTE correctly", () => {
-    const emp1 = makeEmployee({ id: "emp-1", fteWeight: 1 });
-    const emp2 = makeEmployee({ id: "emp-2", fteWeight: 1 });
-    const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
+    const emp1 = makeEmployee({ id: "emp-1" });
+    const emp2 = makeEmployee({ id: "emp-2" });
+    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const codeMap = buildCodeMap(dayCode);
+    const sectionIds = new Set([10]);
 
-    const shiftForKey = (empId: string) => (empId === "emp-1" || empId === "emp-2" ? "D" : null);
-    const getShiftStyle = () => dayShift;
-
-    const result = computeDailyTallies([emp1, emp2], date, shiftForKey, getShiftStyle, ["D"]);
-    expect(result.day["D"]).toBe(2);
-    expect(result.eve).toEqual({});
-    expect(result.night).toEqual({});
+    const idsForKey = () => [10];
+    const result = computeDailyTallies([emp1, emp2], date, idsForKey, codeMap, sectionIds);
+    expect(result[CAT_DAY]["D"]).toBe(2);
+    expect(result[CAT_EVE]).toBeUndefined();
+    expect(result[CAT_NIGHT]).toBeUndefined();
   });
 
   it("counts eve FTE correctly", () => {
-    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
-    const eveShift = makeShiftType({ label: "E", countsTowardEve: true });
+    const emp = makeEmployee({ id: "emp-1" });
+    const eveCode = makeShiftCode({ id: 20, label: "E", categoryId: CAT_EVE });
+    const codeMap = buildCodeMap(eveCode);
+    const sectionIds = new Set([20]);
 
-    const result = computeDailyTallies(
-      [emp],
-      date,
-      () => "E",
-      () => eveShift,
-      ["E"]
-    );
-    expect(result.day).toEqual({});
-    expect(result.eve["E"]).toBe(1);
-    expect(result.night).toEqual({});
+    const result = computeDailyTallies([emp], date, () => [20], codeMap, sectionIds);
+    expect(result[CAT_DAY]).toBeUndefined();
+    expect(result[CAT_EVE]["E"]).toBe(1);
+    expect(result[CAT_NIGHT]).toBeUndefined();
   });
 
   it("counts night FTE correctly", () => {
-    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
-    const nightShift = makeShiftType({ label: "N", countsTowardNight: true });
+    const emp = makeEmployee({ id: "emp-1" });
+    const nightCode = makeShiftCode({ id: 30, label: "N", categoryId: CAT_NIGHT });
+    const codeMap = buildCodeMap(nightCode);
+    const sectionIds = new Set([30]);
 
-    const result = computeDailyTallies(
-      [emp],
-      date,
-      () => "N",
-      () => nightShift,
-      ["N"]
-    );
-    expect(result.day).toEqual({});
-    expect(result.eve).toEqual({});
-    expect(result.night["N"]).toBe(1);
+    const result = computeDailyTallies([emp], date, () => [30], codeMap, sectionIds);
+    expect(result[CAT_DAY]).toBeUndefined();
+    expect(result[CAT_EVE]).toBeUndefined();
+    expect(result[CAT_NIGHT]["N"]).toBe(1);
   });
 
-  it("preserves fractional fteWeight (0.5)", () => {
-    const emp = makeEmployee({ id: "emp-1", fteWeight: 0.5 });
-    const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
+  it("each employee contributes 1 to headcount", () => {
+    const emp = makeEmployee({ id: "emp-1" });
+    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const codeMap = buildCodeMap(dayCode);
+    const sectionIds = new Set([10]);
 
-    const result = computeDailyTallies(
-      [emp],
-      date,
-      () => "D",
-      () => dayShift,
-      ["D"]
-    );
-    expect(result.day["D"]).toBeCloseTo(0.5);
+    const result = computeDailyTallies([emp], date, () => [10], codeMap, sectionIds);
+    expect(result[CAT_DAY]["D"]).toBe(1);
   });
 
-  it("sums fractional weights across multiple employees", () => {
-    const emp1 = makeEmployee({ id: "emp-1", fteWeight: 0.5 });
-    const emp2 = makeEmployee({ id: "emp-2", fteWeight: 0.5 });
-    const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
+  it("sums headcount across multiple employees", () => {
+    const emp1 = makeEmployee({ id: "emp-1" });
+    const emp2 = makeEmployee({ id: "emp-2" });
+    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const codeMap = buildCodeMap(dayCode);
+    const sectionIds = new Set([10]);
 
-    const result = computeDailyTallies(
-      [emp1, emp2],
-      date,
-      () => "D",
-      () => dayShift,
-      ["D"]
-    );
-    expect(result.day["D"]).toBeCloseTo(1.0);
+    const result = computeDailyTallies([emp1, emp2], date, () => [10], codeMap, sectionIds);
+    expect(result[CAT_DAY]["D"]).toBe(2);
   });
 
   it("employees with no shift assigned do not contribute to counts", () => {
-    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
+    const emp = makeEmployee({ id: "emp-1" });
+    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const codeMap = buildCodeMap(dayCode);
+    const sectionIds = new Set([10]);
 
-    const result = computeDailyTallies(
-      [emp],
-      date,
-      () => null,
-      () => makeShiftType({ countsTowardDay: true }),
-      ["D"]
-    );
-    expect(result).toEqual({ day: {}, eve: {}, night: {} });
+    const result = computeDailyTallies([emp], date, () => [], codeMap, sectionIds);
+    expect(result).toEqual({});
+  });
+
+  it("shifts with no categoryId do not appear in tallies", () => {
+    const emp = makeEmployee({ id: "emp-1" });
+    const uncategorized = makeShiftCode({ id: 10, label: "D", categoryId: null });
+    const codeMap = buildCodeMap(uncategorized);
+    const sectionIds = new Set([10]);
+
+    const result = computeDailyTallies([emp], date, () => [10], codeMap, sectionIds);
+    expect(result).toEqual({});
+  });
+
+  it("shift codes not in sectionCodeIds are excluded from tallies", () => {
+    const emp = makeEmployee({ id: "emp-1" });
+    const otherAreaCode = makeShiftCode({ id: 99, label: "D", categoryId: CAT_DAY });
+    const codeMap = buildCodeMap(otherAreaCode);
+    const sectionIds = new Set([10]); // 99 is NOT in this set
+
+    const result = computeDailyTallies([emp], date, () => [99], codeMap, sectionIds);
+    expect(result).toEqual({});
   });
 
   it("counts multiple shifts for a single employee (D/E)", () => {
-    const emp = makeEmployee({ id: "emp-1", fteWeight: 1 });
-    const dayShift = makeShiftType({ label: "D", countsTowardDay: true });
-    const eveShift = makeShiftType({ label: "E", countsTowardEve: true });
+    const emp = makeEmployee({ id: "emp-1" });
+    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const eveCode = makeShiftCode({ id: 20, label: "E", categoryId: CAT_EVE });
+    const codeMap = buildCodeMap(dayCode, eveCode);
+    const sectionIds = new Set([10, 20]);
 
-    const shiftForKey = () => "D/E";
-    const getShiftStyle = (label: string) => (label === "D" ? dayShift : eveShift);
-
-    const result = computeDailyTallies([emp], date, shiftForKey, getShiftStyle, ["D", "E"]);
-    expect(result.day["D"]).toBe(1);
-    expect(result.eve["E"]).toBe(1);
-    expect(result.night).toEqual({});
+    const result = computeDailyTallies([emp], date, () => [10, 20], codeMap, sectionIds);
+    expect(result[CAT_DAY]["D"]).toBe(1);
+    expect(result[CAT_EVE]["E"]).toBe(1);
+    expect(result[CAT_NIGHT]).toBeUndefined();
   });
 });
 
 // ── 7.4 Property 11: FTE aggregation correctness ─────────────────────────────
 
-describe("Property 11: FTE aggregation correctness across all count types", () => {
-  // Feature: comprehensive-test-suite, Property 11: FTE aggregation correctness across all count types
-  it("computed counts equal exact sum of fteWeight for matching shift flags", () => {
-    const arbFteWeight = fc.double({ min: 0.1, max: 2.0, noNaN: true, noDefaultInfinity: true });
-    const arbBool = fc.boolean();
+describe("Property 11: headcount aggregation correctness across all count types", () => {
+  // Feature: comprehensive-test-suite, Property 11: headcount aggregation correctness across all count types
+  it("computed counts equal exact headcount (1 per employee) for matching shift categoryId", () => {
+    const arbCategoryId = fc.oneof(
+      fc.constant(CAT_DAY),
+      fc.constant(CAT_EVE),
+      fc.constant(CAT_NIGHT),
+      fc.constant(null as number | null),
+    );
 
-    // Each entry: employee data + shift type flags
     const arbEntry = fc.record({
-      fteWeight: arbFteWeight,
-      countsTowardDay: arbBool,
-      countsTowardEve: arbBool,
-      countsTowardNight: arbBool,
-      hasShift: arbBool, // whether this employee has a shift assigned at all
+      categoryId: arbCategoryId,
+      hasShift: fc.boolean(),
     });
 
     fc.assert(
@@ -220,60 +233,50 @@ describe("Property 11: FTE aggregation correctness across all count types", () =
         (entries) => {
           const date = new Date(2024, 0, 15);
 
-          // Build employees and shift types with unique ids
-          const employees: Employee[] = entries.map((e, i) =>
-            makeEmployee({ id: `emp-${i + 1}`, fteWeight: e.fteWeight }),
+          const employees: Employee[] = entries.map((_, i) =>
+            makeEmployee({ id: `emp-${i + 1}` }),
           );
 
-          const shiftTypes: ShiftType[] = entries.map((e, i) =>
-            makeShiftType({
-              label: `SHIFT_${i}`,
-              countsTowardDay: e.countsTowardDay,
-              countsTowardEve: e.countsTowardEve,
-              countsTowardNight: e.countsTowardNight,
-            }),
+          // Each entry gets a unique shift code ID (starting at 100)
+          const codes: ShiftCode[] = entries.map((e, i) =>
+            makeShiftCode({ id: 100 + i, label: `SHIFT_${i}`, categoryId: e.categoryId }),
           );
 
-          const shiftForKey = (empId: string): string | null => {
+          const codeMap = new Map(codes.map((c) => [c.id, c]));
+          const sectionIds = new Set(codes.map((c) => c.id));
+
+          const shiftCodeIdsForKey = (empId: string): number[] => {
             const match = empId.match(/^emp-(\d+)$/);
-            if (!match) return null;
+            if (!match) return [];
             const idx = parseInt(match[1], 10) - 1;
-            if (idx < 0 || idx >= entries.length) return null;
-            return entries[idx].hasShift ? `SHIFT_${idx}` : null;
-          };
-
-          const getShiftStyle = (type: string): ShiftType => {
-            const found = shiftTypes.find((st) => st.label === type);
-            return found ?? makeShiftType({ label: type });
+            if (idx < 0 || idx >= entries.length) return [];
+            return entries[idx].hasShift ? [100 + idx] : [];
           };
 
           const result = computeDailyTallies(
             employees,
             date,
-            shiftForKey,
-            getShiftStyle,
-            entries.map((_, i) => `SHIFT_${i}`)
+            shiftCodeIdsForKey,
+            codeMap,
+            sectionIds,
           );
 
-          // Compute expected values manually (matching the if-else ladder in computeDailyTallies)
-          let expectedDay = 0, expectedEve = 0, expectedNight = 0;
-          entries.forEach((e, i) => {
-            if (e.hasShift) {
-              if (e.countsTowardDay) {
-                expectedDay += e.fteWeight;
-              } else if (e.countsTowardEve) {
-                expectedEve += e.fteWeight;
-              } else if (e.countsTowardNight) {
-                expectedNight += e.fteWeight;
-              }
+          // Compute expected headcounts per category
+          const expectedCounts: Record<number, number> = {};
+          entries.forEach((e) => {
+            if (e.hasShift && e.categoryId != null) {
+              expectedCounts[e.categoryId] = (expectedCounts[e.categoryId] ?? 0) + 1;
             }
           });
 
-          const sumTally = (tally: Record<string, number>) => Object.values(tally).reduce((a, b) => a + b, 0);
+          const sumTally = (tally: Record<string, number>) =>
+            Object.values(tally).reduce((a, b) => a + b, 0);
 
-          expect(sumTally(result.day)).toBeCloseTo(expectedDay, 10);
-          expect(sumTally(result.eve)).toBeCloseTo(expectedEve, 10);
-          expect(sumTally(result.night)).toBeCloseTo(expectedNight, 10);
+          for (const catId of [CAT_DAY, CAT_EVE, CAT_NIGHT]) {
+            const expected = expectedCounts[catId] ?? 0;
+            const actual = result[catId] ? sumTally(result[catId]) : 0;
+            expect(actual).toBe(expected);
+          }
         },
       ),
     );
@@ -284,15 +287,15 @@ describe("Property 11: FTE aggregation correctness across all count types", () =
 
 describe("filterAndSortEmployees", () => {
   const employees: Employee[] = [
-    makeEmployee({ id: "emp-1", wings: ["A"], seniority: 3 }),
-    makeEmployee({ id: "emp-2", wings: ["B"], seniority: 1 }),
-    makeEmployee({ id: "emp-3", wings: ["A", "B"], seniority: 2 }),
-    makeEmployee({ id: "emp-4", wings: [], seniority: 0 }), // no wings — always excluded
-    makeEmployee({ id: "emp-5", wings: ["C"], seniority: 5 }),
+    makeEmployee({ id: "emp-1", focusAreaIds: [1], seniority: 3 }),
+    makeEmployee({ id: "emp-2", focusAreaIds: [2], seniority: 1 }),
+    makeEmployee({ id: "emp-3", focusAreaIds: [1, 2], seniority: 2 }),
+    makeEmployee({ id: "emp-4", focusAreaIds: [], seniority: 0 }), // no focusAreaIds — always excluded
+    makeEmployee({ id: "emp-5", focusAreaIds: [3], seniority: 5 }),
   ];
 
-  it('"All" filter includes all employees with at least one wing', () => {
-    const result = filterAndSortEmployees(employees, "All");
+  it('null filter (All) includes all employees with at least one focus area', () => {
+    const result = filterAndSortEmployees(employees, null);
     const ids = result.map((e) => e.id);
     expect(ids).toContain("emp-1");
     expect(ids).toContain("emp-2");
@@ -300,13 +303,13 @@ describe("filterAndSortEmployees", () => {
     expect(ids).toContain("emp-5");
   });
 
-  it('"All" filter excludes employees with empty wings', () => {
-    const result = filterAndSortEmployees(employees, "All");
+  it('null filter (All) excludes employees with empty focus areas', () => {
+    const result = filterAndSortEmployees(employees, null);
     expect(result.map((e) => e.id)).not.toContain("emp-4");
   });
 
-  it("specific wing filter includes only matching employees", () => {
-    const result = filterAndSortEmployees(employees, "A");
+  it("specific focus area filter includes only matching employees", () => {
+    const result = filterAndSortEmployees(employees, 1);
     const ids = result.map((e) => e.id);
     expect(ids).toContain("emp-1");
     expect(ids).toContain("emp-3");
@@ -314,21 +317,21 @@ describe("filterAndSortEmployees", () => {
     expect(ids).not.toContain("emp-5");
   });
 
-  it("specific wing filter excludes employees with empty wings", () => {
-    const result = filterAndSortEmployees(employees, "A");
+  it("specific focus area filter excludes employees with empty focus areas", () => {
+    const result = filterAndSortEmployees(employees, 1);
     expect(result.map((e) => e.id)).not.toContain("emp-4");
   });
 
   it("result is sorted in ascending order by seniority", () => {
-    const result = filterAndSortEmployees(employees, "All");
+    const result = filterAndSortEmployees(employees, null);
     const seniorities = result.map((e) => e.seniority);
     for (let i = 1; i < seniorities.length; i++) {
       expect(seniorities[i]).toBeGreaterThanOrEqual(seniorities[i - 1]);
     }
   });
 
-  it("returns empty array when no employees match the wing filter", () => {
-    const result = filterAndSortEmployees(employees, "Z");
+  it("returns empty array when no employees match the focus area filter", () => {
+    const result = filterAndSortEmployees(employees, 999);
     expect(result).toHaveLength(0);
   });
 });
@@ -337,49 +340,47 @@ describe("filterAndSortEmployees", () => {
 
 describe("Property 12: Employee filter correctness and sort order", () => {
   // Feature: comprehensive-test-suite, Property 12: Employee filter correctness and sort order
-  it("filtered result satisfies wing inclusion, empty-wings exclusion, and seniority sort", () => {
-    const arbWingName = fc.constantFrom("A", "B", "C", "D");
+  it("filtered result satisfies focus area inclusion, empty exclusion, and seniority sort", () => {
+    const arbFocusAreaId = fc.constantFrom(1, 2, 3, 4);
     const arbEmployee = fc.record({
       id: fc.uuid(),
-      fteWeight: fc.double({ min: 0.1, max: 1.0, noNaN: true, noDefaultInfinity: true }),
       seniority: fc.integer({ min: 1, max: 1000 }),
-      wings: fc.array(arbWingName, { minLength: 0, maxLength: 3 }),
+      focusAreaIds: fc.array(arbFocusAreaId, { minLength: 0, maxLength: 3 }),
     }).map((e) =>
       makeEmployee({
         id: e.id,
-        fteWeight: e.fteWeight,
         seniority: e.seniority,
-        wings: [...new Set(e.wings)] as string[], // deduplicate
+        focusAreaIds: [...new Set(e.focusAreaIds)],
       }),
     );
 
-    const arbFilter = fc.oneof(fc.constant("All"), arbWingName);
+    const arbFilter = fc.oneof(fc.constant(null as number | null), arbFocusAreaId);
 
     fc.assert(
       fc.property(
         fc.array(arbEmployee, { minLength: 0, maxLength: 20 }),
         arbFilter,
-        (employeesRaw, activeWing) => {
+        (employeesRaw, activeFocusAreaId) => {
           const employees = employeesRaw.filter((e, idx, arr) => arr.findIndex(x => x.id === e.id) === idx);
-          const result = filterAndSortEmployees(employees, activeWing);
+          const result = filterAndSortEmployees(employees, activeFocusAreaId);
 
-          // (a) All results must have non-empty wings
+          // (a) All results must have non-empty focusAreaIds
           for (const emp of result) {
-            expect(emp.wings.length).toBeGreaterThan(0);
+            expect(emp.focusAreaIds.length).toBeGreaterThan(0);
           }
 
-          // (b) Wing inclusion rule
+          // (b) Focus area inclusion rule
           for (const emp of result) {
-            if (activeWing === "All") {
-              expect(emp.wings.length).toBeGreaterThan(0);
+            if (activeFocusAreaId === null) {
+              expect(emp.focusAreaIds.length).toBeGreaterThan(0);
             } else {
-              expect(emp.wings).toContain(activeWing);
+              expect(emp.focusAreaIds).toContain(activeFocusAreaId);
             }
           }
 
-          // (c) Employees with empty wings must be excluded
-          const emptyWingEmployees = employees.filter((e) => e.wings.length === 0);
-          for (const emp of emptyWingEmployees) {
+          // (c) Employees with empty focusAreaIds must be excluded
+          const emptyFocusAreaEmployees = employees.filter((e) => e.focusAreaIds.length === 0);
+          for (const emp of emptyFocusAreaEmployees) {
             expect(result.map((r) => r.id)).not.toContain(emp.id);
           }
 

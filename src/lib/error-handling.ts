@@ -18,7 +18,8 @@ export async function handleApiError(error: unknown) {
             return;
         }
 
-        toast.error(`An error occurred: ${error.message}`);
+        console.error("handleApiError:", error.message);
+        toast.error("Something went wrong. Please try again.");
     } else {
         toast.error("An unknown error occurred.");
     }

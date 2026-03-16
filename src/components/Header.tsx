@@ -41,6 +41,7 @@ const NAV_ITEMS: { id: ViewMode; label: string; icon?: React.ReactNode }[] = [
 
 const ROLE_LABELS: Record<string, string> = {
   gridmaster: "Gridmaster",
+  super_admin: "Super Admin",
   admin: "Admin",
   scheduler: "Scheduler",
   supervisor: "Supervisor",
@@ -62,15 +63,13 @@ export default function Header({
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [userName, setUserName] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("dg_user_name") || null;
-    }
-    return null;
-  });
+  const [userName, setUserName] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const cached = sessionStorage.getItem("dg_user_name");
+    if (cached) setUserName(cached);
+
     void (async () => {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;
@@ -116,10 +115,6 @@ export default function Header({
         justifyContent: "space-between",
         height: 56,
         borderBottom: "1px solid var(--color-border)",
-        boxShadow: "var(--shadow-raised)",
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
       }}
     >
       {/* Logo + Org Anchor — permanent, unbreakable group */}
@@ -176,7 +171,7 @@ export default function Header({
         {/* Gridmaster badge — only rendered if role = gridmaster */}
         {isGridmaster && (
           <button
-            onClick={() => router.push("/admin")}
+            onClick={() => router.push("/gridmaster")}
             style={{
               display: "inline-flex",
               alignItems: "center",

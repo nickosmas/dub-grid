@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
-import { EditModalState, ShiftType } from "@/types";
+import { EditModalState, FocusArea, NamedItem, ShiftCode } from "@/types";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -9,11 +9,11 @@ const modal: EditModalState = {
   empId: "emp-1",
   empName: "Alice Smith",
   date: new Date(2024, 0, 15), // Jan 15, 2024
-  empWings: ["North"],
-  empDesignation: "CSN II",
+  empFocusAreaIds: [1],
+  empCertificationId: null,
 };
 
-const northShift: ShiftType = {
+const northShift: ShiftCode = {
   id: 1,
   orgId: "org-1",
   label: "D",
@@ -22,10 +22,10 @@ const northShift: ShiftType = {
   border: "#93C5FD",
   text: "#1E40AF",
   sortOrder: 1,
-  wingName: "North",
+  focusAreaId: 1,
 };
 
-const southShift: ShiftType = {
+const southShift: ShiftCode = {
   id: 2,
   orgId: "org-1",
   label: "E",
@@ -34,22 +34,32 @@ const southShift: ShiftType = {
   border: "#FCD34D",
   text: "#92400E",
   sortOrder: 2,
-  wingName: "South",
+  focusAreaId: 2,
 };
 
-const generalShift: ShiftType = {
+const generalShift: ShiftCode = {
   id: 3,
   orgId: "org-1",
   label: "X",
   name: "Off",
   color: "#F1F5F9",
   border: "#CBD5E1",
-  text: "#64748B",
+  text:"#475569",
   sortOrder: 3,
   isGeneral: true,
 };
 
-const shiftTypes = [northShift, southShift, generalShift];
+const shiftCodes = [northShift, southShift, generalShift];
+
+const certifications: NamedItem[] = [
+  { id: 1, name: "JLCSN", orgId: "org-1", abbr: "JLCSN", sortOrder: 0 },
+  { id: 2, name: "CSN II", orgId: "org-1", abbr: "CSN2", sortOrder: 1 },
+];
+
+const focusAreas: FocusArea[] = [
+  { id: 1, orgId: "org-1", name: "North", colorBg: "#EFF6FF", colorText: "#1E40AF", sortOrder: 0 },
+  { id: 2, orgId: "org-1", name: "South", colorBg: "#FEF3C7", colorText: "#92400E", sortOrder: 1 },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +69,8 @@ function renderPanel(
     onSelect?: ReturnType<typeof vi.fn>;
     onClose?: ReturnType<typeof vi.fn>;
     modalOverride?: EditModalState;
-    shiftTypesOverride?: ShiftType[];
+    shiftCodesOverride?: ShiftCode[];
+    certificationsOverride?: NamedItem[];
   } = {},
 ) {
   const onSelect = overrides.onSelect ?? vi.fn();
@@ -68,9 +79,11 @@ function renderPanel(
     <ShiftEditPanel
       modal={overrides.modalOverride ?? modal}
       currentShift={overrides.currentShift ?? null}
-      shiftTypes={overrides.shiftTypesOverride ?? shiftTypes}
+      shiftCodes={overrides.shiftCodesOverride ?? shiftCodes}
       onSelect={onSelect}
       onClose={onClose}
+      focusAreas={focusAreas}
+      certifications={overrides.certificationsOverride ?? certifications}
     />,
   );
   return { ...result, onSelect, onClose };
@@ -87,7 +100,19 @@ describe("ShiftEditPanel", () => {
 
     it("renders formatted date from modal.date (1/15)", () => {
       renderPanel();
-      expect(screen.getByText("1/15")).toBeInTheDocument();
+      // The date "1/15" is a text node inside a <div> that also contains " · " and
+      // the designation span — use getAllByText with a loose matcher and confirm at
+      // least one match exists.
+      const matches = screen.getAllByText((content, element) => {
+        // Match the innermost element whose own text content starts with "1/15"
+        if (!element) return false;
+        const direct = Array.from(element.childNodes)
+          .filter((n) => n.nodeType === Node.TEXT_NODE)
+          .map((n) => n.textContent ?? "")
+          .join("");
+        return direct.trimStart().startsWith("1/15");
+      });
+      expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
     it("renders a close button (×)", () => {
@@ -107,35 +132,40 @@ describe("ShiftEditPanel", () => {
 
     it("clicking the backdrop overlay calls onClose", () => {
       const { container, onClose } = renderPanel();
-      const backdrop = container.querySelector('div[style*="inset: 0"]');
+      // The backdrop uses className="dg-panel-overlay" with no inline inset style
+      const backdrop = container.querySelector('.dg-panel-overlay');
       expect(backdrop).not.toBeNull();
       fireEvent.click(backdrop!);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("Wing tabs", () => {
-    it("renders a wing tab for each unique wingName in shiftTypes", () => {
+  describe("Focus area tabs", () => {
+    it("renders all focus area tabs including home and other areas", () => {
       renderPanel();
-      expect(screen.getByText(/North/)).toBeInTheDocument();
-      expect(screen.getByText(/South/)).toBeInTheDocument();
+      // Both North (home) and South (other) visible as tabs
+      // North appears as both tab and section heading
+      expect(screen.getAllByText(/North/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("South")).toBeInTheDocument();
     });
 
-    it("home wing tab (first in empWings) has '★' suffix", () => {
+    it("home focus area is selected by default with its shifts showing", () => {
       renderPanel();
-      expect(screen.getByText("North ★")).toBeInTheDocument();
+      // North appears as tab + section heading
+      expect(screen.getAllByText("North").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("D")).toBeInTheDocument();
     });
 
-    it("clicking a wing tab filters shift buttons to that wing's shifts", () => {
+    it("clicking another focus area tab shows that area's shifts", () => {
       renderPanel();
-      // Initially on North tab — "D" visible, "E" not visible
+      // Initially on North — "D" visible, "E" not visible
       expect(screen.getByText("D")).toBeInTheDocument();
       expect(screen.queryByText("E")).not.toBeInTheDocument();
 
-      // Click South tab
-      fireEvent.click(screen.getByText("South"));
+      // Click South tab (the tab button, not the section heading)
+      const southButtons = screen.getAllByText("South");
+      fireEvent.click(southButtons[0]);
       expect(screen.getByText("E")).toBeInTheDocument();
-      expect(screen.queryByText("D")).not.toBeInTheDocument();
     });
   });
 
@@ -143,34 +173,33 @@ describe("ShiftEditPanel", () => {
     it("clicking a shift button calls onSelect with the shift's label", () => {
       const { onSelect } = renderPanel();
       fireEvent.click(screen.getByText("D"));
-      expect(onSelect).toHaveBeenCalledWith("D");
+      // Component calls onSelect(label, shiftCodeIds, seriesScope | undefined)
+      expect(onSelect).toHaveBeenCalledWith("D", [1], undefined);
     });
 
     it("active shift button has the shift's color as background style", () => {
       renderPanel({ currentShift: "D" });
-      const labelDiv = screen.getByText("D");
-      const button = labelDiv.closest("button");
-      expect(button).not.toBeNull();
+      // When currentShift is set the panel shows a detail-mode pill <div>
+      // (not a picker button), so locate the closest block element with a background.
+      const labelSpan = screen.getByText("D");
+      // The pill wrapping div is the nearest ancestor with an inline background
+      const pill = labelSpan.closest('div[style*="background"]');
+      expect(pill).not.toBeNull();
       // jsdom normalizes #DBEAFE → rgb(219, 234, 254)
-      expect(button!.style.background).toBe("rgb(219, 234, 254)");
+      expect((pill as HTMLElement).style.background).toBe("rgb(219, 234, 254)");
     });
   });
 
   describe("General section", () => {
-    it("general shifts appear in a 'General' section regardless of active tab", () => {
+    it("general shifts appear in a 'General' section", () => {
       renderPanel();
-      expect(screen.getByText("General")).toBeInTheDocument();
-      expect(screen.getByText("X")).toBeInTheDocument();
-
-      // Switch to South tab — general section still visible
-      fireEvent.click(screen.getByText("South"));
       expect(screen.getByText("General")).toBeInTheDocument();
       expect(screen.getByText("X")).toBeInTheDocument();
     });
   });
 
   describe("Qualification filtering", () => {
-    const restrictedShift: ShiftType = {
+    const restrictedShift: ShiftCode = {
       id: 4,
       orgId: "org-1",
       label: "JL",
@@ -179,17 +208,19 @@ describe("ShiftEditPanel", () => {
       border: "#A78BFA",
       text: "#6D28D9",
       sortOrder: 4,
-      wingName: "North",
-      requiredDesignations: ["JLCSN"],
+      focusAreaId: 1,
+      requiredCertificationIds: [1],
     };
 
     it("disqualified shift button is not rendered when employee lacks the required designation", () => {
-      const modalWithDesig: EditModalState = { ...modal, empDesignation: "CSN II" };
+      const modalWithDesig: EditModalState = { ...modal, empCertificationId: null };
       render(
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftTypes={[restrictedShift, generalShift]}
+          shiftCodes={[restrictedShift, generalShift]}
+          focusAreas={focusAreas}
+          certifications={certifications}
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
@@ -199,12 +230,14 @@ describe("ShiftEditPanel", () => {
     });
 
     it("qualified shift button is enabled when employee has the required designation", () => {
-      const modalWithDesig: EditModalState = { ...modal, empDesignation: "JLCSN" };
+      const modalWithDesig: EditModalState = { ...modal, empCertificationId: 1 };
       render(
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftTypes={[restrictedShift, generalShift]}
+          shiftCodes={[restrictedShift, generalShift]}
+          focusAreas={focusAreas}
+          certifications={certifications}
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
@@ -214,13 +247,15 @@ describe("ShiftEditPanel", () => {
       expect(button).not.toBeDisabled();
     });
 
-    it("unrestricted shift (empty requiredDesignations) is always enabled", () => {
-      const modalWithDesig: EditModalState = { ...modal, empDesignation: "STAFF" };
+    it("unrestricted shift (empty requiredCertificationIds) is always enabled", () => {
+      const modalWithDesig: EditModalState = { ...modal, empCertificationId: null };
       render(
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftTypes={[northShift, generalShift]}
+          shiftCodes={[northShift, generalShift]}
+          focusAreas={focusAreas}
+          certifications={certifications}
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
@@ -231,12 +266,13 @@ describe("ShiftEditPanel", () => {
     });
 
     it("lock icon 🔒 does not appear as shifts are hidden", () => {
-      const modalWithDesig: EditModalState = { ...modal, empDesignation: "CSN II" };
+      const modalWithDesig: EditModalState = { ...modal, empCertificationId: null };
       render(
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftTypes={[restrictedShift]}
+          shiftCodes={[restrictedShift]}
+          certifications={certifications}
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits

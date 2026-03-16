@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+.venv/
+.pdfenv/
 
 # debug
 npm-debug.log*
