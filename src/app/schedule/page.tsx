@@ -396,11 +396,28 @@ function SchedulerContent() {
     [shifts],
   );
 
+  const publishedShiftCodeIdsForKey = useCallback(
+    (empId: string, date: Date): number[] =>
+      shifts[`${empId}_${formatDateKey(date)}`]?.publishedShiftCodeIds ?? [],
+    [shifts],
+  );
+
   const getCustomShiftTimes = useCallback(
-    (empId: string, date: Date): { start: string; end: string } | null => {
+    (empId: string, date: Date): { start: string; end: string; perPill?: { start: string; end: string }[] } | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry?.customStartTime && !entry?.customEndTime) return null;
-      return { start: entry.customStartTime ?? "", end: entry.customEndTime ?? "" };
+      const rawStart = entry.customStartTime ?? "";
+      const rawEnd = entry.customEndTime ?? "";
+      const startParts = rawStart.split("|");
+      const endParts = rawEnd.split("|");
+      const start = startParts[0] || "";
+      const end = endParts[0] || "";
+      const maxLen = Math.max(startParts.length, endParts.length);
+      const perPill = maxLen > 1
+        ? Array.from({ length: maxLen }, (_, i) => ({ start: startParts[i] || "", end: endParts[i] || "" }))
+        : undefined;
+      if (!start && !end && !perPill) return null;
+      return { start, end, perPill };
     },
     [shifts],
   );
@@ -1343,6 +1360,7 @@ function SchedulerContent() {
               draftKindForKey={draftKindForKey}
               showDiffOverlay={showDiffOverlay}
               publishedLabelForKey={publishedLabelForKey}
+              publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
             />
           </div>
         )}
@@ -1429,6 +1447,7 @@ function SchedulerContent() {
           customEndTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customEndTime}
           onCustomTimeChange={canEditShifts ? handleCustomTimeChange : undefined}
           publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
+          draftKind={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.draftKind}
         />
       )}
 

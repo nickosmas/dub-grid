@@ -65,10 +65,11 @@ interface ScheduleGridProps {
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
   isEditMode?: boolean;
-  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
+  publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
 }
 
 
@@ -93,12 +94,14 @@ interface SectionBlockProps {
   isCellInteractive: boolean;
   noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
   onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
-  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
+  publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  isEditMode?: boolean;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -125,8 +128,10 @@ const SectionBlock = memo(function SectionBlock({
   draftKindForKey,
   showDiffOverlay,
   publishedLabelForKey,
+  publishedShiftCodeIdsForKey,
   certifications,
   orgRoles,
+  isEditMode,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
@@ -444,6 +449,7 @@ const SectionBlock = memo(function SectionBlock({
                   const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
                   const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                   const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
+                  const publishedCodeIds = publishedShiftCodeIdsForKey?.(emp.id, date) ?? [];
                   const noteTypes = noteTypesForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                   const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
 
@@ -665,29 +671,21 @@ const SectionBlock = memo(function SectionBlock({
                              );
                           }
 
-                          const firstStyle = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
-                          return (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: "4px",
-                                right: "4px",
-                                bottom: "4px",
-                                left: "4px",
-                              }}
-                            >
+                          // Edit mode: render each shift as a separate vertical pill
+                          if (isEditMode) {
+                            return (
                               <div
                                 style={{
+                                  position: "absolute",
+                                  top: "3px",
+                                  right: "4px",
+                                  bottom: "3px",
+                                  left: "4px",
                                   display: "flex",
-                                  borderRadius: 3,
-                                  overflow: "hidden",
-                                  border: getDraftBorder(draftKind, firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)"),
+                                  flexDirection: "column",
+                                  gap: 2,
+                                  alignItems: "stretch",
                                   opacity: draftKind === 'deleted' ? 0.5 : 1,
-                                  boxShadow: "none",
-                                  cursor: "pointer",
-                                  width: "100%",
-                                  height: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "calc(100% - 14px)" : "100%",
-                                  textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                 }}
                               >
                                 {labels.map((label, li) => {
@@ -700,55 +698,227 @@ const SectionBlock = memo(function SectionBlock({
                                   const crossHomeFaLi = isCross
                                     ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
                                     : undefined;
-
+                                  const isNewPill = draftKind && publishedCodeIds.length > 0
+                                    && cellCodeIds[li] != null
+                                    && !publishedCodeIds.includes(cellCodeIds[li]);
+                                  const pillBorder = isNewPill
+                                    ? `2px dashed ${DRAFT_BORDER_COLORS[draftKind!]}`
+                                    : draftKind === 'new'
+                                      ? `2px dashed ${DRAFT_BORDER_COLORS.new}`
+                                      : `1px solid ${borderColor(style.text)}`;
+                                  const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                  const hasTime = pillTime && (pillTime.start || pillTime.end);
                                   return (
                                     <div
                                       key={li}
                                       style={{
                                         flex: 1,
                                         background: isCross ? "#ffffff" : style.color,
+                                        border: draftKind === 'deleted'
+                                          ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
+                                          : pillBorder,
+                                        borderRadius: 3,
                                         color: style.text,
                                         display: "flex",
+                                        flexDirection: hasTime ? "row" : "column",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        fontSize: 12,
+                                        gap: hasTime ? 3 : 0,
+                                        fontSize: 11,
                                         fontWeight: 800,
-                                        borderRight:
-                                          li < labels.length - 1
-                                            ? `1px solid rgba(0,0,0,0.1)`
-                                            : "none",
                                         position: "relative",
+                                        cursor: "pointer",
+                                        textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
+                                        lineHeight: 1,
+                                        overflow: "hidden",
                                       }}
                                     >
                                       {isCross && crossHomeFaLi && (
-                                         <span
-                                           style={{
-                                             position: "absolute",
-                                             top: 2,
-                                             left: 2,
-                                             fontSize: 8,
-                                             fontWeight: 800,
-                                             lineHeight: 1,
-                                             background: crossHomeFaLi.colorBg,
-                                             color: crossHomeFaLi.colorText,
-                                             borderRadius: 3,
-                                             padding: "1px 2px",
-                                             letterSpacing: "0.02em",
-                                             pointerEvents: "none",
-                                           }}
-                                         >
-                                           {getFocusAreaInitials(crossHomeFaLi.name)}
-                                         </span>
-                                       )}
-                                      {label}
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            left: 2,
+                                            fontSize: 6,
+                                            fontWeight: 800,
+                                            lineHeight: 1,
+                                            background: crossHomeFaLi.colorBg,
+                                            color: crossHomeFaLi.colorText,
+                                            borderRadius: 2,
+                                            padding: "0px 2px",
+                                            letterSpacing: "0.02em",
+                                            pointerEvents: "none",
+                                          }}
+                                        >
+                                          {getFocusAreaInitials(crossHomeFaLi.name)}
+                                        </span>
+                                      )}
+                                      {isNewPill && (
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            right: 0,
+                                            width: 0,
+                                            height: 0,
+                                            borderStyle: "solid",
+                                            borderWidth: "0 6px 6px 0",
+                                            borderColor: `transparent ${DRAFT_BORDER_COLORS[draftKind!]} transparent transparent`,
+                                            pointerEvents: "none",
+                                          }}
+                                        />
+                                      )}
+                                      <span>{label}</span>
+                                      {hasTime && (
+                                        <span style={{ fontSize: 7, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                          {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
+                                        </span>
+                                      )}
                                     </div>
                                   );
                                 })}
+                                {noteTypes.length > 0 && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: 1,
+                                      right: 2,
+                                      display: "flex",
+                                      gap: 2,
+                                      zIndex: 1,
+                                    }}
+                                  >
+                                    {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
+                                      <div
+                                        key={ind.name}
+                                        title={ind.name}
+                                        style={{
+                                          width: 5,
+                                          height: 5,
+                                          borderRadius: "50%",
+                                          background: ind.color,
+                                          border: "1px solid rgba(255,255,255,0.8)",
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
                               </div>
+                            );
+                          }
+
+                          // View mode: render as separate vertical pills (like edit mode)
+                          // Each pill independently shows dashed (new) or solid (existing) border
+                          return (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "3px",
+                                right: "4px",
+                                bottom: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "18px" : "3px",
+                                left: "4px",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 2,
+                                alignItems: "stretch",
+                                opacity: draftKind === 'deleted' ? 0.5 : 1,
+                              }}
+                            >
+                              {labels.map((label, li) => {
+                                const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
+                                const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                                const isCross = label !== "X"
+                                  && codeEntryLi?.focusAreaId != null
+                                  && sectionFocusArea != null
+                                  && codeEntryLi.focusAreaId !== sectionFocusArea.id;
+                                const crossHomeFaLi = isCross
+                                  ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
+                                  : undefined;
+                                const isNewPill = draftKind && publishedCodeIds.length > 0
+                                  && cellCodeIds[li] != null
+                                  && !publishedCodeIds.includes(cellCodeIds[li]);
+                                const pillBorder = isNewPill
+                                  ? `2px dashed ${DRAFT_BORDER_COLORS[draftKind!]}`
+                                  : draftKind === 'new'
+                                    ? `2px dashed ${DRAFT_BORDER_COLORS.new}`
+                                    : `1px solid ${borderColor(style.text)}`;
+                                const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                const hasTime = pillTime && (pillTime.start || pillTime.end);
+
+                                return (
+                                  <div
+                                    key={li}
+                                    style={{
+                                      flex: 1,
+                                      background: isCross ? "#ffffff" : style.color,
+                                      border: draftKind === 'deleted'
+                                        ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
+                                        : pillBorder,
+                                      borderRadius: 3,
+                                      color: style.text,
+                                      display: "flex",
+                                      flexDirection: hasTime ? "row" : "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: hasTime ? 3 : 0,
+                                      fontSize: 12,
+                                      fontWeight: 800,
+                                      position: "relative",
+                                      cursor: "pointer",
+                                      textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
+                                      lineHeight: 1,
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    {isCross && crossHomeFaLi && (
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          top: 0,
+                                          left: 2,
+                                          fontSize: 6,
+                                          fontWeight: 800,
+                                          lineHeight: 1,
+                                          background: crossHomeFaLi.colorBg,
+                                          color: crossHomeFaLi.colorText,
+                                          borderRadius: 2,
+                                          padding: "0px 2px",
+                                          letterSpacing: "0.02em",
+                                          pointerEvents: "none",
+                                        }}
+                                      >
+                                        {getFocusAreaInitials(crossHomeFaLi.name)}
+                                      </span>
+                                    )}
+                                    {isNewPill && (
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          top: 0,
+                                          right: 0,
+                                          width: 0,
+                                          height: 0,
+                                          borderStyle: "solid",
+                                          borderWidth: "0 6px 6px 0",
+                                          borderColor: `transparent ${DRAFT_BORDER_COLORS[draftKind!]} transparent transparent`,
+                                          pointerEvents: "none",
+                                        }}
+                                      />
+                                    )}
+                                    <span>{label}</span>
+                                    {hasTime && (
+                                      <span style={{ fontSize: 7, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                        {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                               {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
                                 <span style={{
                                   position: "absolute",
-                                  bottom: 2,
+                                  bottom: -14,
                                   left: "50%",
                                   transform: "translateX(-50%)",
                                   fontSize: 11,
@@ -765,7 +935,7 @@ const SectionBlock = memo(function SectionBlock({
                               {showDiffOverlay && draftKind === 'new' && (
                                 <span style={{
                                   position: "absolute",
-                                  bottom: 2,
+                                  bottom: -14,
                                   left: "50%",
                                   transform: "translateX(-50%)",
                                   fontSize: 11,
@@ -782,8 +952,8 @@ const SectionBlock = memo(function SectionBlock({
                                 <div
                                   style={{
                                     position: "absolute",
-                                    top: 3,
-                                    right: 4,
+                                    top: 2,
+                                    right: 2,
                                     display: "flex",
                                     gap: 2,
                                     zIndex: 1,
@@ -974,6 +1144,7 @@ export default function ScheduleGrid({
   draftKindForKey,
   showDiffOverlay,
   publishedLabelForKey,
+  publishedShiftCodeIdsForKey,
 }: ScheduleGridProps) {
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
@@ -1194,8 +1365,10 @@ export default function ScheduleGrid({
             draftKindForKey={draftKindForKey}
             showDiffOverlay={showDiffOverlay}
             publishedLabelForKey={publishedLabelForKey}
+            publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
             certifications={certifications}
             orgRoles={orgRoles}
+            isEditMode={isEditMode}
           />
         );
       })}

@@ -52,7 +52,7 @@ interface PrintSectionProps {
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   focusAreas: FocusArea[];
-  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   splitAtIndex?: number;
   fontSize: number;
 }
@@ -561,7 +561,7 @@ interface PrintScheduleViewProps {
   shiftForKey: (empId: string, date: Date) => string | null;
   shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
-  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   onClose: () => void;
   focusAreaLabel?: string;
 }
