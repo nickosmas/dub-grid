@@ -12,16 +12,16 @@
   --color-surface-overlay: #F1F5F9;
 
   /* Borders */
-  --color-border: #E2E8F0;
-  --color-border-light: #F1F5F9;
+  --color-border: #CBD5E1;
+  --color-border-light: #E2E8F0;
   --color-border-focus: #38BDF8;
 
   /* Text */
   --color-text-primary: #0F172A;
   --color-text-secondary: #1E293B;
-  --color-text-muted: #64748B;
-  --color-text-subtle: #94A3B8;
-  --color-text-faint: #CBD5E1;
+  --color-text-muted: #475569;
+  --color-text-subtle: #64748B;
+  --color-text-faint: #94A3B8;
   --color-text-inverse: #FFFFFF;
 
   /* Brand Accent */
@@ -63,6 +63,7 @@ body {
   font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none; /* Prevent bounce effect */
 }
 
 button,
@@ -410,6 +411,122 @@ textarea {
   gap: 8px;
 }
 
+/* Draft breakdown chips */
+.dg-draft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.dg-draft-chip--new { background: #DCFCE7; color: #15803D; }
+.dg-draft-chip--modified { background: #FEF3C7; color: #B45309; }
+.dg-draft-chip--deleted { background: #FEE2E2; color: #DC2626; }
+.dg-draft-chip--notes { background: #E0E7FF; color: #4338CA; }
+
+/* ── Toast Overrides (Sonner) ───────────────────────────── */
+/* Vibrant, full-color banner toasts — no shadows */
+[data-sonner-toaster] {
+  --width: min(calc(100vw - 48px), 720px) !important;
+}
+
+[data-sonner-toast] {
+  box-shadow: none !important;
+  padding: 14px 48px 14px 20px !important;
+  width: var(--width) !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  background: #DCFCE7 !important;
+  color: #16A34A !important;
+  border: 1px solid #BBF7D0 !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  background: #FEE2E2 !important;
+  color: #DC2626 !important;
+  border: 1px solid #FECACA !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  background: #DBEAFE !important;
+  color: #2563EB !important;
+  border: 1px solid #BFDBFE !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  background: #FEF3C7 !important;
+  color: #D97706 !important;
+  border: 1px solid #FDE68A !important;
+}
+
+/* Toast text inherits color from type-specific parent */
+[data-sonner-toast] [data-title] {
+  color: inherit !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+[data-sonner-toast] [data-description] {
+  color: inherit !important;
+  opacity: 0.8 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* Close button — prominent white pill */
+[data-sonner-toast] [data-close-button] {
+  position: absolute !important;
+  top: 50% !important;
+  right: 10px !important;
+  left: auto !important;
+  transform: translateY(-50%) !important;
+  background: #FFFFFF !important;
+  color: inherit !important;
+  border: none !important;
+  opacity: 1 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  transition: transform 150ms ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background: #FFFFFF !important;
+  transform: translateY(-50%) scale(1.1) !important;
+}
+
+[data-sonner-toast] [data-close-button] svg {
+  width: 14px !important;
+  height: 14px !important;
+  color: currentColor !important;
+}
+
+/* Action button — dark for universal contrast */
+[data-sonner-toast] [data-button] {
+  background: var(--color-dark) !important;
+  color: #fff !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  margin-left: auto !important;
+  transition: all 150ms ease !important;
+}
+
+[data-sonner-toast] [data-button]:hover {
+  background: var(--color-dark-elevated) !important;
+  transform: translateY(-1px);
+}
+
 /* ── Spinner ────────────────────────────────────────────── */
 @keyframes dg-spin {
   to {
@@ -464,10 +581,12 @@ textarea {
 }
 
 /* ── Print Styles ───────────────────────────────────────── */
+/* NOTE: The custom print view opens in a new window via window.open().
+   These styles are only for the fallback Ctrl+P case on the main page. */
 @media print {
   @page {
     size: A3 landscape;
-    margin: 0.4in;
+    margin: 0.5in;
   }
 
   *,
@@ -477,10 +596,13 @@ textarea {
     print-color-adjust: exact !important;
   }
 
+  html,
   body {
+    overflow: visible !important;
     background: #fff !important;
   }
 
+  /* Fallback: direct Ctrl+P on the main schedule page */
   .no-print {
     display: none !important;
   }
@@ -489,11 +611,5 @@ textarea {
     display: block !important;
     break-before: page;
     page-break-before: always;
-  }
-
-  html,
-  body,
-  #__next {
-    overflow: visible !important;
   }
 }

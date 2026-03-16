@@ -4,8 +4,18 @@
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { supabase } from "@/lib/supabase";
 import LoginPage from "@/app/login/page";
+
+// Mock supabase module so we can control signInWithPassword per-test
+const mockSignInWithPassword = vi.fn();
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      signInWithPassword: (...args: unknown[]) => mockSignInWithPassword(...args),
+      signOut: vi.fn().mockResolvedValue({}),
+    },
+  },
+}));
 
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -30,23 +40,25 @@ function submitForm(container: HTMLElement) {
 
 describe("Login page submit states", () => {
   beforeEach(() => {
+    // parseHost reads window.location.host (not hostname); set host to a subdomain
     Object.defineProperty(window, 'location', {
-      value: { hostname: 'test-org.localhost', replace: vi.fn(), reload: vi.fn() },
-      writable: true
+      value: { host: 'test-org.localhost', hostname: 'test-org.localhost', replace: vi.fn(), reload: vi.fn(), href: '', search: '?verified=1' },
+      writable: true,
+      configurable: true,
     });
+    mockSignInWithPassword.mockReset();
   });
 
   it("successful sign-in: button stays disabled and message shows 'Please wait...'", async () => {
-    // Arrange: signInWithPassword resolves with no error
-    (supabase.auth as any).signInWithPassword = vi
-      .fn()
-      .mockResolvedValue({ error: null });
+    // Arrange: signInWithPassword resolves with no error (but never settles synchronously
+    // so loading stays true long enough to assert)
+    mockSignInWithPassword.mockReturnValue(new Promise(() => {})); // never resolves
 
     const { container } = render(<LoginPage />);
     submitForm(container);
 
     await waitFor(() => {
-      // Both the message div and the button show "Redirecting..."
+      // Button text changes to "Please wait…" (unicode ellipsis) while loading
       const button = screen.getByRole("button", { name: /please wait/i });
       expect(button).toBeInTheDocument();
       expect(button).toBeDisabled();
@@ -55,9 +67,7 @@ describe("Login page submit states", () => {
 
   it("failed sign-in: loading resets to false and error message is displayed", async () => {
     // Arrange: signInWithPassword resolves with an error
-    (supabase.auth as any).signInWithPassword = vi
-      .fn()
-      .mockResolvedValue({ error: { message: "Invalid login credentials" } });
+    mockSignInWithPassword.mockResolvedValue({ error: { message: "Invalid login credentials" } });
 
     const { container } = render(<LoginPage />);
     submitForm(container);

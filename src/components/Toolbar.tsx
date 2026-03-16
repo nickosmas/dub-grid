@@ -2,8 +2,16 @@
 
 import { useMemo } from "react";
 import { addDays, formatDate } from "@/lib/utils";
-import { Wing } from "@/types";
+import { FocusArea } from "@/types";
 import { ViewMode } from "@/components/Header";
+import CustomSelect from "@/components/CustomSelect";
+
+const SPAN_OPTIONS = [
+  { value: 1 as const, label: "1 Week" },
+  { value: 2 as const, label: "2 Weeks" },
+  { value: "month" as const, label: "Month" },
+];
+
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -14,36 +22,47 @@ interface ToolbarProps {
   viewMode: ViewMode;
   weekStart: Date;
   spanWeeks: 1 | 2 | "month";
-  activeWing: string;
+  activeFocusArea: number | null;
   staffSearch: string;
-  wings: Wing[];
+  focusAreas: FocusArea[];
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
   onSpanChange: (n: 1 | 2 | "month") => void;
-  onWingChange: (wing: string) => void;
+  onFocusAreaChange: (id: number | null) => void;
   onStaffSearchChange: (q: string) => void;
-  canEditSchedule?: boolean;
+  canEditShifts?: boolean;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
+  onApplyRecurring?: () => void;
+  isApplyingRecurring?: boolean;
+  onPrintOpen?: () => void;
+  hasSavedDraft?: boolean;
+  /** True when there are both published AND draft shifts — shows Print + Edit Draft. */
+  hasMixedSchedule?: boolean;
 }
 
 export default function Toolbar({
   viewMode,
   weekStart,
   spanWeeks,
-  activeWing,
+  activeFocusArea,
   staffSearch,
-  wings,
+  focusAreas,
   onPrev,
   onNext,
   onToday,
   onSpanChange,
-  onWingChange,
+  onFocusAreaChange,
   onStaffSearchChange,
-  canEditSchedule,
+  canEditShifts,
   isEditMode,
   onToggleEditMode,
+  onApplyRecurring,
+  isApplyingRecurring,
+  onPrintOpen,
+  hasSavedDraft,
+  hasMixedSchedule,
 }: ToolbarProps) {
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
@@ -54,10 +73,13 @@ export default function Toolbar({
       : `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, 6))}`;
   }, [weekStart, spanWeeks]);
 
-  const wingOptions = [{ name: "All" }, ...wings];
+  const focusAreaOptions: { id: number | null; name: string }[] = [
+    { id: null, name: "All" },
+    ...focusAreas.map((fa) => ({ id: fa.id, name: fa.name })),
+  ];
 
   if (viewMode !== "schedule") {
-    return <div style={{ marginBottom: 18 }} />;
+    return null;
   }
 
   return (
@@ -67,7 +89,7 @@ export default function Toolbar({
         alignItems: "center",
         gap: 12,
         flexWrap: "wrap",
-        marginBottom: 18,
+        paddingBottom: 12,
       }}
     >
       {/* ── LEFT ZONE: Contextual controls ── */}
@@ -121,27 +143,17 @@ export default function Toolbar({
         </button>
       </div>
 
-      {/* Span toggle: 1W / 2W / M */}
-      <div className="dg-segment">
-        {([1, 2, "month"] as const).map((n) => (
-          <button
-            key={n}
-            onClick={() => onSpanChange(n)}
-            className={`dg-segment-btn${spanWeeks === n ? " active" : ""}`}
-          >
-            {n === "month" ? "M" : `${n}W`}
-          </button>
-        ))}
-      </div>
+      {/* Span selector */}
+      <CustomSelect value={spanWeeks} options={SPAN_OPTIONS} onChange={onSpanChange} />
 
-      {/* Wing filter */}
-      {wingOptions.length > 1 && (
+      {/* Focus area filter */}
+      {focusAreaOptions.length > 1 && (
         <div className="dg-segment">
-          {wingOptions.map((w) => (
+          {focusAreaOptions.map((w) => (
             <button
-              key={w.name}
-              onClick={() => onWingChange(w.name)}
-              className={`dg-segment-btn${activeWing === w.name ? " active" : ""}`}
+              key={w.id ?? "all"}
+              onClick={() => onFocusAreaChange(w.id)}
+              className={`dg-segment-btn${activeFocusArea === w.id ? " active" : ""}`}
             >
               {w.name}
             </button>
@@ -188,57 +200,68 @@ export default function Toolbar({
       {/* ── RIGHT ZONE: Global actions ── */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
 
-        {/* Download — disabled while editing to prevent printing draft state */}
-        <button
-          onClick={() => window.print()}
-          disabled={isEditMode}
-          className="dg-btn dg-btn-ghost"
-          style={{
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            padding: "7px 12px",
-            opacity: isEditMode ? 0.4 : 1,
-            cursor: isEditMode ? "not-allowed" : "pointer",
-          }}
-          title={isEditMode ? "Exit edit mode to download" : "Print / Download schedule"}
-        >
-          <svg
-            width="13" height="13" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        {/* Edit mode toggle — only for schedulers; hidden for draft-only saved drafts */}
+        {canEditShifts && onToggleEditMode && !hasMixedSchedule && (!hasSavedDraft) && !isEditMode && (
+          <button
+            onClick={onToggleEditMode}
+            className="dg-btn dg-btn-primary"
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Download
-        </button>
+            Edit
+          </button>
+        )}
 
-        {/* Edit mode toggle — only for schedulers */}
-        {canEditSchedule && onToggleEditMode && (
-          isEditMode ? (
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#B45309",
-                background: "#FEF3C7",
-                border: "1px solid #FCD34D",
-                borderRadius: 8,
-                padding: "5px 10px",
-                letterSpacing: "0.02em",
-                userSelect: "none",
-              }}
+        {/* Print — hidden for draft-only schedules and while editing */}
+        {(!hasSavedDraft || hasMixedSchedule) && !isEditMode && (
+          <button
+            onClick={onPrintOpen}
+            disabled={!onPrintOpen}
+            className="dg-btn dg-btn-ghost"
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 10,
+              padding: "7px 12px",
+            }}
+            title="Print / Export schedule"
+          >
+            <svg
+              width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
             >
-              Edit Mode: ON
-            </span>
-          ) : (
-            <button
-              onClick={onToggleEditMode}
-              className="dg-btn dg-btn-primary"
-            >
-              Edit
-            </button>
-          )
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Print
+          </button>
+        )}
+
+        {/* Apply Recurring Schedules — shown in edit mode */}
+        {canEditShifts && isEditMode && onApplyRecurring && (
+          <button
+            onClick={onApplyRecurring}
+            disabled={isApplyingRecurring}
+            className="dg-btn"
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 10,
+              padding: "7px 12px",
+              fontSize: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              opacity: isApplyingRecurring ? 0.6 : 1,
+            }}
+            title="Fill empty slots from employees' recurring schedule templates"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+            </svg>
+            {isApplyingRecurring ? "Filling…" : "Auto Fill Shifts"}
+          </button>
         )}
       </div>
     </div>

@@ -1,22 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
+import { decodeJwt } from "jose";
+import { toast } from "sonner";
 
+import { parseHost } from "@/lib/subdomain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
-  const host = window.location.hostname;
-  if (host === baseDomain) return null;
-  if (host.endsWith(`.${baseDomain}`)) {
-    return host.slice(0, -`.${baseDomain}`.length) || null;
-  }
-  return null;
+  const parsed = parseHost(window.location.host);
+  return parsed.subdomain;
 }
 
 // ── Shared layout wrapper ──────────────────────────────────────────────────────
@@ -109,11 +107,34 @@ function Card({ children }: { children: React.ReactNode }) {
 function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+
+  function showToast(msg: string) {
+    toast.error(msg);
+  }
+
+  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
+  const baseDomain = parsed?.rootDomain ?? "localhost";
   const suffix = `.${baseDomain}`;
 
-  function handleContinue(e: React.FormEvent<HTMLFormElement>) {
+  // Hidden gridmaster entry — 5 taps on logo within 3s
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLogoTap = useCallback(() => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      window.location.href = "/gridmaster/login";
+      return;
+    }
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 3000);
+  }, []);
+
+  async function handleContinue(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const trimmed = slug
       .trim()
@@ -123,22 +144,43 @@ function DomainSelector() {
       setError("Please enter your domain name.");
       return;
     }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(trimmed)}`);
+      const { valid } = await res.json();
+      if (!valid) {
+        showToast("No workspace found for that domain. Please check and try again.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      showToast("Unable to verify domain. Please try again.");
+      setLoading(false);
+      return;
+    }
+
     const { protocol, port } = window.location;
     const portStr = port ? `:${port}` : "";
-    window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login`;
+    window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login?verified=1`;
   }
 
   return (
     <PageShell footerCenteredOnly>
       <Card>
-        {/* Logo */}
+        {/* Logo — hidden gridmaster entry on 5 rapid taps */}
         <div
+          onClick={handleLogoTap}
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: "10px",
             marginBottom: "32px",
+            userSelect: "none",
+            WebkitTapHighlightColor: "transparent",
           }}
         >
           <DubGridLogo size={52} />
@@ -178,7 +220,7 @@ function DomainSelector() {
                 setSlug(e.target.value);
                 setError("");
               }}
-              placeholder="yourcompany"
+              placeholder="yourorg"
               style={{
                 flex: 1,
                 padding: "13px 14px 13px 16px",
@@ -227,19 +269,20 @@ function DomainSelector() {
           >
             <button
               type="submit"
+              disabled={loading}
               style={{
-                background: "#1B3A2D",
+                background: loading ? "#6B7280" : "#1B3A2D",
                 color: "#fff",
                 border: "none",
                 borderRadius: "999px",
                 padding: "12px 28px",
                 fontSize: "15px",
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 whiteSpace: "nowrap",
               }}
             >
-              Continue
+              {loading ? "Checking…" : "Continue"}
             </button>
             <button
               type="button"
@@ -308,7 +351,7 @@ function DomainSelector() {
               }}
             >
               Your subdomain is the first part of your workspace URL (e.g.{" "}
-              <strong>yourcompany</strong>.{baseDomain}). If you don&apos;t know
+              <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know
               it, contact your organization administrator.
             </p>
             <button
@@ -331,19 +374,245 @@ function DomainSelector() {
           </div>
         </div>
       )}
+
     </PageShell>
   );
 }
 
-// ── Step 2: Email + password (org subdomain) ───────────────────────────────────
+// ── Gridmaster login (gridmaster subdomain) ─────────────────────────────────
+
+function GridmasterLogin() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+
+      window.location.replace("/gridmaster");
+
+      setTimeout(() => {
+        setLoading(false);
+        setMessage("Navigation timed out. Please try refreshing the page.");
+      }, 8000);
+    } catch (err: any) {
+      setMessage(err.message || "An error occurred");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0F172A",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        padding: "24px 16px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "400px",
+          padding: "40px 36px 36px",
+          background: "#1E293B",
+          borderRadius: "14px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+          border: "1px solid #334155",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "28px",
+          }}
+        >
+          <DubGridLogo size={48} color="#F8FAFC" />
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color:"#475569",
+            }}
+          >
+            Gridmaster Portal
+          </span>
+        </div>
+
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 700,
+            color: "#F8FAFC",
+            textAlign: "center",
+            marginBottom: "24px",
+          }}
+        >
+          Platform Admin Sign In
+        </h1>
+
+        {message && (
+          <div
+            style={{
+              padding: "12px",
+              background: "#7F1D1D",
+              color: "#FECACA",
+              borderRadius: "8px",
+              fontSize: "14px",
+              marginBottom: "16px",
+              border: "1px solid #991B1B",
+            }}
+          >
+            {message}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color:"#64748B",
+              }}
+            >
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "11px 13px",
+                border: "1px solid #334155",
+                borderRadius: "8px",
+                fontSize: "15px",
+                background: "#0F172A",
+                color: "#F8FAFC",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color:"#64748B",
+              }}
+            >
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "11px 13px",
+                border: "1px solid #334155",
+                borderRadius: "8px",
+                fontSize: "15px",
+                background: "#0F172A",
+                color: "#F8FAFC",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              marginTop: "4px",
+              width: "100%",
+              padding: "13px",
+              background: loading ? "#475569" : "#2563EB",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "15px",
+              fontWeight: 600,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            {loading ? "Authenticating…" : "Access Portal"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 2: Email + password (organization subdomain) ───────────────────────────
 
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+
+  // Validate subdomain in the background — never block form render.
+  // DomainSelector already validates before redirecting here (?verified=1),
+  // and the post-login JWT check catches org mismatches regardless.
+  const alreadyVerified = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("verified") === "1";
+
+  useEffect(() => {
+    if (alreadyVerified) return;
+    let cancelled = false;
+    async function validate() {
+      try {
+        const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`);
+        const { valid } = await res.json();
+        if (!cancelled && !valid) {
+          const parsed = parseHost(window.location.host);
+          const { protocol } = window.location;
+          const portStr = parsed.port || "";
+          window.location.replace(`${protocol}//${parsed.rootDomain}${portStr}/login`);
+        }
+      } catch {
+        // Network error — allow login attempt; JWT check catches mismatches
+      }
+    }
+    validate();
+    return () => { cancelled = true; };
+  }, [orgSlug, alreadyVerified]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -352,33 +621,82 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setIsError(false);
 
     try {
-      if (!isSignUp) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
 
-        // Navigate immediately — don't wait for AuthProvider's async chain.
-        // org membership is enforced server-side (middleware + RLS) and by
-        // ProtectedRoute on the /schedule page.
-        window.location.replace("/schedule");
+      // Verify the user belongs to this organization's workspace
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const claims = decodeJwt(session.access_token);
+        const isGridmaster = claims.platform_role === "gridmaster";
 
-        // Safety net: if navigation hasn't happened within 8s (e.g. redirect
-        // loop or network issue), reset the button so the user isn't stuck.
-        setTimeout(() => {
-          setLoading(false);
-          setMessage("Navigation timed out. Please try refreshing the page.");
-          setIsError(true);
-        }, 8000);
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setMessage(
-          "Account created! You can now sign in. An administrator must assign you to this organization before you can access the schedule.",
-        );
-        setLoading(false);
+        if (!isGridmaster) {
+          // Try JWT claim first, fall back to DB lookup if hook isn't configured
+          let userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+
+          if (!userSlug) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("org_id, organizations(slug)")
+              .eq("id", session.user.id)
+              .maybeSingle();
+            userSlug = (profile?.organizations as { slug: string } | null)?.slug ?? null;
+          }
+
+          if (userSlug !== orgSlug) {
+            // Check if the user is a member of the requested orgSlug
+            const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
+            
+            if (rpcError || !orgs) {
+              await supabase.auth.signOut();
+              setMessage("Unable to verify workspace access.");
+              setIsError(true);
+              setLoading(false);
+              return;
+            }
+
+            const targetOrg = orgs.find((o: any) => o.org_slug === orgSlug);
+
+            if (targetOrg) {
+              // User is a member, switch active organization
+              const { error: switchError } = await supabase.rpc("switch_org", { 
+                target_org_id: targetOrg.org_id 
+              });
+
+              if (switchError) {
+                await supabase.auth.signOut();
+                setMessage("Failed to switch workspace context.");
+                setIsError(true);
+                setLoading(false);
+                return;
+              }
+
+              // Refresh the session so JWT claims (org_slug, org_id) are updated
+              await supabase.auth.refreshSession();
+            } else {
+              // Not a member of the requested org
+              await supabase.auth.signOut();
+              setMessage("Your account is not associated with this workspace.");
+              setIsError(true);
+              setLoading(false);
+              return;
+            }
+          }
+        }
       }
+
+      // Navigate immediately — don't wait for AuthProvider's async chain.
+      window.location.replace("/schedule");
+
+      // Safety net: if navigation hasn't happened within 8s
+      setTimeout(() => {
+        setLoading(false);
+        setMessage("Navigation timed out. Please try refreshing the page.");
+        setIsError(true);
+      }, 8000);
     } catch (err: any) {
       setMessage(err.message || "An error occurred");
       setIsError(true);
@@ -386,7 +704,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
   }
 
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
+  const baseDomain = parsed?.rootDomain ?? "localhost";
 
   return (
     <PageShell>
@@ -405,7 +724,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           <DubGridWordmark />
         </div>
 
-        {/* Org badge */}
+        {/* Organization badge */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <span
             style={{
@@ -433,7 +752,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             marginBottom: "24px",
           }}
         >
-          {isSignUp ? "Create an account" : "Sign in to your workspace"}
+          Sign in to your workspace
         </h1>
 
         {message && (
@@ -528,7 +847,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <input
               type="password"
               required
-              autoComplete={isSignUp ? "new-password" : "current-password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
@@ -559,7 +878,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            {loading ? "Please wait…" : isSignUp ? "Create Account" : "Sign In"}
+            {loading ? "Please wait…" : "Sign In"}
           </button>
         </form>
 
@@ -572,33 +891,14 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             gap: "12px",
           }}
         >
-          <div style={{ fontSize: "14px", color: "#6B7280" }}>
-            {isSignUp ? "Already have an account? " : "Need an account? "}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setMessage("");
-                setIsError(false);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#1B3A2D",
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              {isSignUp ? "Sign in" : "Sign up"}
-            </button>
-          </div>
           <button
             type="button"
             onClick={() => {
               const { protocol, port } = window.location;
               const portStr = port ? `:${port}` : "";
-              window.location.href = `${protocol}//${baseDomain}${portStr}/login`;
+              const target = `${protocol}//${baseDomain}${portStr}/login`;
+              console.log("[Login] Redirecting to apex:", target);
+              window.location.href = target;
             }}
             style={{
               background: "none",
@@ -625,7 +925,9 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setOrgSlug(getOrgSlug());
+    const slug = getOrgSlug();
+    console.log("[Login] Detected org slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
+    setOrgSlug(slug);
     setMounted(true);
   }, []);
 
@@ -634,7 +936,13 @@ export default function LoginPage() {
 
   return (
     <PublicRoute>
-      {orgSlug ? <OrgLogin orgSlug={orgSlug} /> : <DomainSelector />}
+      {orgSlug === "gridmaster" ? (
+        <GridmasterLogin />
+      ) : orgSlug ? (
+        <OrgLogin orgSlug={orgSlug} />
+      ) : (
+        <DomainSelector />
+      )}
     </PublicRoute>
   );
 }

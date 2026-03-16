@@ -3,17 +3,30 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
-import { Employee, Wing } from "@/types";
-const DESIGNATIONS = ["JLCSN", "CSN III", "CSN II", "STAFF", "—"] as const;
-const ROLES = [
-  "DCSN", "DVCSN", "Supv", "Mentor", "CN", "SC. Mgr.", "Activity Coordinator", "SC/Asst/Act/Cor",
-] as const;
+import { Employee, FocusArea, NamedItem } from "@/types";
+const DESIGNATIONS: NamedItem[] = [
+  { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
+  { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
+  { id: 3, orgId: "org-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
+  { id: 4, orgId: "org-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
+  { id: 5, orgId: "org-1", name: "—", abbr: "—", sortOrder: 4 },
+];
+const ROLES: NamedItem[] = [
+  { id: 1, orgId: "org-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },
+  { id: 2, orgId: "org-1", name: "DVCSN", abbr: "DVCSN", sortOrder: 1 },
+  { id: 3, orgId: "org-1", name: "Supv", abbr: "Supv", sortOrder: 2 },
+  { id: 4, orgId: "org-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
+  { id: 5, orgId: "org-1", name: "CN", abbr: "CN", sortOrder: 4 },
+  { id: 6, orgId: "org-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
+  { id: 7, orgId: "org-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
+  { id: 8, orgId: "org-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
+];
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const wings: Wing[] = [
+const focusAreas: FocusArea[] = [
   {
     id: 1,
     orgId: "org-1",
@@ -35,11 +48,13 @@ const wings: Wing[] = [
 const employee: Employee = {
   id: "emp-42",
   name: "Alice Smith",
-  designation: "STAFF",
-  roles: [],
-  fteWeight: 1.0,
+  status: "active",
+  statusChangedAt: null,
+  statusNote: "",
+  certificationId: 4,
+  roleIds: [],
   seniority: 3,
-  wings: ["North"],
+  focusAreaIds: [1],
   phone: "555-1234",
   email: "alice@example.com",
   contactNotes: "",
@@ -59,20 +74,24 @@ function renderPanel(
   const onSave = overrides.onSave ?? vi.fn();
   const onDelete = overrides.onDelete ?? vi.fn();
   const onCancel = overrides.onCancel ?? vi.fn();
+  const onBench = vi.fn();
+  const onActivate = vi.fn();
 
   render(
     <EditEmployeePanel
       employee={employee}
-      wings={wings}
-      skillLevels={[...DESIGNATIONS]}
+      focusAreas={focusAreas}
+      certifications={[...DESIGNATIONS]}
       roles={[...ROLES]}
       onSave={onSave}
       onDelete={onDelete}
+      onBench={onBench}
+      onActivate={onActivate}
       onCancel={onCancel}
     />,
   );
 
-  return { onSave, onDelete, onCancel };
+  return { onSave, onDelete, onBench, onActivate, onCancel };
 }
 
 // ---------------------------------------------------------------------------
@@ -88,12 +107,6 @@ describe("EditEmployeePanel", () => {
       renderPanel();
       const nameInput = screen.getByDisplayValue("Alice Smith");
       expect(nameInput).toBeInTheDocument();
-    });
-
-    it("FTE input is pre-populated with employee.fteWeight", () => {
-      renderPanel();
-      const fteInput = screen.getByDisplayValue("1");
-      expect(fteInput).toBeInTheDocument();
     });
 
     it("phone input is pre-populated with employee.phone", () => {
@@ -134,8 +147,9 @@ describe("EditEmployeePanel", () => {
     it("Save Changes becomes enabled after changing the designation", async () => {
       const user = userEvent.setup();
       renderPanel();
-      const select = screen.getByRole("combobox");
-      await user.selectOptions(select, "CSN II");
+      // Certification is a CustomSelect — open dropdown and pick a different option
+      await user.click(screen.getByRole("button", { name: /STAFF/ }));
+      await user.click(screen.getByRole("button", { name: "CSN II" }));
       expect(
         screen.getByRole("button", { name: "Save Changes" }),
       ).not.toBeDisabled();
@@ -145,8 +159,8 @@ describe("EditEmployeePanel", () => {
       const user = userEvent.setup();
       renderPanel();
       // First modify designation so isModified would be true
-      const select = screen.getByRole("combobox");
-      await user.selectOptions(select, "CSN II");
+      await user.click(screen.getByRole("button", { name: /STAFF/ }));
+      await user.click(screen.getByRole("button", { name: "CSN II" }));
       // Then clear the name
       const nameInput = screen.getByDisplayValue("Alice Smith");
       await user.clear(nameInput);
@@ -155,14 +169,14 @@ describe("EditEmployeePanel", () => {
       ).toBeDisabled();
     });
 
-    it("Save Changes is disabled when all wings are deselected", async () => {
+    it("Save Changes is disabled when all focus areas are deselected", async () => {
       const user = userEvent.setup();
       renderPanel();
       // Modify name so isModified is true
       const nameInput = screen.getByDisplayValue("Alice Smith");
       await user.clear(nameInput);
       await user.type(nameInput, "Bob Jones");
-      // Deselect the only assigned wing (North)
+      // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(
         screen.getByRole("button", { name: "Save Changes" }),
@@ -190,9 +204,8 @@ describe("EditEmployeePanel", () => {
         expect.objectContaining({
           id: "emp-42",
           name: "Bob Jones",
-          designation: "STAFF",
-          wings: ["North"],
-          fteWeight: 1.0,
+          certificationId: 4,
+          focusAreaIds: [1],
           phone: "555-1234",
           email: "alice@example.com",
         }),
@@ -204,11 +217,11 @@ describe("EditEmployeePanel", () => {
   // Cancel
   // -------------------------------------------------------------------------
   describe("Cancel", () => {
-    it("clicking Cancel calls onCancel", async () => {
+    it("clicking Discard Changes calls onCancel", async () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
       renderPanel({ onCancel });
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Discard Changes" }));
       expect(onCancel).toHaveBeenCalledOnce();
     });
   });
@@ -216,22 +229,22 @@ describe("EditEmployeePanel", () => {
   // -------------------------------------------------------------------------
   // Delete flow
   // -------------------------------------------------------------------------
-  describe("Delete flow", () => {
-    it("clicking Delete Employee shows confirmation text with employee name and 'This cannot be undone.'", async () => {
+  describe("Terminate flow", () => {
+    it("clicking Terminate shows confirmation text with employee name", async () => {
       const user = userEvent.setup();
       renderPanel();
-      await user.click(screen.getByRole("button", { name: "Delete Employee" }));
+      await user.click(screen.getByRole("button", { name: "Terminate" }));
       expect(
-        screen.getByText(/Delete Alice Smith\? This cannot be undone\./),
+        screen.getByText(/Terminate Alice Smith\?/),
       ).toBeInTheDocument();
     });
 
-    it("clicking Delete in confirmation calls onDelete with employee.id", async () => {
+    it("clicking Confirm Termination in confirmation calls onDelete with employee.id", async () => {
       const user = userEvent.setup();
       const onDelete = vi.fn();
       renderPanel({ onDelete });
-      await user.click(screen.getByRole("button", { name: "Delete Employee" }));
-      await user.click(screen.getByRole("button", { name: "Delete" }));
+      await user.click(screen.getByRole("button", { name: "Terminate" }));
+      await user.click(screen.getByRole("button", { name: "Confirm Termination" }));
       expect(onDelete).toHaveBeenCalledOnce();
       expect(onDelete).toHaveBeenCalledWith("emp-42");
     });
@@ -240,13 +253,13 @@ describe("EditEmployeePanel", () => {
       const user = userEvent.setup();
       const onDelete = vi.fn();
       renderPanel({ onDelete });
-      await user.click(screen.getByRole("button", { name: "Delete Employee" }));
+      await user.click(screen.getByRole("button", { name: "Terminate" }));
       // Cancel in the confirmation UI
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(onDelete).not.toHaveBeenCalled();
       // Normal view should be restored
       expect(
-        screen.getByRole("button", { name: "Delete Employee" }),
+        screen.getByRole("button", { name: "Terminate" }),
       ).toBeInTheDocument();
     });
   });
@@ -258,19 +271,16 @@ describe("EditEmployeePanel", () => {
     // Feature: ui-ux-test-suite, Property 7: isModified correctness
     it("isModified is false when unmodified and true after mutating a field", () => {
       // Arbitrary Employee generator
-      const arbWingName = fc.string({ minLength: 1, maxLength: 20 });
       const arbEmployee = fc.record({
         id: fc.uuid(),
         name: fc.string({ minLength: 1, maxLength: 40 }),
-        designation: fc.constantFrom(...DESIGNATIONS),
-        roles: fc.array(fc.constantFrom(...ROLES)),
-        fteWeight: fc.float({
-          min: Math.fround(0.1),
-          max: Math.fround(1.0),
-          noNaN: true,
-        }),
+        status: fc.constant("active" as const),
+        statusChangedAt: fc.constant(null as string | null),
+        statusNote: fc.constant(""),
+        certificationId: fc.oneof(fc.constant(null as number | null), fc.constantFrom(...DESIGNATIONS.map((d) => d.id))),
+        roleIds: fc.array(fc.constantFrom(...ROLES.map((r) => r.id))),
         seniority: fc.integer({ min: 1, max: 999 }),
-        wings: fc.array(arbWingName, { minLength: 1, maxLength: 5 }),
+        focusAreaIds: fc.array(fc.integer({ min: 1, max: 5 }), { minLength: 1, maxLength: 5 }).map(ids => [...new Set(ids)]),
         phone: fc.string({ maxLength: 20 }),
         email: fc.string({ maxLength: 30 }),
         contactNotes: fc.string({ maxLength: 50 }),
@@ -278,11 +288,11 @@ describe("EditEmployeePanel", () => {
 
       fc.assert(
         fc.property(arbEmployee, (emp) => {
-          // Build Wing objects from the employee's wings list
-          const empWings: Wing[] = emp.wings.map((name, i) => ({
-            id: i + 1,
+          // Build FocusArea objects from the employee's focusAreaIds list
+          const empFocusAreas: FocusArea[] = emp.focusAreaIds.map((id, i) => ({
+            id,
             orgId: "org-1",
-            name,
+            name: `Area ${id}`,
             colorBg: "#EFF6FF",
             colorText: "#1D4ED8",
             sortOrder: i + 1,
@@ -291,11 +301,13 @@ describe("EditEmployeePanel", () => {
           const { unmount, container } = render(
             <EditEmployeePanel
               employee={emp}
-              wings={empWings}
-              skillLevels={[...DESIGNATIONS]}
+              focusAreas={empFocusAreas}
+              certifications={[...DESIGNATIONS]}
               roles={[...ROLES]}
               onSave={vi.fn()}
               onDelete={vi.fn()}
+              onBench={vi.fn()}
+              onActivate={vi.fn()}
               onCancel={vi.fn()}
             />,
           );

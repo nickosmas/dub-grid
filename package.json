@@ -9,12 +9,16 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "seed": "npx tsx --env-file=.env.local seed.ts",
+    "use:local": "cp .env.local.bak .env.local && echo '✅ Switched to LOCAL Supabase (restart dev server)'",
+    "use:remote": "cp .env.local .env.local.bak && cp .env.remote .env.local && echo '✅ Switched to REMOTE Supabase (restart dev server)'"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tanstack/react-query": "^5.90.21",
+    "@vercel/analytics": "^1.6.1",
     "jose": "^6.2.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
@@ -26,11 +30,14 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@snaplet/copycat": "^6.0.0",
+    "@snaplet/seed": "^0.98.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.19.36",
+    "@types/pg": "^8.18.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",

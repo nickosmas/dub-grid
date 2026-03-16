@@ -27,7 +27,7 @@ const FEATURES = [
   {
     icon: "🏥",
     title: "Built for Care Facilities",
-    desc: "Wings, skill levels, shift types — DubGrid understands your world out of the box.",
+    desc: "Focus areas, certifications, shift types — DubGrid understands your world out of the box.",
   },
   {
     icon: "📊",
@@ -51,8 +51,8 @@ const PAIN_POINTS = [
     after: "Shift types with built-in color coding",
   },
   {
-    before: '"Who\'s covering Wing B tonight?"',
-    after: "Filtered views by wing, role & date",
+    before: '"Who\'s covering Focus Area B tonight?"',
+    after: "Filtered views by focus area, role & date",
   },
   {
     before: "Version confusion across copies",
@@ -104,7 +104,8 @@ export default function RootPage() {
               return;
             }
           }
-          router.replace("/schedule");
+          // Use full page navigation so the middleware sees refreshed cookies
+          window.location.replace("/schedule");
         } else {
           setReady(true);
         }
@@ -117,8 +118,22 @@ export default function RootPage() {
 
   if (!ready) {
     return (
-      <div className="loading-screen">
-        <div className="spinner" />
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#F8FAFC",
+      }}>
+        <div style={{
+          width: 32,
+          height: 32,
+          border: "3px solid #E2E8F0",
+          borderTopColor: "#1B3A2D",
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -232,8 +247,8 @@ export default function RootPage() {
       <footer className="footer">
         <div className="nav-inner footer-inner">
           <div className="nav-brand" style={{ opacity: 0.6 }}>
-            <DubGridLogo size={24} color="#64748B" />
-            <DubGridWordmark fontSize={16} color="#64748B" />
+            <DubGridLogo size={24} color="#475569" />
+            <DubGridWordmark fontSize={16} color="#475569" />
           </div>
           <span className="footer-copy">
             © {new Date().getFullYear()} DubGrid. All rights reserved.

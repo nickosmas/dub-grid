@@ -2,14 +2,14 @@
 
 ## Multi-Tenant Employee Scheduling Platform
 
-### Product Requirements Document · v1.0
+### Product Requirements Document · v2.0
 
 ---
 
 |                     |                                                                     |
 | ------------------- | ------------------------------------------------------------------- |
-| **Document Status** | Draft — For Development Handoff                                     |
-| **Version**         | 1.0                                                                 |
+| **Document Status** | Living Document — Reflects Current Implementation                   |
+| **Version**         | 2.0                                                                 |
 | **Prepared For**    | Development Team                                                    |
 | **Date**            | March 2026                                                          |
 | **Scope**           | DubGrid — multi-tenant staff scheduling web app for care facilities |
@@ -20,15 +20,32 @@
 
 Care facilities typically manage employee scheduling across multiple wings or departments, often using manually maintained spreadsheets — horizontal grids covering dozens of employees across multiple shift types and sections.
 
-This document defines the requirements for DubGrid, a multi-tenant scheduling platform that replaces spreadsheet-based scheduling. Each tenant (organization) can configure its own wings/sections, shift codes, staff roster, and scheduling conventions. The application delivers a modern, polished user experience that feels like a real application rather than a spreadsheet.
+DubGrid is a multi-tenant scheduling platform that replaces spreadsheet-based scheduling. Each tenant (organization) can configure its own focus areas (wings/sections), shift codes, staff roster, and scheduling conventions. The application delivers a modern, polished user experience with real-time collaboration, draft/publish workflows, and a comprehensive role-based access control system.
 
 The system is self-contained with no third-party integrations required.
 
 ---
 
-## 2. Background & Current State
+## 2. Technology Stack
 
-### 2.1 Problem Statement
+| Layer         | Technology                                       |
+| ------------- | ------------------------------------------------ |
+| Framework     | Next.js 16, React 19, TypeScript                 |
+| Styling       | Tailwind CSS v4                                  |
+| Database      | Supabase (PostgreSQL + Auth + Realtime + RLS)    |
+| Auth          | Supabase Auth with custom JWT claims             |
+| SSR           | @supabase/ssr v0.9 for cookie-based SSR sessions |
+| State/Cache   | TanStack React Query v5                          |
+| JWT           | jose v6 for JWT verification in middleware        |
+| Notifications | Sonner v2 (toast notifications)                  |
+| Testing       | Vitest + Testing Library (unit), Playwright (E2E)|
+| Deployment    | Vercel                                           |
+
+---
+
+## 3. Background & Current State
+
+### 3.1 Problem Statement
 
 Many care facilities manage employee scheduling through manually maintained spreadsheets. These typically follow a common structure:
 
@@ -39,72 +56,78 @@ Many care facilities manage employee scheduling through manually maintained spre
 - Some staff members appear in multiple sections due to cross-department assignments
 - A printed version includes the print date, date range, and a legend
 
-### 2.2 Multi-Tenant Architecture
+### 3.2 Multi-Tenant Architecture
 
-DubGrid supports multiple organizations, each with their own configurable structure:
+DubGrid supports multiple organizations via subdomain-based routing, each with their own configurable structure:
 
-- **Organizations** — Each tenant is an independent organization with its own data, staff, and settings
-- **Wings/Sections** — Each organization defines its own set of schedule sections (e.g., nursing wings, departments, shift groups)
-- **Shift Codes** — A default set of shift codes is provided; organizations can customize labels and add custom codes
-- **Staff Roster** — Each organization maintains its own employee roster with designations, roles, and wing assignments
+- **Organizations** — Each tenant is an independent organization with its own data, staff, settings, and subdomain (e.g., `acme.dubgrid.com`)
+- **Focus Areas** — Each organization defines its own schedule sections (e.g., nursing wings, departments, shift groups). The label "Focus Areas" is customizable per org.
+- **Shift Codes** — A default set of shift codes is provided; organizations can customize labels, colors, and add custom codes
+- **Shift Categories** — Tally buckets with optional time windows for grouping shift counts
+- **Staff Roster** — Each organization maintains its own employee roster with designations, certifications, roles, and focus area assignments
+- **Certifications** — Customizable skill levels per organization (label is configurable)
+- **Organization Roles** — Custom display roles per organization (label is configurable)
 
-### 2.3 Default Schedule Sections (Configurable per Organization)
+### 3.3 Customizable Terminology
 
-Organizations commonly structure their schedules into sections such as:
+Organizations can customize the following labels in their settings:
 
-| Section Example      | Shift Types              | Notes                                                                           |
-| -------------------- | ------------------------ | ------------------------------------------------------------------------------- |
-| Primary Nursing Wing | Day, Evening             | Main section; largest staff count; includes supervisors, mentors, charge nurses |
-| Night Shift          | Night                    | Dedicated overnight team                                                        |
-| Visiting Nurses      | VN (Visiting Nurse)      | Staff assigned visiting nurse duties; may overlap with other sections           |
-| Secondary Wing       | Day (SCD), Evening (SCE) | Cross-wing section; staff may appear here and in primary wing                   |
-
-### 2.4 Key Scheduling Conventions
-
-- Staff may appear in multiple sections in the same week (cross-wing)
-- Orientation/shadow shifts are denoted with parentheses around the code, e.g. `(D)` — they do not count toward staffing totals
-- Supervisors take specific shift codes (Ds/Es/Ns) distinct from general staff (D/E/N)
-- Charge Nurse shifts are coded as `Dcn` or `Ecn`
-- Part-time staff carry a fractional FTE weight (e.g., 0.3) displayed inline with their name
-- Count rows at the bottom of each section auto-tally Day, Evening, and Night coverage per date
-
----
-
-## 3. Product Goals
-
-### 3.1 Primary Goals
-
-- Replace spreadsheet-based scheduling with DubGrid, a polished multi-tenant web application
-- Support configurable scheduling logic, shift code vocabulary, and layout conventions per organization
-- Make schedule creation and editing significantly faster than manual spreadsheet editing
-- Support clean printed output matching common scheduling print formats
-- Operate with zero third-party dependencies or integrations
-
-### 3.2 Non-Goals (Out of Scope)
-
-- No payroll processing or time-clock integration
-- No BambooHR or any HR system integration
-- No mobile native app (web app responsive design is acceptable)
-- No automated shift-filling or AI-based scheduling suggestions
-- No employee-facing shift swapping or request workflows
-- No real-time multi-user conflict resolution
+| Default Term   | DB Field                              | Purpose                            |
+| -------------- | ------------------------------------- | ---------------------------------- |
+| Focus Areas    | `organizations.focus_area_label`      | Schedule sections / wings          |
+| Certifications | `organizations.certification_label`   | Staff skill levels                 |
+| Roles          | `organizations.role_label`            | Staff display roles                |
 
 ---
 
 ## 4. Users & Roles
 
-| Role              | Who                         | Capabilities                                                                              |
-| ----------------- | --------------------------- | ----------------------------------------------------------------------------------------- |
-| Super Admin       | Platform owner / IT         | Full access to all organizations, settings, user management, and all schedule sections    |
-| Admin / Scheduler | Org operations manager      | Full access: create/edit/delete schedules, manage staff roster, print, configure settings |
-| Supervisor        | Wing/department supervisors | View all schedules; limited edit access for their wing; cannot manage staff roster        |
-| Staff (Read-Only) | Employees                   | View their own schedule and their section's current and upcoming schedule; no edit access |
+### 4.1 Role Hierarchy
+
+DubGrid implements a four-tier RBAC system with JWT-based claims enforced at both the edge middleware and database (RLS) levels.
+
+| Tier | Role         | Scope    | Who                      | Capabilities                                                                                |
+| ---- | ------------ | -------- | ------------------------ | ------------------------------------------------------------------------------------------- |
+| 4    | Gridmaster   | Platform | Platform owner           | Global god mode — all orgs, all data, impersonation, user management, audit logs            |
+| 3    | Super Admin  | Org      | Org owner                | Full org access — all settings, user management, permission configuration, schedule publish  |
+| 2    | Admin        | Org      | Org operations staff     | Configurable permissions — granular access set per-user by super admin                      |
+| 0    | User         | Org      | Staff / read-only users  | View schedule and staff only (canViewSchedule + canViewStaff always true)                   |
+
+### 4.2 Admin Permissions (Granular, per-user)
+
+Admins receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. All default to `false` except canViewSchedule and canViewStaff (always true for all roles).
+
+| Category   | Permission                     | Delegatable | Description                              |
+| ---------- | ------------------------------ | ----------- | ---------------------------------------- |
+| Schedule   | `canEditShifts`                | Yes         | Create, edit, delete shift entries        |
+| Schedule   | `canPublishSchedule`           | Yes         | Publish draft changes                     |
+| Schedule   | `canApplyRecurringSchedule`    | Yes         | Apply recurring shift templates           |
+| Notes      | `canEditNotes`                 | Yes         | Manage schedule notes/indicators          |
+| Recurring  | `canManageRecurringShifts`     | Yes         | Configure recurring shift templates       |
+| Recurring  | `canManageShiftSeries`         | Yes         | Manage repeating shift series             |
+| Staff      | `canViewStaff`                 | Always on   | View staff roster (always true)           |
+| Staff      | `canManageEmployees`           | Yes         | Add, edit, bench, terminate employees     |
+| Config     | `canManageFocusAreas`          | Yes         | Manage focus areas / wings                |
+| Config     | `canManageShiftCodes`          | Yes         | Manage shift code definitions             |
+| Config     | `canManageIndicatorTypes`      | Yes         | Manage note/indicator type definitions    |
+| Config     | `canManageOrgLabels`           | Yes         | Edit custom terminology labels (focus areas, certifications, roles) |
+| Config     | `canManageOrgSettings`         | No          | Edit org name, address, phone, employee count, timezone (super_admin only) |
+
+**Super Admin-only (never delegatable to admins):** `canManageUsers`, `canConfigureAdminPermissions`, `canManageOrgSettings`
+
+### 4.3 Authentication Flow
+
+- Email/password authentication via Supabase Auth
+- Custom JWT access token hook writes claims at top level of JWT payload: `platform_role`, `org_role`, `org_id`, `org_slug`
+- Edge middleware verifies JWT, calculates effective role, and enforces route-level access
+- Subdomain routing ensures users stay within their org context
+- Invitation-only registration with 72-hour expiry tokens
 
 ---
 
 ## 5. Shift Code Reference
 
-All codes below are provided as defaults and must be supported as valid cell values in DubGrid. Organizations can customize labels and add custom codes.
+All codes below are provided as defaults and must be supported as valid cell values in DubGrid. Organizations can customize labels, colors, and add custom codes via Settings.
 
 | Code                  | Name                   | Description                                                             |
 | --------------------- | ---------------------- | ----------------------------------------------------------------------- |
@@ -125,22 +148,17 @@ All codes below are provided as defaults and must be supported as valid cell val
 | `0.3`                 | Part-Time Fraction     | Denotes part-time staffing weight (e.g., 0.3 FTE)                       |
 | `E/Ns`                | Split / Transition     | Shift spanning two shift types (e.g., Eve moving into Night Supervisor) |
 
-**Codes that count toward staffing totals:**
-
-- **COUNT DAY:** `D`, `Ds`, `Dcn`, `SCD` — `(D)` excluded
-- **COUNT EVE:** `E`, `Es`, `Ecn`, `SCE` — `(E)` excluded
-- **COUNT NIGHT:** `N`, `Ns` — `(N)` excluded
-- Orientation codes `(D)`, `(E)`, `(N)` are visually distinct and never counted
+**Shift codes support:** custom colors (background, text, border), default start/end times, certification requirements, off-day designation, and assignment to shift categories for tally grouping.
 
 ---
 
 ## 6. Staff Designations & Roles
 
-Each staff member carries one primary designation code and may carry one or more role tags.
+Each staff member carries one primary designation code and may carry one or more role tags. Organizations define their own certifications and roles via Settings.
 
 | Code                   | Title                  | Notes                                                            |
 | ---------------------- | ---------------------- | ---------------------------------------------------------------- |
-| `JLCSN`                | Job Level CSN          | Core certification level; most staff carry this designation      |
+| `JLCSN`                | Journal Listed CSN          | Core certification level; most staff carry this designation      |
 | `DCSN`                 | Director CSN           | Director-level CSN; senior clinical oversight                    |
 | `DVCSN`                | Director VCSN          | Director of Visiting CS Nursing                                  |
 | `CSN III`              | CSN Level III          | Mid-tier CSN designation                                         |
@@ -155,157 +173,299 @@ Each staff member carries one primary designation code and may carry one or more
 
 ---
 
-## 7. Functional Requirements
+## 7. Functional Requirements & Implementation Status
 
 Priority levels: **Must** = required for launch, **Should** = high priority, **Could** = nice-to-have.
 
-| ID    | Feature             | Priority | Description                                                                                                                                                                 |
-| ----- | ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| FR-01 | Schedule Grid       | Must     | Display a horizontal two-week grid (Sun–Sat × 2) as the default view, with a toggle to collapse to a single-week view.                                                      |
-| FR-02 | Schedule Sections   | Must     | Support configurable schedule sections rendered as separate, labeled blocks within each organization.                                                                       |
-| FR-03 | Shift Code Entry    | Must     | Allow entry of all defined shift codes per cell: D, E, N, X, Ds, Es, Ns, Dcn, Ecn, SCD, SCE, VN, V, Ofc, T, A, (D), (E), (N), 0.3, E/Ns. Organizations can extend this set. |
-| FR-04 | Cross-Wing Staff    | Must     | Staff who appear in multiple wings must be visually linked. A "Ghost Shift" indicator should show cross-wing assignments on a single row.                                   |
-| FR-05 | Shift Count Row     | Must     | Each section must auto-calculate and display COUNT rows: Count Day, Count Eve, and/or Count Night as applicable per section.                                                |
-| FR-06 | Seniority Sorting   | Must     | Staff rows must be sortable by seniority (hire date / seniority rank), defaulting to most senior at top.                                                                    |
-| FR-07 | Staff Designations  | Must     | Each staff record must store and display designation codes (JLCSN, DCSN, CSN III, etc.) and role tags (Supv, Mentor, CN, SC. Mgr., etc.).                                   |
-| FR-08 | Skills / Role Tags  | Must     | Support tagging staff with role qualifiers: Mentor, Supervisor, Charge Nurse, Activity Coordinator, Visiting CS Nurse, Part-time (with FTE weight).                         |
-| FR-09 | Orientation Mode    | Must     | Cells marked as orientation/shadowing (parenthetical codes like `(D)`) must render distinctly and not count toward staffing counts.                                         |
-| FR-10 | Part-Time Weight    | Must     | Part-time staff (e.g., 0.3 FTE) must display their FTE fraction and be configurable per employee.                                                                           |
-| FR-11 | Print Layout        | Must     | Provide a print-optimized view matching the original two-week horizontal format, including all sections, shift counts, and a legend. Must support landscape printing.       |
-| FR-12 | Schedule Legend     | Must     | A legend mapping all shift codes and visual indicators must be visible on-screen and included in the print layout.                                                          |
-| FR-13 | Staff Management    | Must     | Admin can add, edit, and deactivate staff. Fields: full name, designation, role tags, skills, FTE, wing assignment, seniority rank, hire date.                              |
-| FR-14 | Date Navigation     | Must     | Users can navigate backward and forward by the current view span (1 or 2 weeks). A "Today" button returns to the current period.                                            |
-| FR-15 | Wing Filter         | Must     | Users can filter the schedule view by wing/section: All, or any individual section configured for the organization.                                                         |
-| FR-16 | Print Date Header   | Must     | Printed schedules must include the printed date and the schedule date range in the header (e.g., `printed: 1/26                                                             | Feb 22 – Mar 7`). |
-| FR-17 | No Integrations     | Must     | The system must operate fully standalone with no third-party integrations, APIs, or external data dependencies.                                                             |
-| FR-18 | Staff Schedule View | Should   | Staff members can view their own schedule for the current and upcoming period in a read-only view (to be enforced via RBAC in a future phase).                              |
-| FR-19 | Shift Notes         | Could    | Allow a freeform note per cell (e.g., "covers SN if SC short") that displays as a tooltip or inline annotation.                                                             |
+Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implemented
+
+### 7.1 Schedule Management
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-01 | Schedule Grid           | Must     | ✅     | 1-week, 2-week, and month view. Staff rows × date columns with shift code cells. Toggle between views via toolbar.     |
+| FR-02 | Focus Area Sections     | Must     | ✅     | Configurable sections with color-coded headers. Filter by focus area in toolbar. Each org defines its own sections.     |
+| FR-03 | Shift Code Entry        | Must     | ✅     | Click cell to open shift edit panel. Select from org's configured shift codes. Supports custom times per entry.         |
+| FR-04 | Cross-Wing Staff        | Must     | ✅     | Employees can be assigned to multiple focus areas. Grid displays assignments per focus area with filtering.             |
+| FR-05 | Shift Count Row         | Must     | ✅     | Auto-calculated tally rows per section. Shift codes are grouped by shift category; counts appear at the bottom of each focus area section. |
+| FR-06 | Seniority Sorting       | Must     | ✅     | Staff rows sortable by seniority within focus areas.                                                                   |
+| FR-07 | Staff Designations      | Must     | ✅     | Each employee stores certifications and roles. Displayed in staff view and grid name column.                           |
+| FR-08 | Skills / Role Tags      | Must     | ✅     | Certifications and roles are configurable per org. Employees tagged with multiple certifications and roles.            |
+| FR-09 | ~~Orientation Mode~~    | ~~Must~~ | N/A    | Removed from scope.                                                                                                    |
+| FR-10 | ~~Part-Time Weight~~    | ~~Must~~ | N/A    | Removed from scope.                                                                                                    |
+| FR-11 | Print Layout            | Must     | ✅     | Print-optimized view with customizable options. Select focus areas and date range. Landscape format with legend.        |
+| FR-12 | Schedule Legend          | Must     | ✅     | Legend displaying all shift codes with colors. Included in print view via PrintLegend component.                       |
+| FR-13 | Staff Management        | Must     | ✅     | Full CRUD: add (bulk import), edit, bench, activate, terminate employees. Status tracking with timestamps and notes.   |
+| FR-14 | Date Navigation         | Must     | ✅     | Back/Today/Forward buttons in toolbar. Steps by active view span. Month view calendar navigation.                      |
+| FR-15 | Focus Area Filter       | Must     | ✅     | Filter schedule view by focus area: All or any individual section. Staff search within filtered view.                  |
+| FR-16 | Print Date Header       | Must     | ✅     | Printed schedules include organization name, print date, and schedule date range.                                      |
+| FR-17 | No Integrations         | Must     | ✅     | System operates standalone. All data in Supabase. No third-party APIs or external dependencies.                        |
+
+### 7.2 Draft/Publish Workflow
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-20 | Draft Mode              | Must     | ✅     | All schedule edits are initially drafts. Visual distinction between draft and published shifts.                         |
+| FR-21 | Publish Changes         | Must     | ✅     | Super admins and permitted admins can publish all draft changes for a date range. Confirmation dialog before publish.   |
+| FR-22 | Discard Drafts          | Must     | ✅     | Cancel/rollback all unpublished draft changes.                                                                         |
+| FR-23 | Draft Recovery          | Should   | ✅     | Draft sessions saved to DB. Can recover unsaved drafts across browser sessions. Draft banner shows change count.       |
+
+### 7.3 Recurring Schedules
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-24 | Recurring Shifts        | Should   | ✅     | Define recurring shift templates per employee. Apply recurring schedule to a date range.                               |
+| FR-25 | Shift Series            | Should   | ✅     | Create repeating shift series: daily, weekly, or biweekly. Configurable start/end dates and occurrence limits.         |
+| FR-26 | Apply Recurring Schedule | Should  | ✅     | One-click apply of recurring shift templates to selected date range. Requires `canApplyRecurringSchedule` permission.  |
+
+### 7.4 Notes & Indicators
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-19 | Shift Notes             | Could    | ✅     | Schedule notes/indicators per cell with focus area scoping. Configurable indicator types. Draft/published status.       |
+
+### 7.5 Real-Time Collaboration
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-27 | Real-Time Sync          | Should   | ✅     | Schedule changes sync across tabs and users in real-time via Supabase Realtime subscriptions.                          |
+| FR-28 | Tab Coordination        | Should   | ✅     | Cross-tab communication for session state consistency.                                                                 |
+
+### 7.6 Staff Schedule View
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-18 | Staff Schedule View     | Should   | 🔨     | Users with `user` role can view the schedule in read-only mode. Full per-wing scoped view not yet implemented.        |
 
 ---
 
 ## 8. Data Model
 
-| Entity           | Key Fields                                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `Employee`       | id, name, designation, roles[], skills[], fte_weight, wing, seniority_rank, hire_date, is_active                   |
-| `SchedulePeriod` | id, start_date (Sunday), end_date (Saturday+13), label                                                             |
-| `ShiftEntry`     | id, employee_id, date, shift_code, section, is_orientation, notes                                                  |
-| `Section`        | id, organization_id, name, display_order, shift_types                                                              |
-| `ShiftCode`      | id, organization_id, code, label, counts_toward_day, counts_toward_eve, counts_toward_night, is_off, is_cross_wing |
-| `StaffCount`     | Derived. Computed per section per date from ShiftEntry records filtered by shift type.                             |
+### 8.1 Core Tables
 
-### 8.1 Cross-Wing Logic
+| Entity                      | Key Fields                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `organizations`             | id, name, slug, address, phone, timezone, employee_count, focus_area_label, certification_label, role_label |
+| `profiles`                  | id (FK auth.users), org_id, platform_role (enum), version, role_locked                               |
+| `organization_memberships`  | user_id, org_id, org_role (enum), admin_permissions (JSONB), joined_at                               |
+| `employees`                 | id, org_id, name, status (active/benched/terminated), certifications[], roles[], focus_areas[], phone, email, seniority_rank, contact_notes |
+| `shifts`                    | id, employee_id, org_id, date, shift_code_id, status (draft/published), version (optimistic lock), idempotency_key, custom_start_time, custom_end_time |
+| `focus_areas`               | id, org_id, name, color, display_order                                                               |
+| `shift_codes`               | id, org_id, code, label, bg_color, text_color, border_color, default_start_time, default_end_time, is_off_day, certification_id, category_id |
+| `shift_categories`          | id, org_id, name, time_window_start, time_window_end, display_order                                 |
+| `schedule_notes`            | id, org_id, employee_id, date, focus_area_id, indicator_type_id, text, status (draft/published)     |
+| `indicator_types`           | id, org_id, name, color, icon                                                                        |
+| `certifications`            | id, org_id, name, abbreviation                                                                       |
+| `organization_roles`        | id, org_id, name, abbreviation                                                                       |
+| `recurring_shifts`          | id, org_id, employee_id, shift_code_id, days_of_week, focus_area_id                                 |
+| `shift_series`              | id, org_id, employee_id, shift_code_id, recurrence (daily/weekly/biweekly), start_date, end_date, max_occurrences |
 
-A staff member may have `ShiftEntry` records in multiple sections for the same date. The UI must:
+### 8.2 RBAC & Security Tables
 
-- Show the primary section assignment on the main schedule row
-- Show a cross-wing indicator (Ghost Shift) in the alternate section row for the same employee
-- Staffing counts in each section must only count the shift if the employee is actively assigned to that section on that date
+| Entity                      | Key Fields                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `role_change_log`           | id, changed_by, target_user_id, old_role, new_role, org_id, idempotency_key (UNIQUE), created_at    |
+| `jwt_refresh_locks`         | user_id, locked_until (blocks JWT refresh for 5s after role change)                                  |
+| `invitations`               | id, org_id, email, invited_by, token, expires_at (72h), accepted_at                                 |
+| `impersonation_sessions`    | id, gridmaster_id, target_user_id, org_id, started_at, expires_at (30min)                           |
+| `user_sessions`             | id, user_id, device_info, last_active_at                                                             |
+| `draft_sessions`            | id, org_id, user_id, session_data, saved_at                                                          |
+
+### 8.3 Database Security
+
+- **Row-Level Security (RLS):** All tables have RLS policies enforcing org-scoped data access
+- **Custom JWT claims:** `platform_role`, `org_role`, `org_id`, `org_slug` written at JWT top level by access token hook
+- **Optimistic locking:** `shifts` table uses a `version` column to prevent concurrent overwrites
+- **Idempotency:** Role changes and shift operations use idempotency keys to prevent duplicate writes
 
 ---
 
-## 9. UI & UX Requirements
+## 9. Architecture
 
-### 9.1 Schedule Grid
+### 9.1 Multi-Tenant Routing
 
-- Two-week view is the default; single-week toggle available in the toolbar
-- Columns represent dates (Sun–Sat); rows represent staff members
-- Each section is a visually distinct labeled block within the same scrollable view
+Organizations are routed via subdomains:
+- `acme.dubgrid.com` → Organization "Acme" schedule
+- `dubgrid.com` → Landing page / login
+- `gridmaster.dubgrid.com/dashboard` → Gridmaster command center
+
+Edge middleware (`middleware.ts`) enforces:
+- JWT verification and role calculation
+- Subdomain-to-org matching
+- Route-level access control (settings → admin+, /dashboard → gridmaster only)
+- Header injection (`x-dubgrid-role`, `x-dubgrid-org-id`)
+
+### 9.2 Key Application Files
+
+| File                              | Purpose                                                    |
+| --------------------------------- | ---------------------------------------------------------- |
+| `src/app/schedule/page.tsx`       | Main scheduler UI (~1,500 lines) — grid, staff, settings   |
+| `src/app/dashboard/page.tsx`      | Gridmaster command center                                  |
+| `src/app/login/page.tsx`          | Auth login with org subdomain validation                   |
+| `src/app/accept-invite/page.tsx`  | Invitation acceptance flow                                 |
+| `src/app/profile/page.tsx`        | User profile view                                          |
+| `src/lib/db.ts`                   | Data access layer (~2,000 lines)                           |
+| `src/lib/supabase.ts`             | Lazy browser Supabase client via Proxy pattern             |
+| `src/types/index.ts`              | All domain + RBAC TypeScript types                         |
+| `src/hooks/usePermissions.ts`     | JWT claim parsing + DB permission fetching                 |
+| `middleware.ts`                   | Edge middleware for RBAC + subdomain routing                |
+
+### 9.3 Component Architecture
+
+```
+schedule/page.tsx (main app shell)
+├── Header.tsx (view tabs: Schedule / Staff / Settings, user menu)
+├── Toolbar.tsx (date nav, span toggle, focus area filter, search, print)
+├── DraftBanner.tsx (draft change count + Publish/Cancel/Save)
+├── ScheduleGrid.tsx (employee × date grid with shift cells)
+│   ├── ShiftEditPanel.tsx (shift code picker, notes, series)
+│   └── RepeatModal.tsx (create repeating shift series)
+├── MonthView.tsx (calendar month alternative)
+├── StaffView.tsx (employee roster management)
+│   ├── AddEmployeeModal.tsx (bulk import)
+│   └── EditEmployeePanel.tsx (edit single employee)
+├── SettingsPage.tsx (org configuration tabs)
+├── PrintOptionsModal.tsx (print configuration)
+└── PrintScheduleView.tsx + PrintLegend.tsx (print output)
+```
+
+### 9.4 Gridmaster Command Center
+
+```
+gridmaster/page.tsx (gridmaster shell)
+├── TabNavigation.tsx (sidebar nav)
+├── GridmasterDashboard.tsx (stats, recent activity)
+├── AllUsersView.tsx (platform-wide user table)
+├── AuditLogView.tsx (role change audit trail)
+├── OrganizationDetail.tsx (org management)
+│   └── AdminPermissionsEditor.tsx (per-user permission config)
+├── CreateOrganizationForm.tsx (new org registration)
+└── EnhancedImpersonation.tsx (impersonate org users)
+```
+
+---
+
+## 10. UI & UX
+
+### 10.1 Schedule Grid
+
+- Three view modes: 1-week, 2-week (default), and month view
+- Columns represent dates; rows represent staff members
+- Sections are color-coded by focus area
+- Click a cell to open the shift edit panel with all valid codes
+- Draft shifts are visually distinct from published shifts
+- Staff search/highlight within the active focus area filter
 - Today's date column is highlighted
-- Staff rows alternate in subtle background shading for readability
-- Clicking a cell opens a shift picker with all valid codes
 
-### 9.2 Staff Name Column
+### 10.2 Staff Name Column
 
-- Displays: full name, designation code, role tags (e.g., Supv, Mentor)
-- FTE weight shown for part-time staff (e.g., `0.3`)
-- Seniority rank shown (e.g., #1, #2...) with most senior at top
+- Displays: full name, certification(s), role tag(s)
+- Seniority ordering (most senior at top)
+- Contact info (phone, email) accessible from staff view
 
-### 9.3 Count Rows
+### 10.3 Draft/Publish Workflow
 
-- Pinned at the bottom of each section
-- Auto-calculated from shift entries in real time
-- Labeled: COUNT DAY / COUNT EVE / COUNT NIGHT per section as applicable
+- All edits enter draft state by default
+- DraftBanner shows count of pending changes
+- Publish action promotes all drafts to published (requires permission)
+- Discard action rolls back all draft changes
+- Draft recovery saves session state to DB for cross-session restoration
 
-### 9.4 Print View
+### 10.4 Print View
 
-- Landscape orientation
+- Landscape orientation with customizable options
+- Select which focus areas and date range to include
 - Header: organization name, printed date, schedule date range
-- All sections included with their count rows
-- Legend printed at the bottom: shift codes and visual indicators
-- Font size adjusted for legibility when printed
+- Legend with all shift codes and their colors
+- Optimized font sizing for legibility
 
-### 9.5 Toolbar
+### 10.5 Toolbar
 
 - Date range navigator: back / today / forward (steps by active view span)
-- View toggle: 1W / 2W
-- Wing filter: All / or any configured section for the organization
+- View toggle: 1W / 2W / Month
+- Focus area filter: All or any configured section
+- Staff search within active filter
+- Apply Recurring Schedule button (permission-gated)
 - Print button
-- Add Staff button (admin only)
+- Edit mode toggle
 
 ---
 
-## 10. Non-Functional Requirements
+## 11. Non-Functional Requirements
 
 - **Performance:** Schedule grid for 50+ employees over 14 days must render in under 1 second
 - **Compatibility:** Must work in current versions of Chrome, Safari, and Edge
+- **Real-Time:** Supabase Realtime subscriptions keep schedule data in sync across concurrent users
+- **Persistence:** All data persisted in Supabase (PostgreSQL). No local storage dependency.
+- **Security:** RLS policies enforce org-scoped access at the database level. JWT claims verified in edge middleware.
+- **Deployment:** Deployable on Vercel with Supabase backend
+- **Print:** Print output faithful to on-screen layout with configurable options
 - No external API calls or third-party data dependencies
-- Data must persist between sessions (local storage, IndexedDB, or a lightweight backend)
-- Must be deployable as a standalone web app with no proprietary cloud dependency
-- Print output must be faithful to the on-screen layout
 
 ---
 
-## 11. Future Phases
+## 12. API Surface
 
-The following capabilities are explicitly out of scope for the initial launch but are confirmed for future implementation. Development decisions for Phase 1 should not preclude or complicate these additions.
+DubGrid uses a thin API surface, with most operations going directly through the Supabase client (RLS-protected):
 
-### 11.1 Authentication & Role-Based Access Control (RBAC)
+| Endpoint                         | Method | Purpose                                           |
+| -------------------------------- | ------ | ------------------------------------------------- |
+| `/api/validate-domain`           | GET    | Check if org subdomain slug is available           |
+| Supabase RPC: `change_user_role` | POST   | Change user's organization role (with idempotency) |
 
-Authentication and a comprehensive RBAC system will be implemented in a future phase. The intended access model:
-
-| Role              | Who                         | Intended Permissions                                                                          |
-| ----------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
-| Super Admin       | Platform owner / IT         | Full access to all organizations, data, settings, user management, and all schedule sections  |
-| Scheduler / Admin | Org operations manager      | Create, edit, and publish schedules; manage full staff roster; access all sections            |
-| Supervisor        | Wing/department supervisors | View all schedules; edit shifts within their assigned wing/section only; cannot manage roster |
-| Staff (Read-Only) | Employees                   | View their own schedule and their section's current and upcoming schedule; no edit access     |
-
-**Phase 1 build note:** For initial launch, DubGrid will operate without authentication (single shared admin session). The data model and permission logic should be architected to accommodate RBAC retrofit without a schema migration. Specifically: all data writes should be attributable to a user ID field (nullable for Phase 1), and UI components should be built with permission-gating hooks in place even if they are not enforced yet.
+All other CRUD operations use Supabase client-side queries protected by Row-Level Security policies.
 
 ---
 
-## 12. Open Questions for Development
+## 13. Outstanding Work
 
-- **Data persistence:** Local browser storage, or a small server-side database? What happens if the browser is cleared?
-- **Multi-user editing:** Will multiple admins edit the schedule simultaneously, and if so, how should conflicts be handled?
-- **Historical schedules:** Should past schedule periods be archived and viewable?
-- **FTE counts:** Should staffing COUNT rows reflect FTE-weighted headcounts (e.g., 0.3 + 1 + 1 = 2.3), or always whole-person counts?
-- **Sheltered Care cross-staff:** When a Skilled Nursing Wing employee is assigned SCD/SCE, should they disappear from Skilled Nursing Wing counts that day?
+### 13.1 Not Yet Implemented
+
+| ID    | Feature                  | Priority | Notes                                                                          |
+| ----- | ------------------------ | -------- | ------------------------------------------------------------------------------ |
+|       | Supervisor Shift Codes   | Should   | Ds/Es/Ns treated as distinct supervisor-specific codes in counting logic       |
+|       | Charge Nurse Codes       | Should   | Dcn/Ecn as distinct charge nurse shift categories                              |
+|       | Coverage Gap Detection   | Could    | Detect and alert when shift coverage falls below minimums                      |
+|       | Wing-Scoped User View   | Could    | Staff-role users see only their assigned focus area's schedule                 |
+|       | Mobile Responsive Polish | Could    | Grid optimized for tablet/mobile viewports                                    |
+|       | E2E Test Suite           | Should   | Playwright config exists but tests not yet written                             |
+|       | Onboarding Flow          | Should   | New org setup wizard (currently a minimal placeholder)                         |
+
+### 13.2 Known Issues
+
+- 17 pre-existing test failures (AuthProvider, login page, PublicRoute, and role-level property tests)
 
 ---
 
-## 13. Appendix — Example Seed Staff Roster
+## 14. Resolved Questions
 
-The following example staff entries illustrate the data model for seeding an initial roster. Each organization should define its own roster during onboarding.
+These items were open questions in PRD v1.0 and have been resolved during development:
 
-| Name (Example) | Designation | Roles                | Notes                                    |
-| -------------- | ----------- | -------------------- | ---------------------------------------- |
-| Employee A     | JLCSN       | DCSN                 | Director CSN                             |
-| Employee B     | JLCSN       | Mentor               |                                          |
-| Employee C     | JLCSN       | Supv                 |                                          |
-| Employee D     | JLCSN       | Supv                 | Also in secondary wing                   |
-| Employee E     | JLCSN       | Mentor, Supv         | Cross-wing assignment                    |
-| Employee F     | JLCSN       | Supv, CN             | Also visiting nurse; VN shifts           |
-| Employee G     | STAFF       |                      | Primary wing only                        |
-| Employee H     | STAFF       |                      | SCD/SCE; primarily secondary wing        |
-| Employee I     | CSN III     |                      | Also visiting nurse (VN shifts)          |
-| Employee J     | CSN II      |                      | Cross-wing assignment                    |
-| Employee K     | JLCSN       | SC. Mgr.             | Secondary wing manager; Dcn shifts       |
-| Employee L     | JLCSN       | DVCSN                | Director visiting nurses; VN-only shifts |
-| Employee M     | —           | Activity Coordinator | Non-clinical                             |
-| Employee N     | —           | SC/Asst/Act/Cor      | 0.3 FTE part-time                        |
-| Employee O     | JLCSN       | Supv                 | Night shift only                         |
+| Question                         | Resolution                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| Data persistence strategy?       | Supabase (PostgreSQL) with RLS. No local storage dependency.                                  |
+| Multi-user editing?              | Real-time sync via Supabase Realtime. Optimistic locking on shifts (version column).          |
+| Historical schedules?            | Past schedule periods are persisted and viewable by navigating date ranges.                   |
+| FTE-weighted counts?             | Not yet implemented (FR-05/FR-10). Design decision pending.                                   |
+| Cross-staff counting?            | Employees belong to multiple focus areas. Shift entries are per-employee per-date.            |
+| Authentication & RBAC?           | Fully implemented. Four-tier role hierarchy with granular admin permissions. JWT-based claims. |
+
+---
+
+## 15. Appendix — Naming Conventions
+
+| Layer              | Convention | Examples                                                      |
+| ------------------ | ---------- | ------------------------------------------------------------- |
+| DB tables          | Full       | `organizations`, `organization_memberships`                   |
+| DB columns         | Short      | `org_id`, `org_role`, `org_slug`                              |
+| DB functions       | Short      | `caller_org_id()`, `caller_org_role()`, `switch_org()`        |
+| DB enum type       | Short      | `org_role`                                                    |
+| JWT claims         | Short      | `org_id`, `org_role`, `org_slug`                              |
+| TypeScript types   | Full       | `Organization`, `OrganizationRole`, `OrganizationUser`        |
+| TypeScript vars    | Short      | `orgId`, `orgRole`, `orgSlug`, `orgName`                      |
+| Function names     | Mixed      | `fetchOrganizationRoles(orgId)`, `createOrganization(data)`   |
+| UI text            | Full       | "Organization Details", "Create Organization"                 |
+| HTTP headers       | Short      | `x-dubgrid-org-id`, `x-dubgrid-org-slug`                     |
 
 ---
 
