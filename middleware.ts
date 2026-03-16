@@ -74,7 +74,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
-    pathname === "/admin/login" ||
+    pathname === "/gridmaster/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/accept-invite" ||
@@ -189,8 +189,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
-  // Gridmaster-only admin route
-  if (pathname.startsWith("/admin") && effectiveRole !== "gridmaster") {
+  // Gridmaster-only route
+  if (pathname.startsWith("/gridmaster") && effectiveRole !== "gridmaster") {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 

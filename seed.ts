@@ -342,10 +342,28 @@ function id(val: unknown): number {
 }
 
 async function main() {
-  const dbConfig = process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL.includes("supabase") ? { rejectUnauthorized: false } : undefined }
-    : { connectionString: "postgresql://postgres:postgres@127.0.0.1:54322/postgres" };
-  const db = new Client(dbConfig);
+  let connectionString: string;
+
+  if (process.env.DATABASE_URL) {
+    connectionString = process.env.DATABASE_URL;
+  } else if (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("supabase.co")) {
+    // Remote Supabase — derive pooler connection string from project ref
+    const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
+    const password = process.env.SUPABASE_DB_PASSWORD;
+    if (!password) {
+      console.error("ERROR: Set SUPABASE_DB_PASSWORD in .env.remote to seed remote DB.");
+      console.error("Find it in Supabase Dashboard → Settings → Database → Database password");
+      process.exit(1);
+    }
+    connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
+    console.log(`Connecting to REMOTE Supabase (${ref})...\n`);
+  } else {
+    connectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+    console.log("Connecting to LOCAL Supabase...\n");
+  }
+
+  const ssl = connectionString.includes("supabase") ? { rejectUnauthorized: false } : undefined;
+  const db = new Client({ connectionString, ssl });
   await db.connect();
 
   // ── Cleanup ────────────────────────────────────────────────────────────
@@ -355,7 +373,7 @@ async function main() {
       public.organization_memberships,
       public.schedule_notes,
       public.shifts,
-      public.regular_shifts,
+      public.recurring_shifts,
       public.shift_series,
       public.schedule_draft_sessions,
       public.employees,
@@ -560,7 +578,7 @@ async function main() {
       const params = batch.flat();
       await db.query(
         `INSERT INTO public.shifts
-           (emp_id, date, org_id, published_shift_code_ids, draft_shift_code_ids, focus_area_id, from_regular, version)
+           (emp_id, date, org_id, published_shift_code_ids, draft_shift_code_ids, focus_area_id, from_recurring, version)
          VALUES ${placeholders}
          ON CONFLICT (emp_id, date) DO NOTHING`,
         params
@@ -602,7 +620,7 @@ async function main() {
     { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "ardenwood" },
   ];
 
-  const allAdminPerms = `'{"canEditShifts":true,"canPublishSchedule":true,"canApplyRegularSchedule":true,"canEditNotes":true,"canManageRegularShifts":true,"canManageShiftSeries":true,"canManageEmployees":true,"canManageFocusAreas":true,"canManageShiftCodes":true,"canManageIndicatorTypes":true,"canManageOrgSettings":true}'::jsonb`;
+  const allAdminPerms = `'{"canEditShifts":true,"canPublishSchedule":true,"canApplyRecurringSchedule":true,"canEditNotes":true,"canManageRecurringShifts":true,"canManageShiftSeries":true,"canManageEmployees":true,"canManageFocusAreas":true,"canManageShiftCodes":true,"canManageIndicatorTypes":true,"canManageOrgSettings":true}'::jsonb`;
 
   for (const user of TEST_USERS) {
     const orgIdStr = user.preferred_org === 'ardenwood' ? ardenwoodOrgId : defaultOrgId;

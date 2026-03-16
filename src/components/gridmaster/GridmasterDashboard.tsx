@@ -74,7 +74,7 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
 
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 
-export default function AdminDashboard({
+export default function GridmasterDashboard({
   organizations,
   stats,
   totalUsers,

@@ -34,8 +34,8 @@ interface ToolbarProps {
   canEditShifts?: boolean;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
-  onApplyRegular?: () => void;
-  isApplyingRegular?: boolean;
+  onApplyRecurring?: () => void;
+  isApplyingRecurring?: boolean;
   onPrintOpen?: () => void;
   hasSavedDraft?: boolean;
   /** True when there are both published AND draft shifts — shows Print + Edit Draft. */
@@ -58,8 +58,8 @@ export default function Toolbar({
   canEditShifts,
   isEditMode,
   onToggleEditMode,
-  onApplyRegular,
-  isApplyingRegular,
+  onApplyRecurring,
+  isApplyingRecurring,
   onPrintOpen,
   hasSavedDraft,
   hasMixedSchedule,
@@ -235,11 +235,11 @@ export default function Toolbar({
           </button>
         )}
 
-        {/* Apply Regular Schedules — shown in edit mode */}
-        {canEditShifts && isEditMode && onApplyRegular && (
+        {/* Apply Recurring Schedules — shown in edit mode */}
+        {canEditShifts && isEditMode && onApplyRecurring && (
           <button
-            onClick={onApplyRegular}
-            disabled={isApplyingRegular}
+            onClick={onApplyRecurring}
+            disabled={isApplyingRecurring}
             className="dg-btn"
             style={{
               border: "1px solid var(--color-border)",
@@ -249,9 +249,9 @@ export default function Toolbar({
               display: "flex",
               alignItems: "center",
               gap: 5,
-              opacity: isApplyingRegular ? 0.6 : 1,
+              opacity: isApplyingRecurring ? 0.6 : 1,
             }}
-            title="Fill empty slots from employees' regular schedule templates"
+            title="Fill empty slots from employees' recurring schedule templates"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -260,7 +260,7 @@ export default function Toolbar({
               <line x1="3" y1="10" x2="21" y2="10" />
               <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
             </svg>
-            {isApplyingRegular ? "Filling…" : "Auto Fill Shifts"}
+            {isApplyingRecurring ? "Filling…" : "Auto Fill Shifts"}
           </button>
         )}
       </div>

@@ -58,11 +58,9 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
   });
 
-  it("renders span buttons 1W, 2W, M", () => {
-    render(<Toolbar {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "1W" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "2W" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument();
+  it("renders span selector showing current span label", () => {
+    render(<Toolbar {...defaultProps} spanWeeks={1} />);
+    expect(screen.getByRole("button", { name: /1 Week/ })).toBeInTheDocument();
   });
 
   it("renders All focus area button plus one per focus area in focusAreas prop", () => {
@@ -141,12 +139,13 @@ describe("Toolbar — Print button", () => {
 });
 
 describe("Toolbar — active state styles", () => {
-  it("active span button (matching spanWeeks) has 'active' CSS class; inactive buttons do not", () => {
-    render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    const btn1W = screen.getByRole("button", { name: "1W" });
-    const btn2W = screen.getByRole("button", { name: "2W" });
-    expect(btn1W.className).toContain("active");
-    expect(btn2W.className).not.toContain("active");
+  it("span selector trigger displays the label matching the current spanWeeks value", () => {
+    const { rerender } = render(<Toolbar {...defaultProps} spanWeeks={1} />);
+    expect(screen.getByRole("button", { name: /1 Week/ })).toBeInTheDocument();
+    rerender(<Toolbar {...defaultProps} spanWeeks={2} />);
+    expect(screen.getByRole("button", { name: /2 Weeks/ })).toBeInTheDocument();
+    rerender(<Toolbar {...defaultProps} spanWeeks="month" />);
+    expect(screen.getByRole("button", { name: /Month/ })).toBeInTheDocument();
   });
 
   it("active focus area button (matching activeFocusArea) has 'active' CSS class; others do not", () => {
@@ -180,24 +179,21 @@ describe("Toolbar — callbacks", () => {
     expect(defaultProps.onToday).toHaveBeenCalledTimes(1);
   });
 
-  it("clicking 1W calls onSpanChange(1)", async () => {
+  it("selecting '2 Weeks' from span dropdown calls onSpanChange(2)", async () => {
     const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "1W" }));
-    expect(defaultProps.onSpanChange).toHaveBeenCalledWith(1);
-  });
-
-  it("clicking 2W calls onSpanChange(2)", async () => {
-    const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "2W" }));
+    render(<Toolbar {...defaultProps} spanWeeks={1} />);
+    // Open the CustomSelect dropdown
+    await user.click(screen.getByRole("button", { name: /1 Week/ }));
+    // Click the "2 Weeks" option in the portaled dropdown
+    await user.click(screen.getByRole("button", { name: "2 Weeks" }));
     expect(defaultProps.onSpanChange).toHaveBeenCalledWith(2);
   });
 
-  it('clicking M calls onSpanChange("month")', async () => {
+  it("selecting 'Month' from span dropdown calls onSpanChange('month')", async () => {
     const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "M" }));
+    render(<Toolbar {...defaultProps} spanWeeks={1} />);
+    await user.click(screen.getByRole("button", { name: /1 Week/ }));
+    await user.click(screen.getByRole("button", { name: "Month" }));
     expect(defaultProps.onSpanChange).toHaveBeenCalledWith("month");
   });
 

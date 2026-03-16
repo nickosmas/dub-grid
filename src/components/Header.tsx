@@ -171,7 +171,7 @@ export default function Header({
         {/* Gridmaster badge — only rendered if role = gridmaster */}
         {isGridmaster && (
           <button
-            onClick={() => router.push("/admin")}
+            onClick={() => router.push("/gridmaster")}
             style={{
               display: "inline-flex",
               alignItems: "center",

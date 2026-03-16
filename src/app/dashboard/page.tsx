@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { usePermissions, useLogout } from "@/hooks";
 import { DubGridLogo } from "@/components/Logo";
-import AdminDashboard from "@/components/admin/AdminDashboard";
-import OrganizationDetail from "@/components/admin/OrganizationDetail";
-import CreateOrganizationForm from "@/components/admin/CreateOrganizationForm";
-import AllUsersView from "@/components/admin/AllUsersView";
-import AuditLogView from "@/components/admin/AuditLogView";
-import EnhancedImpersonation from "@/components/admin/EnhancedImpersonation";
+import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
+import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
+import CreateOrganizationForm from "@/components/gridmaster/CreateOrganizationForm";
+import AllUsersView from "@/components/gridmaster/AllUsersView";
+import AuditLogView from "@/components/gridmaster/AuditLogView";
+import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import {
   fetchAllOrganizations,
   fetchTenantStats,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/db";
 import type { Organization } from "@/types";
 
-type AdminView =
+type GridmasterView =
   | "dashboard"
   | "all-users"
   | "audit-log"
@@ -312,7 +312,7 @@ function OrgSearchCombobox({
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
-export default function AdminPage() {
+export default function GridmasterPage() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
   const { signOutLocal } = useLogout();
 
@@ -322,7 +322,7 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<AdminView>("dashboard");
+  const [view, setView] = useState<GridmasterView>("dashboard");
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
 
   const loadData = useCallback(async () => {
@@ -563,7 +563,7 @@ export default function AdminPage() {
           )}
 
           {view === "dashboard" && (
-            <AdminDashboard
+            <GridmasterDashboard
               organizations={organizations}
               stats={stats}
               totalUsers={totalUsers}

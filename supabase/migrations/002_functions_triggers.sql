@@ -337,8 +337,8 @@ CREATE TRIGGER trigger_schedule_notes_audit
   BEFORE INSERT OR UPDATE ON public.schedule_notes
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
-CREATE TRIGGER trigger_regular_shifts_audit
-  BEFORE INSERT OR UPDATE ON public.regular_shifts
+CREATE TRIGGER trigger_recurring_shifts_audit
+  BEFORE INSERT OR UPDATE ON public.recurring_shifts
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
 CREATE TRIGGER trigger_shift_series_audit

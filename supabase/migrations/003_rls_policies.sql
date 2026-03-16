@@ -21,7 +21,7 @@ ALTER TABLE public.shift_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.indicator_types ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.regular_shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recurring_shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_series ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.role_change_log ENABLE ROW LEVEL SECURITY;
@@ -29,6 +29,7 @@ ALTER TABLE public.jwt_refresh_locks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.impersonation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -330,6 +331,30 @@ CREATE POLICY "admin_delete_draft_sessions"
   USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
 
 
+-- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
+
+CREATE POLICY "gridmaster_all_recurring_drafts"
+  ON public.recurring_shifts_draft_sessions FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_recurring_drafts"
+  ON public.recurring_shifts_draft_sessions FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_recurring_drafts"
+  ON public.recurring_shifts_draft_sessions FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+
+CREATE POLICY "admin_update_recurring_drafts"
+  ON public.recurring_shifts_draft_sessions FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_recurring_drafts"
+  ON public.recurring_shifts_draft_sessions FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 6. SHIFTS (employee-scoped — uses EXISTS subquery for org check)
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -382,28 +407,28 @@ CREATE POLICY "admin_delete_shifts"
 -- 7. REGULAR_SHIFTS & SHIFT_SERIES (gridmaster OR org admin)
 -- ══════════════════════════════════════════════════════════════════════════════
 
--- ── regular_shifts ────────────────────────────────────────────────────────────
+-- ── recurring_shifts ────────────────────────────────────────────────────────────
 
-CREATE POLICY "regular_shifts_select"
-  ON public.regular_shifts FOR SELECT TO authenticated
+CREATE POLICY "recurring_shifts_select"
+  ON public.recurring_shifts FOR SELECT TO authenticated
   USING (public.is_gridmaster() OR org_id = public.caller_org_id());
 
-CREATE POLICY "regular_shifts_insert"
-  ON public.regular_shifts FOR INSERT TO authenticated
+CREATE POLICY "recurring_shifts_insert"
+  ON public.recurring_shifts FOR INSERT TO authenticated
   WITH CHECK (
     public.is_gridmaster()
     OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
   );
 
-CREATE POLICY "regular_shifts_update"
-  ON public.regular_shifts FOR UPDATE TO authenticated
+CREATE POLICY "recurring_shifts_update"
+  ON public.recurring_shifts FOR UPDATE TO authenticated
   USING (
     public.is_gridmaster()
     OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
   );
 
-CREATE POLICY "regular_shifts_delete"
-  ON public.regular_shifts FOR DELETE TO authenticated
+CREATE POLICY "recurring_shifts_delete"
+  ON public.recurring_shifts FOR DELETE TO authenticated
   USING (
     public.is_gridmaster()
     OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))

@@ -42,7 +42,7 @@ describe("Login page submit states", () => {
   beforeEach(() => {
     // parseHost reads window.location.host (not hostname); set host to a subdomain
     Object.defineProperty(window, 'location', {
-      value: { host: 'test-org.localhost', hostname: 'test-org.localhost', replace: vi.fn(), reload: vi.fn(), href: '' },
+      value: { host: 'test-org.localhost', hostname: 'test-org.localhost', replace: vi.fn(), reload: vi.fn(), href: '', search: '?verified=1' },
       writable: true,
       configurable: true,
     });
