@@ -411,6 +411,21 @@ textarea {
   gap: 8px;
 }
 
+/* Draft breakdown chips */
+.dg-draft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.dg-draft-chip--new { background: #DCFCE7; color: #15803D; }
+.dg-draft-chip--modified { background: #FEF3C7; color: #B45309; }
+.dg-draft-chip--deleted { background: #FEE2E2; color: #DC2626; }
+.dg-draft-chip--notes { background: #E0E7FF; color: #4338CA; }
+
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
 /* Vibrant, full-color banner toasts — no shadows */
 [data-sonner-toaster] {

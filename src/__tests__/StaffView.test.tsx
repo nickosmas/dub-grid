@@ -85,29 +85,22 @@ const defaultProps = {
 
 describe("StaffView", () => {
   describe("Controls", () => {
-    it("renders '+ Add Staff Members' button", () => {
+    it("renders 'Add' button", () => {
       render(<StaffView {...defaultProps} />);
-      expect(screen.getByText("+ Add Staff Members")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Add/ })).toBeInTheDocument();
     });
 
-    it("clicking '+ Add Staff Members' calls onAdd", async () => {
+    it("clicking 'Add' button calls onAdd", async () => {
       const onAdd = vi.fn();
       render(<StaffView {...defaultProps} onAdd={onAdd} />);
-      await userEvent.click(screen.getByText("+ Add Staff Members"));
+      await userEvent.click(screen.getByRole("button", { name: /Add/ }));
       expect(onAdd).toHaveBeenCalledTimes(1);
     });
 
-    it("renders sort buttons 'Seniority', 'Name', 'Focus Areas'", () => {
+    it("renders sort selector with Seniority as default", () => {
       render(<StaffView {...defaultProps} />);
-      expect(
-        screen.getByRole("button", { name: "Seniority" }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Name" })).toBeInTheDocument();
-      // "Focus Areas" appears in both the sort bar and the sidebar nav;
-      // confirm at least one exists with that label.
-      expect(
-        screen.getAllByRole("button", { name: "Focus Areas" }).length,
-      ).toBeGreaterThan(0);
+      // Sort is now a CustomSelect dropdown; the trigger shows the current value
+      expect(screen.getByRole("button", { name: /Seniority/ })).toBeInTheDocument();
     });
   });
 
@@ -197,9 +190,9 @@ describe("Property-based tests", () => {
           />,
         );
 
-        // Click "Seniority" sort button to ensure seniority sort is active
+        // Open sort dropdown and click "Seniority" to ensure seniority sort is active
         await userEvent.click(
-          within(container).getByRole("button", { name: "Seniority" }),
+          within(container).getByRole("button", { name: /Seniority/ }),
         );
 
         // StaffView renders sidebar (children[0]) + content area (children[1]).
@@ -258,10 +251,11 @@ describe("Property-based tests", () => {
             />,
           );
 
-          // Click "Name" sort button
+          // Open sort dropdown and click "Name"
           await userEvent.click(
-            within(container).getByRole("button", { name: "Name" }),
+            within(container).getByRole("button", { name: /Seniority/ }),
           );
+          await userEvent.click(screen.getByRole("button", { name: "Name" }));
 
           // StaffView renders sidebar (children[0]) + content area (children[1]).
           // Content area > MembersSection root (children[0]).
@@ -331,11 +325,13 @@ describe("Property-based tests", () => {
             />,
           );
 
-          // Click the sort bar "Focus Areas" button, scoped to the sort segment
-          const sortSegment = container.querySelector(".dg-segment") as HTMLElement;
+          // Open sort dropdown and click "Focus Areas" (use getAllByRole since sidebar also has this label)
           await userEvent.click(
-            within(sortSegment).getByRole("button", { name: "Focus Areas" }),
+            within(container).getByRole("button", { name: /Seniority/ }),
           );
+          const focusAreaBtns = screen.getAllByRole("button", { name: "Focus Areas" });
+          // The portaled dropdown option is the last one added to the DOM
+          await userEvent.click(focusAreaBtns[focusAreaBtns.length - 1]);
 
           // Read rendered names from the DOM (same structure as name sort test)
           // children[0] = status tabs, children[1] = controls, children[2] = table

@@ -110,13 +110,21 @@ export interface Employee {
   archivedAt?: string | null;
 }
 
+export type DraftKind = 'new' | 'modified' | 'deleted' | null;
+
 export type ShiftMap = Record<string, {
   label: string;
   shiftCodeIds: number[];
   isDraft: boolean;
   isDelete?: boolean;
+  /** Classification of the draft change type. null = no draft. */
+  draftKind: DraftKind;
+  /** Published shift code IDs (empty array if never published). */
+  publishedShiftCodeIds: number[];
+  /** Resolved label of published version (empty if never published). */
+  publishedLabel: string;
   seriesId?: string | null;
-  fromRegular?: boolean;
+  fromRecurring?: boolean;
   customStartTime?: string | null;
   customEndTime?: string | null;
 }>;
@@ -124,7 +132,7 @@ export type ShiftMap = Record<string, {
 export type SeriesFrequency = 'daily' | 'weekly' | 'biweekly';
 export type SeriesScope = 'this' | 'all';
 
-export interface RegularShift {
+export interface RecurringShift {
   id: string;
   empId: string;
   orgId: string;
@@ -136,7 +144,7 @@ export interface RegularShift {
   effectiveUntil: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Non-null when the regular shift has been archived (soft-deleted). */
+  /** Non-null when the recurring shift has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
 
@@ -219,14 +227,14 @@ export interface AdminPermissions {
   canEditShifts: boolean;
   /** Publish or discard the draft schedule */
   canPublishSchedule: boolean;
-  /** Apply regular shift templates to a date range */
-  canApplyRegularSchedule: boolean;
+  /** Apply recurring shift templates to a date range */
+  canApplyRecurringSchedule: boolean;
   // Notes & Indicators
   /** Add / edit / delete schedule notes (indicators) */
   canEditNotes: boolean;
   // Recurring Shifts
-  /** Create / edit / delete regular (recurring) shift templates */
-  canManageRegularShifts: boolean;
+  /** Create / edit / delete recurring shift templates */
+  canManageRecurringShifts: boolean;
   /** Create / edit / delete shift series */
   canManageShiftSeries: boolean;
   // Staff
@@ -241,8 +249,10 @@ export interface AdminPermissions {
   canManageShiftCodes: boolean;
   /** Add / edit / delete indicator / note type definitions */
   canManageIndicatorTypes: boolean;
-  /** Edit organization name, address, labels, certifications, roles */
+  /** Edit organization name, address, phone, employee count, timezone (super_admin only) */
   canManageOrgSettings: boolean;
+  /** Edit custom terminology labels — focus areas, certifications, roles (delegatable to admin) */
+  canManageOrgLabels: boolean;
 }
 
 export interface Profile {

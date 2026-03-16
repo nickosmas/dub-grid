@@ -17,8 +17,8 @@ import type {
   OrganizationRole,
 } from "@/types";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import AdminPermissionsEditor from "@/components/admin/AdminPermissionsEditor";
-import AuditLogView from "@/components/admin/AuditLogView";
+import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
+import AuditLogView from "@/components/gridmaster/AuditLogView";
 
 type Tab = "overview" | "users" | "employees" | "config" | "activity";
 
@@ -665,12 +665,21 @@ function UsersTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-secondary)" }}>
-          Users ({users.length})
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+          {users.length} user{users.length !== 1 ? "s" : ""}
         </span>
-        <button className="dg-btn dg-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowAddForm(!showAddForm)}>
-          {showAddForm ? "Cancel" : "+ Add User"}
+        <div style={{ flex: 1 }} />
+        <button className="dg-btn dg-btn-primary" style={{ padding: "7px 14px", fontSize: 13 }} onClick={() => setShowAddForm(!showAddForm)}>
+          {showAddForm ? (
+            "Cancel"
+          ) : (
+            <>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add
+            </>
+          )}
         </button>
       </div>
 
@@ -851,29 +860,50 @@ function EmployeesTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Status toggle */}
-      <div style={{ display: "flex", gap: 8 }}>
-        {(["active", "benched", "terminated"] as const).map((s) => {
-          const count = s === "active" ? active.length : s === "benched" ? benched.length : terminated.length;
-          const isActive = showStatus === s;
+      {/* Status tabs */}
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
+        {([
+          { key: "active" as const, label: "Active", count: active.length, color: "var(--color-today-text)" },
+          { key: "benched" as const, label: "Benched", count: benched.length, color: "var(--color-warning)" },
+          { key: "terminated" as const, label: "Terminated", count: terminated.length, color: "var(--color-danger)" },
+        ]).map((tab) => {
+          const isActive = showStatus === tab.key;
           return (
             <button
-              key={s}
-              onClick={() => setShowStatus(s)}
+              key={tab.key}
+              onClick={() => setShowStatus(tab.key)}
               style={{
-                padding: "6px 14px",
-                fontSize: 12,
+                padding: "8px 20px",
+                fontSize: 13,
                 fontWeight: isActive ? 700 : 500,
-                color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                background: isActive ? "var(--color-surface-overlay)" : "transparent",
-                border: `1px solid ${isActive ? "var(--color-border)" : "transparent"}`,
-                borderRadius: 8,
+                color: isActive ? tab.color : "var(--color-text-muted)",
+                background: "transparent",
+                border: "none",
+                borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: -1,
                 fontFamily: "inherit",
-                textTransform: "capitalize",
+                transition: "color 120ms ease, border-color 120ms ease",
               }}
             >
-              {s} ({count})
+              {tab.label}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: isActive ? `${tab.color}15` : "var(--color-border-light)",
+                  color: isActive ? tab.color : "var(--color-text-faint)",
+                  borderRadius: 10,
+                  padding: "1px 7px",
+                  minWidth: 20,
+                  textAlign: "center",
+                }}
+              >
+                {tab.count}
+              </span>
             </button>
           );
         })}

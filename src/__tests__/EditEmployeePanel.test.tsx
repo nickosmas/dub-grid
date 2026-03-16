@@ -147,8 +147,9 @@ describe("EditEmployeePanel", () => {
     it("Save Changes becomes enabled after changing the designation", async () => {
       const user = userEvent.setup();
       renderPanel();
-      const select = screen.getByRole("combobox");
-      await user.selectOptions(select, "CSN II");
+      // Certification is a CustomSelect — open dropdown and pick a different option
+      await user.click(screen.getByRole("button", { name: /STAFF/ }));
+      await user.click(screen.getByRole("button", { name: "CSN II" }));
       expect(
         screen.getByRole("button", { name: "Save Changes" }),
       ).not.toBeDisabled();
@@ -158,8 +159,8 @@ describe("EditEmployeePanel", () => {
       const user = userEvent.setup();
       renderPanel();
       // First modify designation so isModified would be true
-      const select = screen.getByRole("combobox");
-      await user.selectOptions(select, "CSN II");
+      await user.click(screen.getByRole("button", { name: /STAFF/ }));
+      await user.click(screen.getByRole("button", { name: "CSN II" }));
       // Then clear the name
       const nameInput = screen.getByDisplayValue("Alice Smith");
       await user.clear(nameInput);

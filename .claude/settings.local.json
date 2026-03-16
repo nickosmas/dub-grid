@@ -45,7 +45,9 @@
       "Bash(wc:*)",
       "Bash(DATABASE_URL=\"postgresql://postgres:blubaroN*#9575!@db.xpoylacxkbphnudsupuu.supabase.co:5432/postgres\" npx tsx:*)",
       "Bash(DATABASE_URL=\"postgresql://postgres:blubaroN%2A%239575%21@db.xpoylacxkbphnudsupuu.supabase.co:5432/postgres\" npx tsx:*)",
-      "Bash(DATABASE_URL=\"postgresql://postgres.xpoylacxkbphnudsupuu:blubaroN%2A%239575%21@aws-0-us-west-1.pooler.supabase.com:5432/postgres\" npx tsx:*)"
+      "Bash(DATABASE_URL=\"postgresql://postgres.xpoylacxkbphnudsupuu:blubaroN%2A%239575%21@aws-0-us-west-1.pooler.supabase.com:5432/postgres\" npx tsx:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(PGPASSWORD=\"KrvUpksTnpzjJbTpQqgXHUViKacExDfq\" /opt/homebrew/Cellar/postgresql@15/15.15/bin/psql:*)"
     ]
   }
 }

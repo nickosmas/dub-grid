@@ -194,8 +194,8 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
   );
 }
 
-// ── Organization Settings ─────────────────────────────────────────────────────
-function OrganizationSettings({
+// ── Organization Details (super_admin only) ──────────────────────────────────
+function OrganizationDetailsSettings({
   organization,
   onSave,
 }: {
@@ -207,9 +207,6 @@ function OrganizationSettings({
     address: organization.address,
     phone: organization.phone,
     employeeCount: organization.employeeCount?.toString() ?? "",
-    focusAreaLabel: organization.focusAreaLabel,
-    certificationLabel: organization.certificationLabel,
-    roleLabel: organization.roleLabel,
     timezone: organization.timezone ?? "",
   });
   const [saving, setSaving] = useState(false);
@@ -220,9 +217,6 @@ function OrganizationSettings({
     form.address !== organization.address ||
     form.phone !== organization.phone ||
     (form.employeeCount || "") !== (organization.employeeCount?.toString() ?? "") ||
-    form.focusAreaLabel !== organization.focusAreaLabel ||
-    form.certificationLabel !== organization.certificationLabel ||
-    form.roleLabel !== organization.roleLabel ||
     form.timezone !== (organization.timezone ?? "");
 
   const handleSave = useCallback(async () => {
@@ -235,9 +229,6 @@ function OrganizationSettings({
         address: form.address.trim(),
         phone: form.phone.trim(),
         employeeCount: form.employeeCount ? parseInt(form.employeeCount) : null,
-        focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
-        certificationLabel: form.certificationLabel.trim() || "Certifications",
-        roleLabel: form.roleLabel.trim() || "Roles",
         timezone: form.timezone || null,
       };
       await db.updateOrganization(updated);
@@ -297,51 +288,6 @@ function OrganizationSettings({
         </div>
       </div>
 
-      {/* Custom terminology labels */}
-      <div>
-        <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 12px" }}>
-          Customize what your organization calls each feature. These labels appear throughout the app.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-          <div>
-            <label style={labelStyle}>FOCUS AREAS LABEL</label>
-            <input
-              value={form.focusAreaLabel}
-              onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
-              placeholder="Focus Areas"
-              style={inputStyle}
-            />
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
-              e.g. Focus Areas, Departments, Units
-            </p>
-          </div>
-          <div>
-            <label style={labelStyle}>CERTIFICATIONS LABEL</label>
-            <input
-              value={form.certificationLabel}
-              onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
-              placeholder="Certifications"
-              style={inputStyle}
-            />
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
-              e.g. Certifications, Designations
-            </p>
-          </div>
-          <div>
-            <label style={labelStyle}>ROLES LABEL</label>
-            <input
-              value={form.roleLabel}
-              onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
-              placeholder="Roles"
-              style={inputStyle}
-            />
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
-              e.g. Responsibilities, Positions
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Timezone */}
       <div>
         <label style={labelStyle}>TIME ZONE</label>
@@ -354,6 +300,120 @@ function OrganizationSettings({
           onChange={(v) => setForm((p) => ({ ...p, timezone: v }))}
           style={{ width: "100%", maxWidth: 340 }}
         />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          onClick={handleSave}
+          disabled={!isModified || saving}
+          style={{
+            background: isModified ? "var(--color-accent-gradient)" : "#ccc",
+            border: "none",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "9px 20px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: isModified ? "pointer" : "not-allowed",
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>
+            Saved!
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Custom Labels (delegatable to admin) ─────────────────────────────────────
+function OrganizationLabelsSettings({
+  organization,
+  onSave,
+}: {
+  organization: Organization;
+  onSave: (o: Organization) => void;
+}) {
+  const [form, setForm] = useState({
+    focusAreaLabel: organization.focusAreaLabel,
+    certificationLabel: organization.certificationLabel,
+    roleLabel: organization.roleLabel,
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const isModified =
+    form.focusAreaLabel !== organization.focusAreaLabel ||
+    form.certificationLabel !== organization.certificationLabel ||
+    form.roleLabel !== organization.roleLabel;
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      const updated: Organization = {
+        ...organization,
+        focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
+        certificationLabel: form.certificationLabel.trim() || "Certifications",
+        roleLabel: form.roleLabel.trim() || "Roles",
+      };
+      await db.updateOrganization(updated);
+      onSave(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast.success("Labels saved");
+    } catch (err) {
+      toast.error("Failed to save labels");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  }, [form, organization, onSave]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
+        Customize what your organization calls each feature. These labels appear throughout the app.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <div>
+          <label style={labelStyle}>FOCUS AREAS LABEL</label>
+          <input
+            value={form.focusAreaLabel}
+            onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
+            placeholder="Focus Areas"
+            style={inputStyle}
+          />
+          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            e.g. Focus Areas, Departments, Units
+          </p>
+        </div>
+        <div>
+          <label style={labelStyle}>CERTIFICATIONS LABEL</label>
+          <input
+            value={form.certificationLabel}
+            onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
+            placeholder="Certifications"
+            style={inputStyle}
+          />
+          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            e.g. Certifications, Designations
+          </p>
+        </div>
+        <div>
+          <label style={labelStyle}>ROLES LABEL</label>
+          <input
+            value={form.roleLabel}
+            onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
+            placeholder="Roles"
+            style={inputStyle}
+          />
+          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            e.g. Responsibilities, Positions
+          </p>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1081,7 +1141,7 @@ function ShiftCodeRow({
             />
           </div>
 
-          {/* Required Certifications — only for regular shifts */}
+          {/* Required Certifications — only for recurring shifts */}
           {!form.isOffDay && certifications.length > 0 && (
             <div>
               <label style={labelStyle}>
@@ -2304,20 +2364,20 @@ function ShiftCategoriesSettings({
 // ── Admin permission metadata ──────────────────────────────────────────────────
 
 const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
-  { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRegularSchedule"] },
+  { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRecurringSchedule"] },
   { label: "Notes", keys: ["canEditNotes"] },
-  { label: "Recurring", keys: ["canManageRegularShifts", "canManageShiftSeries"] },
+  { label: "Recurring", keys: ["canManageRecurringShifts", "canManageShiftSeries"] },
   { label: "Staff", keys: ["canManageEmployees"] },
-  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings"] },
+  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings", "canManageOrgLabels"] },
 ];
 
 const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canViewSchedule: "View Schedule",
   canEditShifts: "Edit Shifts",
   canPublishSchedule: "Publish Schedule",
-  canApplyRegularSchedule: "Apply Regular Schedule",
+  canApplyRecurringSchedule: "Apply Recurring Schedule",
   canEditNotes: "Edit Notes / Indicators",
-  canManageRegularShifts: "Manage Regular Shifts",
+  canManageRecurringShifts: "Manage Recurring Shifts",
   canManageShiftSeries: "Manage Shift Series",
   canViewStaff: "View Staff",
   canManageEmployees: "Manage Employees",
@@ -2325,6 +2385,7 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canManageShiftCodes: "Manage Shift Codes",
   canManageIndicatorTypes: "Manage Indicator Types",
   canManageOrgSettings: "Manage Organization Settings",
+  canManageOrgLabels: "Manage Custom Labels",
 };
 
 /** Permissions that are always on and cannot be toggled off. */
@@ -2338,9 +2399,9 @@ function emptyAdminPerms(): AdminPermissions {
     canViewSchedule: true,
     canEditShifts: false,
     canPublishSchedule: false,
-    canApplyRegularSchedule: false,
+    canApplyRecurringSchedule: false,
     canEditNotes: false,
-    canManageRegularShifts: false,
+    canManageRecurringShifts: false,
     canManageShiftSeries: false,
     canViewStaff: true,
     canManageEmployees: false,
@@ -2348,6 +2409,7 @@ function emptyAdminPerms(): AdminPermissions {
     canManageShiftCodes: false,
     canManageIndicatorTypes: false,
     canManageOrgSettings: false,
+    canManageOrgLabels: false,
   };
 }
 
@@ -2464,16 +2526,30 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
   };
 
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
   const ROLE_ORDER: Record<string, number> = { super_admin: 0, admin: 1, user: 2 };
 
-  const sortedUsers = [...users].sort((a, b) => {
-    const ra = ROLE_ORDER[a.orgRole] ?? 3;
-    const rb = ROLE_ORDER[b.orgRole] ?? 3;
-    if (ra !== rb) return ra - rb;
-    const nameA = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "";
-    const nameB = [b.firstName, b.lastName].filter(Boolean).join(" ") || b.email || "";
-    return nameA.localeCompare(nameB);
-  });
+  const sortedUsers = [...users]
+    .filter((u) => {
+      if (roleFilter !== "all" && u.orgRole !== roleFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const name = [u.firstName, u.lastName].filter(Boolean).join(" ").toLowerCase();
+        const email = (u.email ?? "").toLowerCase();
+        if (!name.includes(q) && !email.includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const ra = ROLE_ORDER[a.orgRole] ?? 3;
+      const rb = ROLE_ORDER[b.orgRole] ?? 3;
+      if (ra !== rb) return ra - rb;
+      const nameA = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "";
+      const nameB = [b.firstName, b.lastName].filter(Boolean).join(" ") || b.email || "";
+      return nameA.localeCompare(nameB);
+    });
 
   if (loading) {
     return <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Loading users…</p>;
@@ -2499,14 +2575,67 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 16px" }}>
-        Manage user roles and admin permissions. Super Admins can promote users to Admin and configure their access.
-      </p>
       {error && (
         <div style={{ marginBottom: 12, padding: 10, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 8, color: "#B91C1C", fontSize: 13 }}>
           {error}
         </div>
       )}
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+        {/* Left group: filter */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Filter</span>
+          <CustomSelect
+            value={roleFilter}
+            options={[
+              { value: "all", label: "All Roles" },
+              { value: "super_admin", label: "Super Admin" },
+              { value: "admin", label: "Admin" },
+              { value: "user", label: "User" },
+            ]}
+            onChange={setRoleFilter}
+            style={{ width: "auto", minWidth: 140 }}
+            fontSize={12}
+          />
+          {(search || roleFilter !== "all") && (
+            <button
+              onClick={() => { setSearch(""); setRoleFilter("all"); }}
+              style={{
+                background: "none", border: "none", color: "var(--color-today-text)", fontSize: 12,
+                fontWeight: 600, cursor: "pointer", padding: "4px 8px",
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Right group: count + search */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+            {sortedUsers.length} of {users.length}
+          </span>
+          <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
+            <svg
+              width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-faint)" }}
+            >
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              className="dg-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              style={{ paddingLeft: 32, fontSize: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
+            />
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: "flex", flexDirection: "column" }}>
         {sortedUsers.map((user) => {
           const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
@@ -2551,13 +2680,17 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                 }}>
                   {ROLE_LABELS[user.orgRole] ?? user.orgRole}
                 </span>
-                <span style={{
-                  fontSize: 14, color: "var(--color-text-faint)",
-                  transform: isExpanded ? "rotate(180deg)" : "none",
-                  transition: "transform 0.15s",
-                }}>
-                  ▾
-                </span>
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{
+                    color: "var(--color-text-faint)",
+                    flexShrink: 0,
+                    transition: "transform 0.15s ease",
+                    transform: isExpanded ? "rotate(180deg)" : "none",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </div>
 
               {/* Expanded edit panel */}
@@ -2812,7 +2945,7 @@ export default function SettingsPage({
   onOrgRolesChange,
   canManageOrg,
 }: SettingsPageProps) {
-  const { isGridmaster, isSuperAdmin } = usePermissions();
+  const { isGridmaster, isSuperAdmin, canManageOrgLabels } = usePermissions();
   const [activeSection, setActiveSection] = useState<string>(
     canManageOrg ? "organization" : "impersonation"
   );
@@ -2877,9 +3010,16 @@ export default function SettingsPage({
 
         {activeSection === "organization" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
-            <Section title="Organization Details">
-              <OrganizationSettings organization={organization} onSave={onOrganizationSave} />
-            </Section>
+            {isSuperAdmin && (
+              <Section title="Organization Details">
+                <OrganizationDetailsSettings organization={organization} onSave={onOrganizationSave} />
+              </Section>
+            )}
+            {(isSuperAdmin || canManageOrgLabels) && (
+              <Section title="Custom Labels">
+                <OrganizationLabelsSettings organization={organization} onSave={onOrganizationSave} />
+              </Section>
+            )}
             <Section title={focusAreaLabel}>
               <FocusAreasSettings
                 focusAreas={focusAreas}

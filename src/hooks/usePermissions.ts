@@ -17,9 +17,9 @@ const ALL_PERMS: AdminPermissions = {
   canViewSchedule: true,
   canEditShifts: true,
   canPublishSchedule: true,
-  canApplyRegularSchedule: true,
+  canApplyRecurringSchedule: true,
   canEditNotes: true,
-  canManageRegularShifts: true,
+  canManageRecurringShifts: true,
   canManageShiftSeries: true,
   canViewStaff: true,
   canManageEmployees: true,
@@ -27,6 +27,7 @@ const ALL_PERMS: AdminPermissions = {
   canManageShiftCodes: true,
   canManageIndicatorTypes: true,
   canManageOrgSettings: true,
+  canManageOrgLabels: true,
 };
 
 /** Read-only baseline — used for user role (and admin with no configured perms). */
@@ -34,9 +35,9 @@ const READ_ONLY_PERMS: AdminPermissions = {
   canViewSchedule: true,
   canEditShifts: false,
   canPublishSchedule: false,
-  canApplyRegularSchedule: false,
+  canApplyRecurringSchedule: false,
   canEditNotes: false,
-  canManageRegularShifts: false,
+  canManageRecurringShifts: false,
   canManageShiftSeries: false,
   canViewStaff: true,
   canManageEmployees: false,
@@ -44,6 +45,7 @@ const READ_ONLY_PERMS: AdminPermissions = {
   canManageShiftCodes: false,
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,
+  canManageOrgLabels: false,
 };
 
 export interface Permissions extends AdminPermissions {
@@ -90,7 +92,8 @@ function buildPerms(
     p.canManageFocusAreas ||
     p.canManageShiftCodes ||
     p.canManageIndicatorTypes ||
-    p.canManageOrgSettings;
+    p.canManageOrgSettings ||
+    p.canManageOrgLabels;
 
   return {
     ...p,

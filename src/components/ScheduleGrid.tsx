@@ -4,7 +4,7 @@ import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, NoteType, IndicatorType, NamedItem } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, NoteType, IndicatorType, NamedItem, DraftKind } from "@/types";
 import { getCertAbbr, getRoleAbbrs } from "@/lib/utils";
 import { borderColor } from "@/lib/colors";
 
@@ -31,6 +31,17 @@ function fmt12hShort(time24: string): string {
   return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
 
+const DRAFT_BORDER_COLORS: Record<string, string> = {
+  new: '#16A34A',
+  modified: '#D97706',
+  deleted: '#DC2626',
+};
+
+function getDraftBorder(draftKind: DraftKind, fallback: string): string {
+  if (!draftKind) return fallback;
+  return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
+}
+
 interface ScheduleGridProps {
   filteredEmployees: Employee[];
   allEmployees: Employee[];
@@ -39,7 +50,6 @@ interface ScheduleGridProps {
   spanWeeks: 1 | 2;
   shiftForKey: (empId: string, date: Date) => string | null;
   shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
-  isDraftForKey?: (empId: string, date: Date) => boolean;
   /** Pass focusAreaId for context-aware label resolution */
   getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
   handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
@@ -56,6 +66,9 @@ interface ScheduleGridProps {
   orgRoles?: NamedItem[];
   isEditMode?: boolean;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  showDiffOverlay?: boolean;
+  publishedLabelForKey?: (empId: string, date: Date) => string | null;
 }
 
 
@@ -67,7 +80,6 @@ interface SectionBlockProps {
   todayKey: string;
   shiftForKey: (empId: string, date: Date) => string | null;
   shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
-  isDraftForKey?: (empId: string, date: Date) => boolean;
   /** Pass focusAreaId for context-aware label resolution */
   getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
   handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
@@ -82,6 +94,9 @@ interface SectionBlockProps {
   noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
   onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string } | null;
+  draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  showDiffOverlay?: boolean;
+  publishedLabelForKey?: (empId: string, date: Date) => string | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
 }
@@ -94,7 +109,6 @@ const SectionBlock = memo(function SectionBlock({
   todayKey,
   shiftForKey,
   shiftCodeIdsForKey,
-  isDraftForKey,
   getShiftStyle,
   handleCellClick,
   colWidth,
@@ -108,6 +122,9 @@ const SectionBlock = memo(function SectionBlock({
   noteTypesForKey,
   onTooltipChange,
   getCustomShiftTimes,
+  draftKindForKey,
+  showDiffOverlay,
+  publishedLabelForKey,
   certifications,
   orgRoles,
 }: SectionBlockProps) {
@@ -425,7 +442,8 @@ const SectionBlock = memo(function SectionBlock({
                     splitAtIndex !== undefined && di === splitAtIndex;
                   const shiftCode = shiftForKey(emp.id, date);
                   const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
-                  const isDraft = isDraftForKey?.(emp.id, date) ?? false;
+                  const draftKind = draftKindForKey?.(emp.id, date) ?? null;
+                  const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
                   const noteTypes = noteTypesForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                   const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
 
@@ -503,22 +521,24 @@ const SectionBlock = memo(function SectionBlock({
                                <div
                                  style={{
                                    position: "absolute",
-                                   top: customTimes ? "4px" : "0.625rem",
-                                   right: "0.625rem",
-                                   bottom: customTimes ? "4px" : "0.625rem",
-                                   left: "0.625rem",
+                                   top: customTimes ? "3px" : "4px",
+                                   right: "4px",
+                                   bottom: customTimes ? "3px" : "4px",
+                                   left: "4px",
                                    background: isCross ? "#ffffff" : style.color,
-                                   opacity: isDraft ? 0.6 : 1,
-                                   border: `1px solid ${borderColor(style.text)}`,
-                                   borderRadius: 6,
+                                   opacity: draftKind === 'deleted' ? 0.5 : 1,
+                                   border: getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`),
+                                   borderRadius: 3,
                                    color: style.text,
                                    boxShadow: "none",
                                    cursor: "pointer",
                                    display: "flex",
                                    flexDirection: "column",
                                    alignItems: "center",
-                                   justifyContent: "center",
+                                   justifyContent: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "flex-start" : "center",
+                                   paddingTop: showDiffOverlay && draftKind && draftKind !== 'deleted' ? 4 : 0,
                                    overflow: "hidden",
+                                   textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                  }}
                                >
                                  {isCross && crossHomeFa && (
@@ -541,7 +561,37 @@ const SectionBlock = memo(function SectionBlock({
                                      {getFocusAreaInitials(crossHomeFa.name)}
                                    </span>
                                  )}
-                                 <span style={{ fontSize: 12, fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                                 {draftKind === 'new' && (
+                                   <span
+                                     style={{
+                                       position: "absolute",
+                                       top: 0,
+                                       right: 0,
+                                       width: 0,
+                                       height: 0,
+                                       borderStyle: "solid",
+                                       borderWidth: "0 12px 12px 0",
+                                       borderColor: "transparent #16A34A transparent transparent",
+                                       pointerEvents: "none",
+                                     }}
+                                   />
+                                 )}
+                                 {draftKind === 'modified' && (
+                                   <span
+                                     style={{
+                                       position: "absolute",
+                                       top: 0,
+                                       right: 0,
+                                       width: 0,
+                                       height: 0,
+                                       borderStyle: "solid",
+                                       borderWidth: "0 12px 12px 0",
+                                       borderColor: "transparent #D97706 transparent transparent",
+                                       pointerEvents: "none",
+                                     }}
+                                   />
+                                 )}
+                                 <span style={{ fontSize: 14, fontWeight: 800, lineHeight: 1 }}>{label}</span>
                                  {customTimes && (
                                    <span style={{
                                      fontSize: 9,
@@ -554,11 +604,42 @@ const SectionBlock = memo(function SectionBlock({
                                      {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
                                    </span>
                                  )}
+                                 {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
+                                   <span style={{
+                                     position: "absolute",
+                                     bottom: 2,
+                                     left: "50%",
+                                     transform: "translateX(-50%)",
+                                     fontSize: 11,
+                                     fontWeight: 700,
+                                     color: "#D97706",
+                                     whiteSpace: "nowrap",
+                                     pointerEvents: "none",
+                                     lineHeight: 1,
+                                   }}>
+                                     was: {publishedLabel}
+                                   </span>
+                                 )}
+                                 {showDiffOverlay && draftKind === 'new' && (
+                                   <span style={{
+                                     position: "absolute",
+                                     bottom: 2,
+                                     left: "50%",
+                                     transform: "translateX(-50%)",
+                                     fontSize: 11,
+                                     fontWeight: 800,
+                                     color: "#16A34A",
+                                     whiteSpace: "nowrap",
+                                     pointerEvents: "none",
+                                   }}>
+                                     new
+                                   </span>
+                                 )}
                                  {noteTypes.length > 0 && (
                                    <div
                                      style={{
                                        position: "absolute",
-                                       bottom: 3,
+                                       bottom: showDiffOverlay && draftKind ? 15 : 3,
                                        right: 4,
                                        display: "flex",
                                        gap: 2,
@@ -589,23 +670,24 @@ const SectionBlock = memo(function SectionBlock({
                             <div
                               style={{
                                 position: "absolute",
-                                top: "0.625rem",
-                                right: "0.625rem",
-                                bottom: "0.625rem",
-                                left: "0.625rem",
+                                top: "4px",
+                                right: "4px",
+                                bottom: "4px",
+                                left: "4px",
                               }}
                             >
                               <div
                                 style={{
                                   display: "flex",
-                                  borderRadius: 6,
+                                  borderRadius: 3,
                                   overflow: "hidden",
-                                  border: firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)",
-                                  opacity: isDraft ? 0.6 : 1,
+                                  border: getDraftBorder(draftKind, firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)"),
+                                  opacity: draftKind === 'deleted' ? 0.5 : 1,
                                   boxShadow: "none",
                                   cursor: "pointer",
                                   width: "100%",
-                                  height: "100%",
+                                  height: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "calc(100% - 14px)" : "100%",
+                                  textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                 }}
                               >
                                 {labels.map((label, li) => {
@@ -629,7 +711,7 @@ const SectionBlock = memo(function SectionBlock({
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         fontWeight: 800,
                                         borderRight:
                                           li < labels.length - 1
@@ -663,6 +745,39 @@ const SectionBlock = memo(function SectionBlock({
                                   );
                                 })}
                               </div>
+                              {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
+                                <span style={{
+                                  position: "absolute",
+                                  bottom: 2,
+                                  left: "50%",
+                                  transform: "translateX(-50%)",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "#D97706",
+                                  whiteSpace: "nowrap",
+                                  pointerEvents: "none",
+                                  lineHeight: 1,
+                                  zIndex: 1,
+                                }}>
+                                  was: {publishedLabel}
+                                </span>
+                              )}
+                              {showDiffOverlay && draftKind === 'new' && (
+                                <span style={{
+                                  position: "absolute",
+                                  bottom: 2,
+                                  left: "50%",
+                                  transform: "translateX(-50%)",
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: "#16A34A",
+                                  whiteSpace: "nowrap",
+                                  pointerEvents: "none",
+                                  zIndex: 1,
+                                }}>
+                                  new
+                                </span>
+                              )}
                               {noteTypes.length > 0 && (
                                 <div
                                   style={{
@@ -693,6 +808,29 @@ const SectionBlock = memo(function SectionBlock({
                             </div>
                           );
                         })()
+                      ) : showDiffOverlay && draftKind === 'deleted' && publishedLabel ? (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "4px",
+                            right: "4px",
+                            bottom: "4px",
+                            left: "4px",
+                            background: "#FEE2E2",
+                            opacity: 0.35,
+                            border: "2px dashed #DC2626",
+                            borderRadius: 3,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            textDecoration: "line-through",
+                            color: "#DC2626",
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1 }}>
+                            {publishedLabel}
+                          </span>
+                        </div>
                       ) : (
                         <>
                           <div
@@ -818,7 +956,6 @@ export default function ScheduleGrid({
   spanWeeks,
   shiftForKey,
   shiftCodeIdsForKey,
-  isDraftForKey,
   getShiftStyle,
   handleCellClick,
   today,
@@ -834,6 +971,9 @@ export default function ScheduleGrid({
   orgRoles = [],
   isEditMode = true,
   getCustomShiftTimes,
+  draftKindForKey,
+  showDiffOverlay,
+  publishedLabelForKey,
 }: ScheduleGridProps) {
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
@@ -1038,7 +1178,6 @@ export default function ScheduleGrid({
             todayKey={todayKey}
             shiftForKey={shiftForKey}
             shiftCodeIdsForKey={shiftCodeIdsForKey}
-            isDraftForKey={isDraftForKey}
             getShiftStyle={getShiftStyle}
             handleCellClick={handleCellClick}
             colWidth={colWidth}
@@ -1052,6 +1191,9 @@ export default function ScheduleGrid({
             noteTypesForKey={noteTypesForKey}
             onTooltipChange={setTooltip}
             getCustomShiftTimes={getCustomShiftTimes}
+            draftKindForKey={draftKindForKey}
+            showDiffOverlay={showDiffOverlay}
+            publishedLabelForKey={publishedLabelForKey}
             certifications={certifications}
             orgRoles={orgRoles}
           />

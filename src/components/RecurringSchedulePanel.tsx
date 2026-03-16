@@ -1,14 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Employee, FocusArea, RegularShift, ShiftCode, NamedItem } from "@/types";
+import { Employee, FocusArea, RecurringShift, ShiftCode, NamedItem } from "@/types";
 import * as db from "@/lib/db";
 import { getCertName } from "@/lib/utils";
 import { toast } from "sonner";
+import ShiftPicker from "./ShiftPicker";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-interface RegularSchedulePanelProps {
+function fmt12h(time24: string | null | undefined): string {
+  if (!time24) return "";
+  const [h, m] = time24.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+interface RecurringSchedulePanelProps {
   employee: Employee;
   orgId: string;
   shiftCodes: ShiftCode[];
@@ -54,78 +63,9 @@ export function DayPicker({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, onClose]);
 
-  const regularShifts = shiftCodes.filter((st) => !st.isOffDay);
-  const offDayShifts = shiftCodes.filter((st) => st.isOffDay);
-
-  // Group regular shifts by focus area
-  const generalShifts = regularShifts.filter((st) => !st.focusAreaId);
-  const groupedByFocusArea = focusAreas
-    .map((fa) => ({
-      focusArea: fa,
-      shifts: regularShifts.filter((st) => st.focusAreaId === fa.id),
-    }))
-    .filter((g) => g.shifts.length > 0);
-  const hasFocusAreaGroups = groupedByFocusArea.length > 0;
-
-  const sectionLabel: React.CSSProperties = {
-    fontSize: 10,
-    fontWeight: 700,
-    color: "var(--color-text-subtle)",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    marginBottom: 6,
-  };
-
-  function ShiftTile({ st, isOff = false }: { st?: ShiftCode; isOff?: boolean }) {
-    const isActive = isOff ? currentLabel === "" : currentLabel === st?.label;
-    const bg = isOff ? "#F8FAFC" : st?.color ?? "#F8FAFC";
-    const border = isOff ? "#CBD5E1" : st?.border ?? "#CBD5E1";
-    const text = isOff ? "#64748B" : st?.text ?? "#64748B";
-
-    return (
-      <button
-        onClick={() => {
-          onSelect(isOff ? "" : st!.label);
-          onClose();
-        }}
-        style={{
-          background: isActive ? bg : "#F8FAFC",
-          border: isActive ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(0,0,0,0.1)",
-          borderRadius: 6,
-          padding: "8px 10px",
-          cursor: "pointer",
-          textAlign: "left",
-          transition: "border-color 120ms ease, background 120ms ease",
-          outline: isActive ? `2px solid ${border}` : "none",
-          outlineOffset: 1,
-        }}
-        onMouseEnter={(e) => {
-          if (!isActive) e.currentTarget.style.background = `${bg}25`;
-        }}
-        onMouseLeave={(e) => {
-          if (!isActive) e.currentTarget.style.background = "#fff";
-        }}
-      >
-        {isOff ? (
-          <div style={{ fontSize: 11, fontWeight: 700, color:"#64748B" }}>— Off —</div>
-        ) : (
-          <>
-            <div style={{ fontWeight: 800, fontSize: 13, color: isActive ? text : border }}>
-              {st!.label}
-            </div>
-            {st!.name && st!.name !== st!.label && (
-              <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 2 }}>
-                {st!.name}
-              </div>
-            )}
-          </>
-        )}
-      </button>
-    );
-  }
 
   return (
-    <div ref={containerRef} style={{ position: "relative" }}>
+    <div ref={containerRef}>
       {/* Trigger */}
       <div
         style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
@@ -152,7 +92,7 @@ export function DayPicker({
             padding: "8px 12px",
             background: shiftCode ? shiftCode.color : "#F8FAFC",
             border: shiftCode ? "1px solid rgba(0,0,0,0.15)" : open ? "1.5px solid #94A3B8" : "1.5px solid #E2E8F0",
-            borderRadius: 6,
+            borderRadius: 8,
             cursor: "pointer",
             fontFamily: "inherit",
             transition: "border-color 120ms ease",
@@ -196,82 +136,31 @@ export function DayPicker({
         </button>
       </div>
 
-      {/* Dropdown panel */}
+      {/* Inline expansion — renders in-flow to avoid clipping by parent overflow */}
       {open && (
         <div
           style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 46,
-            right: 0,
-            zIndex: 200,
+            marginTop: 8,
+            marginLeft: 46,
             background: "#fff",
             border: "1px solid var(--color-border)",
             borderRadius: 10,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            padding: "12px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+            width: 440,
+            padding: "16px 20px",
           }}
         >
-          {/* Off option */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
-            <ShiftTile isOff />
-          </div>
-
-          {/* Regular shifts — grouped by focus area when available */}
-          {hasFocusAreaGroups ? (
-            <>
-              {groupedByFocusArea.map(({ focusArea, shifts }) => (
-                <div key={focusArea.id}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                    {focusArea.name}
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                    {shifts.map((st) => (
-                      <ShiftTile key={st.id} st={st} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {generalShifts.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                    General
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                    {generalShifts.map((st) => (
-                      <ShiftTile key={st.id} st={st} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            regularShifts.length > 0 && (
-              <div>
-                <div style={sectionLabel}>Shifts</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  {regularShifts.map((st) => (
-                    <ShiftTile key={st.id} st={st} />
-                  ))}
-                </div>
-              </div>
-            )
-          )}
-
-          {/* Off day types */}
-          {offDayShifts.length > 0 && (
-            <div>
-              <div style={sectionLabel}>Off Day Types</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                {offDayShifts.map((st) => (
-                  <ShiftTile key={st.id} st={st} />
-                ))}
-              </div>
-            </div>
-          )}
+          <ShiftPicker
+            shiftCodes={shiftCodes}
+            focusAreas={focusAreas}
+            currentShiftCodeIds={currentLabel && currentLabel !== "OFF" ? shiftCodes.filter(sc => currentLabel.split("/").includes(sc.label)).map(sc => sc.id) : []}
+            onSelect={(label) => {
+              onSelect(label);
+              onClose();
+            }}
+            multiSelect={false}
+            closeOnSelect={true}
+          />
         </div>
       )}
     </div>
@@ -279,7 +168,7 @@ export function DayPicker({
 }
 
 // ── Main panel ────────────────────────────────────────────────────────────────
-export default function RegularSchedulePanel({
+export default function RecurringSchedulePanel({
   employee,
   orgId,
   shiftCodes,
@@ -287,8 +176,8 @@ export default function RegularSchedulePanel({
   focusAreas,
   certifications,
   onClose,
-}: RegularSchedulePanelProps) {
-  const [regularShifts, setRegularShifts] = useState<RegularShift[]>([]);
+}: RecurringSchedulePanelProps) {
+  const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -304,7 +193,7 @@ export default function RegularSchedulePanel({
   })();
 
   useEffect(() => {
-    db.fetchRegularShifts(orgId, employee.id, shiftCodeMap)
+    db.fetchRecurringShifts(orgId, employee.id, shiftCodeMap)
       .then((rows) => {
         const map: Record<number, string> = {};
         for (const rs of rows) {
@@ -313,7 +202,7 @@ export default function RegularSchedulePanel({
           }
         }
         setSchedule(map);
-        setRegularShifts(rows);
+        setRecurringShifts(rows);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -333,22 +222,22 @@ export default function RegularSchedulePanel({
     try {
       for (let day = 0; day < 7; day++) {
         const newLabel = schedule[day];
-        const existing = regularShifts.filter((rs) => rs.dayOfWeek === day);
+        const existing = recurringShifts.filter((rs) => rs.dayOfWeek === day);
 
         if (newLabel) {
           const sc = shiftCodes.find(s => s.label === newLabel);
           if (!sc) continue;
-          await db.upsertRegularShift(employee.id, orgId, day, sc.id, todayKey);
+          await db.upsertRecurringShift(employee.id, orgId, day, sc.id, todayKey);
         } else {
           for (const rs of existing) {
-            await db.deleteRegularShift(employee.id, rs.dayOfWeek, rs.effectiveFrom);
+            await db.deleteRecurringShift(employee.id, rs.dayOfWeek, rs.effectiveFrom);
           }
         }
       }
-      toast.success("Regular schedule saved");
+      toast.success("Recurring schedule saved");
       onClose();
     } catch (err: any) {
-      toast.error("Failed to save regular schedule");
+      toast.error("Failed to save recurring schedule");
       setError(err.message ?? "Save failed");
     } finally {
       setSaving(false);

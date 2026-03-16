@@ -48,7 +48,9 @@ export default function CustomSelect<T extends string | number>({
         position: "absolute",
         top: rect.bottom + window.scrollY + 6,
         left: rect.left + window.scrollX,
-        width: rect.width,
+        minWidth: rect.width,
+        width: "max-content",
+        maxWidth: "min(350px, 90vw)",
         maxHeight: maxH,
         zIndex: 9999,
       });
@@ -157,7 +159,8 @@ export default function CustomSelect<T extends string | number>({
               borderRadius: 7,
               cursor: "pointer",
               fontFamily: "inherit",
-              whiteSpace: "nowrap",
+              whiteSpace: "normal",
+              wordBreak: "break-word",
               transition: "background 100ms ease",
             }}
             onMouseEnter={(e) => {

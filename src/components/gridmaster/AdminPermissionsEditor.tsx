@@ -12,7 +12,7 @@ const PERMISSION_GROUPS = [
     permissions: [
       { key: "canEditShifts", label: "Edit Shifts" },
       { key: "canPublishSchedule", label: "Publish Schedule" },
-      { key: "canApplyRegularSchedule", label: "Apply Regular Schedule" },
+      { key: "canApplyRecurringSchedule", label: "Apply Recurring Schedule" },
     ],
   },
   {
@@ -24,7 +24,7 @@ const PERMISSION_GROUPS = [
   {
     label: "Recurring Shifts",
     permissions: [
-      { key: "canManageRegularShifts", label: "Manage Regular Shifts" },
+      { key: "canManageRecurringShifts", label: "Manage Recurring Shifts" },
       { key: "canManageShiftSeries", label: "Manage Shift Series" },
     ],
   },
@@ -40,7 +40,7 @@ const PERMISSION_GROUPS = [
       { key: "canManageFocusAreas", label: "Manage Focus Areas" },
       { key: "canManageShiftCodes", label: "Manage Shift Codes" },
       { key: "canManageIndicatorTypes", label: "Manage Indicator Types" },
-      { key: "canManageOrgSettings", label: "Manage Organization Settings" },
+      { key: "canManageOrgLabels", label: "Manage Custom Labels" },
     ],
   },
 ] as const;
@@ -49,9 +49,9 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canViewSchedule: true,
   canEditShifts: false,
   canPublishSchedule: false,
-  canApplyRegularSchedule: false,
+  canApplyRecurringSchedule: false,
   canEditNotes: false,
-  canManageRegularShifts: false,
+  canManageRecurringShifts: false,
   canManageShiftSeries: false,
   canViewStaff: true,
   canManageEmployees: false,
@@ -59,6 +59,7 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canManageShiftCodes: false,
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,
+  canManageOrgLabels: false,
 };
 
 export default function AdminPermissionsEditor({

@@ -19,6 +19,7 @@ import { addDays, formatDateKey, getWeekStart } from "@/lib/utils";
 import { filterAndSortEmployees } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
 import type { DraftSession } from "@/lib/db";
+import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { validateConfig, supabase } from "@/lib/supabase";
 import { handleApiError } from "@/lib/error-handling";
 import { usePermissions } from "@/hooks";
@@ -35,10 +36,11 @@ import {
   Organization,
   FocusArea,
   NoteType,
-  RegularShift,
+  RecurringShift,
   SeriesFrequency,
   SeriesScope,
   NamedItem,
+  DraftKind,
 } from "@/types";
 
 /** Compute the min/max date range of all draft changes from in-memory state. */
@@ -99,8 +101,8 @@ function SchedulerContent() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [regularShifts, setRegularShifts] = useState<RegularShift[]>([]);
-  const [isApplyingRegular, setIsApplyingRegular] = useState(false);
+  const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
+  const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [activePrintConfig, setActivePrintConfig] = useState<PrintConfig | null>(null);
   const [repeatModalState, setRepeatModalState] = useState<{
@@ -112,21 +114,14 @@ function SchedulerContent() {
   const [showDraftConfirmModal, setShowDraftConfirmModal] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showDiffOverlay, setShowDiffOverlay] = useState(false);
 
-  const hasUnpublishedChanges = useMemo(() => {
-    return (
-      Object.values(shifts).some(shift => shift.isDraft) ||
-      Object.values(notes).some(noteList => noteList.some(n => n.status !== 'published'))
-    );
-  }, [shifts, notes]);
+  const draftBreakdown = useMemo(
+    () => computeDraftBreakdown(shifts, notes),
+    [shifts, notes],
+  );
 
-  const draftChangeCount = useMemo(() => {
-    let count = 0;
-    for (const shift of Object.values(shifts)) {
-      if (shift.isDraft) count++;
-    }
-    return count;
-  }, [shifts]);
+  const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
 
   /** True when the schedule has both published and draft shifts (a mixed state). */
   const hasPublishedShifts = useMemo(() => {
@@ -173,13 +168,13 @@ function SchedulerContent() {
         ]);
         const activeCodes = allCodes.filter(sc => !sc.archivedAt);
         const codeMap = new Map(allCodes.map(sc => [sc.id, sc.label]));
-        const [emps, benched, terminated, shiftData, noteRows, regShifts] = await Promise.all([
+        const [emps, benched, terminated, shiftData, noteRows, recShifts] = await Promise.all([
           db.fetchEmployees(org.id, ["active"]),
           db.fetchEmployees(org.id, ["benched"]),
           db.fetchEmployees(org.id, ["terminated"]),
           db.fetchShifts(org.id, canEditShifts, codeMap),
           db.fetchScheduleNotes(org.id),
-          db.fetchRegularShifts(org.id, undefined, codeMap),
+          db.fetchRecurringShifts(org.id, undefined, codeMap),
         ]);
         const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
         for (const note of noteRows) {
@@ -202,7 +197,7 @@ function SchedulerContent() {
         setTerminatedEmployees(terminated);
         setShifts(shiftData);
         setNotes(noteMap);
-        setRegularShifts(regShifts);
+        setRecurringShifts(recShifts);
       } catch (err) {
         console.error(err);
         handleApiError(err);
@@ -385,10 +380,20 @@ function SchedulerContent() {
     [shifts],
   );
 
-  const isDraftForKey = useCallback(
-    (empId: string, date: Date): boolean =>
-      (draftCheckComplete || isEditMode) && (shifts[`${empId}_${formatDateKey(date)}`]?.isDraft ?? false),
+  const draftKindForKey = useCallback(
+    (empId: string, date: Date): DraftKind => {
+      if (!draftCheckComplete && !isEditMode) return null;
+      return shifts[`${empId}_${formatDateKey(date)}`]?.draftKind ?? null;
+    },
     [shifts, draftCheckComplete, isEditMode],
+  );
+
+  const publishedLabelForKey = useCallback(
+    (empId: string, date: Date): string | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      return entry?.publishedLabel || null;
+    },
+    [shifts],
   );
 
   const getCustomShiftTimes = useCallback(
@@ -444,7 +449,13 @@ function SchedulerContent() {
       if (label === "OFF" || shiftCodeIds.length === 0) {
         setShifts((prev) => {
           const next = { ...prev };
-          next[key] = { label: "OFF", shiftCodeIds: [], isDraft: true, isDelete: true };
+          const existing = prev[key];
+          next[key] = {
+            label: "OFF", shiftCodeIds: [], isDraft: true, isDelete: true,
+            draftKind: existing?.publishedShiftCodeIds?.length ? 'deleted' : 'new',
+            publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
+            publishedLabel: existing?.publishedLabel ?? '',
+          };
           return next;
         });
         db.deleteShift(empId, dateKey).catch((err) => {
@@ -452,7 +463,19 @@ function SchedulerContent() {
           console.error(err);
         });
       } else {
-        setShifts((prev) => ({ ...prev, [key]: { label, shiftCodeIds, isDraft: true } }));
+        setShifts((prev) => {
+          const existing = prev[key];
+          const hasPublished = existing?.publishedShiftCodeIds?.length ?? 0;
+          return {
+            ...prev,
+            [key]: {
+              label, shiftCodeIds, isDraft: true,
+              draftKind: hasPublished ? 'modified' : 'new',
+              publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
+              publishedLabel: existing?.publishedLabel ?? '',
+            },
+          };
+        });
         db.upsertShift(empId, dateKey, shiftCodeIds, orgId).catch((err) => {
           toast.error("Failed to save shift");
           console.error(err);
@@ -596,9 +619,9 @@ function SchedulerContent() {
     [repeatModalState, org, canEditShifts, shiftCodes, shiftCodeMap],
   );
 
-  const handleApplyRegular = useCallback(async () => {
+  const handleApplyRecurring = useCallback(async () => {
     if (!org) return;
-    setIsApplyingRegular(true);
+    setIsApplyingRecurring(true);
     try {
       let startDate: Date;
       let endDate: Date;
@@ -610,15 +633,15 @@ function SchedulerContent() {
         endDate = addDays(weekStart, spanWeeks * 7 - 1);
       }
 
-      // Always fetch fresh regular shifts so we pick up any recently saved templates
-      const freshRegularShifts = await db.fetchRegularShifts(org.id, undefined, shiftCodeMap);
-      setRegularShifts(freshRegularShifts);
+      // Always fetch fresh recurring shifts so we pick up any recently saved templates
+      const freshRecurringShifts = await db.fetchRecurringShifts(org.id, undefined, shiftCodeMap);
+      setRecurringShifts(freshRecurringShifts);
 
-      const generated = await db.applyRegularSchedules(
+      const generated = await db.applyRecurringSchedules(
         org.id,
         startDate,
         endDate,
-        freshRegularShifts,
+        freshRecurringShifts,
         shifts,
       );
 
@@ -628,19 +651,22 @@ function SchedulerContent() {
           for (const { empId, date, label } of generated) {
             // Look up the shift code ID from the label
             const sc = shiftCodes.find(s => s.label === label);
-            next[`${empId}_${date}`] = { label, shiftCodeIds: sc ? [sc.id] : [], isDraft: true, fromRegular: true };
+            next[`${empId}_${date}`] = {
+              label, shiftCodeIds: sc ? [sc.id] : [], isDraft: true, fromRecurring: true,
+              draftKind: 'new', publishedShiftCodeIds: [], publishedLabel: '',
+            };
           }
           return next;
         });
-        toast.success(`Regular schedule applied (${generated.length} shifts)`);
+        toast.success(`Recurring schedule applied (${generated.length} shifts)`);
       }
     } catch (err) {
-      toast.error("Failed to apply regular schedule");
+      toast.error("Failed to apply recurring schedule");
       console.error(err);
     } finally {
-      setIsApplyingRegular(false);
+      setIsApplyingRecurring(false);
     }
-  }, [org, spanWeeks, monthStart, weekStart, regularShifts, shifts]);
+  }, [org, spanWeeks, monthStart, weekStart, recurringShifts, shifts]);
 
   const handleNoteToggle = useCallback(
     async (noteType: NoteType, active: boolean, focusAreaId: number) => {
@@ -891,6 +917,7 @@ function SchedulerContent() {
       setDraftSession(null);
       setShowDraftRecoveryBanner(false);
       setIsEditMode(false);
+      setShowDiffOverlay(false);
       toast.success("Schedule published");
 
       // Notify other tabs/users to refetch the published schedule
@@ -942,6 +969,7 @@ function SchedulerContent() {
       setDraftSession(null);
       setShowDraftRecoveryBanner(false);
       setIsEditMode(false);
+      setShowDiffOverlay(false);
       toast.success("Changes discarded");
     } catch (err: any) {
       toast.error("Failed to discard changes");
@@ -958,6 +986,7 @@ function SchedulerContent() {
       const range = getDraftDateRangeFromState(shifts, notes);
       if (!range) {
         setIsEditMode(false);
+        setShowDiffOverlay(false);
         return;
       }
       const { data: { session } } = await supabase.auth.getSession();
@@ -970,6 +999,7 @@ function SchedulerContent() {
       setDraftSession({ id: "", orgId: org.id, savedBy: userId, startDate, endDate, savedAt: new Date().toISOString() });
       setShowDraftRecoveryBanner(true);
       setIsEditMode(false);
+      setShowDiffOverlay(false);
       toast.success("Draft saved");
     } catch (err) {
       toast.error("Failed to save draft");
@@ -1214,7 +1244,9 @@ function SchedulerContent() {
             isCanceling={isCanceling}
             isSavingDraft={isSavingDraft}
             hasChanges={hasUnpublishedChanges}
-            changeCount={draftChangeCount}
+            breakdown={draftBreakdown}
+            showDiff={showDiffOverlay}
+            onToggleDiff={() => setShowDiffOverlay(v => !v)}
           />
         )}
         {showDraftRecoveryBanner && draftSession && !isEditMode && viewMode === "schedule" && (() => {
@@ -1271,8 +1303,8 @@ function SchedulerContent() {
                   setIsEditMode((v) => !v);
                 }
               }}
-              onApplyRegular={handleApplyRegular}
-              isApplyingRegular={isApplyingRegular}
+              onApplyRecurring={handleApplyRecurring}
+              isApplyingRecurring={isApplyingRecurring}
               onPrintOpen={() => setShowPrintOptions(true)}
               hasSavedDraft={showDraftRecoveryBanner && draftSession != null && !isEditMode}
               hasMixedSchedule={showDraftRecoveryBanner && draftSession != null && !isEditMode && hasPublishedShifts}
@@ -1293,7 +1325,6 @@ function SchedulerContent() {
               spanWeeks={spanWeeks}
               shiftForKey={shiftForKey}
               shiftCodeIdsForKey={shiftCodeIdsForKey}
-              isDraftForKey={isDraftForKey}
               getShiftStyle={getShiftStyle}
               handleCellClick={handleCellClick}
               today={today}
@@ -1309,6 +1340,9 @@ function SchedulerContent() {
               activeFocusArea={activeFocusArea}
               isEditMode={isEditMode}
               getCustomShiftTimes={getCustomShiftTimes}
+              draftKindForKey={draftKindForKey}
+              showDiffOverlay={showDiffOverlay}
+              publishedLabelForKey={publishedLabelForKey}
             />
           </div>
         )}
@@ -1325,6 +1359,7 @@ function SchedulerContent() {
             shiftCodes={shiftCodes}
             shiftCategories={shiftCategories}
             activeFocusArea={activeFocusArea}
+            draftKindForKey={draftKindForKey}
           />
         )}
 
@@ -1393,6 +1428,7 @@ function SchedulerContent() {
           customStartTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customStartTime}
           customEndTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customEndTime}
           onCustomTimeChange={canEditShifts ? handleCustomTimeChange : undefined}
+          publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
         />
       )}
 

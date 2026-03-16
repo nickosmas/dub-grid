@@ -10,7 +10,7 @@ import * as fc from "fast-check";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type OrganizationRole = "admin" | "scheduler" | "supervisor" | "user";
+type OrganizationRole = "super_admin" | "admin" | "user";
 type PromotableRole = "admin" | "gridmaster";
 type AllRoles = OrganizationRole | "gridmaster";
 
@@ -164,11 +164,11 @@ function createMockRoleChangeSystem() {
 // ── Arbitraries ───────────────────────────────────────────────────────────────
 
 const arbUuid = fc.uuid();
-const arbOrgRole = fc.constantFrom<OrganizationRole>("admin", "scheduler", "supervisor", "user");
+const arbOrgRole = fc.constantFrom<OrganizationRole>("super_admin", "admin", "user");
 const arbIdempotencyKey = fc.uuid();
 const arbPromotableRole = fc.constantFrom<PromotableRole>("admin", "gridmaster");
-const arbNonPromotableOrgRole = fc.constantFrom<OrganizationRole>("scheduler", "supervisor", "user");
-const arbAllRoles = fc.constantFrom<AllRoles>("admin", "scheduler", "supervisor", "user", "gridmaster");
+const arbNonPromotableOrgRole = fc.constantFrom<OrganizationRole>("user");
+const arbAllRoles = fc.constantFrom<AllRoles>("super_admin", "admin", "user", "gridmaster");
 
 // ── Property Tests ────────────────────────────────────────────────────────────
 
@@ -3197,7 +3197,7 @@ describe("Property 27: Middleware Route Protection", () => {
 
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-  const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+  const arbOrgRole = fc.constantFrom("super_admin", "admin", "user", undefined);
   const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for settings paths
@@ -3257,7 +3257,7 @@ describe("Property 27: Middleware Route Protection", () => {
       fc.assert(
         fc.property(
           fc.constantFrom("none", undefined),
-          fc.constantFrom("admin", "scheduler", "supervisor", "user"),
+          fc.constantFrom("super_admin", "admin", "user"),
           arbOrgId,
           (platformRole, orgRole, orgId) => {
             const claims = {
@@ -3300,9 +3300,8 @@ describe("Property 27: Middleware Route Protection", () => {
       fc.assert(
         fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
           expect(getRoleLevel("gridmaster")).toBe(4);
-          expect(getRoleLevel("admin")).toBe(3);
-          expect(getRoleLevel("scheduler")).toBe(2);
-          expect(getRoleLevel("supervisor")).toBe(1);
+          expect(getRoleLevel("super_admin")).toBe(3);
+          expect(getRoleLevel("admin")).toBe(2);
           expect(getRoleLevel("user")).toBe(0);
         }),
         { numRuns: 100 }
@@ -3312,7 +3311,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("returns 0 for unknown roles", () => {
       // List of Object prototype properties to exclude from testing
       const objectPrototypeProps = Object.getOwnPropertyNames(Object.prototype);
-      const knownRoles = ["gridmaster", "admin", "scheduler", "supervisor", "user"];
+      const knownRoles = ["gridmaster", "super_admin", "admin", "user"];
       const excludedStrings = [...objectPrototypeProps, ...knownRoles];
 
       fc.assert(
@@ -3331,7 +3330,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level < 3 are redirected from /settings to /dashboard", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("scheduler", "supervisor", "user"),
+          fc.constantFrom("admin", "user"),
           arbSettingsPath,
           (orgRole, settingsPath) => {
             const claims = {
@@ -3358,14 +3357,14 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level >= 3 can access /settings routes", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("admin", "gridmaster"),
+          fc.constantFrom("super_admin", "gridmaster"),
           arbSettingsPath,
           (role, settingsPath) => {
-            // For admin, use org_role; for gridmaster, use platform_role
+            // For super_admin, use org_role; for gridmaster, use platform_role
             const claims =
               role === "gridmaster"
                 ? { platform_role: "gridmaster", org_role: undefined, org_id: "test-org-id" }
-                : { platform_role: "none", org_role: "admin", org_id: "test-org-id" };
+                : { platform_role: "none", org_role: "super_admin", org_id: "test-org-id" };
 
             const effectiveRole = calculateEffectiveRole(claims);
             const level = getRoleLevel(effectiveRole);
@@ -3410,7 +3409,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level < 2 are redirected from /schedule to /view", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("supervisor", "user"),
+          fc.constantFrom("user"),
           arbSchedulePath,
           (orgRole, schedulePath) => {
             const claims = {
@@ -3437,7 +3436,7 @@ describe("Property 27: Middleware Route Protection", () => {
     it("users with level >= 2 can access /schedule routes", () => {
       fc.assert(
         fc.property(
-          fc.constantFrom("scheduler", "admin", "gridmaster"),
+          fc.constantFrom("admin", "gridmaster"),
           arbSchedulePath,
           (role, schedulePath) => {
             // Build claims based on role
@@ -3502,10 +3501,10 @@ describe("Property 27: Middleware Route Protection", () => {
   });
 
   describe("role level boundaries", () => {
-    it("level 2 (scheduler) can access /schedule but not /settings", () => {
+    it("level 2 (admin) can access /schedule but not /settings", () => {
       fc.assert(
         fc.property(arbSettingsPath, arbSchedulePath, (settingsPath, schedulePath) => {
-          const level = 2; // scheduler level
+          const level = 2; // admin level
 
           // Should be redirected from /settings
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
@@ -3519,10 +3518,10 @@ describe("Property 27: Middleware Route Protection", () => {
       );
     });
 
-    it("level 3 (admin) can access both /settings and /schedule", () => {
+    it("level 3 (super_admin) can access both /settings and /schedule", () => {
       fc.assert(
         fc.property(arbSettingsPath, arbSchedulePath, (settingsPath, schedulePath) => {
-          const level = 3; // admin level
+          const level = 3; // super_admin level
 
           // Should be able to access /settings
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
@@ -3531,23 +3530,6 @@ describe("Property 27: Middleware Route Protection", () => {
           // Should be able to access /schedule
           const scheduleRedirect = simulateRouteProtection(level, schedulePath);
           expect(scheduleRedirect).toBeNull();
-        }),
-        { numRuns: 100 }
-      );
-    });
-
-    it("level 1 (supervisor) cannot access /settings or /schedule", () => {
-      fc.assert(
-        fc.property(arbSettingsPath, arbSchedulePath, (settingsPath, schedulePath) => {
-          const level = 1; // supervisor level
-
-          // Should be redirected from /settings
-          const settingsRedirect = simulateRouteProtection(level, settingsPath);
-          expect(settingsRedirect).toBe("/dashboard");
-
-          // Should be redirected from /schedule
-          const scheduleRedirect = simulateRouteProtection(level, schedulePath);
-          expect(scheduleRedirect).toBe("/view");
         }),
         { numRuns: 100 }
       );
@@ -3642,7 +3624,7 @@ describe("Property 28: Middleware Header Injection", () => {
 
   // Arbitraries for JWT claims
   const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-  const arbOrgRole = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+  const arbOrgRole = fc.constantFrom("super_admin", "admin", "user", undefined);
   const arbOrgId = fc.option(fc.uuid(), { nil: undefined });
 
   // Arbitrary for JWT claims

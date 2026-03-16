@@ -108,49 +108,76 @@ export default function AllUsersView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
-        All Users ({users.length})
-      </h2>
-
       {error && (
         <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
           {error}
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <input
-          className="dg-input"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by email…"
-          style={{ maxWidth: 280 }}
-        />
-        <CustomSelect
-          value={roleFilter}
-          options={[
-            { value: "all", label: "All Roles" },
-            { value: "gridmaster", label: "Gridmaster" },
-            { value: "super_admin", label: "Super Admin" },
-            { value: "admin", label: "Admin" },
-            { value: "user", label: "User" },
-          ]}
-          onChange={setRoleFilter}
-          style={{ width: 160 }}
-        />
-        <CustomSelect
-          value={orgFilter}
-          options={[
-            { value: "all", label: "All Organizations" },
-            ...organizations.map((c) => ({ value: c.id, label: c.name })),
-          ]}
-          onChange={setOrgFilter}
-          style={{ width: 200 }}
-        />
-        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-        </span>
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+        {/* Left group: filter dropdowns */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", whiteSpace: "nowrap" }}>Filter</span>
+          <CustomSelect
+            value={roleFilter}
+            options={[
+              { value: "all", label: "All Roles" },
+              { value: "gridmaster", label: "Gridmaster" },
+              { value: "super_admin", label: "Super Admin" },
+              { value: "admin", label: "Admin" },
+              { value: "user", label: "User" },
+            ]}
+            onChange={setRoleFilter}
+            style={{ width: "auto", minWidth: 140 }}
+            fontSize={12}
+          />
+          <CustomSelect
+            value={orgFilter}
+            options={[
+              { value: "all", label: "All Organizations" },
+              ...organizations.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            onChange={setOrgFilter}
+            style={{ width: "auto", minWidth: 160 }}
+            fontSize={12}
+          />
+          {(search || roleFilter !== "all" || orgFilter !== "all") && (
+            <button
+              onClick={() => { setSearch(""); setRoleFilter("all"); setOrgFilter("all"); }}
+              style={{
+                background: "none", border: "none", color: "var(--color-today-text)", fontSize: 12,
+                fontWeight: 600, cursor: "pointer", padding: "4px 8px",
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Right group: count, search */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+            {filtered.length} of {users.length}
+          </span>
+          <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
+            <svg
+              width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-faint)" }}
+            >
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              className="dg-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              style={{ paddingLeft: 32, fontSize: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Table & Empty State */}

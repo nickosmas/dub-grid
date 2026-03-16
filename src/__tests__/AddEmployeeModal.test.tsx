@@ -79,8 +79,9 @@ describe("AddEmployeeModal", () => {
 
     it("renders designation selects (one per default row)", () => {
       renderModal();
-      const selects = screen.getAllByRole("combobox");
-      expect(selects.length).toBeGreaterThanOrEqual(1);
+      // CustomSelect renders buttons; the default certification option shows "None" or similar
+      const certButtons = screen.getAllByRole("button", { name: /None|—/ });
+      expect(certButtons.length).toBeGreaterThanOrEqual(1);
     });
 
     it("renders focus area toggle buttons for each focus area (in at least the first row)", () => {

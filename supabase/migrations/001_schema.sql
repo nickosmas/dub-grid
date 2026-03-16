@@ -210,7 +210,7 @@ CREATE TABLE public.shifts (
   user_id                  UUID,
   version                  BIGINT NOT NULL DEFAULT 0,
   series_id                UUID,
-  from_regular             BOOLEAN NOT NULL DEFAULT false,
+  from_recurring           BOOLEAN NOT NULL DEFAULT false,
   custom_start_time        TIME,
   custom_end_time          TIME,
   draft_shift_code_ids     INTEGER[] NOT NULL DEFAULT '{}',
@@ -264,9 +264,9 @@ CREATE TABLE public.indicator_types (
 );
 
 
--- ── regular_shifts ────────────────────────────────────────────────────────────
+-- ── recurring_shifts ────────────────────────────────────────────────────────────
 
-CREATE TABLE public.regular_shifts (
+CREATE TABLE public.recurring_shifts (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   emp_id          UUID NOT NULL,
   org_id          UUID NOT NULL,
@@ -280,7 +280,7 @@ CREATE TABLE public.regular_shifts (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  CONSTRAINT regular_shifts_day_of_week_check CHECK (day_of_week >= 0 AND day_of_week <= 6)
+  CONSTRAINT recurring_shifts_day_of_week_check CHECK (day_of_week >= 0 AND day_of_week <= 6)
 );
 
 
@@ -415,6 +415,18 @@ CREATE TABLE public.schedule_draft_sessions (
 );
 
 
+-- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
+
+CREATE TABLE public.recurring_shifts_draft_sessions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id     UUID NOT NULL,
+  saved_by   UUID NOT NULL,
+  draft_data JSONB NOT NULL DEFAULT '{}'::JSONB,
+  saved_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (org_id)
+);
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 3. FOREIGN KEYS
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -490,13 +502,13 @@ ALTER TABLE public.schedule_notes
 ALTER TABLE public.indicator_types
   ADD CONSTRAINT indicator_types_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
--- regular_shifts
-ALTER TABLE public.regular_shifts
-  ADD CONSTRAINT regular_shifts_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
-  ADD CONSTRAINT regular_shifts_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT regular_shifts_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE RESTRICT,
-  ADD CONSTRAINT regular_shifts_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT regular_shifts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+-- recurring_shifts
+ALTER TABLE public.recurring_shifts
+  ADD CONSTRAINT recurring_shifts_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
+  ADD CONSTRAINT recurring_shifts_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT recurring_shifts_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT recurring_shifts_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT recurring_shifts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- shift_series
 ALTER TABLE public.shift_series
@@ -534,6 +546,11 @@ ALTER TABLE public.user_sessions
 ALTER TABLE public.schedule_draft_sessions
   ADD CONSTRAINT schedule_draft_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT schedule_draft_sessions_saved_by_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id);
+
+-- recurring_shifts_draft_sessions
+ALTER TABLE public.recurring_shifts_draft_sessions
+  ADD CONSTRAINT recurring_shifts_draft_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT recurring_shifts_draft_user_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id);
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -603,12 +620,12 @@ CREATE INDEX idx_schedule_notes_emp ON public.schedule_notes(emp_id);
 CREATE UNIQUE INDEX indicator_types_org_name_active_unique ON public.indicator_types(org_id, name) WHERE archived_at IS NULL;
 CREATE INDEX idx_indicator_types_active ON public.indicator_types(org_id) WHERE archived_at IS NULL;
 
--- regular_shifts
-CREATE INDEX idx_regular_shifts_org ON public.regular_shifts(org_id);
-CREATE INDEX idx_regular_shifts_emp ON public.regular_shifts(emp_id);
-CREATE INDEX idx_regular_shifts_code_id ON public.regular_shifts(shift_code_id);
-CREATE UNIQUE INDEX regular_shifts_emp_day_from_active_unique ON public.regular_shifts(emp_id, day_of_week, effective_from) WHERE archived_at IS NULL;
-CREATE INDEX idx_regular_shifts_active ON public.regular_shifts(org_id) WHERE archived_at IS NULL;
+-- recurring_shifts
+CREATE INDEX idx_recurring_shifts_org ON public.recurring_shifts(org_id);
+CREATE INDEX idx_recurring_shifts_emp ON public.recurring_shifts(emp_id);
+CREATE INDEX idx_recurring_shifts_code_id ON public.recurring_shifts(shift_code_id);
+CREATE UNIQUE INDEX recurring_shifts_emp_day_from_active_unique ON public.recurring_shifts(emp_id, day_of_week, effective_from) WHERE archived_at IS NULL;
+CREATE INDEX idx_recurring_shifts_active ON public.recurring_shifts(org_id) WHERE archived_at IS NULL;
 
 -- shift_series
 CREATE INDEX idx_shift_series_org ON public.shift_series(org_id);

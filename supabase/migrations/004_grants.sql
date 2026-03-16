@@ -21,6 +21,9 @@ GRANT SELECT ON TABLE public.organizations TO supabase_auth_admin;
 -- Hook needs to read/delete jwt_refresh_locks to check/clean locks
 GRANT SELECT, DELETE ON TABLE public.jwt_refresh_locks TO supabase_auth_admin;
 
+-- Recurring shifts draft sessions — explicit grant for authenticated role
+GRANT ALL ON TABLE public.recurring_shifts_draft_sessions TO authenticated;
+
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 2. DEFAULT PRIVILEGES

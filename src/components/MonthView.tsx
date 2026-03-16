@@ -3,8 +3,14 @@
 import React, { useMemo } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
-import { Employee, ShiftCategory, ShiftCode, FocusArea } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, DraftKind } from "@/types";
 import { borderColor } from "@/lib/colors";
+
+const DRAFT_BORDER_COLORS: Record<string, string> = {
+  new: '#16A34A',
+  modified: '#D97706',
+  deleted: '#DC2626',
+};
 
 interface MonthViewProps {
   monthStart: Date;
@@ -17,6 +23,7 @@ interface MonthViewProps {
   shiftCodes?: ShiftCode[];
   shiftCategories: ShiftCategory[];
   activeFocusArea?: number | null;
+  draftKindForKey?: (empId: string, date: Date) => DraftKind;
 }
 
 function buildMonthCells(monthStart: Date): (Date | null)[] {
@@ -52,6 +59,7 @@ export default function MonthView({
   shiftCodes = [],
   shiftCategories,
   activeFocusArea = null,
+  draftKindForKey,
 }: MonthViewProps) {
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
@@ -143,7 +151,7 @@ export default function MonthView({
           const categoryCounts = new Map<number, number>();
           const byFocusArea = new Map<
             string,
-            { name: string; shift: string; style: ShiftCode }[]
+            { name: string; shift: string; style: ShiftCode; draftKind: DraftKind }[]
           >();
 
           filteredEmployees.forEach((emp) => {
@@ -167,7 +175,8 @@ export default function MonthView({
               }
               if (!primaryFaName) return;
               const list = byFocusArea.get(primaryFaName) ?? [];
-              list.push({ name: emp.name, shift: label, style });
+              const dk = draftKindForKey?.(emp.id, date) ?? null;
+              list.push({ name: emp.name, shift: label, style, draftKind: dk });
               byFocusArea.set(primaryFaName, list);
             });
           });
@@ -302,7 +311,7 @@ export default function MonthView({
                           gap: 2,
                         }}
                       >
-                        {workers.map(({ name, shift, style: s }, ni) => (
+                        {workers.map(({ name, shift, style: s, draftKind: dk }, ni) => (
                           <div
                             key={ni}
                             style={{
@@ -315,12 +324,14 @@ export default function MonthView({
                                 key={ni}
                                 style={{
                                   background: s.color,
-                                  border: `1px solid ${borderColor(s.text)}`,
+                                  border: dk ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}` : `1px solid ${borderColor(s.text)}`,
                                   borderRadius: 4,
-                                  padding: "2px 6px",
+                                  padding: dk ? "1px 5px" : "2px 6px",
                                   fontSize: 11,
                                   fontWeight: 600,
                                   color: s.text,
+                                  opacity: dk === 'deleted' ? 0.5 : 1,
+                                  textDecoration: dk === 'deleted' ? 'line-through' : 'none',
                                 }}
                               >{shift}
                             </div>

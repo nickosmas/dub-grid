@@ -11,13 +11,14 @@ import {
   ScheduleNote,
   NoteType,
   IndicatorType,
-  RegularShift,
+  RecurringShift,
   ShiftSeries,
   SeriesFrequency,
   OrganizationUser,
   NamedItem,
   Invitation,
   AssignableOrganizationRole,
+  DraftKind,
 } from "@/types";
 
 // ── Optimistic Locking Error ──────────────────────────────────────────────────
@@ -189,7 +190,7 @@ interface DbShift {
   published_shift_code_ids: number[];
   draft_is_delete: boolean;
   series_id?: string | null;
-  from_regular?: boolean;
+  from_recurring?: boolean;
   custom_start_time?: string | null;
   custom_end_time?: string | null;
 }
@@ -836,7 +837,7 @@ export async function fetchShifts(
 ): Promise<ShiftMap> {
   const { data, error } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, series_id, from_regular, custom_start_time, custom_end_time, employees!inner(org_id)")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, series_id, from_recurring, custom_start_time, custom_end_time, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (error) throw error;
   const map: ShiftMap = {};
@@ -852,14 +853,31 @@ export async function fetchShifts(
 
     const isDraft = hasDraft && JSON.stringify(draftIds) !== JSON.stringify(pubIds);
 
+    // Classify draft change type
+    let draftKind: DraftKind = null;
+    if (isDraft) {
+      if (row.draft_is_delete && pubIds.length > 0) {
+        draftKind = 'deleted';
+      } else if (pubIds.length === 0) {
+        draftKind = 'new';
+      } else {
+        draftKind = 'modified';
+      }
+    }
+
+    const publishedLabel = pubIds.length > 0 ? resolveCodeLabels(pubIds, shiftCodeMap) : '';
+
     if (effectiveIds.length > 0 || (isScheduler && row.draft_is_delete)) {
       map[`${row.emp_id}_${row.date}`] = {
         label: row.draft_is_delete && isScheduler ? "OFF" : resolveCodeLabels(effectiveIds, shiftCodeMap),
         shiftCodeIds: effectiveIds,
         isDraft,
         isDelete: row.draft_is_delete,
+        draftKind,
+        publishedShiftCodeIds: pubIds,
+        publishedLabel,
         seriesId: row.series_id ?? null,
-        fromRegular: row.from_regular ?? false,
+        fromRecurring: row.from_recurring ?? false,
         customStartTime: row.custom_start_time ?? null,
         customEndTime: row.custom_end_time ?? null,
       };
@@ -1413,9 +1431,9 @@ export async function revokeInvitation(invitationId: string): Promise<void> {
   if (error) throw error;
 }
 
-// ── Regular Shifts ────────────────────────────────────────────────────────────
+// ── Recurring Shifts ──────────────────────────────────────────────────────────
 
-interface DbRegularShift {
+interface DbRecurringShift {
   id: string;
   emp_id: string;
   org_id: string;
@@ -1428,7 +1446,7 @@ interface DbRegularShift {
   archived_at: string | null;
 }
 
-function rowToRegularShift(row: DbRegularShift, codeMap: Map<number, string>): RegularShift {
+function rowToRecurringShift(row: DbRecurringShift, codeMap: Map<number, string>): RecurringShift {
   return {
     id: row.id,
     empId: row.emp_id,
@@ -1444,14 +1462,14 @@ function rowToRegularShift(row: DbRegularShift, codeMap: Map<number, string>): R
   };
 }
 
-export async function fetchRegularShifts(
+export async function fetchRecurringShifts(
   orgId: string,
   empId?: string,
   shiftCodeMap?: Map<number, string>,
   includeArchived = false,
-): Promise<RegularShift[]> {
+): Promise<RecurringShift[]> {
   let query = supabase
-    .from("regular_shifts")
+    .from("recurring_shifts")
     .select("*")
     .eq("org_id", orgId)
     .order("day_of_week");
@@ -1459,10 +1477,10 @@ export async function fetchRegularShifts(
   if (empId) query = query.eq("emp_id", empId);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data as DbRegularShift[]).map(r => rowToRegularShift(r, shiftCodeMap ?? new Map()));
+  return (data as DbRecurringShift[]).map(r => rowToRecurringShift(r, shiftCodeMap ?? new Map()));
 }
 
-export async function upsertRegularShift(
+export async function upsertRecurringShift(
   empId: string,
   orgId: string,
   dayOfWeek: number,
@@ -1472,7 +1490,7 @@ export async function upsertRegularShift(
   // Cannot use .upsert() because the unique constraint is a partial index
   // (WHERE archived_at IS NULL) which ON CONFLICT doesn't support.
   const { data, error: updateError } = await supabase
-    .from("regular_shifts")
+    .from("recurring_shifts")
     .update({ shift_code_id: shiftCodeId })
     .eq("emp_id", empId)
     .eq("day_of_week", dayOfWeek)
@@ -1484,15 +1502,15 @@ export async function upsertRegularShift(
 
   if (!data || data.length === 0) {
     const { error: insertError } = await supabase
-      .from("regular_shifts")
+      .from("recurring_shifts")
       .insert({ emp_id: empId, org_id: orgId, day_of_week: dayOfWeek, shift_code_id: shiftCodeId, effective_from: effectiveFrom });
     if (insertError) throw new Error(insertError.message);
   }
 }
 
-export async function deleteRegularShift(empId: string, dayOfWeek: number, effectiveFrom: string): Promise<void> {
+export async function deleteRecurringShift(empId: string, dayOfWeek: number, effectiveFrom: string): Promise<void> {
   const { error } = await supabase
-    .from("regular_shifts")
+    .from("recurring_shifts")
     .update({ archived_at: new Date().toISOString() })
     .eq("emp_id", empId)
     .eq("day_of_week", dayOfWeek)
@@ -1501,25 +1519,25 @@ export async function deleteRegularShift(empId: string, dayOfWeek: number, effec
 }
 
 /**
- * Applies regular shift templates to a date range as drafts.
+ * Applies recurring shift templates to a date range as drafts.
  * Only fills slots where no shift currently exists (uses ignoreDuplicates).
  * Returns keys of newly created shifts.
  */
-export async function applyRegularSchedules(
+export async function applyRecurringSchedules(
   orgId: string,
   startDate: Date,
   endDate: Date,
-  regularShifts: RegularShift[],
+  recurringShifts: RecurringShift[],
   existingShifts: ShiftMap,
 ): Promise<{ empId: string; date: string; label: string }[]> {
-  // Group regular shifts by employee
-  const byEmp: Record<string, RegularShift[]> = {};
-  for (const rs of regularShifts) {
+  // Group recurring shifts by employee
+  const byEmp: Record<string, RecurringShift[]> = {};
+  for (const rs of recurringShifts) {
     if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
     byEmp[rs.empId].push(rs);
   }
 
-  const toInsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; draft_is_delete: boolean; org_id: string; from_regular: boolean }[] = [];
+  const toInsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; draft_is_delete: boolean; org_id: string; from_recurring: boolean }[] = [];
   const generated: { empId: string; date: string; label: string }[] = [];
 
   const current = new Date(startDate);
@@ -1540,7 +1558,7 @@ export async function applyRegularSchedules(
       if (existingShifts[mapKey]) continue;
 
       const effective_from_cmp = new Date(current);
-      // Find the best matching regular shift for this day-of-week:
+      // Find the best matching recurring shift for this day-of-week:
       // 1. Prefer a template whose effectiveFrom <= this date (and not expired)
       // 2. Fall back to the earliest template for this day-of-week (covers days
       //    before the template was created, so the full pay period gets filled)
@@ -1562,7 +1580,7 @@ export async function applyRegularSchedules(
       }
 
       if (regular) {
-        toInsert.push({ emp_id: empId, date: dateKey, draft_shift_code_ids: [regular.shiftCodeId], draft_is_delete: false, org_id: orgId, from_regular: true });
+        toInsert.push({ emp_id: empId, date: dateKey, draft_shift_code_ids: [regular.shiftCodeId], draft_is_delete: false, org_id: orgId, from_recurring: true });
         generated.push({ empId, date: dateKey, label: regular.shiftLabel });
       }
     }
@@ -1633,6 +1651,60 @@ export async function saveDraftSession(
 export async function deleteDraftSession(orgId: string): Promise<void> {
   const { error } = await supabase
     .from("schedule_draft_sessions")
+    .delete()
+    .eq("org_id", orgId);
+  if (error) throw error;
+}
+
+// ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
+
+export interface RecurringDraft {
+  id: string;
+  orgId: string;
+  savedBy: string;
+  draftData: Record<string, Record<number, string>>;
+  savedAt: string;
+}
+
+export async function getRecurringDraft(orgId: string): Promise<RecurringDraft | null> {
+  const { data, error } = await supabase
+    .from("recurring_shifts_draft_sessions")
+    .select("*")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    id: data.id,
+    orgId: data.org_id,
+    savedBy: data.saved_by,
+    draftData: data.draft_data as Record<string, Record<number, string>>,
+    savedAt: data.saved_at,
+  };
+}
+
+export async function saveRecurringDraft(
+  orgId: string,
+  savedBy: string,
+  draftData: Record<string, Record<number, string>>,
+): Promise<void> {
+  const { error } = await supabase
+    .from("recurring_shifts_draft_sessions")
+    .upsert(
+      {
+        org_id: orgId,
+        saved_by: savedBy,
+        draft_data: draftData,
+        saved_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id" },
+    );
+  if (error) throw error;
+}
+
+export async function deleteRecurringDraft(orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("recurring_shifts_draft_sessions")
     .delete()
     .eq("org_id", orgId);
   if (error) throw error;

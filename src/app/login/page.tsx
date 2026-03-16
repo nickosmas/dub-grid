@@ -126,7 +126,7 @@ function DomainSelector() {
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
     if (tapCountRef.current >= 5) {
       tapCountRef.current = 0;
-      window.location.href = "/admin/login";
+      window.location.href = "/gridmaster/login";
       return;
     }
     tapTimerRef.current = setTimeout(() => {
@@ -399,7 +399,7 @@ function GridmasterLogin() {
       });
       if (error) throw error;
 
-      window.location.replace("/admin");
+      window.location.replace("/gridmaster");
 
       setTimeout(() => {
         setLoading(false);
@@ -587,12 +587,12 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
-  // Skip re-validation if the DomainSelector already verified this slug
+  // Validate subdomain in the background — never block form render.
+  // DomainSelector already validates before redirecting here (?verified=1),
+  // and the post-login JWT check catches org mismatches regardless.
   const alreadyVerified = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("verified") === "1";
-  const [validating, setValidating] = useState(!alreadyVerified);
 
-  // Validate subdomain corresponds to a real organization on mount
   useEffect(() => {
     if (alreadyVerified) return;
     let cancelled = false;
@@ -601,18 +601,14 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`);
         const { valid } = await res.json();
         if (!cancelled && !valid) {
-          // Redirect to apex login with error hint
           const parsed = parseHost(window.location.host);
           const { protocol } = window.location;
           const portStr = parsed.port || "";
           window.location.replace(`${protocol}//${parsed.rootDomain}${portStr}/login`);
-          return;
         }
       } catch {
-        // If validation fails (network error), allow login attempt —
-        // the post-login JWT check will still catch mismatches
+        // Network error — allow login attempt; JWT check catches mismatches
       }
-      if (!cancelled) setValidating(false);
     }
     validate();
     return () => { cancelled = true; };
@@ -710,19 +706,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const baseDomain = parsed?.rootDomain ?? "localhost";
-
-  // Don't render the form until we've confirmed the subdomain is valid
-  if (validating) {
-    return (
-      <PageShell>
-        <Card>
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#6B7280", fontSize: "15px" }}>
-            Verifying workspace…
-          </div>
-        </Card>
-      </PageShell>
-    );
-  }
 
   return (
     <PageShell>

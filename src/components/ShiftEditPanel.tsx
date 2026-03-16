@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { formatDate, getCertName } from "@/lib/utils";
 import { EditModalState, ShiftCode, NoteType, IndicatorType, SeriesScope, FocusArea, NamedItem } from "@/types";
+import ShiftPicker from "./ShiftPicker";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
@@ -26,6 +27,8 @@ interface ShiftEditPanelProps {
   customEndTime?: string | null;
   /** Called when user changes the custom time override */
   onCustomTimeChange?: (start: string | null, end: string | null) => void;
+  /** Published shift code IDs — used to identify newly added shifts in split-shift view */
+  publishedShiftCodeIds?: number[];
   /** All focus areas — used to resolve focusAreaId to names */
   focusAreas?: FocusArea[];
   /** All certifications — used to resolve certificationId to names */
@@ -73,6 +76,7 @@ export default function ShiftEditPanel({
   customStartTime,
   customEndTime,
   onCustomTimeChange,
+  publishedShiftCodeIds = [],
   focusAreas = [],
   certifications = [],
 }: ShiftEditPanelProps) {
@@ -157,62 +161,9 @@ export default function ShiftEditPanel({
   const primaryFocusAreaId = modal.empFocusAreaIds[0] ?? 0;
   const [activeTab] = useState<number>(primaryFocusAreaId);
 
-  // Picker tab: default to the section the cell was clicked in, then current shift's area, then primary
-  const [pickerTab, setPickerTab] = useState<number>(() => {
-    if (modal.activeFocusAreaId != null) return modal.activeFocusAreaId;
-    const shiftFa = currentShiftCodeIds.length
-      ? shiftCodes.find((s) => s.id === currentShiftCodeIds[0])?.focusAreaId
-      : null;
-    return shiftFa ?? modal.empFocusAreaIds[0] ?? 0;
-  });
-
   const currentLabels = currentShift
     ? currentShift.split("/").filter((l) => l !== "OFF")
     : [];
-
-  function isQualified(s: ShiftCode) {
-    return (
-      !s.requiredCertificationIds?.length ||
-      (modal.empCertificationId != null && s.requiredCertificationIds.includes(modal.empCertificationId))
-    );
-  }
-
-  // Shifts for a given focus area name (resolved via focusAreaId)
-  function getShiftsForFocusArea(faName: string): ShiftCode[] {
-    const faId = focusAreas.find((fa) => fa.name === faName)?.id;
-    if (faId == null) return [];
-    return shiftCodes.filter(
-      (st) => !st.isGeneral && st.focusAreaId === faId && isQualified(st),
-    );
-  }
-
-
-  // All focus areas that have shift codes, home areas first, then others
-  const allPickerAreas = [
-    ...focusAreas.filter(
-      (fa) =>
-        modal.empFocusAreaIds.includes(fa.id) &&
-        shiftCodes.some((st) => !st.isGeneral && st.focusAreaId === fa.id && isQualified(st)),
-    ),
-    ...focusAreas.filter(
-      (fa) =>
-        !modal.empFocusAreaIds.includes(fa.id) &&
-        shiftCodes.some((st) => !st.isGeneral && st.focusAreaId === fa.id && isQualified(st)),
-    ),
-  ];
-
-  // Split general shifts into non-off-day (general) and off-day groups
-  const generalNonOffShifts = shiftCodes.filter((st) => st.isGeneral && !st.isOffDay && isQualified(st));
-  const offDayShifts = shiftCodes.filter((st) => st.isOffDay && isQualified(st));
-
-  const sectionLabel: React.CSSProperties = {
-    marginBottom: 8,
-    fontSize: 10,
-    fontWeight: 700,
-    color: "var(--color-text-subtle)",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-  };
 
   function getShiftCodeStyle(label: string, codeId?: number) {
     if (codeId != null) {
@@ -223,10 +174,21 @@ export default function ShiftEditPanel({
       shiftCodes.find((st) => st.label === label) ?? {
         color: "#F8FAFC",
         border: "#CBD5E1",
-        text:"#475569",
+        text: "#475569",
       }
     );
   }
+
+
+  const sectionLabel: React.CSSProperties = {
+    marginBottom: 8,
+    fontSize: 10,
+    fontWeight: 700,
+    color: "var(--color-text-subtle)",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+  };
+
 
   function renderNoteDots(noteTypes: NoteType[], side: "left" | "right" = "right") {
     if (noteTypes.length === 0) return null;
@@ -312,13 +274,14 @@ export default function ShiftEditPanel({
           const shiftFaId = shiftCode?.focusAreaId;
           const shiftWingId = shiftFaId ?? activeTab;
           const pillNoteTypes = getNoteTypes ? getNoteTypes(shiftWingId) : [];
+          const isNewPill = publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]);
           return (
             <div key={label + i}>
               {/* Pill */}
               <div
                 style={{
                   background: s.color,
-                  border: `1.5px solid ${s.border}`,
+                  border: isNewPill ? `2px dashed var(--color-primary)` : `1.5px solid ${s.border}`,
                   borderRadius: 10,
                   height: 64,
                   display: "flex",
@@ -490,78 +453,7 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderShiftButton(s: ShiftCode) {
-    const isActive = currentShiftCodeIds.includes(s.id);
-    const disabled = !allowShiftEdits;
 
-    const handleToggle = () => {
-      if (!allowShiftEdits) return;
-      let newIds: number[];
-      if (isActive) {
-        // Remove this specific shift code by ID
-        newIds = currentShiftCodeIds.filter(id => id !== s.id);
-      } else {
-        // Add this specific shift code by ID
-        newIds = [...currentShiftCodeIds, s.id];
-      }
-      const newLabels = newIds
-        .map(id => shiftCodes.find(sc => sc.id === id)?.label)
-        .filter((l): l is string => l != null && l !== "OFF");
-      const newShift = newLabels.length > 0 ? newLabels.join("/") : "OFF";
-      onSelect(newShift, newIds, seriesId ? seriesScope : undefined);
-      if (newShift !== "OFF") {
-        setShowPicker(false);
-      }
-    };
-
-    return (
-      <button
-        key={s.id}
-        onClick={handleToggle}
-        disabled={disabled}
-        style={{
-          background: isActive ? s.color : "#fff",
-          border: `1.5px solid ${s.border}`,
-          borderRadius: 8,
-          padding: "10px",
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: allowShiftEdits ? 1 : 0.5,
-          textAlign: "left",
-          transition: "border-color 150ms ease, background 150ms ease",
-          position: "relative",
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled && !isActive) {
-            e.currentTarget.style.background = `${s.color}15`;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!disabled && !isActive) {
-            e.currentTarget.style.background = "#fff";
-          }
-        }}
-      >
-        <div
-          style={{
-            fontWeight: 800,
-            fontSize: 13,
-            color: isActive ? s.text : s.border,
-          }}
-        >
-          {s.label}
-        </div>
-        <div
-          style={{
-            fontSize: 10,
-            color: "var(--color-text-subtle)",
-            marginTop: 1,
-          }}
-        >
-          {s.name}
-        </div>
-      </button>
-    );
-  }
 
   // Detail mode: show when we have an active shift and aren't in picker mode
   // (or when shift edits are not allowed)
@@ -636,7 +528,7 @@ export default function ShiftEditPanel({
 
 
         {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
           {inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
             <>
@@ -645,7 +537,9 @@ export default function ShiftEditPanel({
 
               {/* Custom time override — single active shifts only */}
               {hasActiveShift && allowShiftEdits && onCustomTimeChange && currentLabels.length === 1 && (() => {
-                const defaultStart = shiftCodes.find(st => st.label === currentLabels[0])?.defaultStartTime ?? null;
+                const matchedCode = shiftCodes.find(st => st.label === currentLabels[0]);
+                const defaultStart = matchedCode?.defaultStartTime ?? null;
+                const defaultEnd = matchedCode?.defaultEndTime ?? null;
                 function handleUndoCustomTime() {
                   const s = parseTo12h(customStartTime); const e = parseTo12h(customEndTime);
                   setStartH(s.hour); setStartM(s.minute); setStartP(s.period);
@@ -691,7 +585,7 @@ export default function ShiftEditPanel({
                           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                         </svg>
                         Set custom time
-                        {defaultStart && <span style={{ marginLeft: 2, opacity: 0.6 }}>· default {fmt12h(defaultStart)}</span>}
+                        {(defaultStart || defaultEnd) && <span style={{ marginLeft: 2, opacity: 0.6 }}>· default {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" \u2013 ")}</span>}
                       </button>
                     ) : (
                       <div style={{ background: "#F8FAFC", border: "1px solid var(--color-border)", borderRadius: 10, padding: "12px" }}>
@@ -896,14 +790,7 @@ export default function ShiftEditPanel({
               {allowShiftEdits && (
                 <div style={{ marginTop: 8 }}>
                   <button
-                    onClick={() => {
-                      // Sync tab to the current shift's focus area
-                      if (currentShiftCodeIds.length) {
-                        const fa = shiftCodes.find((s) => s.id === currentShiftCodeIds[0])?.focusAreaId;
-                        if (fa != null) setPickerTab(fa);
-                      }
-                      setShowPicker(true);
-                    }}
+                    onClick={() => setShowPicker(true)}
                     className="dg-btn dg-btn-ghost"
                     style={{
                       width: "100%",
@@ -968,108 +855,21 @@ export default function ShiftEditPanel({
                 </button>
               )}
 
-              {/* Focus area tabs */}
-              {allPickerAreas.length > 1 && (
-                <div style={{
-                  display: "flex",
-                  borderBottom: "2px solid var(--color-border)",
-                  marginBottom: 16,
-                  marginLeft: -20,
-                  marginRight: -20,
-                  paddingLeft: 20,
-                  paddingRight: 20,
-                  gap: 0,
-                }}>
-                  {allPickerAreas.map((fa) => {
-                    const isActive = pickerTab === fa.id;
-                    return (
-                      <button
-                        key={fa.id}
-                        onClick={() => setPickerTab(fa.id)}
-                        style={{
-                          flex: 1,
-                          padding: "9px 8px",
-                          border: "none",
-                          borderBottom: isActive ? "2.5px solid var(--color-primary)" : "2.5px solid transparent",
-                          background: isActive ? "var(--color-primary-light, rgba(59,130,246,0.08))" : "none",
-                          color: isActive ? "var(--color-primary)" : "var(--color-text-subtle)",
-                          fontSize: 12,
-                          fontWeight: isActive ? 700 : 500,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          transition: "color 100ms ease, background 100ms ease",
-                          marginBottom: -2,
-                          whiteSpace: "nowrap",
-                          borderRadius: isActive ? "6px 6px 0 0" : 0,
-                        }}
-                      >
-                        {fa.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Shifts for the active tab's focus area */}
-              {(() => {
-                const activeArea = allPickerAreas.find((fa) => fa.id === pickerTab);
-                const areaName = activeArea?.name ?? allPickerAreas[0]?.name ?? "";
-                const areaShifts = getShiftsForFocusArea(areaName);
-
-                const boldHeading: React.CSSProperties = {
-                  marginBottom: 10,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "var(--color-text-secondary)",
-                };
-
-                return (
-                  <>
-                    {/* Focus area shifts — heading only shown when there's a single area (no tabs) */}
-                    {areaShifts.length > 0 && (
-                      <div style={{ marginBottom: 20 }}>
-                        {allPickerAreas.length <= 1 && <div style={boldHeading}>{areaName}</div>}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          {areaShifts.map((s) => renderShiftButton(s))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* General shifts (non-off-day) */}
-                    {generalNonOffShifts.length > 0 && (
-                      <div style={{ marginBottom: 20 }}>
-                        <div style={boldHeading}>General</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          {generalNonOffShifts.map((s) => renderShiftButton(s))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Off Days */}
-                    {offDayShifts.length > 0 && (
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={boldHeading}>Off Days</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          {offDayShifts.map((s) => renderShiftButton(s))}
-                        </div>
-                      </div>
-                    )}
-
-                    {areaShifts.length === 0 && generalNonOffShifts.length === 0 && offDayShifts.length === 0 && (
-                      <div
-                        style={{
-                          padding: "24px 16px",
-                          textAlign: "center",
-                          color: "var(--color-text-subtle)",
-                          fontSize: 13,
-                        }}
-                      >
-                        No shifts available.
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              {/* Shift Picker Component */}
+              <ShiftPicker
+                shiftCodes={shiftCodes}
+                focusAreas={focusAreas}
+                currentShiftCodeIds={currentShiftCodeIds}
+                onSelect={(label, ids) => {
+                  onSelect(label, ids, seriesId ? seriesScope : undefined);
+                  if (label !== "OFF") setShowPicker(false);
+                }}
+                empFocusAreaIds={modal.empFocusAreaIds}
+                empCertificationId={modal.empCertificationId}
+                initialTab={modal.activeFocusAreaId}
+                multiSelect={true}
+                closeOnSelect={false}
+              />
             </>
           )}
         </div>
@@ -1103,7 +903,7 @@ export default function ShiftEditPanel({
               className="dg-btn"
               style={{ flex: 1, fontSize: 12, padding: "9px 12px" }}
             >
-              Save Draft
+              Confirm
             </button>
           </div>
         )}
