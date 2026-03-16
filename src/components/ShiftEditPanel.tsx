@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatDate, getCertName } from "@/lib/utils";
-import { EditModalState, ShiftCode, NoteType, IndicatorType, SeriesScope, FocusArea, NamedItem } from "@/types";
+import { EditModalState, ShiftCode, NoteType, IndicatorType, SeriesScope, FocusArea, NamedItem, DraftKind } from "@/types";
 import ShiftPicker from "./ShiftPicker";
 
 interface ShiftEditPanelProps {
@@ -29,6 +29,8 @@ interface ShiftEditPanelProps {
   onCustomTimeChange?: (start: string | null, end: string | null) => void;
   /** Published shift code IDs — used to identify newly added shifts in split-shift view */
   publishedShiftCodeIds?: number[];
+  /** Draft classification for this cell — used to show NEW badge on single-shift pills */
+  draftKind?: DraftKind;
   /** All focus areas — used to resolve focusAreaId to names */
   focusAreas?: FocusArea[];
   /** All certifications — used to resolve certificationId to names */
@@ -57,6 +59,135 @@ function fmt12h(time24: string | null | undefined): string {
   const { hour, minute, period } = parseTo12h(time24);
   return `${hour}:${minute} ${period}`;
 }
+
+// ── Color helper — darken a hex/rgb color for borders ─────────────────────
+function darkenColor(color: string, amount = 0.25): string {
+  // Handle hex
+  const hex = color.replace("#", "");
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    const r = Math.max(0, Math.round(parseInt(hex.slice(0, 2), 16) * (1 - amount)));
+    const g = Math.max(0, Math.round(parseInt(hex.slice(2, 4), 16) * (1 - amount)));
+    const b = Math.max(0, Math.round(parseInt(hex.slice(4, 6), 16) * (1 - amount)));
+    return `rgb(${r},${g},${b})`;
+  }
+  // Fallback: just return the border color
+  return color;
+}
+
+// ── Pipe-delimited per-sub-shift time helpers ─────────────────────────────
+function parseMultiTimes(time: string | null | undefined, count: number): (string | null)[] {
+  if (!time) return Array(count).fill(null);
+  const parts = time.split('|');
+  return Array.from({ length: count }, (_, i) => parts[i] || null);
+}
+
+function joinMultiTimes(times: (string | null)[]): string | null {
+  if (times.every(t => !t)) return null;
+  return times.map(t => t ?? '').join('|');
+}
+
+// ── Per-pill custom time editor (select dropdowns, immediate save) ────────
+const HOURS = [1,2,3,4,5,6,7,8,9,10,11,12];
+const MINUTES = ["00","05","10","15","20","25","30","35","40","45","50","55"];
+const pillSelStyle: React.CSSProperties = {
+  padding: "5px 2px", border: "1.5px solid var(--color-border)", borderRadius: 6,
+  fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: "#fff",
+  textAlign: "center", cursor: "pointer", outline: "none", boxSizing: "border-box",
+};
+
+function PillTimeEditor({
+  customStart,
+  customEnd,
+  defaultStart,
+  defaultEnd,
+  onSave,
+  onRemove,
+}: {
+  customStart: string | null;
+  customEnd: string | null;
+  defaultStart: string | null;
+  defaultEnd: string | null;
+  onSave: (start: string | null, end: string | null) => void;
+  onRemove: () => void;
+}) {
+  const [expanded, setExpanded] = useState(!!(customStart || customEnd));
+  const s = parseTo12h(customStart);
+  const e = parseTo12h(customEnd);
+
+  function updateStart(hour: string, minute: string, period: "AM" | "PM") {
+    onSave(to24h(hour, minute, period), customEnd);
+  }
+  function updateEnd(hour: string, minute: string, period: "AM" | "PM") {
+    onSave(customStart, to24h(hour, minute, period));
+  }
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        style={{
+          display: "flex", alignItems: "center", gap: 5, fontSize: 11,
+          color: "var(--color-text-subtle)", background: "none",
+          border: "1px dashed var(--color-border)", borderRadius: 7,
+          padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
+          width: "100%", justifyContent: "center", marginTop: 8,
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Custom time
+        {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}</span>}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ background: "#F8FAFC", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
+        <button
+          onClick={() => { setExpanded(false); onRemove(); }}
+          style={{ fontSize: 10, color: "var(--color-text-subtle)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+        >Remove</button>
+      </div>
+
+      {/* Start row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>START</span>
+        <select value={s.hour} onChange={(ev) => updateStart(ev.target.value, s.minute, s.period)} style={{ ...pillSelStyle, width: 46 }}>
+          <option value="">--</option>
+          {HOURS.map((h) => <option key={h} value={String(h)}>{h}</option>)}
+        </select>
+        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
+        <select value={s.minute} onChange={(ev) => updateStart(s.hour, ev.target.value, s.period)} style={{ ...pillSelStyle, width: 46 }}>
+          {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select value={s.period} onChange={(ev) => updateStart(s.hour, s.minute, ev.target.value as "AM" | "PM")} style={{ ...pillSelStyle, width: 50 }}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+
+      {/* End row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>END</span>
+        <select value={e.hour} onChange={(ev) => updateEnd(ev.target.value, e.minute, e.period)} style={{ ...pillSelStyle, width: 46 }}>
+          <option value="">--</option>
+          {HOURS.map((h) => <option key={h} value={String(h)}>{h}</option>)}
+        </select>
+        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
+        <select value={e.minute} onChange={(ev) => updateEnd(e.hour, ev.target.value, e.period)} style={{ ...pillSelStyle, width: 46 }}>
+          {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select value={e.period} onChange={(ev) => updateEnd(e.hour, e.minute, ev.target.value as "AM" | "PM")} style={{ ...pillSelStyle, width: 50 }}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  );
+}
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftEditPanel({
@@ -77,6 +208,7 @@ export default function ShiftEditPanel({
   customEndTime,
   onCustomTimeChange,
   publishedShiftCodeIds = [],
+  draftKind = null,
   focusAreas = [],
   certifications = [],
 }: ShiftEditPanelProps) {
@@ -84,21 +216,6 @@ export default function ShiftEditPanel({
 
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
-
-  // Custom time state (12-hour format)
-  const [showCustomTime, setShowCustomTime] = useState(!!(customStartTime || customEndTime));
-  const [startH, setStartH] = useState(() => parseTo12h(customStartTime).hour);
-  const [startM, setStartM] = useState(() => parseTo12h(customStartTime).minute);
-  const [startP, setStartP] = useState<"AM" | "PM">(() => parseTo12h(customStartTime).period);
-  const [endH, setEndH] = useState(() => parseTo12h(customEndTime).hour);
-  const [endM, setEndM] = useState(() => parseTo12h(customEndTime).minute);
-  const [endP, setEndP] = useState<"AM" | "PM">(() => parseTo12h(customEndTime).period);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
-  function commitCustomTime(sh: string, sm: string, sp: "AM" | "PM", eh: string, em: string, ep: "AM" | "PM") {
-    const start = to24h(sh, sm, sp);
-    const end = to24h(eh, em, ep);
-    onCustomTimeChange?.(start, end);
-  }
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
@@ -233,11 +350,15 @@ export default function ShiftEditPanel({
       const faName = (s as ShiftCode).focusAreaId != null
         ? focusAreas.find(fa => fa.id === (s as ShiftCode).focusAreaId)?.name
         : undefined;
+      const isCellNew = draftKind === 'new';
+      const isCellModified = draftKind === 'modified';
       return (
         <div
           style={{
             background: s.color,
-            border: `1.5px solid ${s.border}`,
+            border: isCellNew
+              ? `2px dashed ${darkenColor(s.color, 0.35)}`
+              : `1.5px solid ${darkenColor(s.color, 0.25)}`,
             borderRadius: 10,
             height: 72,
             display: "flex",
@@ -249,6 +370,27 @@ export default function ShiftEditPanel({
             gap: 2,
           }}
         >
+          {(isCellNew || isCellModified) && (
+            <span
+              style={{
+                position: "absolute",
+                top: -10,
+                left: 12,
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.05em",
+                background: isCellNew ? "#16A34A" : "#D97706",
+                color: "#fff",
+                borderRadius: 4,
+                padding: "3px 8px",
+                lineHeight: 1,
+                pointerEvents: "none",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+              }}
+            >
+              {isCellNew ? "NEW" : "EDITED"}
+            </span>
+          )}
           <span style={{ fontWeight: 800, fontSize: 20, color: s.text, lineHeight: 1 }}>
             {label}
           </span>
@@ -262,9 +404,9 @@ export default function ShiftEditPanel({
       );
     }
 
-    // Multi-shift: individual stacked pills, each with its own indicators
+    // Multi-shift: individual stacked cards, each with its own details & indicators
     return (
-      <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {currentLabels.map((label, i) => {
           const s = getShiftCodeStyle(label, currentShiftCodeIds[i]);
           const fullName = (s as ShiftCode).name && (s as ShiftCode).name !== label ? (s as ShiftCode).name : null;
@@ -274,37 +416,73 @@ export default function ShiftEditPanel({
           const shiftFaId = shiftCode?.focusAreaId;
           const shiftWingId = shiftFaId ?? activeTab;
           const pillNoteTypes = getNoteTypes ? getNoteTypes(shiftWingId) : [];
-          const isNewPill = publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]);
+          const isNewPill = draftKind === 'new'
+            || (publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
+          const isModifiedPill = draftKind === 'modified' && !isNewPill;
+          const faName = shiftCode?.focusAreaId != null
+            ? focusAreas.find(fa => fa.id === shiftCode.focusAreaId)?.name
+            : undefined;
+          const defaultStart = shiftCode?.defaultStartTime ?? null;
+          const defaultEnd = shiftCode?.defaultEndTime ?? null;
           return (
-            <div key={label + i}>
-              {/* Pill */}
+            <div
+              key={label + i}
+              style={{
+                border: isNewPill
+                  ? `2px dashed ${darkenColor(s.color, 0.35)}`
+                  : `1.5px solid ${darkenColor(s.color, 0.25)}`,
+                borderRadius: 12,
+                overflow: "visible",
+                position: "relative",
+              }}
+            >
+              {/* NEW / EDITED badge */}
+              {(isNewPill || isModifiedPill) && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -10,
+                    left: 12,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.05em",
+                    background: isNewPill ? "#16A34A" : "#D97706",
+                    color: "#fff",
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                    lineHeight: 1,
+                    pointerEvents: "none",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                    zIndex: 2,
+                  }}
+                >
+                  {isNewPill ? "NEW" : "EDITED"}
+                </span>
+              )}
+              {/* Pill header */}
               <div
                 style={{
                   background: s.color,
-                  border: isNewPill ? `2px dashed var(--color-primary)` : `1.5px solid ${s.border}`,
-                  borderRadius: 10,
-                  height: 64,
+                  borderBottom: `1px solid ${darkenColor(s.color, 0.2)}`,
+                  height: 56,
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
+                  borderRadius: "10px 10px 0 0",
                   position: "relative",
                   gap: 2,
                 }}
               >
-                <span style={{ fontWeight: 800, fontSize: 18, color: s.text, lineHeight: 1 }}>
-                  {label}
-                </span>
-                {(() => {
-                  const faName = shiftCode?.focusAreaId != null
-                    ? focusAreas.find(fa => fa.id === shiftCode.focusAreaId)?.name
-                    : undefined;
-                  return (fullName || faName) ? (
-                    <span style={{ fontSize: 11, color: s.text, opacity: 0.7, lineHeight: 1 }}>
+                <div style={{ textAlign: "center" }}>
+                  <span style={{ fontWeight: 800, fontSize: 18, color: s.text, lineHeight: 1 }}>
+                    {label}
+                  </span>
+                  {(fullName || faName) && (
+                    <div style={{ fontSize: 10, color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 3 }}>
                       {fullName}{fullName && faName ? " · " : ""}{faName}
-                    </span>
-                  ) : null;
-                })()}
+                    </div>
+                  )}
+                </div>
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
                   <button
@@ -323,7 +501,7 @@ export default function ShiftEditPanel({
                     style={{
                       position: "absolute",
                       top: 8,
-                      right: 10,
+                      right: 8,
                       width: 22,
                       height: 22,
                       borderRadius: 5,
@@ -342,11 +520,60 @@ export default function ShiftEditPanel({
                     ×
                   </button>
                 )}
-                {/* Note dots inside pill — left side to avoid colliding with × button */}
+                {/* Note dots — left side to avoid × button */}
                 {renderNoteDots(pillNoteTypes, "left")}
               </div>
-              {/* Inline indicators for this shift's focus area */}
-              {renderInlineIndicators(shiftWingId)}
+              {/* Card body: default time, per-pill custom time editor, + indicators */}
+              <div style={{ padding: "10px 12px", background: "#fff", borderRadius: "0 0 10px 10px" }}>
+                {/* Default time info */}
+                {(defaultStart || defaultEnd) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11,
+                      color: "var(--color-text-subtle)",
+                    }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span style={{ fontWeight: 500 }}>
+                      {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}
+                    </span>
+                  </div>
+                )}
+                {/* Per-pill custom time editor */}
+                {allowShiftEdits && onCustomTimeChange && (() => {
+                  const pillStarts = parseMultiTimes(customStartTime, currentLabels.length);
+                  const pillEnds = parseMultiTimes(customEndTime, currentLabels.length);
+                  return (
+                    <PillTimeEditor
+                      customStart={pillStarts[i]}
+                      customEnd={pillEnds[i]}
+                      defaultStart={defaultStart}
+                      defaultEnd={defaultEnd}
+                      onSave={(start, end) => {
+                        const newStarts = [...pillStarts];
+                        const newEnds = [...pillEnds];
+                        newStarts[i] = start;
+                        newEnds[i] = end;
+                        onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
+                      }}
+                      onRemove={() => {
+                        const newStarts = [...pillStarts];
+                        const newEnds = [...pillEnds];
+                        newStarts[i] = null;
+                        newEnds[i] = null;
+                        onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
+                      }}
+                    />
+                  );
+                })()}
+                {/* Inline indicators for this shift's focus area */}
+                {renderInlineIndicators(shiftWingId)}
+              </div>
             </div>
           );
         })}
@@ -535,114 +762,19 @@ export default function ShiftEditPanel({
               {/* Current shift displayed prominently */}
               {renderCurrentShiftPill()}
 
-              {/* Custom time override — single active shifts only */}
-              {hasActiveShift && allowShiftEdits && onCustomTimeChange && currentLabels.length === 1 && (() => {
+              {/* Custom time override — single-shift only (multi-shift has per-pill editors) */}
+              {hasActiveShift && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
                 const matchedCode = shiftCodes.find(st => st.label === currentLabels[0]);
-                const defaultStart = matchedCode?.defaultStartTime ?? null;
-                const defaultEnd = matchedCode?.defaultEndTime ?? null;
-                function handleUndoCustomTime() {
-                  const s = parseTo12h(customStartTime); const e = parseTo12h(customEndTime);
-                  setStartH(s.hour); setStartM(s.minute); setStartP(s.period);
-                  setEndH(e.hour); setEndM(e.minute); setEndP(e.period);
-                }
-                const inputSt: React.CSSProperties = {
-                  width: 32, padding: "7px 2px",
-                  border: "1px solid var(--color-border)", borderRadius: 6,
-                  fontSize: 15, fontWeight: 600, fontFamily: "inherit",
-                  background: "#fff", textAlign: "center", boxSizing: "border-box",
-                  outline: "none",
-                };
-                function AmPm({ value, onChange }: { value: "AM" | "PM"; onChange: (v: "AM" | "PM") => void }) {
-                  return (
-                    <div style={{ display: "flex", border: "1px solid var(--color-border)", borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
-                      {(["AM", "PM"] as const).map((p) => (
-                        <button key={p} onClick={() => onChange(p)} style={{
-                          padding: "7px 6px", fontSize: 10, fontWeight: 700, border: "none",
-                          borderRight: p === "AM" ? "1px solid var(--color-border)" : "none",
-                          background: value === p ? "var(--color-text-secondary)" : "#fff",
-                          color: value === p ? "#fff" : "var(--color-text-subtle)",
-                          cursor: "pointer", fontFamily: "inherit", lineHeight: 1,
-                          transition: "background 100ms ease, color 100ms ease",
-                        }}>{p}</button>
-                      ))}
-                    </div>
-                  );
-                }
                 return (
                   <div style={{ marginBottom: 16 }}>
-                    {!showCustomTime ? (
-                      <button
-                        onClick={() => setShowCustomTime(true)}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 6, fontSize: 12,
-                          color: "var(--color-text-subtle)", background: "none",
-                          border: "1px dashed var(--color-border)", borderRadius: 7,
-                          padding: "7px 12px", cursor: "pointer", fontFamily: "inherit",
-                          width: "100%", justifyContent: "center",
-                        }}
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        Set custom time
-                        {(defaultStart || defaultEnd) && <span style={{ marginLeft: 2, opacity: 0.6 }}>· default {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" \u2013 ")}</span>}
-                      </button>
-                    ) : (
-                      <div style={{ background: "#F8FAFC", border: "1px solid var(--color-border)", borderRadius: 10, padding: "12px" }}>
-                        {/* Header */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
-                          <button
-                            onClick={() => { setShowCustomTime(false); onCustomTimeChange(null, null); }}
-                            style={{ fontSize: 11, color: "var(--color-text-subtle)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
-                          >Remove</button>
-                        </div>
-
-                        {/* Single row: [H]:[M][AM/PM] → [H]:[M][AM/PM] */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-                          {/* Start */}
-                          <input type="text" inputMode="numeric" value={startH} placeholder={focusedField === "sH" ? "" : "8"} maxLength={2}
-                            onFocus={() => { setFocusedField("sH"); setStartH(""); }}
-                            onChange={(e) => setStartH(e.target.value.replace(/\D/g, ""))}
-                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setStartH(parseTo12h(customStartTime).hour); }}
-                            style={inputSt}
-                          />
-                          <span style={{ fontSize: 14, color: "var(--color-text-subtle)", fontWeight: 700, lineHeight: 1, flexShrink: 0 }}>:</span>
-                          <input type="text" inputMode="numeric" value={startM} placeholder={focusedField === "sM" ? "" : "00"} maxLength={2}
-                            onFocus={() => { setFocusedField("sM"); setStartM(""); }}
-                            onChange={(e) => setStartM(e.target.value.replace(/\D/g, ""))}
-                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setStartM(parseTo12h(customStartTime).minute); else setStartM(e.target.value.padStart(2, "0")); }}
-                            style={inputSt}
-                          />
-                          <AmPm value={startP} onChange={setStartP} />
-
-                          {/* Divider */}
-                          <span style={{ color: "var(--color-text-subtle)", fontSize: 11, fontWeight: 500, flexShrink: 0, margin: "0 3px" }}>→</span>
-
-                          {/* End */}
-                          <input type="text" inputMode="numeric" value={endH} placeholder={focusedField === "eH" ? "" : "4"} maxLength={2}
-                            onFocus={() => { setFocusedField("eH"); setEndH(""); }}
-                            onChange={(e) => setEndH(e.target.value.replace(/\D/g, ""))}
-                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setEndH(parseTo12h(customEndTime).hour); }}
-                            style={inputSt}
-                          />
-                          <span style={{ fontSize: 14, color: "var(--color-text-subtle)", fontWeight: 700, lineHeight: 1, flexShrink: 0 }}>:</span>
-                          <input type="text" inputMode="numeric" value={endM} placeholder={focusedField === "eM" ? "" : "00"} maxLength={2}
-                            onFocus={() => { setFocusedField("eM"); setEndM(""); }}
-                            onChange={(e) => setEndM(e.target.value.replace(/\D/g, ""))}
-                            onBlur={(e) => { setFocusedField(null); if (!e.target.value) setEndM(parseTo12h(customEndTime).minute); else setEndM(e.target.value.padStart(2, "0")); }}
-                            style={inputSt}
-                          />
-                          <AmPm value={endP} onChange={setEndP} />
-                        </div>
-
-                        {/* Actions */}
-                        <div style={{ display: "flex", gap: 7 }}>
-                          <button onClick={handleUndoCustomTime} style={{ flex: 1, padding: "8px 0", fontSize: 12, fontWeight: 500, border: "1px solid var(--color-border)", borderRadius: 7, background: "#fff", color: "var(--color-text)", cursor: "pointer", fontFamily: "inherit" }}>Undo</button>
-                          <button onClick={() => commitCustomTime(startH, startM, startP, endH, endM, endP)} style={{ flex: 2, padding: "8px 0", fontSize: 12, fontWeight: 600, border: "1px solid var(--color-primary)", borderRadius: 7, background: "var(--color-primary)", color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>Save</button>
-                        </div>
-                      </div>
-                    )}
+                    <PillTimeEditor
+                      customStart={customStartTime ?? null}
+                      customEnd={customEndTime ?? null}
+                      defaultStart={matchedCode?.defaultStartTime ?? null}
+                      defaultEnd={matchedCode?.defaultEndTime ?? null}
+                      onSave={(start, end) => onCustomTimeChange(start, end)}
+                      onRemove={() => onCustomTimeChange(null, null)}
+                    />
                   </div>
                 );
               })()}
@@ -701,8 +833,8 @@ export default function ShiftEditPanel({
                 </div>
               )}
 
-              {/* Make repeating */}
-              {allowShiftEdits && hasActiveShift && !seriesId && onMakeRepeating && (
+              {/* Make repeating — disabled for split shifts (max 1 code) */}
+              {allowShiftEdits && hasActiveShift && !seriesId && onMakeRepeating && currentLabels.length <= 1 && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={sectionLabel}>Repeating</div>
                   <button
@@ -786,8 +918,8 @@ export default function ShiftEditPanel({
                 </div>
               )}
 
-              {/* Add another shift */}
-              {allowShiftEdits && (
+              {/* Add another shift — hidden when at max (2) */}
+              {allowShiftEdits && currentLabels.length < 2 && (
                 <div style={{ marginTop: 8 }}>
                   <button
                     onClick={() => setShowPicker(true)}

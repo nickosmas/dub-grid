@@ -621,35 +621,26 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setIsError(false);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Sign in — the response already includes the session (no extra getSession() needed)
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
 
-      // Verify the user belongs to this organization's workspace
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = data.session;
       if (session) {
         const claims = decodeJwt(session.access_token);
         const isGridmaster = claims.platform_role === "gridmaster";
 
         if (!isGridmaster) {
-          // Try JWT claim first, fall back to DB lookup if hook isn't configured
-          let userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
-
-          if (!userSlug) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("org_id, organizations(slug)")
-              .eq("id", session.user.id)
-              .maybeSingle();
-            userSlug = (profile?.organizations as { slug: string } | null)?.slug ?? null;
-          }
+          const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
 
           if (userSlug !== orgSlug) {
-            // Check if the user is a member of the requested orgSlug
+            // Slug mismatch — check membership. If JWT had no slug, the hook may
+            // not be configured; fall back to DB via get_my_organizations.
             const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
-            
+
             if (rpcError || !orgs) {
               await supabase.auth.signOut();
               setMessage("Unable to verify workspace access.");
@@ -661,9 +652,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             const targetOrg = orgs.find((o: any) => o.org_slug === orgSlug);
 
             if (targetOrg) {
-              // User is a member, switch active organization
-              const { error: switchError } = await supabase.rpc("switch_org", { 
-                target_org_id: targetOrg.org_id 
+              // Switch org + refresh JWT in parallel-ish (switch must complete first)
+              const { error: switchError } = await supabase.rpc("switch_org", {
+                target_org_id: targetOrg.org_id,
               });
 
               if (switchError) {
@@ -674,10 +665,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 return;
               }
 
-              // Refresh the session so JWT claims (org_slug, org_id) are updated
               await supabase.auth.refreshSession();
             } else {
-              // Not a member of the requested org
               await supabase.auth.signOut();
               setMessage("Your account is not associated with this workspace.");
               setIsError(true);
@@ -688,10 +677,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         }
       }
 
-      // Navigate immediately — don't wait for AuthProvider's async chain.
       window.location.replace("/schedule");
 
-      // Safety net: if navigation hasn't happened within 8s
       setTimeout(() => {
         setLoading(false);
         setMessage("Navigation timed out. Please try refreshing the page.");
@@ -878,7 +865,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            {loading ? "Please wait…" : "Sign In"}
+            {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
 

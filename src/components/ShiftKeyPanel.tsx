@@ -1,10 +1,10 @@
 "use client";
 
-import { ShiftType } from "@/types";
+import { ShiftCode } from "@/types";
 
 const EXCLUDED = new Set(["OFF", "0.3"]);
 
-export default function ShiftKeyPanel({ shiftTypes }: { shiftTypes: ShiftType[] }) {
+export default function ShiftKeyPanel({ shiftTypes }: { shiftTypes: ShiftCode[] }) {
   const items = shiftTypes.filter((s) => !EXCLUDED.has(s.label));
 
   // marginTop aligns panel top with the first wing container (skips section label).

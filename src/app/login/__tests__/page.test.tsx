@@ -49,7 +49,7 @@ describe("Login page submit states", () => {
     mockSignInWithPassword.mockReset();
   });
 
-  it("successful sign-in: button stays disabled and message shows 'Please wait...'", async () => {
+  it("successful sign-in: button stays disabled and shows 'Signing in…'", async () => {
     // Arrange: signInWithPassword resolves with no error (but never settles synchronously
     // so loading stays true long enough to assert)
     mockSignInWithPassword.mockReturnValue(new Promise(() => {})); // never resolves
@@ -58,8 +58,7 @@ describe("Login page submit states", () => {
     submitForm(container);
 
     await waitFor(() => {
-      // Button text changes to "Please wait…" (unicode ellipsis) while loading
-      const button = screen.getByRole("button", { name: /please wait/i });
+      const button = screen.getByRole("button", { name: /signing in/i });
       expect(button).toBeInTheDocument();
       expect(button).toBeDisabled();
     });

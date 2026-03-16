@@ -88,9 +88,13 @@ export default function ShiftPicker({
     const handleToggle = () => {
       let newIds: number[];
       if (multiSelect) {
-        newIds = isActive
-          ? currentShiftCodeIds.filter((id) => id !== s.id)
-          : [...currentShiftCodeIds, s.id];
+        if (isActive) {
+          newIds = currentShiftCodeIds.filter((id) => id !== s.id);
+        } else if (currentShiftCodeIds.length >= 2) {
+          return; // Max 2 shifts per cell
+        } else {
+          newIds = [...currentShiftCodeIds, s.id];
+        }
       } else {
         newIds = [s.id];
       }

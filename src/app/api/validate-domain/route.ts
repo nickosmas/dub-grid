@@ -5,7 +5,9 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("slug")?.trim().toLowerCase();
 
   if (!slug || slug === "gridmaster" || !/^[a-z0-9-]+$/.test(slug)) {
-    return NextResponse.json({ valid: false });
+    return NextResponse.json({ valid: false }, {
+      headers: { "Cache-Control": "public, max-age=60" },
+    });
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,9 +16,12 @@ export async function GET(req: NextRequest) {
   if (!url || !serviceKey) {
     // If we lack the service key in local dev, RLS blocks anonymous read of organizations.
     // Rather than failing validation, we assume the domain is valid to allow the login flow.
-    return NextResponse.json({ valid: true });
+    return NextResponse.json({ valid: true }, {
+      headers: { "Cache-Control": "public, max-age=60" },
+    });
   }
 
+  const cacheHeaders = { "Cache-Control": "public, max-age=60" };
   const supabase = createClient(url, serviceKey);
 
   const { data, error } = await supabase
@@ -28,8 +33,8 @@ export async function GET(req: NextRequest) {
   if (error) {
     console.error("[validate-domain] Supabase error:", error.message);
     // On query error, allow through rather than blocking valid users
-    return NextResponse.json({ valid: true });
+    return NextResponse.json({ valid: true }, { headers: cacheHeaders });
   }
 
-  return NextResponse.json({ valid: !!data });
+  return NextResponse.json({ valid: !!data }, { headers: cacheHeaders });
 }
