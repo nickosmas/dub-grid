@@ -259,6 +259,7 @@ textarea {
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  text-decoration: none;
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
   font-family: inherit;
 }
@@ -363,11 +364,14 @@ textarea {
   padding: 28px 32px;
   min-width: 320px;
   max-width: 480px;
+  max-height: calc(100vh - 48px);
   width: 100%;
   box-shadow: var(--shadow-modal);
   border: 1px solid var(--color-border);
   outline: none;
   animation: modal-in 180ms ease-out;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes modal-in {

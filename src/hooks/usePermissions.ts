@@ -115,6 +115,18 @@ LOADING_PERMS.isLoading = true;
 
 const NO_PERMS: Permissions = buildPerms("user", null, false);
 
+// ── Module-level cache ──────────────────────────────────────────────────────
+// Same pattern as org/employee caches — survives across route navigations.
+// Permissions rarely change within a session, so cached value is safe to show
+// instantly while a background re-resolve happens.
+
+let permsCache: Permissions | null = null;
+
+/** Clear the cache (call on logout). */
+export function clearPermsCache(): void {
+  permsCache = null;
+}
+
 /**
  * Extracts the effective role + org from the JWT access token.
  * Custom claims (platform_role, org_role, org_id) are written at the top level
@@ -147,16 +159,22 @@ export function getPermissionsFromSession(session: Session | null): Permissions 
 }
 
 export function usePermissions(): Permissions {
-  const [perms, setPerms] = useState<Permissions>(() => ({ ...LOADING_PERMS }));
+  const [perms, setPerms] = useState<Permissions>(() => permsCache ?? { ...LOADING_PERMS });
 
   useEffect(() => {
     let mounted = true;
+
+    /** Set both React state and module-level cache. */
+    function setPermsAndCache(p: Permissions) {
+      permsCache = p;
+      if (mounted) setPerms(p);
+    }
 
     async function loadSession(session: Session | null) {
       if (!mounted) return;
 
       if (!session?.access_token) {
-        if (mounted) setPerms(NO_PERMS);
+        setPermsAndCache(NO_PERMS);
         return;
       }
 
@@ -164,7 +182,7 @@ export function usePermissions(): Permissions {
 
       // gridmaster / super_admin: all perms, no DB query needed.
       if (effectiveRole === "gridmaster" || effectiveRole === "super_admin") {
-        if (mounted) setPerms(buildPerms(effectiveRole, orgId, false));
+        setPermsAndCache(buildPerms(effectiveRole, orgId, false));
         return;
       }
 
@@ -178,7 +196,7 @@ export function usePermissions(): Permissions {
           .single();
 
         if (mounted) {
-          setPerms(buildPerms("admin", orgId, false, data?.admin_permissions ?? null));
+          setPermsAndCache(buildPerms("admin", orgId, false, data?.admin_permissions ?? null));
         }
         return;
       }
@@ -193,7 +211,7 @@ export function usePermissions(): Permissions {
 
         if (mounted && profile) {
           if (profile.platform_role === "gridmaster") {
-            setPerms(buildPerms("gridmaster", profile.org_id, false));
+            setPermsAndCache(buildPerms("gridmaster", profile.org_id, false));
             return;
           }
 
@@ -206,7 +224,7 @@ export function usePermissions(): Permissions {
               .single();
 
             if (mounted && membership) {
-              setPerms(buildPerms(
+              setPermsAndCache(buildPerms(
                 membership.org_role,
                 profile.org_id,
                 false,
@@ -218,7 +236,7 @@ export function usePermissions(): Permissions {
         }
       }
 
-      if (mounted) setPerms(buildPerms(effectiveRole, orgId, false));
+      setPermsAndCache(buildPerms(effectiveRole, orgId, false));
     }
 
     supabase.auth

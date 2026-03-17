@@ -32,6 +32,7 @@ export const metadata: Metadata = {
 
 
 import AuthProvider from "@/components/AuthProvider";
+import { PageTransitionProvider } from "@/components/PageTransition";
 import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({
@@ -46,7 +47,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PageTransitionProvider>{children}</PageTransitionProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

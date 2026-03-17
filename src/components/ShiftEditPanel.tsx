@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDate, getCertName } from "@/lib/utils";
-import { EditModalState, ShiftCode, NoteType, IndicatorType, SeriesScope, FocusArea, NamedItem, DraftKind } from "@/types";
+import { EditModalState, ShiftCode, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind } from "@/types";
 import ShiftPicker from "./ShiftPicker";
+import ConfirmDialog from "./ConfirmDialog";
+import RepeatForm from "./RepeatForm";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
@@ -15,12 +17,20 @@ interface ShiftEditPanelProps {
   onClose: () => void;
   allowShiftEdits?: boolean;
   canEditNotes?: boolean;
-  getNoteTypes?: (focusAreaId: number) => NoteType[];
-  onNoteToggle?: (noteType: NoteType, active: boolean, focusAreaId: number) => void;
+  getActiveIndicatorIds?: (focusAreaId: number) => number[];
+  onNoteToggle?: (indicatorTypeId: number, active: boolean, focusAreaId: number) => void;
   /** Series ID if the current shift belongs to a repeating series */
   seriesId?: string | null;
-  /** Called when the user wants to create a repeating shift for the current selection */
-  onMakeRepeating?: () => void;
+  /** Called when the user confirms creating a repeating shift */
+  onRepeatConfirm?: (
+    frequency: SeriesFrequency,
+    daysOfWeek: number[] | null,
+    startDate: string,
+    endDate: string | null,
+    maxOccurrences: number | null,
+  ) => void;
+  /** Employee ID — needed for repeat form overwrite checks */
+  empId?: string;
   /** Current custom start time override for this shift (e.g. "07:30") */
   customStartTime?: string | null;
   /** Current custom end time override for this shift (e.g. "15:30") */
@@ -230,11 +240,22 @@ function PillTimeEditor({
   const s = parseTo12h(customStart);
   const e = parseTo12h(customEnd);
 
+  // Validate start < end when both are set
+  const hasTimeError = !!(customStart && customEnd && customStart >= customEnd);
+
   function updateStart(hour: string, minute: string, period: "AM" | "PM") {
-    onSave(to24h(hour, minute, period), customEnd);
+    const newStart = to24h(hour, minute, period);
+    if (newStart && customEnd && newStart >= customEnd) {
+      // Still save to show the error — user can fix end time next
+    }
+    onSave(newStart, customEnd);
   }
   function updateEnd(hour: string, minute: string, period: "AM" | "PM") {
-    onSave(customStart, to24h(hour, minute, period));
+    const newEnd = to24h(hour, minute, period);
+    if (customStart && newEnd && customStart >= newEnd) {
+      // Still save to show the error — user can fix start time next
+    }
+    onSave(customStart, newEnd);
   }
 
   if (!expanded) {
@@ -285,6 +306,12 @@ function PillTimeEditor({
         <TimeDropdown value={e.minute} options={minuteOptions} onChange={(v) => updateEnd(e.hour, v, e.period)} width={50} />
         <TimeDropdown value={e.period} options={periodOptions} onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")} width={54} />
       </div>
+
+      {hasTimeError && (
+        <div style={{ color: "#DC2626", fontSize: 10, fontWeight: 600, marginTop: 6 }}>
+          Start time must be before end time
+        </div>
+      )}
     </div>
   );
 }
@@ -300,10 +327,11 @@ export default function ShiftEditPanel({
   onClose,
   allowShiftEdits = true,
   canEditNotes = false,
-  getNoteTypes,
+  getActiveIndicatorIds,
   onNoteToggle,
   seriesId,
-  onMakeRepeating,
+  onRepeatConfirm,
+  empId,
   customStartTime,
   customEndTime,
   onCustomTimeChange,
@@ -313,22 +341,24 @@ export default function ShiftEditPanel({
   certifications = [],
 }: ShiftEditPanelProps) {
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
+  const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
 
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
+  const [showRepeatForm, setShowRepeatForm] = useState(false);
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
   const [initialShiftCodeIds] = useState(() => [...currentShiftCodeIds]);
-  const [initialNotesByFocusArea] = useState<Record<number, NoteType[]>>(() => {
-    if (!getNoteTypes) return {};
+  const [initialNotesByFocusArea] = useState<Record<number, number[]>>(() => {
+    if (!getActiveIndicatorIds) return {};
     const focusAreaIds = new Set<number>(modal.empFocusAreaIds);
     for (const st of shiftCodes) {
       if (st.focusAreaId != null) focusAreaIds.add(st.focusAreaId);
     }
-    const record: Record<number, NoteType[]> = {};
+    const record: Record<number, number[]> = {};
     for (const faId of focusAreaIds) {
-      record[faId] = [...getNoteTypes(faId)];
+      record[faId] = [...getActiveIndicatorIds(faId)];
     }
     return record;
   });
@@ -336,9 +366,9 @@ export default function ShiftEditPanel({
   // Derive whether any edits have been made since panel opened
   const hasShiftEdit = currentShift !== initialShift;
   const hasNoteEdit = (() => {
-    if (!getNoteTypes) return false;
+    if (!getActiveIndicatorIds) return false;
     for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
-      const curTypes = getNoteTypes(Number(faIdStr));
+      const curTypes = getActiveIndicatorIds(Number(faIdStr));
       if (curTypes.length !== initTypes.length) return true;
       if (curTypes.some((t) => !initTypes.includes(t))) return true;
     }
@@ -352,10 +382,10 @@ export default function ShiftEditPanel({
       onSelect(initialShift ?? "OFF", initialShiftCodeIds);
     }
     // Revert notes for each focus area
-    if (getNoteTypes) {
+    if (getActiveIndicatorIds) {
       for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
         const faId = Number(faIdStr);
-        const curTypes = getNoteTypes(faId);
+        const curTypes = getActiveIndicatorIds(faId);
         for (const type of initTypes) {
           if (!curTypes.includes(type)) onNoteToggle?.(type, true, faId);
         }
@@ -407,9 +437,9 @@ export default function ShiftEditPanel({
   };
 
 
-  function renderNoteDots(noteTypes: NoteType[], side: "left" | "right" = "right") {
-    if (noteTypes.length === 0) return null;
-    const activeDots = indicatorTypes.filter((ind) => noteTypes.includes(ind.name));
+  function renderNoteDots(activeIds: number[], side: "left" | "right" = "right") {
+    if (activeIds.length === 0) return null;
+    const activeDots = indicatorTypes.filter((ind) => activeIds.includes(ind.id));
     if (activeDots.length === 0) return null;
     return (
       <div
@@ -441,7 +471,7 @@ export default function ShiftEditPanel({
 
   function renderCurrentShiftPill() {
     if (!hasActiveShift || currentLabels.length === 0) return null;
-    const noteTypes = getNoteTypes ? getNoteTypes(activeTab) : [];
+    const noteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab) : [];
 
     if (currentLabels.length === 1) {
       const label = currentLabels[0];
@@ -515,7 +545,7 @@ export default function ShiftEditPanel({
             : shiftCodes.find((st) => st.label === label);
           const shiftFaId = shiftCode?.focusAreaId;
           const shiftWingId = shiftFaId ?? activeTab;
-          const pillNoteTypes = getNoteTypes ? getNoteTypes(shiftWingId) : [];
+          const pillNoteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(shiftWingId) : [];
           const isNewPill = draftKind === 'new'
             || (publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
           const isModifiedPill = draftKind === 'modified' && !isNewPill;
@@ -586,17 +616,7 @@ export default function ShiftEditPanel({
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
                   <button
-                    onClick={() => {
-                      const remainingIds = currentShiftCodeIds.filter((_, j) => j !== i);
-                      const remainingLabels = remainingIds
-                        .map(id => shiftCodes.find(sc => sc.id === id)?.label)
-                        .filter((l): l is string => l != null);
-                      onSelect(
-                        remainingLabels.length > 0 ? remainingLabels.join("/") : "OFF",
-                        remainingIds,
-                        seriesId ? seriesScope : undefined,
-                      );
-                    }}
+                    onClick={() => setPendingDelete({ type: "pill", index: i })}
                     title={`Remove ${label}`}
                     style={{
                       position: "absolute",
@@ -685,12 +705,12 @@ export default function ShiftEditPanel({
     if (!canEditNotes || indicatorTypes.length === 0) return null;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
-        {indicatorTypes.map(({ name, color }) => {
-          const isActive = getNoteTypes ? getNoteTypes(focusAreaId).includes(name) : false;
+        {indicatorTypes.map(({ id, name, color }) => {
+          const isActive = getActiveIndicatorIds ? getActiveIndicatorIds(focusAreaId).includes(id) : false;
           return (
             <button
-              key={name}
-              onClick={() => onNoteToggle?.(name, !isActive, focusAreaId)}
+              key={id}
+              onClick={() => onNoteToggle?.(id, !isActive, focusAreaId)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -730,12 +750,12 @@ export default function ShiftEditPanel({
       <div>
         <div style={sectionLabel}>Indicators</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {indicatorTypes.map(({ name, color }) => {
-            const isActive = getNoteTypes ? getNoteTypes(activeTab).includes(name) : false;
+          {indicatorTypes.map(({ id, name, color }) => {
+            const isActive = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab).includes(id) : false;
             return (
               <button
-                key={name}
-                onClick={() => onNoteToggle?.(name, !isActive, activeTab)}
+                key={id}
+                onClick={() => onNoteToggle?.(id, !isActive, activeTab)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -856,7 +876,18 @@ export default function ShiftEditPanel({
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-          {inDetailMode ? (
+          {showRepeatForm && onRepeatConfirm && empId ? (
+            // ── Repeat form mode ─────────────────────────────────────────────
+            <RepeatForm
+              empId={empId}
+              shiftLabel={currentLabels[0] ?? ""}
+              shiftCodeId={currentShiftCodeIds[0] ?? 0}
+              startDate={modal.date}
+              shiftCodes={shiftCodes}
+              onConfirm={onRepeatConfirm}
+              onBack={() => setShowRepeatForm(false)}
+            />
+          ) : inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
             <>
               {/* Current shift displayed prominently */}
@@ -934,11 +965,11 @@ export default function ShiftEditPanel({
               )}
 
               {/* Make repeating — disabled for split shifts (max 1 code) */}
-              {allowShiftEdits && hasActiveShift && !seriesId && onMakeRepeating && currentLabels.length <= 1 && (
+              {allowShiftEdits && hasActiveShift && !seriesId && onRepeatConfirm && currentLabels.length <= 1 && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={sectionLabel}>Repeating</div>
                   <button
-                    onClick={onMakeRepeating}
+                    onClick={() => setShowRepeatForm(true)}
                     className="dg-btn"
                     style={{
                       width: "100%",
@@ -977,7 +1008,7 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && (
                 <div style={{ marginTop: 16 }}>
                   <button
-                    onClick={() => onSelect("OFF", [], seriesId ? seriesScope : undefined)}
+                    onClick={() => setPendingDelete({ type: "all" })}
                     style={{
                       width: "100%",
                       fontSize: 12,
@@ -1140,6 +1171,53 @@ export default function ShiftEditPanel({
           </div>
         )}
       </div>
+
+      {/* Confirm delete dialog */}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={
+            pendingDelete.type === "all" && currentLabels.length > 1
+              ? "Remove All Shifts?"
+              : "Remove Shift?"
+          }
+          message={
+            pendingDelete.type === "pill"
+              ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+              : currentLabels.length > 1
+                ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
+                : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+          }
+          confirmLabel="Remove"
+          variant="danger"
+          onConfirm={() => {
+            if (pendingDelete.type === "all") {
+              onSelect("OFF", [], seriesId ? seriesScope : undefined);
+              if (onCustomTimeChange) onCustomTimeChange(null, null);
+            } else {
+              const removedIdx = pendingDelete.index;
+              const remainingIds = currentShiftCodeIds.filter((_, j) => j !== removedIdx);
+              const remainingLabels = remainingIds
+                .map(id => shiftCodes.find(sc => sc.id === id)?.label)
+                .filter((l): l is string => l != null);
+              onSelect(
+                remainingLabels.length > 0 ? remainingLabels.join("/") : "OFF",
+                remainingIds,
+                seriesId ? seriesScope : undefined,
+              );
+              // Realign pipe-delimited custom times by removing the deleted pill's entry
+              if (onCustomTimeChange) {
+                const pillStarts = parseMultiTimes(customStartTime, currentShiftCodeIds.length);
+                const pillEnds = parseMultiTimes(customEndTime, currentShiftCodeIds.length);
+                pillStarts.splice(removedIdx, 1);
+                pillEnds.splice(removedIdx, 1);
+                onCustomTimeChange(joinMultiTimes(pillStarts), joinMultiTimes(pillEnds));
+              }
+            }
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </>
   );
 }

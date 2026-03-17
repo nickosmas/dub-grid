@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem } from "@/types";
 import * as db from "@/lib/db";
@@ -82,6 +84,7 @@ function Section({
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
         width: "100%",
         maxWidth,
+        flexShrink: 0,
       }}
     >
       <div
@@ -2871,17 +2874,18 @@ function SidebarLink({
   label,
   icon,
   active,
-  onClick,
+  href,
 }: {
   label: string;
   icon: React.ReactNode;
   active: boolean;
-  onClick: () => void;
+  href: string;
 }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <button
-      onClick={onClick}
+    <Link
+      href={href}
+      replace
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -2895,7 +2899,6 @@ function SidebarLink({
           : hovered
           ? "var(--color-border-light)"
           : "transparent",
-        border: "none",
         borderRadius: 7,
         cursor: "pointer",
         fontSize: 13,
@@ -2903,6 +2906,7 @@ function SidebarLink({
         color: active ? "var(--color-text-primary)" : hovered ? "var(--color-text-primary)" : "var(--color-text-secondary)",
         textAlign: "left",
         fontFamily: "inherit",
+        textDecoration: "none",
         transition: "background 120ms ease, color 120ms ease",
         position: "relative",
       }}
@@ -2925,7 +2929,7 @@ function SidebarLink({
         {icon}
       </span>
       {label}
-    </button>
+    </Link>
   );
 }
 
@@ -2950,9 +2954,11 @@ export default function SettingsPage({
   isGridmaster,
   canManageOrgLabels,
 }: SettingsPageProps) {
-  const [activeSection, setActiveSection] = useState<string>(
-    canManageOrg ? "organization" : "impersonation"
-  );
+  const pathname = usePathname();
+  const VALID_SECTIONS = ["organization", "shift-categories", "shift-codes", "indicators", "staff-config", "users", "impersonation"];
+  const sectionFromPath = pathname.split("/")[2];
+  const defaultSection = canManageOrg ? "organization" : "impersonation";
+  const activeSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : defaultSection;
 
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
@@ -3004,7 +3010,7 @@ export default function SettingsPage({
             label={link.label}
             icon={link.icon}
             active={activeSection === link.id}
-            onClick={() => setActiveSection(link.id)}
+            href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`}
           />
         ))}
       </aside>

@@ -11,6 +11,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "seed": "npx tsx --env-file=.env.local seed.ts",
+    "db:reset": "supabase db reset && FORCE_LOCAL_DB=1 npm run seed",
+    "db:reset:remote": "npm run use:remote && npx tsx --env-file=.env.local scripts/reset-remote-db.ts && npm run seed && npm run use:local",
     "use:local": "cp .env.local.bak .env.local && echo '✅ Switched to LOCAL Supabase (restart dev server)'",
     "use:remote": "cp .env.local .env.local.bak && cp .env.remote .env.local && echo '✅ Switched to REMOTE Supabase (restart dev server)'"
   },

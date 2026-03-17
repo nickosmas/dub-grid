@@ -1,25 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useLogout, usePermissions } from "@/hooks";
+import { usePageTransition } from "@/components/PageTransition";
 import { supabase } from "@/lib/supabase";
 
-export type ViewMode = "schedule" | "staff" | "settings";
-
-interface HeaderProps {
-  viewMode: ViewMode;
-  onViewChange: (mode: ViewMode) => void;
-  orgName?: string;
-  availableViewModes?: ViewMode[];
-}
-
-const NAV_ITEMS: { id: ViewMode; label: string; icon?: React.ReactNode }[] = [
-  { id: "schedule", label: "Schedule" },
-  { id: "staff", label: "Staff" },
+const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
+  { id: "schedule", href: "/schedule", label: "Schedule" },
+  { id: "staff", href: "/staff", label: "Staff" },
   {
     id: "settings",
+    href: "/settings",
     label: "Settings",
     icon: (
       <svg
@@ -48,19 +42,29 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-export default function Header({
-  viewMode,
-  onViewChange,
-  orgName,
-  availableViewModes,
-}: HeaderProps) {
+interface HeaderProps {
+  orgName?: string;
+}
+
+export default function Header({ orgName }: HeaderProps) {
+  const pathname = usePathname();
   const router = useRouter();
   const { signOutLocal } = useLogout();
-  const { isGridmaster, role } = usePermissions();
-  const allowedModes = availableViewModes ?? ["schedule", "staff", "settings"];
-  const visibleNavItems = NAV_ITEMS.filter((item) =>
-    allowedModes.includes(item.id),
-  );
+  const { isGridmaster, role, canEditShifts, canManageOrg, isSuperAdmin } = usePermissions();
+  const { startNavigation } = usePageTransition();
+
+  const activeTab = pathname.startsWith("/staff")
+    ? "staff"
+    : pathname.startsWith("/settings")
+      ? "settings"
+      : "schedule";
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.id === "schedule") return true;
+    if (item.id === "staff") return canEditShifts;
+    if (item.id === "settings") return canManageOrg || isSuperAdmin || isGridmaster;
+    return false;
+  });
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -155,16 +159,19 @@ export default function Header({
         }}
       >
         {visibleNavItems.map((item) => {
-          const active = viewMode === item.id;
+          const active = activeTab === item.id;
           return (
-            <button
+            <Link
               key={item.id}
-              onClick={() => onViewChange(item.id)}
+              href={item.href}
               className={`dg-nav-tab${active ? " active" : ""}`}
+              onClick={() => {
+                if (!active) startNavigation();
+              }}
             >
               {item.icon}
               {item.label}
-            </button>
+            </Link>
           );
         })}
 

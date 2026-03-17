@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
-import { ViewMode } from "@/components/Header";
 import CustomSelect from "@/components/CustomSelect";
 
 const SPAN_OPTIONS = [
@@ -19,7 +18,6 @@ const MONTH_NAMES = [
 ];
 
 interface ToolbarProps {
-  viewMode: ViewMode;
   weekStart: Date;
   spanWeeks: 1 | 2 | "month";
   activeFocusArea: number | null;
@@ -32,18 +30,13 @@ interface ToolbarProps {
   onFocusAreaChange: (id: number | null) => void;
   onStaffSearchChange: (q: string) => void;
   canEditShifts?: boolean;
-  isEditMode?: boolean;
-  onToggleEditMode?: () => void;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
   onPrintOpen?: () => void;
-  hasSavedDraft?: boolean;
-  /** True when there are both published AND draft shifts — shows Print + Edit Draft. */
-  hasMixedSchedule?: boolean;
+  presenceSlot?: React.ReactNode;
 }
 
 export default function Toolbar({
-  viewMode,
   weekStart,
   spanWeeks,
   activeFocusArea,
@@ -56,13 +49,10 @@ export default function Toolbar({
   onFocusAreaChange,
   onStaffSearchChange,
   canEditShifts,
-  isEditMode,
-  onToggleEditMode,
   onApplyRecurring,
   isApplyingRecurring,
   onPrintOpen,
-  hasSavedDraft,
-  hasMixedSchedule,
+  presenceSlot,
 }: ToolbarProps) {
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
@@ -77,10 +67,6 @@ export default function Toolbar({
     { id: null, name: "All" },
     ...focusAreas.map((fa) => ({ id: fa.id, name: fa.name })),
   ];
-
-  if (viewMode !== "schedule") {
-    return null;
-  }
 
   return (
     <div
@@ -200,43 +186,33 @@ export default function Toolbar({
       {/* ── RIGHT ZONE: Global actions ── */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
 
-        {/* Edit mode toggle — only for schedulers; hidden for draft-only saved drafts */}
-        {canEditShifts && onToggleEditMode && !hasMixedSchedule && (!hasSavedDraft) && !isEditMode && (
-          <button
-            onClick={onToggleEditMode}
-            className="dg-btn dg-btn-primary"
-          >
-            Edit
-          </button>
-        )}
+        {presenceSlot}
 
-        {/* Print — hidden for draft-only schedules and while editing */}
-        {(!hasSavedDraft || hasMixedSchedule) && !isEditMode && (
-          <button
-            onClick={onPrintOpen}
-            disabled={!onPrintOpen}
-            className="dg-btn dg-btn-ghost"
-            style={{
-              border: "1px solid var(--color-border)",
-              borderRadius: 10,
-              padding: "7px 12px",
-            }}
-            title="Print / Export schedule"
+        {/* Print */}
+        <button
+          onClick={onPrintOpen}
+          disabled={!onPrintOpen}
+          className="dg-btn dg-btn-ghost"
+          style={{
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            padding: "7px 12px",
+          }}
+          title="Print / Export schedule"
+        >
+          <svg
+            width="13" height="13" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
           >
-            <svg
-              width="13" height="13" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            >
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Print
-          </button>
-        )}
+            <polyline points="6 9 6 2 18 2 18 9" />
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          Print
+        </button>
 
-        {/* Apply Recurring Schedules — shown in edit mode */}
-        {canEditShifts && isEditMode && onApplyRecurring && (
+        {/* Apply Recurring Schedules — shown for editors */}
+        {canEditShifts && onApplyRecurring && (
           <button
             onClick={onApplyRecurring}
             disabled={isApplyingRecurring}

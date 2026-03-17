@@ -29,7 +29,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Initial session check
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error && /refresh.token/i.test(error.message)) {
+          // Refresh token was revoked (e.g. another browser signed out globally).
+          // Clear the stale local session so ProtectedRoute can redirect to /login.
+          console.warn("Refresh token invalid, clearing local session:", error.message);
+          await supabase.auth.signOut({ scope: "local" });
+          setUser(null);
+          return;
+        }
         setUser(session?.user ?? null);
       } catch (error) {
         console.error("Error checking session:", error);
@@ -56,7 +64,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
   };
 
   return (

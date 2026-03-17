@@ -26,11 +26,25 @@ GRANT ALL ON TABLE public.recurring_shifts_draft_sessions TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 2. DEFAULT PRIVILEGES
+-- 2. GRANTS ON EXISTING OBJECTS
+--
+-- Grant access to all existing tables, functions, and sequences.
+-- These are needed because ALTER DEFAULT PRIVILEGES only applies to
+-- future objects, not objects already created by earlier migration files.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 3. DEFAULT PRIVILEGES
 --
 -- Ensures all future objects in the public schema are accessible to the
--- standard Supabase roles. This is typically already set by Supabase,
--- but we include it for completeness.
+-- standard Supabase roles.
 -- ══════════════════════════════════════════════════════════════════════════════
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public

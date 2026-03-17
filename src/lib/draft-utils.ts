@@ -1,4 +1,4 @@
-import type { ShiftMap, NoteType } from '@/types';
+import type { ShiftMap } from '@/types';
 
 export interface DraftBreakdown {
   newShifts: number;
@@ -11,7 +11,7 @@ export interface DraftBreakdown {
 
 export function computeDraftBreakdown(
   shifts: ShiftMap,
-  notes: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]>,
+  notes: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>,
 ): DraftBreakdown {
   let newShifts = 0;
   let modifiedShifts = 0;

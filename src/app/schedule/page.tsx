@@ -1,28 +1,26 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import Header, { ViewMode } from "@/components/Header";
+import Header from "@/components/Header";
 import Toolbar from "@/components/Toolbar";
 import ScheduleGrid from "@/components/ScheduleGrid";
 import MonthView from "@/components/MonthView";
-import StaffView from "@/components/StaffView";
-import SettingsPage from "@/components/SettingsPage";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
-import AddEmployeeModal from "@/components/AddEmployeeModal";
 import PrintLegend from "@/components/PrintLegend";
 import PrintOptionsModal, { PrintConfig } from "@/components/PrintOptionsModal";
 import PrintScheduleView from "@/components/PrintScheduleView";
 import DraftBanner from "@/components/DraftBanner";
-import Modal from "@/components/Modal";
-import RepeatModal from "@/components/RepeatModal";
-import { addDays, formatDateKey, getWeekStart } from "@/lib/utils";
+
+import ProgressBar from "@/components/ProgressBar";
+import { usePageTransition } from "@/components/PageTransition";
+import { addDays, formatDate, formatDateKey, getWeekStart } from "@/lib/utils";
 import { filterAndSortEmployees } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
-import type { DraftSession } from "@/lib/db";
+import { OptimisticLockError } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
-import { validateConfig, supabase } from "@/lib/supabase";
-import { handleApiError } from "@/lib/error-handling";
-import { usePermissions } from "@/hooks";
+import { supabase } from "@/lib/supabase";
+import { usePermissions, useOrganizationData, useEmployees, useCellLocks } from "@/hooks";
+import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -31,90 +29,52 @@ import {
   EditModalState,
   ShiftMap,
   ShiftCode,
-  ShiftCategory,
-  IndicatorType,
-  Organization,
-  FocusArea,
-  NoteType,
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
-  NamedItem,
   DraftKind,
+  PublishChange,
+  PublishHistoryEntry,
 } from "@/types";
 
-/** Compute the min/max date range of all draft changes from in-memory state. */
-function getDraftDateRangeFromState(
-  shifts: ShiftMap,
-  notes: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]>,
-): { startDate: Date; endDate: Date } | null {
-  const draftDates: string[] = [];
-  for (const [key, shift] of Object.entries(shifts)) {
-    if (shift.isDraft) {
-      const m = key.match(/(\d{4}-\d{2}-\d{2})/);
-      if (m) draftDates.push(m[1]);
-    }
-  }
-  for (const [key, noteList] of Object.entries(notes)) {
-    if (noteList.some(n => n.status !== 'published')) {
-      const m = key.match(/(\d{4}-\d{2}-\d{2})/);
-      if (m) draftDates.push(m[1]);
-    }
-  }
-  if (draftDates.length === 0) return null;
-  draftDates.sort();
-  return {
-    startDate: new Date(draftDates[0] + "T00:00:00"),
-    endDate: new Date(draftDates[draftDates.length - 1] + "T00:00:00"),
-  };
-}
-
 function SchedulerContent() {
-  const { canEditShifts, canEditNotes, canManageOrg, canManageOrgLabels, isSuperAdmin, isGridmaster, isLoading: permsLoading } = usePermissions();
+  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, isLoading: permsLoading } = usePermissions();
+  const {
+    org, focusAreas, shiftCodes, allShiftCodesRef, shiftCategories,
+    indicatorTypes, certifications, orgRoles, shiftCodeMap,
+    loading: orgLoading, loadError,
+  } = useOrganizationData();
+  const {
+    employees,
+    loading: empLoading,
+  } = useEmployees(org?.id ?? null);
+
   const today = useRef(new Date()).current;
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(new Date()),
   );
   const [activeFocusArea, setActiveFocusArea] = useState<number | null>(null);
-  const [org, setOrg] = useState<Organization | null>(null);
-  const [focusAreas, setFocusAreas] = useState<FocusArea[]>([]);
-  const [shiftCodes, setShiftCodes] = useState<ShiftCode[]>([]);
-  // Full set including archived codes — used to build the codeMap for historical label resolution
-  const allShiftCodesRef = useRef<ShiftCode[]>([]);
-  const [shiftCategories, setShiftCategories] = useState<ShiftCategory[]>([]);
-  const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[]>([]);
-  const [certifications, setCertifications] = useState<NamedItem[]>([]);
-  const [orgRoles, setOrgRoles] = useState<NamedItem[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [benchedEmployees, setBenchedEmployees] = useState<Employee[]>([]);
-  const [terminatedEmployees, setTerminatedEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<ShiftMap>({});
-  const [notes, setNotes] = useState<Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]>>({});
+  const [notes, setNotes] = useState<Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>>({});
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("schedule");
   const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(2);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [activePrintConfig, setActivePrintConfig] = useState<PrintConfig | null>(null);
-  const [repeatModalState, setRepeatModalState] = useState<{
-    label: string; date: Date; empId: string; empName: string;
-  } | null>(null);
-  const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
-  const [showDraftRecoveryBanner, setShowDraftRecoveryBanner] = useState(false);
-  const [showDraftConfirmModal, setShowDraftConfirmModal] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showAutoFillConfirm, setShowAutoFillConfirm] = useState(false);
+  const [autoFillPreview, setAutoFillPreview] = useState<{ count: number; dateRange: string } | null>(null);
   const [showDiffOverlay, setShowDiffOverlay] = useState(false);
+  const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{ seriesId: string; shiftCount: number } | null>(null);
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry | null>(null);
+  const [showPublishDiff, setShowPublishDiff] = useState(false);
 
   const draftBreakdown = useMemo(
     () => computeDraftBreakdown(shifts, notes),
@@ -123,201 +83,165 @@ function SchedulerContent() {
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
 
-  /** True when the schedule has both published and draft shifts (a mixed state). */
-  const hasPublishedShifts = useMemo(() => {
-    return Object.values(shifts).some(shift => !shift.isDraft && shift.label !== "OFF");
-  }, [shifts]);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
 
-  // Role-based view modes: settings requires admin+, staff requires scheduler+
-  const availableViewModes: ViewMode[] = useMemo(() => {
-    const modes: ViewMode[] = ["schedule"];
-    if (canEditShifts) modes.push("staff");
-    if (canManageOrg || isSuperAdmin || isGridmaster) modes.push("settings");
-    return modes;
-  }, [canEditShifts, canManageOrg, isSuperAdmin, isGridmaster]);
-
-  const employeesRef = useRef<Employee[]>([]);
-  employeesRef.current = employees;
-  const benchedRef = useRef<Employee[]>([]);
-  benchedRef.current = benchedEmployees;
-  const terminatedRef = useRef<Employee[]>([]);
-  terminatedRef.current = terminatedEmployees;
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const skipNextBroadcastRef = useRef(false);
+  const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
+  const scheduleLoadStarted = useRef(false);
   useEffect(() => {
-    async function load() {
+    if (orgLoading || !org || scheduleLoadStarted.current) return;
+    scheduleLoadStarted.current = true;
+    const orgId = org.id;
+
+    async function fetchCurrentUser(): Promise<{ id: string; name: string } | null> {
       try {
-        validateConfig();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
+        if (!user) return null;
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", user.id)
+          .maybeSingle();
+        const first = profile?.first_name?.trim() || "";
+        const last = profile?.last_name?.trim() || "";
+        const full = [first, last].filter(Boolean).join(" ");
+        const name = full || user.email?.split("@")[0] || "Unknown";
+        return { id: user.id, name };
+      } catch {
+        return null;
+      }
+    }
 
-        const org = await db.fetchUserOrganization();
-        if (!org) {
-          setLoadError("No organization found. Check your database setup.");
-          return;
-        }
+    async function loadSchedule() {
+      try {
+        const codeMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
 
-        // Fetch reference data first so we can build the code map for shift fetches.
-        // Shift codes are fetched with includeArchived=true so the codeMap resolves
-        // historical labels; the UI receives active-only via filtering.
-        const [w, allCodes, cats, indicators, certs, roles] = await Promise.all([
-          db.fetchFocusAreas(org.id),
-          db.fetchShiftCodes(org.id, true),
-          db.fetchShiftCategories(org.id),
-          db.fetchIndicatorTypes(org.id),
-          db.fetchCertifications(org.id),
-          db.fetchOrganizationRoles(org.id),
+        // All 5 fetches are independent — run in parallel
+        const [shiftData, noteRows, recShifts, latestPublish, userInfo] = await Promise.all([
+          db.fetchShifts(orgId, canEditShifts, codeMap),
+          db.fetchScheduleNotes(orgId),
+          db.fetchRecurringShifts(orgId, undefined, codeMap),
+          db.fetchLatestPublishHistory(orgId).catch(() => null),
+          fetchCurrentUser(),
         ]);
-        const activeCodes = allCodes.filter(sc => !sc.archivedAt);
-        const codeMap = new Map(allCodes.map(sc => [sc.id, sc.label]));
-        const [emps, benched, terminated, shiftData, noteRows, recShifts] = await Promise.all([
-          db.fetchEmployees(org.id, ["active"]),
-          db.fetchEmployees(org.id, ["benched"]),
-          db.fetchEmployees(org.id, ["terminated"]),
-          db.fetchShifts(org.id, canEditShifts, codeMap),
-          db.fetchScheduleNotes(org.id),
-          db.fetchRecurringShifts(org.id, undefined, codeMap),
-        ]);
-        const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+
+        const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
         for (const note of noteRows) {
           const key = note.focusAreaId != null
             ? `${note.empId}_${note.date}_${note.focusAreaId}`
             : `${note.empId}_${note.date}`;
           if (!noteMap[key]) noteMap[key] = [];
-          noteMap[key].push({ type: note.noteType, status: note.status });
+          noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
         }
-        setOrg(org);
-        setFocusAreas(w);
-        allShiftCodesRef.current = allCodes;
-        setShiftCodes(activeCodes);
-        setShiftCategories(cats);
-        setIndicatorTypes(indicators);
-        setCertifications(certs);
-        setOrgRoles(roles);
-        setEmployees(emps);
-        setBenchedEmployees(benched);
-        setTerminatedEmployees(terminated);
         setShifts(shiftData);
         setNotes(noteMap);
         setRecurringShifts(recShifts);
+        if (latestPublish) setPublishHistory(latestPublish);
+        if (userInfo) setCurrentUser(userInfo);
       } catch (err) {
-        console.error(err);
-        handleApiError(err);
-        setLoadError(
-          err instanceof Error ? err.message : "Failed to load data",
-        );
+        console.error("loadSchedule error:", err);
       } finally {
-        setLoading(false);
+        setScheduleLoading(false);
       }
     }
-    load();
-  }, []);
+    loadSchedule();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgLoading, org]);
 
-  // Warn users before navigating away with unsaved draft changes.
-  useEffect(() => {
-    if (!isEditMode || !hasUnpublishedChanges) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isEditMode, hasUnpublishedChanges]);
+  const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence } = useCellLocks(realtimeChannelRef, currentUser);
 
   // Subscribe to real-time schedule broadcasts so other tabs/users see
-  // published changes immediately without a manual refresh.
+  // published and draft changes immediately without a manual refresh.
   useEffect(() => {
     if (!org) return;
+
+    const refetchScheduleData = async () => {
+      const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
+      const [shiftData, noteRows] = await Promise.all([
+        db.fetchShifts(org.id, canEditShifts, cMap),
+        db.fetchScheduleNotes(org.id),
+      ]);
+      const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+      for (const note of noteRows) {
+        const key = note.focusAreaId != null
+          ? `${note.empId}_${note.date}_${note.focusAreaId}`
+          : `${note.empId}_${note.date}`;
+        if (!noteMap[key]) noteMap[key] = [];
+        noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
+      }
+      setShifts(shiftData);
+      setNotes(noteMap);
+    };
 
     const channel = supabase
       .channel(`schedule:${org.id}`)
       .on('broadcast', { event: 'schedule_published' }, async () => {
         try {
-          const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-          const [shiftData, noteRows] = await Promise.all([
-            db.fetchShifts(org.id, canEditShifts, cMap),
-            db.fetchScheduleNotes(org.id),
-          ]);
-          const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
-          for (const note of noteRows) {
-            const key = note.focusAreaId != null
-              ? `${note.empId}_${note.date}_${note.focusAreaId}`
-              : `${note.empId}_${note.date}`;
-            if (!noteMap[key]) noteMap[key] = [];
-            noteMap[key].push({ type: note.noteType, status: note.status });
-          }
-          setShifts(shiftData);
-          setNotes(noteMap);
+          await refetchScheduleData();
+          const history = await db.fetchLatestPublishHistory(org.id);
+          setPublishHistory(history);
         } catch (err) {
           console.error('Failed to sync schedule update:', err);
         }
       })
-      .subscribe();
+      .on('broadcast', { event: 'draft_changed' }, () => {
+        // Skip if we sent this broadcast ourselves
+        if (skipNextBroadcastRef.current) {
+          skipNextBroadcastRef.current = false;
+          return;
+        }
+        // Debounce rapid changes (500ms)
+        if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
+        draftChangedDebounceRef.current = setTimeout(async () => {
+          try {
+            await refetchScheduleData();
+          } catch (err) {
+            console.error('Failed to sync draft change:', err);
+          }
+        }, 500);
+      })
+      .on('presence', { event: 'sync' }, syncPresence)
+      .subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED' && currentUser) {
+          await channel.track({ editingCell: null, userId: currentUser.id, userName: currentUser.name });
+        }
+      });
 
     realtimeChannelRef.current = channel;
 
     return () => {
       realtimeChannelRef.current = null;
+      if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [org, canEditShifts]);
+  }, [org, canEditShifts, currentUser, syncPresence]);
 
-  // Draft recovery: detect saved or orphaned drafts on initial load.
+  // Re-fetch with scheduler visibility once permissions resolve, so editors
+  // see draft data even if the initial load ran before permissions were ready.
   const draftCheckStarted = useRef(false);
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
-    if (permsLoading || !org || loading || draftCheckStarted.current) return;
+    if (permsLoading || !org || scheduleLoading || draftCheckStarted.current) return;
     if (!canEditShifts) { setDraftCheckComplete(true); return; }
     draftCheckStarted.current = true;
 
     (async () => {
       try {
-        const session = await db.getDraftSession(org.id);
-        if (session) {
-          // Re-fetch shifts with scheduler visibility so draft data is loaded.
-          // The initial load may have run before permissions resolved, fetching
-          // published-only data.
-          const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-          const draftShifts = await db.fetchShifts(org.id, true, cMap);
-          setShifts(draftShifts);
-          setDraftSession(session);
-          setShowDraftRecoveryBanner(true);
-          setDraftCheckComplete(true);
-          return;
-        }
-
-        // No saved session — check for orphaned drafts and auto-discard
-        const hasDrafts =
-          Object.values(shifts).some(s => s.isDraft) ||
-          Object.values(notes).some(nl => nl.some(n => n.status !== "published"));
-
-        if (hasDrafts) {
-          const range = getDraftDateRangeFromState(shifts, notes);
-          if (range) {
-            await db.discardScheduleDrafts(org.id, range.startDate, range.endDate);
-            const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-            const [freshShifts, freshNotes] = await Promise.all([
-              db.fetchShifts(org.id, true, cMap),
-              db.fetchScheduleNotes(org.id),
-            ]);
-            const noteMap: Record<string, { type: NoteType; status: "published" | "draft" | "draft_deleted" }[]> = {};
-            for (const note of freshNotes) {
-              const key = note.focusAreaId != null
-                ? `${note.empId}_${note.date}_${note.focusAreaId}`
-                : `${note.empId}_${note.date}`;
-              if (!noteMap[key]) noteMap[key] = [];
-              noteMap[key].push({ type: note.noteType, status: note.status });
-            }
-            setShifts(freshShifts);
-            setNotes(noteMap);
-          }
-        }
+        const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
+        const draftShifts = await db.fetchShifts(org.id, true, cMap);
+        setShifts(draftShifts);
       } catch (err) {
-        console.error("Draft recovery check failed:", err);
+        console.error("Draft check failed:", err);
       } finally {
         setDraftCheckComplete(true);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permsLoading, org, loading, canEditShifts]);
+  }, [permsLoading, org, scheduleLoading, canEditShifts]);
 
   const dates = useMemo(
     () =>
@@ -348,14 +272,6 @@ function SchedulerContent() {
     return filteredEmployees;
   }, [filteredEmployees]);
 
-  const staffEmployees = useMemo(
-    () =>
-      employees
-        .filter((e) => e.focusAreaIds.length > 0)
-        .sort((a, b) => a.seniority - b.seniority),
-    [employees],
-  );
-
   const highlightEmpIds = useMemo(() => {
     if (!staffSearch.trim()) return undefined;
     const q = staffSearch.toLowerCase();
@@ -382,10 +298,11 @@ function SchedulerContent() {
 
   const draftKindForKey = useCallback(
     (empId: string, date: Date): DraftKind => {
-      if (!draftCheckComplete && !isEditMode) return null;
+      if (!draftCheckComplete) return null;
+      if (!canEditShifts) return null;
       return shifts[`${empId}_${formatDateKey(date)}`]?.draftKind ?? null;
     },
-    [shifts, draftCheckComplete, isEditMode],
+    [shifts, draftCheckComplete, canEditShifts],
   );
 
   const publishedLabelForKey = useCallback(
@@ -400,6 +317,24 @@ function SchedulerContent() {
     (empId: string, date: Date): number[] =>
       shifts[`${empId}_${formatDateKey(date)}`]?.publishedShiftCodeIds ?? [],
     [shifts],
+  );
+
+  // Build a lookup map from publish history changes for O(1) access
+  const publishChangesMap = useMemo(() => {
+    if (!publishHistory) return null;
+    const map = new Map<string, PublishChange>();
+    for (const change of publishHistory.changes) {
+      map.set(`${change.empId}_${change.date}`, change);
+    }
+    return map;
+  }, [publishHistory]);
+
+  const publishDiffKindForKey = useCallback(
+    (empId: string, date: Date): PublishChange | null => {
+      if (!showPublishDiff || !publishChangesMap) return null;
+      return publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
+    },
+    [showPublishDiff, publishChangesMap],
   );
 
   const getCustomShiftTimes = useCallback(
@@ -440,18 +375,27 @@ function SchedulerContent() {
     [editPanel, org?.id],
   );
 
-  const noteTypesForKey = useCallback(
-    (empId: string, date: Date, focusAreaId?: number): NoteType[] => {
+  const activeIndicatorIdsForKey = useCallback(
+    (empId: string, date: Date, focusAreaId?: number): number[] => {
       const dateKey = formatDateKey(date);
       const key = focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
       const noteList = notes[key] ?? [];
       // Only return notes that aren't marked as deleted in draft
       return noteList
         .filter(n => n.status !== 'draft_deleted')
-        .map(n => n.type);
+        .map(n => n.indicatorTypeId);
     },
     [notes],
   );
+
+  const broadcastDraftChanged = useCallback(() => {
+    skipNextBroadcastRef.current = true;
+    realtimeChannelRef.current?.send({
+      type: 'broadcast',
+      event: 'draft_changed',
+      payload: {},
+    });
+  }, []);
 
   const setShift = useCallback(
     (empId: string, date: Date, label: string, shiftCodeIds: number[]) => {
@@ -463,15 +407,24 @@ function SchedulerContent() {
 
       const dateKey = formatDateKey(date);
       const key = `${empId}_${dateKey}`;
+      const existing = shifts[key];
+      const existingVersion = existing?.version;
+
+      const handleConflict = async () => {
+        toast.error("Shift was modified by another user — refreshing");
+        const freshShifts = await db.fetchShifts(orgId, canEditShifts, shiftCodeMap);
+        setShifts(freshShifts);
+      };
+
       if (label === "OFF" || shiftCodeIds.length === 0) {
         setShifts((prev) => {
           const next = { ...prev };
-          const existing = prev[key];
+          const ex = prev[key];
           next[key] = {
             label: "OFF", shiftCodeIds: [], isDraft: true, isDelete: true,
-            draftKind: existing?.publishedShiftCodeIds?.length ? 'deleted' : 'new',
-            publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
-            publishedLabel: existing?.publishedLabel ?? '',
+            draftKind: ex?.publishedShiftCodeIds?.length ? 'deleted' : 'new',
+            publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
+            publishedLabel: ex?.publishedLabel ?? '',
           };
           return next;
         });
@@ -479,27 +432,42 @@ function SchedulerContent() {
           toast.error("Failed to delete shift");
           console.error(err);
         });
+        broadcastDraftChanged();
       } else {
+        // Filter out any stale/archived shift code IDs
+        const validCodeIds = shiftCodeIds.filter((id) => shiftCodeMap.has(id));
+        if (validCodeIds.length === 0) {
+          toast.error("Selected shift code is no longer available");
+          return;
+        }
+        if (validCodeIds.length < shiftCodeIds.length) {
+          toast.warning("Some shift codes were removed (no longer available)");
+        }
         setShifts((prev) => {
-          const existing = prev[key];
-          const hasPublished = existing?.publishedShiftCodeIds?.length ?? 0;
+          const ex = prev[key];
+          const hasPublished = ex?.publishedShiftCodeIds?.length ?? 0;
           return {
             ...prev,
             [key]: {
-              label, shiftCodeIds, isDraft: true,
+              label, shiftCodeIds: validCodeIds, isDraft: true,
               draftKind: hasPublished ? 'modified' : 'new',
-              publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
-              publishedLabel: existing?.publishedLabel ?? '',
+              publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
+              publishedLabel: ex?.publishedLabel ?? '',
             },
           };
         });
-        db.upsertShift(empId, dateKey, shiftCodeIds, orgId).catch((err) => {
-          toast.error("Failed to save shift");
-          console.error(err);
+        db.upsertShift(empId, dateKey, validCodeIds, orgId, undefined, undefined, existingVersion).catch((err) => {
+          if (err instanceof OptimisticLockError) {
+            handleConflict();
+          } else {
+            toast.error("Failed to save shift");
+            console.error(err);
+          }
         });
+        broadcastDraftChanged();
       }
     },
-    [org?.id],
+    [org?.id, shifts, canEditShifts, shiftCodeMap, broadcastDraftChanged],
   );
 
   const getShiftStyle = useCallback(
@@ -540,6 +508,13 @@ function SchedulerContent() {
 
   const handleCellClick = useCallback(
     (emp: Employee, date: Date, focusAreaName?: string) => {
+      const cellKey = `${emp.id}_${formatDateKey(date)}`;
+      const lock = getCellLock(cellKey);
+      if (lock) {
+        toast.info(`Being edited by ${lock.userName}`);
+        return;
+      }
+      lockCell(cellKey);
       const activeFaId = focusAreaName
         ? focusAreas.find((fa) => fa.name === focusAreaName)?.id ?? null
         : null;
@@ -552,15 +527,7 @@ function SchedulerContent() {
         activeFocusAreaId: activeFaId,
       });
     },
-    [canEditNotes, focusAreas],
-  );
-
-  /** Build a code map from ALL codes (including archived) for resolving IDs → labels. */
-  const shiftCodeMap = useMemo(
-    () => new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label])),
-    // Re-derive when the active set changes (which implies allShiftCodesRef was updated too)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shiftCodes],
+    [canEditNotes, focusAreas, getCellLock, lockCell],
   );
 
   const handleShiftSelect = useCallback(
@@ -570,11 +537,24 @@ function SchedulerContent() {
       const currentMeta = shifts[key];
 
       if (seriesScope === 'all' && currentMeta?.seriesId) {
-        // Bulk-update all shifts in the series (series are single-shift)
+        const isDelete = label === 'OFF' || shiftCodeIds.length === 0;
+
+        if (isDelete) {
+          // Count shifts in the series before showing confirmation
+          const { count } = await supabase
+            .from("shifts")
+            .select("*", { count: "exact", head: true })
+            .eq("series_id", currentMeta.seriesId);
+          setPendingSeriesDelete({ seriesId: currentMeta.seriesId, shiftCount: count ?? 0 });
+          return;
+        }
+
+        // Bulk-update all shifts in the series
         try {
           await db.updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
           const shiftData = await db.fetchShifts(org!.id, canEditShifts, shiftCodeMap);
           setShifts(shiftData);
+          broadcastDraftChanged();
           toast.success("Series updated");
         } catch (err) {
           toast.error("Failed to update series");
@@ -584,20 +564,26 @@ function SchedulerContent() {
         setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
       }
     },
-    [editPanel, shifts, org, canEditShifts, setShift, shiftCodeMap],
+    [editPanel, shifts, org, canEditShifts, setShift, shiftCodeMap, broadcastDraftChanged],
   );
 
-  const handleMakeRepeating = useCallback(() => {
-    if (!editPanel) return;
-    const currentLabel = shiftForKey(editPanel.empId, editPanel.date);
-    if (!currentLabel || currentLabel === 'OFF') return;
-    setRepeatModalState({
-      label: currentLabel,
-      date: editPanel.date,
-      empId: editPanel.empId,
-      empName: editPanel.empName,
-    });
-  }, [editPanel, shiftForKey]);
+  const handleConfirmSeriesDelete = useCallback(async () => {
+    if (!pendingSeriesDelete || !org) return;
+    try {
+      const deletedCount = await db.deleteShiftSeries(pendingSeriesDelete.seriesId);
+      const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap);
+      setShifts(shiftData);
+      broadcastDraftChanged();
+      toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
+    } catch (err) {
+      toast.error("Failed to delete series");
+      console.error(err);
+    } finally {
+      setPendingSeriesDelete(null);
+      unlockCell();
+      setEditPanel(null);
+    }
+  }, [pendingSeriesDelete, org, canEditShifts, shiftCodeMap, broadcastDraftChanged, unlockCell]);
 
   const handleRepeatConfirm = useCallback(
     async (
@@ -607,15 +593,17 @@ function SchedulerContent() {
       endDate: string | null,
       maxOccurrences: number | null,
     ) => {
-      if (!repeatModalState || !org) return;
-      const sc = shiftCodes.find(s => s.label === repeatModalState.label);
-      if (!sc) return;
+      if (!editPanel || !org) return;
+      const currentLabel = shiftForKey(editPanel.empId, editPanel.date);
+      if (!currentLabel || currentLabel === 'OFF') return;
+      const codeIds = shiftCodeIdsForKey(editPanel.empId, editPanel.date);
+      if (!codeIds.length) return;
       try {
         await db.createShiftSeries(
-          repeatModalState.empId,
+          editPanel.empId,
           org.id,
-          sc.id,
-          repeatModalState.label,
+          codeIds[0],
+          currentLabel,
           frequency,
           daysOfWeek,
           startDate,
@@ -629,64 +617,117 @@ function SchedulerContent() {
         toast.error("Failed to create repeating shift");
         console.error(err);
       } finally {
-        setRepeatModalState(null);
+        unlockCell();
         setEditPanel(null);
       }
     },
-    [repeatModalState, org, canEditShifts, shiftCodes, shiftCodeMap],
+    [editPanel, org, canEditShifts, shiftCodeMap, shiftForKey, shiftCodeIdsForKey, unlockCell],
   );
 
+  // Compute the auto-fill date range (reused by preview + apply)
+  const getAutoFillRange = useCallback((): { startDate: Date; endDate: Date } => {
+    if (spanWeeks === "month") {
+      return {
+        startDate: new Date(monthStart),
+        endDate: new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0),
+      };
+    }
+    return {
+      startDate: new Date(weekStart),
+      endDate: addDays(weekStart, spanWeeks * 7 - 1),
+    };
+  }, [spanWeeks, monthStart, weekStart]);
+
+  // Preview: count how many slots would be filled, then show confirmation dialog
+  const handleAutoFillPreview = useCallback(async () => {
+    if (!org) return;
+    const { startDate, endDate } = getAutoFillRange();
+
+    // Fetch fresh recurring shifts to get an accurate count
+    const freshRecurringShifts = await db.fetchRecurringShifts(org.id, undefined, shiftCodeMap);
+    setRecurringShifts(freshRecurringShifts);
+
+    // Count empty slots that would be filled (same logic as applyRecurringSchedules but client-side only)
+    const byEmp: Record<string, RecurringShift[]> = {};
+    for (const rs of freshRecurringShifts) {
+      if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
+      byEmp[rs.empId].push(rs);
+    }
+
+    let count = 0;
+    const current = new Date(startDate);
+    current.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    while (current <= end) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      const d = String(current.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${d}`;
+      const dayOfWeek = current.getDay();
+
+      for (const [empId, empShifts] of Object.entries(byEmp)) {
+        if (shifts[`${empId}_${dateKey}`]) continue;
+        const candidates = empShifts.filter(rs => rs.dayOfWeek === dayOfWeek);
+        if (candidates.length > 0) count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (count === 0) {
+      toast.info("No empty slots to fill for this date range");
+      return;
+    }
+
+    const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
+    setAutoFillPreview({ count, dateRange });
+    setShowAutoFillConfirm(true);
+  }, [org, getAutoFillRange, shiftCodeMap, shifts]);
+
+  // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
     if (!org) return;
+    setShowAutoFillConfirm(false);
     setIsApplyingRecurring(true);
     try {
-      let startDate: Date;
-      let endDate: Date;
-      if (spanWeeks === "month") {
-        startDate = new Date(monthStart);
-        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-      } else {
-        startDate = new Date(weekStart);
-        endDate = addDays(weekStart, spanWeeks * 7 - 1);
-      }
-
-      // Always fetch fresh recurring shifts so we pick up any recently saved templates
-      const freshRecurringShifts = await db.fetchRecurringShifts(org.id, undefined, shiftCodeMap);
-      setRecurringShifts(freshRecurringShifts);
+      const { startDate, endDate } = getAutoFillRange();
 
       const generated = await db.applyRecurringSchedules(
         org.id,
         startDate,
         endDate,
-        freshRecurringShifts,
+        recurringShifts,
         shifts,
       );
 
       if (generated.length > 0) {
         setShifts(prev => {
           const next = { ...prev };
-          for (const { empId, date, label } of generated) {
-            // Look up the shift code ID from the label
-            const sc = shiftCodes.find(s => s.label === label);
+          for (const { empId, date, label, shiftCodeId } of generated) {
             next[`${empId}_${date}`] = {
-              label, shiftCodeIds: sc ? [sc.id] : [], isDraft: true, fromRecurring: true,
+              label, shiftCodeIds: [shiftCodeId], isDraft: true, fromRecurring: true,
               draftKind: 'new', publishedShiftCodeIds: [], publishedLabel: '',
             };
           }
           return next;
         });
         toast.success(`Recurring schedule applied (${generated.length} shifts)`);
+        broadcastDraftChanged();
+      } else {
+        toast.info("No empty slots to fill");
       }
     } catch (err) {
       toast.error("Failed to apply recurring schedule");
       console.error(err);
     } finally {
       setIsApplyingRecurring(false);
+      setAutoFillPreview(null);
     }
-  }, [org, spanWeeks, monthStart, weekStart, recurringShifts, shifts]);
+  }, [org, getAutoFillRange, recurringShifts, shifts, broadcastDraftChanged]);
 
   const handleNoteToggle = useCallback(
-    async (noteType: NoteType, active: boolean, focusAreaId: number) => {
+    async (indicatorTypeId: number, active: boolean, focusAreaId: number) => {
       if (!org || !editPanel) return;
       const dateKey = formatDateKey(editPanel.date);
       const key = `${editPanel.empId}_${dateKey}_${focusAreaId}`;
@@ -694,22 +735,22 @@ function SchedulerContent() {
       let existingStatus: 'published' | 'draft' | 'draft_deleted' | undefined;
       setNotes((prev) => {
         const existing = prev[key] ?? [];
-        existingStatus = existing.find(n => n.type === noteType)?.status;
-        
-        let updated: { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[];
+        existingStatus = existing.find(n => n.indicatorTypeId === indicatorTypeId)?.status;
+
+        let updated: { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[];
         if (active) {
           // "Adding" or "Restoring"
           if (existingStatus === 'draft_deleted') {
-            updated = existing.map(n => n.type === noteType ? { ...n, status: 'published' as const } : n);
+            updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'published' as const } : n);
           } else {
-            updated = [...existing.filter(n => n.type !== noteType), { type: noteType, status: 'draft' as const }];
+            updated = [...existing.filter(n => n.indicatorTypeId !== indicatorTypeId), { indicatorTypeId, status: 'draft' as const }];
           }
         } else {
           // "Deleting" or "Canceling draft"
           if (existingStatus === 'published') {
-            updated = existing.map(n => n.type === noteType ? { ...n, status: 'draft_deleted' as const } : n);
+            updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'draft_deleted' as const } : n);
           } else {
-            updated = existing.filter(n => n.type !== noteType);
+            updated = existing.filter(n => n.indicatorTypeId !== indicatorTypeId);
           }
         }
         return { ...prev, [key]: updated };
@@ -721,7 +762,7 @@ function SchedulerContent() {
             org.id,
             editPanel.empId,
             dateKey,
-            noteType,
+            indicatorTypeId,
             focusAreaId,
             existingStatus
           );
@@ -729,150 +770,18 @@ function SchedulerContent() {
           await db.deleteScheduleNote(
             editPanel.empId,
             dateKey,
-            noteType,
+            indicatorTypeId,
             focusAreaId,
             existingStatus
           );
         }
+        broadcastDraftChanged();
       } catch (error) {
         console.error(error);
       }
     },
-    [editPanel, org],
+    [editPanel, org, broadcastDraftChanged],
   );
-
-  useEffect(() => {
-    if (!availableViewModes.includes(viewMode)) {
-      setViewMode("schedule");
-    }
-  }, [availableViewModes, viewMode]);
-
-  const handleAddEmployee = useCallback(
-    async (dataList: Omit<Employee, "id" | "seniority">[]) => {
-      if (!org) return;
-      try {
-        const added: Employee[] = [];
-        for (const data of dataList) {
-          const maxSen = Math.max(
-            ...employeesRef.current.map((e) => e.seniority),
-            ...added.map((e) => e.seniority),
-            0,
-          );
-          const newEmp = await db.insertEmployee(
-            { ...data, seniority: maxSen + 1 },
-            org.id,
-          );
-          added.push(newEmp);
-        }
-        setEmployees((prev) => [...prev, ...added]);
-        setShowAddModal(false);
-        toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
-      } catch (err) {
-        toast.error("Failed to add employee");
-        console.error(err);
-      }
-    },
-    [org],
-  );
-
-  const handleSaveEmployee = useCallback(
-    async (emp: Employee) => {
-      if (!org) return;
-      setEmployees((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
-      try {
-        await db.updateEmployee(emp, org.id);
-        toast.success("Employee saved");
-      } catch (err) {
-        toast.error("Failed to save employee");
-        console.error(err);
-      }
-    },
-    [org],
-  );
-
-  const handleDeleteEmployee = useCallback(async (empId: string) => {
-    // Move to terminated list from whichever list they're in
-    const now = new Date().toISOString();
-    const activeEmp = employeesRef.current.find((e) => e.id === empId);
-    const benchedEmp = benchedRef.current.find((e) => e.id === empId);
-    const emp = activeEmp ?? benchedEmp;
-    if (emp) {
-      setTerminatedEmployees((t) => [...t, { ...emp, status: "terminated", statusChangedAt: now }]);
-    }
-    if (activeEmp) setEmployees((prev) => prev.filter((e) => e.id !== empId));
-    if (benchedEmp) setBenchedEmployees((prev) => prev.filter((e) => e.id !== empId));
-    try {
-      await db.deleteEmployee(empId);
-      toast.success("Employee terminated");
-    } catch (err) {
-      toast.error("Failed to terminate employee");
-      console.error(err);
-    }
-  }, []);
-
-  const handleBenchEmployee = useCallback(async (empId: string, note?: string) => {
-    const emp = employeesRef.current.find((e) => e.id === empId);
-    if (emp) {
-      const benched: Employee = { ...emp, status: "benched", statusNote: note ?? "", statusChangedAt: new Date().toISOString() };
-      setBenchedEmployees((b) => [...b, benched]);
-      setEmployees((prev) => prev.filter((e) => e.id !== empId));
-    }
-    try {
-      await db.benchEmployee(empId, note);
-      toast.success("Employee benched");
-    } catch (err) {
-      toast.error("Failed to bench employee");
-      console.error(err);
-    }
-  }, []);
-
-  const handleActivateEmployee = useCallback(async (empId: string) => {
-    const now = new Date().toISOString();
-    const benchedEmp = benchedRef.current.find((e) => e.id === empId);
-    const terminatedEmp = terminatedRef.current.find((e) => e.id === empId);
-    const emp = benchedEmp ?? terminatedEmp;
-    if (emp) {
-      setEmployees((a) => [...a, { ...emp, status: "active", statusNote: "", statusChangedAt: now }]);
-    }
-    if (benchedEmp) setBenchedEmployees((prev) => prev.filter((e) => e.id !== empId));
-    if (terminatedEmp) setTerminatedEmployees((prev) => prev.filter((e) => e.id !== empId));
-    try {
-      await db.activateEmployee(empId);
-      toast.success("Employee activated");
-    } catch (err) {
-      toast.error("Failed to activate employee");
-      console.error(err);
-    }
-  }, []);
-
-  const handleShiftCodesChange = useCallback((codes: ShiftCode[]) => {
-    // codes from Settings are active-only; merge with existing archived codes
-    const archivedCodes = allShiftCodesRef.current.filter(sc => sc.archivedAt);
-    allShiftCodesRef.current = [...codes, ...archivedCodes];
-    setShiftCodes(codes);
-  }, []);
-
-  // With FK references, cascade renames are no longer needed — just update
-  // the reference data in state + cache without re-fetching employees.
-  const handleCertificationsChange = useCallback(async (items: NamedItem[]) => {
-    setCertifications(items);
-    // Certification renames/deletions may affect shift_codes.required_certification_ids
-    // — re-fetch shift codes (including archived for codeMap) to reflect updates.
-    if (org) {
-      try {
-        const allCodes = await db.fetchShiftCodes(org.id, true);
-        const activeCodes = allCodes.filter(sc => !sc.archivedAt);
-        allShiftCodesRef.current = allCodes;
-        setShiftCodes(activeCodes);
-      } catch (err) {
-        console.error("re-fetch shift codes after cert change:", err);
-      }
-    }
-  }, [org]);
-
-  const handleOrgRolesChange = useCallback((items: NamedItem[]) => {
-    setOrgRoles(items);
-  }, []);
 
   const handlePrev = useCallback(() => {
     if (spanWeeks === "month") {
@@ -920,20 +829,21 @@ function SchedulerContent() {
         db.fetchShifts(org.id, canEditShifts, shiftCodeMap),
         db.fetchScheduleNotes(org.id),
       ]);
-      const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+      const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
       for (const note of noteRows) {
         const key = note.focusAreaId != null
           ? `${note.empId}_${note.date}_${note.focusAreaId}`
           : `${note.empId}_${note.date}`;
         if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ type: note.noteType, status: note.status });
+        noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
       }
       setShifts(shiftData);
       setNotes(noteMap);
-      await db.deleteDraftSession(org.id).catch(console.error);
-      setDraftSession(null);
-      setShowDraftRecoveryBanner(false);
-      setIsEditMode(false);
+      const latestPublish = await db.fetchLatestPublishHistory(org.id);
+      setPublishHistory(latestPublish);
+      setShowPublishDiff(false);
+      unlockCell();
+      setEditPanel(null);
       setShowDiffOverlay(false);
       toast.success("Schedule published");
 
@@ -972,20 +882,18 @@ function SchedulerContent() {
         db.fetchShifts(org.id, canEditShifts, shiftCodeMap),
         db.fetchScheduleNotes(org.id),
       ]);
-      const noteMap: Record<string, { type: NoteType; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+      const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
       for (const note of noteRows) {
         const key = note.focusAreaId != null
           ? `${note.empId}_${note.date}_${note.focusAreaId}`
           : `${note.empId}_${note.date}`;
         if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ type: note.noteType, status: note.status });
+        noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
       }
       setShifts(shiftData);
       setNotes(noteMap);
-      await db.deleteDraftSession(org.id).catch(console.error);
-      setDraftSession(null);
-      setShowDraftRecoveryBanner(false);
-      setIsEditMode(false);
+      unlockCell();
+      setEditPanel(null);
       setShowDiffOverlay(false);
       toast.success("Changes discarded");
     } catch (err: any) {
@@ -995,111 +903,6 @@ function SchedulerContent() {
       setIsCanceling(false);
     }
   }, [org, weekStart, monthStart, spanWeeks, canEditShifts, shiftCodeMap]);
-
-  const handleSaveDraft = useCallback(async () => {
-    if (!org) return;
-    setIsSavingDraft(true);
-    try {
-      const range = getDraftDateRangeFromState(shifts, notes);
-      if (!range) {
-        setIsEditMode(false);
-        setShowDiffOverlay(false);
-        return;
-      }
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (!userId) return;
-
-      await db.saveDraftSession(org.id, userId, range.startDate, range.endDate);
-      const startDate = formatDateKey(range.startDate);
-      const endDate = formatDateKey(range.endDate);
-      setDraftSession({ id: "", orgId: org.id, savedBy: userId, startDate, endDate, savedAt: new Date().toISOString() });
-      setShowDraftRecoveryBanner(true);
-      setIsEditMode(false);
-      setShowDiffOverlay(false);
-      toast.success("Draft saved");
-    } catch (err) {
-      toast.error("Failed to save draft");
-      console.error("Failed to save draft session:", err);
-    } finally {
-      setIsSavingDraft(false);
-    }
-  }, [org, shifts, notes]);
-
-  const handleResumeDraft = useCallback(() => {
-    setIsEditMode(true);
-    setShowDraftRecoveryBanner(false);
-  }, []);
-
-  const handleRecoveryPublish = useCallback(async () => {
-    if (!org || !draftSession) return;
-    setIsPublishing(true);
-    try {
-      const start = new Date(draftSession.startDate + "T00:00:00");
-      const end = new Date(draftSession.endDate + "T00:00:00");
-      await db.publishSchedule(org.id, start, end);
-      await db.deleteDraftSession(org.id);
-
-      const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-      const [freshShifts, freshNotes] = await Promise.all([
-        db.fetchShifts(org.id, canEditShifts, cMap),
-        db.fetchScheduleNotes(org.id),
-      ]);
-      const noteMap: Record<string, { type: NoteType; status: "published" | "draft" | "draft_deleted" }[]> = {};
-      for (const note of freshNotes) {
-        const key = note.focusAreaId != null
-          ? `${note.empId}_${note.date}_${note.focusAreaId}`
-          : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ type: note.noteType, status: note.status });
-      }
-      setShifts(freshShifts);
-      setNotes(noteMap);
-      setDraftSession(null);
-      setShowDraftRecoveryBanner(false);
-      toast.success("Schedule published");
-    } catch (err: any) {
-      console.error(err);
-      toast.error("Failed to publish schedule");
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [org, draftSession, canEditShifts]);
-
-  const handleRecoveryDiscard = useCallback(async () => {
-    if (!org || !draftSession) return;
-    setIsCanceling(true);
-    try {
-      const start = new Date(draftSession.startDate + "T00:00:00");
-      const end = new Date(draftSession.endDate + "T00:00:00");
-      await db.discardScheduleDrafts(org.id, start, end);
-      await db.deleteDraftSession(org.id);
-
-      const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-      const [freshShifts, freshNotes] = await Promise.all([
-        db.fetchShifts(org.id, canEditShifts, cMap),
-        db.fetchScheduleNotes(org.id),
-      ]);
-      const noteMap: Record<string, { type: NoteType; status: "published" | "draft" | "draft_deleted" }[]> = {};
-      for (const note of freshNotes) {
-        const key = note.focusAreaId != null
-          ? `${note.empId}_${note.date}_${note.focusAreaId}`
-          : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ type: note.noteType, status: note.status });
-      }
-      setShifts(freshShifts);
-      setNotes(noteMap);
-      setDraftSession(null);
-      setShowDraftRecoveryBanner(false);
-      toast.success("Changes discarded");
-    } catch (err) {
-      toast.error("Failed to discard changes");
-      console.error(err);
-    } finally {
-      setIsCanceling(false);
-    }
-  }, [org, draftSession, canEditShifts]);
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
@@ -1119,14 +922,14 @@ function SchedulerContent() {
           textAlign: "center",
         }}
       >
-        <div 
-          style={{ 
-            width: 64, 
-            height: 64, 
-            borderRadius: "50%", 
-            background: "#FEF2F2", 
-            display: "flex", 
-            alignItems: "center", 
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: "#FEF2F2",
+            display: "flex",
+            alignItems: "center",
             justifyContent: "center",
             marginBottom: 8
           }}
@@ -1137,16 +940,16 @@ function SchedulerContent() {
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
         </div>
-        
+
         <div style={{ maxWidth: 400 }}>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", marginBottom: 12, letterSpacing: "-0.02em" }}>
             Workspace Setup Required
           </h1>
           <p style={{ fontSize: 16, color: "#475569", lineHeight: 1.6, marginBottom: 32 }}>
-            Your account is active, but it looks like your workspace hasn't been initialized yet. 
+            Your account is active, but it looks like your workspace hasn't been initialized yet.
             Once your administrator completes the setup, you'll be able to access the schedule.
           </p>
-          
+
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <button
               onClick={() => window.location.reload()}
@@ -1190,40 +993,12 @@ function SchedulerContent() {
     );
   }
 
-  // ── Full-screen loading ─────────────────────────────────────────────────────
+  const { setPageReady } = usePageTransition();
+  const isLoading = orgLoading || empLoading || scheduleLoading || !draftCheckComplete;
 
-  if (loading || !draftCheckComplete) {
-    const sz = 144, cl = sz / 4, gp = cl * 0.18, rx = cl * 0.22;
-    // Each cell gets a unique duration AND delay so they never sync up.
-    const cells: { dur: number; delay: number }[] = [
-      { dur: 0.82, delay: 0.00 }, { dur: 0.94, delay: 0.38 }, { dur: 0.76, delay: 0.16 }, { dur: 1.00, delay: 0.62 },
-      { dur: 0.88, delay: 0.28 }, { dur: 0.72, delay: 0.54 }, { dur: 0.98, delay: 0.06 }, { dur: 0.84, delay: 0.44 },
-      { dur: 0.74, delay: 0.70 }, { dur: 0.92, delay: 0.22 }, { dur: 0.86, delay: 0.58 }, { dur: 0.78, delay: 0.12 },
-      { dur: 0.96, delay: 0.34 }, { dur: 0.80, delay: 0.66 }, { dur: 0.90, delay: 0.48 }, { dur: 0.70, delay: 0.26 },
-    ];
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        minHeight: "100vh", background: "var(--color-bg)",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-      }}>
-        <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} fill="none">
-          {[0,1,2,3].map(row =>
-            [0,1,2,3].map(col => {
-              const c = cells[row * 4 + col];
-              return (
-                <rect key={`${row}-${col}`} x={col*cl+gp} y={row*cl+gp}
-                  width={cl-gp*2} height={cl-gp*2} rx={rx} fill="#1B3A2D">
-                  <animate attributeName="opacity" values="0.12;0.95;0.12"
-                    dur={`${c.dur}s`} begin={`${c.delay}s`} repeatCount="indefinite" />
-                </rect>
-              );
-            })
-          )}
-        </svg>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!isLoading) setPageReady();
+  }, [isLoading, setPageReady]);
 
   // ── Main UI ──────────────────────────────────────────────────────────────────
 
@@ -1236,6 +1011,7 @@ function SchedulerContent() {
         color: "var(--color-text-primary)",
       }}
     >
+      <ProgressBar loading={isLoading} />
       <div
         className="no-print"
         style={{
@@ -1246,93 +1022,90 @@ function SchedulerContent() {
           boxShadow: "var(--shadow-raised)",
         }}
       >
-        <Header
-          viewMode={viewMode}
-          onViewChange={setViewMode}
-          orgName={org?.name}
-          availableViewModes={availableViewModes}
-        />
-        {isEditMode && canEditShifts && viewMode === "schedule" && (
-          <DraftBanner
-            onPublish={() => setShowPublishConfirm(true)}
-            onCancel={hasUnpublishedChanges ? () => setShowDiscardConfirm(true) : handleCancelChanges}
-            onSaveDraft={handleSaveDraft}
-            isPublishing={isPublishing}
-            isCanceling={isCanceling}
-            isSavingDraft={isSavingDraft}
-            hasChanges={hasUnpublishedChanges}
-            breakdown={draftBreakdown}
-            showDiff={showDiffOverlay}
-            onToggleDiff={() => setShowDiffOverlay(v => !v)}
-          />
-        )}
-        {showDraftRecoveryBanner && draftSession && !isEditMode && viewMode === "schedule" && (() => {
-          const fmtDate = (iso: string) => {
-            const [y, m, d] = iso.split("-");
-            return `${parseInt(m)}/${parseInt(d)}/${y}`;
-          };
-          return (
-            <div
-              className="dg-draft-banner no-print"
-              style={{ background: "#EFF6FF", borderColor: "#93C5FD", color: "#1E40AF" }}
-            >
-              <div className="dg-draft-banner-dot" style={{ background: "#3B82F6" }} />
-              <span style={{ fontWeight: 600 }}>
-                Unpublished draft
-              </span>
-              <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                {fmtDate(draftSession.startDate)} to {fmtDate(draftSession.endDate)} — changes are saved but not yet visible to staff
-              </span>
-              <div className="dg-draft-banner-actions">
-                <button
-                  onClick={handleResumeDraft}
-                  className="dg-btn dg-btn-primary"
-                  style={{ fontSize: 12, padding: "5px 12px" }}
-                >
-                  Continue Editing
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-        {viewMode === "schedule" && (
-          <div style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
-            <Toolbar
-              viewMode={viewMode}
-              weekStart={weekStart}
-              spanWeeks={spanWeeks}
-              activeFocusArea={activeFocusArea}
-              staffSearch={staffSearch}
-              focusAreas={focusAreas}
-              onPrev={handlePrev}
-              onNext={handleNext}
-              onToday={handleToday}
-              onSpanChange={setSpanWeeks}
-              onFocusAreaChange={setActiveFocusArea}
-              onStaffSearchChange={setStaffSearch}
-              canEditShifts={canEditShifts}
-              isEditMode={isEditMode}
-              onToggleEditMode={() => {
-                if (isEditMode && hasUnpublishedChanges) {
-                  setShowDraftConfirmModal(true);
-                } else {
-                  if (showDraftRecoveryBanner) setShowDraftRecoveryBanner(false);
-                  setIsEditMode((v) => !v);
-                }
-              }}
-              onApplyRecurring={handleApplyRecurring}
-              isApplyingRecurring={isApplyingRecurring}
-              onPrintOpen={() => setShowPrintOptions(true)}
-              hasSavedDraft={showDraftRecoveryBanner && draftSession != null && !isEditMode}
-              hasMixedSchedule={showDraftRecoveryBanner && draftSession != null && !isEditMode && hasPublishedShifts}
-            />
-          </div>
-        )}
+        <Header orgName={org?.name} />
       </div>
 
-      {viewMode === "schedule" && <div style={{ padding: "16px 16px" }}>
+      {!isLoading && (
+        <>
+          <div
+            className="no-print"
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 99,
+            }}
+          >
+            {canEditShifts && hasUnpublishedChanges && (
+              <DraftBanner
+                onPublish={() => setShowPublishConfirm(true)}
+                onCancel={() => setShowDiscardConfirm(true)}
+                isPublishing={isPublishing}
+                isCanceling={isCanceling}
+                breakdown={draftBreakdown}
+                showDiff={showDiffOverlay}
+                onToggleDiff={() => setShowDiffOverlay(v => !v)}
+                canPublish={canPublishSchedule}
+              />
+            )}
+            {!hasUnpublishedChanges && canEditShifts && publishHistory && publishHistory.changeCount > 0 && (
+              <div className="dg-draft-banner no-print" style={{ background: "#EEF2FF", borderColor: "#A5B4FC", color: "#3730A3" }}>
+                <div className="dg-draft-banner-dot" style={{ background: "#6366F1" }} />
+                <span style={{ fontWeight: 600 }}>
+                  Published {(() => {
+                    const diff = Date.now() - new Date(publishHistory.publishedAt).getTime();
+                    const mins = Math.floor(diff / 60000);
+                    if (mins < 1) return "just now";
+                    if (mins < 60) return `${mins} min ago`;
+                    const hrs = Math.floor(mins / 60);
+                    if (hrs < 24) return `${hrs} hr ago`;
+                    const days = Math.floor(hrs / 24);
+                    return `${days} day${days !== 1 ? "s" : ""} ago`;
+                  })()}
+                </span>
+                <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                  {publishHistory.changeCount} change{publishHistory.changeCount !== 1 ? "s" : ""}
+                </span>
+                <div className="dg-draft-banner-actions">
+                  <button
+                    onClick={() => setShowPublishDiff(v => !v)}
+                    className="dg-btn dg-btn-secondary"
+                    style={{
+                      fontSize: 12,
+                      padding: "5px 12px",
+                      background: showPublishDiff ? "#E0E7FF" : undefined,
+                      color: showPublishDiff ? "#4338CA" : undefined,
+                    }}
+                  >
+                    {showPublishDiff ? "Hide Changes" : "Show What Changed"}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
+              <Toolbar
+                weekStart={weekStart}
+                spanWeeks={spanWeeks}
+                activeFocusArea={activeFocusArea}
+                staffSearch={staffSearch}
+                focusAreas={focusAreas}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                onToday={handleToday}
+                onSpanChange={setSpanWeeks}
+                onFocusAreaChange={setActiveFocusArea}
+                onStaffSearchChange={setStaffSearch}
+                canEditShifts={canEditShifts && canApplyRecurringSchedule}
+                onApplyRecurring={handleAutoFillPreview}
+                isApplyingRecurring={isApplyingRecurring}
+                onPrintOpen={() => setShowPrintOptions(true)}
+                presenceSlot={<PresenceAvatars onlineUsers={onlineUsers} />}
+              />
+            </div>
+          </div>
 
-        {spanWeeks !== "month" && (
+          <div style={{ padding: "16px 16px" }}>
+
+            {spanWeeks !== "month" && (
           <div>
             <ScheduleGrid
               filteredEmployees={visibleScheduleEmployees}
@@ -1352,20 +1125,21 @@ function SchedulerContent() {
               indicatorTypes={indicatorTypes}
               certifications={certifications}
               orgRoles={orgRoles}
-              isCellInteractive={isEditMode && canEditNotes}
-              noteTypesForKey={noteTypesForKey}
+              isCellInteractive={canEditNotes}
+              activeIndicatorIdsForKey={activeIndicatorIdsForKey}
               activeFocusArea={activeFocusArea}
-              isEditMode={isEditMode}
               getCustomShiftTimes={getCustomShiftTimes}
               draftKindForKey={draftKindForKey}
               showDiffOverlay={showDiffOverlay}
               publishedLabelForKey={publishedLabelForKey}
               publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+              publishDiffForKey={publishDiffKindForKey}
+              cellLocks={lockedCells}
             />
           </div>
         )}
 
-        {viewMode === "schedule" && spanWeeks === "month" && (
+        {spanWeeks === "month" && (
           <MonthView
             monthStart={monthStart}
             filteredEmployees={visibleScheduleEmployees}
@@ -1381,53 +1155,7 @@ function SchedulerContent() {
           />
         )}
 
-      </div>}
-
-      {viewMode === "staff" && (
-        <StaffView
-          employees={staffEmployees}
-          benchedEmployees={benchedEmployees}
-          terminatedEmployees={terminatedEmployees}
-          focusAreas={focusAreas}
-          certifications={certifications}
-          roles={orgRoles}
-          onSave={handleSaveEmployee}
-          onDelete={handleDeleteEmployee}
-          onBench={handleBenchEmployee}
-          onActivate={handleActivateEmployee}
-          onAdd={() => setShowAddModal(true)}
-          orgId={org?.id ?? ""}
-          shiftCodes={shiftCodes}
-          shiftCodeMap={shiftCodeMap}
-          canEditShifts={canEditShifts}
-          focusAreaLabel={org?.focusAreaLabel}
-          certificationLabel={org?.certificationLabel}
-          roleLabel={org?.roleLabel}
-        />
-      )}
-
-      {viewMode === "settings" && org && (
-        <SettingsPage
-          organization={org}
-          focusAreas={focusAreas}
-          shiftCodes={shiftCodes}
-          shiftCategories={shiftCategories}
-          indicatorTypes={indicatorTypes}
-          certifications={certifications}
-          orgRoles={orgRoles}
-          onOrganizationSave={setOrg}
-          onFocusAreasChange={setFocusAreas}
-          onShiftCodesChange={handleShiftCodesChange}
-          onShiftCategoriesChange={setShiftCategories}
-          onIndicatorTypesChange={setIndicatorTypes}
-          onCertificationsChange={handleCertificationsChange}
-          onOrgRolesChange={handleOrgRolesChange}
-          canManageOrg={canManageOrg}
-          isSuperAdmin={isSuperAdmin}
-          isGridmaster={isGridmaster}
-          canManageOrgLabels={canManageOrgLabels}
-        />
-      )}
+      </div>
 
       {editPanel && (
         <ShiftEditPanel
@@ -1441,37 +1169,17 @@ function SchedulerContent() {
           onSelect={handleShiftSelect}
           allowShiftEdits={canEditShifts}
           canEditNotes={canEditNotes}
-          getNoteTypes={(focusAreaId) => noteTypesForKey(editPanel.empId, editPanel.date, focusAreaId)}
+          getActiveIndicatorIds={(focusAreaId) => activeIndicatorIdsForKey(editPanel.empId, editPanel.date, focusAreaId)}
           onNoteToggle={handleNoteToggle}
-          onClose={() => setEditPanel(null)}
+          onClose={() => { unlockCell(); setEditPanel(null); }}
           seriesId={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.seriesId}
-          onMakeRepeating={canEditShifts ? handleMakeRepeating : undefined}
+          onRepeatConfirm={canEditShifts && canManageShiftSeries ? handleRepeatConfirm : undefined}
+          empId={editPanel.empId}
           customStartTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customStartTime}
           customEndTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customEndTime}
           onCustomTimeChange={canEditShifts ? handleCustomTimeChange : undefined}
           publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
           draftKind={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.draftKind}
-        />
-      )}
-
-      {repeatModalState && (
-        <RepeatModal
-          empName={repeatModalState.empName}
-          shiftLabel={repeatModalState.label}
-          startDate={repeatModalState.date}
-          shiftCodes={shiftCodes}
-          onConfirm={handleRepeatConfirm}
-          onClose={() => setRepeatModalState(null)}
-        />
-      )}
-
-      {showAddModal && (
-        <AddEmployeeModal
-          focusAreas={focusAreas}
-          certifications={certifications}
-          roles={orgRoles}
-          onAdd={handleAddEmployee}
-          onClose={() => setShowAddModal(false)}
         />
       )}
 
@@ -1511,43 +1219,6 @@ function SchedulerContent() {
         />
       )}
 
-      {showDraftConfirmModal && (
-        <Modal title="Unsaved Changes" onClose={() => setShowDraftConfirmModal(false)}>
-          <p style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 20 }}>
-            You have unpublished changes. What would you like to do?
-          </p>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button
-              className="dg-btn dg-btn-ghost"
-              onClick={() => setShowDraftConfirmModal(false)}
-              style={{ fontSize: 13, padding: "7px 14px" }}
-            >
-              Cancel
-            </button>
-            <button
-              className="dg-btn dg-btn-secondary"
-              onClick={async () => {
-                setShowDraftConfirmModal(false);
-                await handleCancelChanges();
-              }}
-              style={{ fontSize: 13, padding: "7px 14px", color: "#DC2626" }}
-            >
-              Discard Changes
-            </button>
-            <button
-              className="dg-btn dg-btn-primary"
-              onClick={async () => {
-                setShowDraftConfirmModal(false);
-                await handleSaveDraft();
-              }}
-              style={{ fontSize: 13, padding: "7px 14px" }}
-            >
-              Save Draft
-            </button>
-          </div>
-        </Modal>
-      )}
-
       {showDiscardConfirm && (
         <ConfirmDialog
           title="Discard Changes?"
@@ -1576,6 +1247,31 @@ function SchedulerContent() {
           }}
           onCancel={() => setShowPublishConfirm(false)}
         />
+      )}
+
+      {showAutoFillConfirm && autoFillPreview && (
+        <ConfirmDialog
+          title="Auto Fill Shifts?"
+          message={`This will fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? '' : 's'} for ${autoFillPreview.dateRange} using recurring shift templates. Existing shifts will not be overwritten.`}
+          confirmLabel="Fill Shifts"
+          variant="info"
+          isLoading={isApplyingRecurring}
+          onConfirm={handleApplyRecurring}
+          onCancel={() => { setShowAutoFillConfirm(false); setAutoFillPreview(null); }}
+        />
+      )}
+
+      {pendingSeriesDelete && (
+        <ConfirmDialog
+          title="Delete Shift Series?"
+          message={`This will mark ${pendingSeriesDelete.shiftCount} shift${pendingSeriesDelete.shiftCount === 1 ? '' : 's'} for deletion. They will be permanently removed when you publish.`}
+          confirmLabel="Delete Series"
+          variant="danger"
+          onConfirm={handleConfirmSeriesDelete}
+          onCancel={() => { setPendingSeriesDelete(null); unlockCell(); setEditPanel(null); }}
+        />
+      )}
+        </>
       )}
     </div>
   );
