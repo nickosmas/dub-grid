@@ -1472,7 +1472,8 @@ export async function fetchRecurringShifts(
     .from("recurring_shifts")
     .select("*")
     .eq("org_id", orgId)
-    .order("day_of_week");
+    .order("day_of_week")
+    .order("effective_from", { ascending: false });
   if (!includeArchived) query = query.is("archived_at", null);
   if (empId) query = query.eq("emp_id", empId);
   const { data, error } = await query;
@@ -1487,34 +1488,32 @@ export async function upsertRecurringShift(
   shiftCodeId: number,
   effectiveFrom: string,
 ): Promise<void> {
-  // Cannot use .upsert() because the unique constraint is a partial index
-  // (WHERE archived_at IS NULL) which ON CONFLICT doesn't support.
-  const { data, error: updateError } = await supabase
+  // Archive ALL existing active rows for this (emp, day) first.
+  // This avoids duplicate active rows when the effectiveFrom date differs
+  // and prevents unique-constraint violations from multi-row updates.
+  const { error: archiveError } = await supabase
     .from("recurring_shifts")
-    .update({ shift_code_id: shiftCodeId })
+    .update({ archived_at: new Date().toISOString() })
     .eq("emp_id", empId)
     .eq("day_of_week", dayOfWeek)
-    .eq("effective_from", effectiveFrom)
-    .is("archived_at", null)
-    .select("id");
+    .is("archived_at", null);
 
-  if (updateError) throw new Error(updateError.message);
+  if (archiveError) throw new Error(archiveError.message);
 
-  if (!data || data.length === 0) {
-    const { error: insertError } = await supabase
-      .from("recurring_shifts")
-      .insert({ emp_id: empId, org_id: orgId, day_of_week: dayOfWeek, shift_code_id: shiftCodeId, effective_from: effectiveFrom });
-    if (insertError) throw new Error(insertError.message);
-  }
+  // Insert a fresh row with the current effectiveFrom
+  const { error: insertError } = await supabase
+    .from("recurring_shifts")
+    .insert({ emp_id: empId, org_id: orgId, day_of_week: dayOfWeek, shift_code_id: shiftCodeId, effective_from: effectiveFrom });
+  if (insertError) throw new Error(insertError.message);
 }
 
-export async function deleteRecurringShift(empId: string, dayOfWeek: number, effectiveFrom: string): Promise<void> {
+export async function deleteRecurringShift(empId: string, dayOfWeek: number): Promise<void> {
   const { error } = await supabase
     .from("recurring_shifts")
     .update({ archived_at: new Date().toISOString() })
     .eq("emp_id", empId)
     .eq("day_of_week", dayOfWeek)
-    .eq("effective_from", effectiveFrom);
+    .is("archived_at", null);
   if (error) throw new Error(error.message);
 }
 

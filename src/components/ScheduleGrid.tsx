@@ -294,7 +294,7 @@ const SectionBlock = memo(function SectionBlock({
                 zIndex: 2,
                 background: "var(--color-bg)",
                 padding: "10px 14px",
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 700,
                 color: "var(--color-text-subtle)",
                 letterSpacing: "0.08em",
@@ -324,7 +324,7 @@ const SectionBlock = memo(function SectionBlock({
                 >
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: 600,
                       color: isToday
                         ? "var(--color-today-text)"
@@ -336,7 +336,7 @@ const SectionBlock = memo(function SectionBlock({
                   </div>
                   <div
                     style={{
-                      fontSize: 15,
+                      fontSize: 17,
                       fontWeight: 700,
                       color: isToday
                         ? "var(--color-today-text)"
@@ -398,7 +398,7 @@ const SectionBlock = memo(function SectionBlock({
                     >
                       <span
                         style={{
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: 600,
                           color: "var(--color-text-secondary)",
                           whiteSpace: "nowrap",
@@ -410,7 +410,7 @@ const SectionBlock = memo(function SectionBlock({
                     {emp.roleIds.length > 0 && (
                       <div
                         style={{
-                          fontSize: 10,
+                          fontSize: 12,
                           color: "var(--color-text-subtle)",
                           marginTop: 1,
                           whiteSpace: "nowrap",
@@ -423,7 +423,7 @@ const SectionBlock = memo(function SectionBlock({
                   {emp.certificationId != null && (
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: 700,
                         background: dc.bg,
                         color: dc.text,
@@ -551,15 +551,18 @@ const SectionBlock = memo(function SectionBlock({
                                    <span
                                      style={{
                                        position: "absolute",
-                                       top: 2,
-                                       left: 3,
-                                       fontSize: 9,
+                                       top: 0,
+                                       bottom: 0,
+                                       left: 0,
+                                       display: "flex",
+                                       alignItems: "center",
+                                       fontSize: 11,
                                        fontWeight: 800,
                                        lineHeight: 1,
                                        background: crossHomeFa.colorBg,
                                        color: crossHomeFa.colorText,
-                                       borderRadius: 3,
-                                       padding: "1px 3px",
+                                       borderRadius: "2px 0 0 2px",
+                                       padding: "0 3px",
                                        letterSpacing: "0.02em",
                                        pointerEvents: "none",
                                      }}
@@ -597,10 +600,10 @@ const SectionBlock = memo(function SectionBlock({
                                      }}
                                    />
                                  )}
-                                 <span style={{ fontSize: 14, fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                                 <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{label}</span>
                                  {customTimes && (
                                    <span style={{
-                                     fontSize: 9,
+                                     fontSize: 11,
                                      fontWeight: 500,
                                      lineHeight: 1,
                                      marginTop: 4,
@@ -616,7 +619,7 @@ const SectionBlock = memo(function SectionBlock({
                                      bottom: 2,
                                      left: "50%",
                                      transform: "translateX(-50%)",
-                                     fontSize: 11,
+                                     fontSize: 13,
                                      fontWeight: 700,
                                      color: "#D97706",
                                      whiteSpace: "nowrap",
@@ -632,7 +635,7 @@ const SectionBlock = memo(function SectionBlock({
                                      bottom: 2,
                                      left: "50%",
                                      transform: "translateX(-50%)",
-                                     fontSize: 11,
+                                     fontSize: 13,
                                      fontWeight: 800,
                                      color: "#16A34A",
                                      whiteSpace: "nowrap",
@@ -656,8 +659,8 @@ const SectionBlock = memo(function SectionBlock({
                                          key={ind.name}
                                          title={ind.name}
                                          style={{
-                                           width: 5,
-                                           height: 5,
+                                           width: 7,
+                                           height: 7,
                                            borderRadius: "50%",
                                            background: ind.color,
                                            border: "1px solid rgba(255,255,255,0.85)",
@@ -724,7 +727,7 @@ const SectionBlock = memo(function SectionBlock({
                                         alignItems: "center",
                                         justifyContent: "center",
                                         gap: hasTime ? 3 : 0,
-                                        fontSize: 11,
+                                        fontSize: 14,
                                         fontWeight: 800,
                                         position: "relative",
                                         cursor: "pointer",
@@ -738,14 +741,17 @@ const SectionBlock = memo(function SectionBlock({
                                           style={{
                                             position: "absolute",
                                             top: 0,
-                                            left: 2,
-                                            fontSize: 6,
+                                            bottom: 0,
+                                            left: 0,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            fontSize: 9,
                                             fontWeight: 800,
                                             lineHeight: 1,
                                             background: crossHomeFaLi.colorBg,
                                             color: crossHomeFaLi.colorText,
-                                            borderRadius: 2,
-                                            padding: "0px 2px",
+                                            borderRadius: "2px 0 0 2px",
+                                            padding: "0 2px",
                                             letterSpacing: "0.02em",
                                             pointerEvents: "none",
                                           }}
@@ -770,7 +776,7 @@ const SectionBlock = memo(function SectionBlock({
                                       )}
                                       <span>{label}</span>
                                       {hasTime && (
-                                        <span style={{ fontSize: 7, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                        <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
                                           {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
                                         </span>
                                       )}
@@ -793,8 +799,8 @@ const SectionBlock = memo(function SectionBlock({
                                         key={ind.name}
                                         title={ind.name}
                                         style={{
-                                          width: 5,
-                                          height: 5,
+                                          width: 7,
+                                          height: 7,
                                           borderRadius: "50%",
                                           background: ind.color,
                                           border: "1px solid rgba(255,255,255,0.8)",
@@ -862,7 +868,7 @@ const SectionBlock = memo(function SectionBlock({
                                       alignItems: "center",
                                       justifyContent: "center",
                                       gap: hasTime ? 3 : 0,
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       fontWeight: 800,
                                       position: "relative",
                                       cursor: "pointer",
@@ -876,14 +882,17 @@ const SectionBlock = memo(function SectionBlock({
                                         style={{
                                           position: "absolute",
                                           top: 0,
-                                          left: 2,
-                                          fontSize: 6,
+                                          bottom: 0,
+                                          left: 0,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          fontSize: 9,
                                           fontWeight: 800,
                                           lineHeight: 1,
                                           background: crossHomeFaLi.colorBg,
                                           color: crossHomeFaLi.colorText,
-                                          borderRadius: 2,
-                                          padding: "0px 2px",
+                                          borderRadius: "2px 0 0 2px",
+                                          padding: "0 2px",
                                           letterSpacing: "0.02em",
                                           pointerEvents: "none",
                                         }}
@@ -908,7 +917,7 @@ const SectionBlock = memo(function SectionBlock({
                                     )}
                                     <span>{label}</span>
                                     {hasTime && (
-                                      <span style={{ fontSize: 7, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                      <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
                                         {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
                                       </span>
                                     )}
@@ -921,7 +930,7 @@ const SectionBlock = memo(function SectionBlock({
                                   bottom: -14,
                                   left: "50%",
                                   transform: "translateX(-50%)",
-                                  fontSize: 11,
+                                  fontSize: 13,
                                   fontWeight: 700,
                                   color: "#D97706",
                                   whiteSpace: "nowrap",
@@ -938,7 +947,7 @@ const SectionBlock = memo(function SectionBlock({
                                   bottom: -14,
                                   left: "50%",
                                   transform: "translateX(-50%)",
-                                  fontSize: 11,
+                                  fontSize: 13,
                                   fontWeight: 800,
                                   color: "#16A34A",
                                   whiteSpace: "nowrap",
@@ -964,8 +973,8 @@ const SectionBlock = memo(function SectionBlock({
                                       key={ind.name}
                                       title={ind.name}
                                       style={{
-                                        width: 6,
-                                        height: 6,
+                                        width: 7,
+                                        height: 7,
                                         borderRadius: "50%",
                                         background: ind.color,
                                         border: "1px solid rgba(255,255,255,0.8)",
@@ -997,7 +1006,7 @@ const SectionBlock = memo(function SectionBlock({
                             color: "#DC2626",
                           }}
                         >
-                          <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1 }}>
+                          <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1 }}>
                             {publishedLabel}
                           </span>
                         </div>

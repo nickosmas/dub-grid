@@ -228,10 +228,8 @@ export default function RecurringSchedulePanel({
           const sc = shiftCodes.find(s => s.label === newLabel);
           if (!sc) continue;
           await db.upsertRecurringShift(employee.id, orgId, day, sc.id, todayKey);
-        } else {
-          for (const rs of existing) {
-            await db.deleteRecurringShift(employee.id, rs.dayOfWeek, rs.effectiveFrom);
-          }
+        } else if (existing.length > 0) {
+          await db.deleteRecurringShift(employee.id, day);
         }
       }
       toast.success("Recurring schedule saved");
