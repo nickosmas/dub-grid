@@ -11,6 +11,17 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+/** Returns true only after `delay` ms of `active` being true. Resets immediately when `active` becomes false. */
+function useDelayedFlag(active: boolean, delay = 400): boolean {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!active) { setVisible(false); return; }
+    const id = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(id);
+  }, [active, delay]);
+  return visible;
+}
+
 function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
   const parsed = parseHost(window.location.host);
@@ -108,6 +119,7 @@ function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const showLoadingText = useDelayedFlag(loading);
   const [showHelp, setShowHelp] = useState(false);
 
   function showToast(msg: string) {
@@ -282,7 +294,7 @@ function DomainSelector() {
                 whiteSpace: "nowrap",
               }}
             >
-              {loading ? "Checking…" : "Continue"}
+              {showLoadingText ? "Checking…" : "Continue"}
             </button>
             <button
               type="button"
@@ -385,6 +397,7 @@ function GridmasterLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const showLoadingText = useDelayedFlag(loading);
   const [message, setMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -570,7 +583,7 @@ function GridmasterLogin() {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            {loading ? "Authenticating…" : "Access Portal"}
+            {showLoadingText ? "Authenticating…" : "Access Portal"}
           </button>
         </form>
       </div>
@@ -584,6 +597,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const showLoadingText = useDelayedFlag(loading);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
@@ -865,7 +879,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            {loading ? "Signing in…" : "Sign In"}
+            {showLoadingText ? "Signing in…" : "Sign In"}
           </button>
         </form>
 
