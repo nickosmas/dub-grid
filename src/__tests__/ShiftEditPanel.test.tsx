@@ -9,7 +9,7 @@ const modal: EditModalState = {
   empId: "emp-1",
   empName: "Alice Smith",
   date: new Date(2024, 0, 15), // Jan 15, 2024
-  empFocusAreaIds: [1],
+  empFocusAreaIds: [1, 2],
   empCertificationId: null,
 };
 

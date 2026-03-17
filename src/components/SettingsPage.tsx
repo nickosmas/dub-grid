@@ -7,7 +7,6 @@ import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
-import { usePermissions } from "@/hooks";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
@@ -58,6 +57,9 @@ interface SettingsPageProps {
   onCertificationsChange: (items: NamedItem[]) => void;
   onOrgRolesChange: (items: NamedItem[]) => void;
   canManageOrg: boolean;
+  isSuperAdmin: boolean;
+  isGridmaster: boolean;
+  canManageOrgLabels: boolean;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -2944,8 +2946,10 @@ export default function SettingsPage({
   onCertificationsChange,
   onOrgRolesChange,
   canManageOrg,
+  isSuperAdmin,
+  isGridmaster,
+  canManageOrgLabels,
 }: SettingsPageProps) {
-  const { isGridmaster, isSuperAdmin, canManageOrgLabels } = usePermissions();
   const [activeSection, setActiveSection] = useState<string>(
     canManageOrg ? "organization" : "impersonation"
   );

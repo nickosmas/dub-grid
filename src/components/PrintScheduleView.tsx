@@ -320,15 +320,18 @@ function PrintSection({
                                 <span
                                   style={{
                                     position: "absolute",
-                                    top: "0.25em",
-                                    left: "0.35em",
+                                    top: 0,
+                                    bottom: 0,
+                                    left: 0,
+                                    display: "flex",
+                                    alignItems: "center",
                                     fontSize: "1em",
                                     fontWeight: 800,
                                     lineHeight: 1,
                                     background: crossHomeFa.colorBg,
                                     color: crossHomeFa.colorText,
-                                    borderRadius: 3,
-                                    padding: "0.1em 0.3em",
+                                    borderRadius: "3px 0 0 3px",
+                                    padding: "0 0.3em",
                                     letterSpacing: "0.02em",
                                   }}
                                 >
@@ -352,80 +355,83 @@ function PrintSection({
                           );
                         }
 
-                        const firstStyle = getStyleByIdOrLabel(labels[0], cellCodeIds[0]);
                         return (
                           <div
                             style={{
                               position: "absolute",
-                              top: "0.5em",
+                              top: "0.25em",
                               right: "0.5em",
-                              bottom: "0.5em",
+                              bottom: "0.25em",
                               left: "0.5em",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.15em",
+                              alignItems: "stretch",
                             }}
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                borderRadius: 4,
-                                overflow: "hidden",
-                                border: firstStyle ? `1px solid ${borderColor(firstStyle.text)}` : "1px solid rgba(0,0,0,0.1)",
-                                width: "100%",
-                                height: "100%",
-                              }}
-                            >
-                              {labels.map((label, li) => {
-                                const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
-                                const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
-                                const isCross = label !== "X"
-                                  && codeEntryLi?.focusAreaId != null
-                                  && codeEntryLi.focusAreaId !== focusAreaId;
-                                const crossHomeFaLi = isCross
-                                  ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
-                                  : undefined;
+                            {labels.map((label, li) => {
+                              const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
+                              const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                              const isCross = label !== "X"
+                                && codeEntryLi?.focusAreaId != null
+                                && codeEntryLi.focusAreaId !== focusAreaId;
+                              const crossHomeFaLi = isCross
+                                ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
+                                : undefined;
+                              const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
+                              const hasTime = pillTime && (pillTime.start || pillTime.end);
 
-                                return (
-                                  <div
-                                    key={li}
-                                    style={{
-                                      flex: 1,
-                                      background: isCross ? "#ffffff" : style.color,
-                                      color: style.text,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontWeight: 800,
-                                      fontSize: "0.85em",
-                                      borderRight:
-                                        li < labels.length - 1
-                                          ? `1px solid rgba(0,0,0,0.1)`
-                                          : "none",
-                                      position: "relative",
-                                    }}
-                                  >
-                                    {isCross && crossHomeFaLi && (
-                                      <span
-                                        style={{
-                                          position: "absolute",
-                                          top: "0.2em",
-                                          left: "0.2em",
-                                          fontSize: "0.85em",
-                                          fontWeight: 800,
-                                          lineHeight: 1,
-                                          background: crossHomeFaLi.colorBg,
-                                          color: crossHomeFaLi.colorText,
-                                          borderRadius: 3,
-                                          padding: "0.1em 0.2em",
-                                          letterSpacing: "0.02em",
-                                        }}
-                                      >
-                                        {getFocusAreaInitials(crossHomeFaLi.name)}
-                                      </span>
-                                    )}
-                                    {label}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                              return (
+                                <div
+                                  key={li}
+                                  style={{
+                                    flex: 1,
+                                    background: isCross ? "#ffffff" : style.color,
+                                    border: `1px solid ${borderColor(style.text)}`,
+                                    borderRadius: 3,
+                                    color: style.text,
+                                    display: "flex",
+                                    flexDirection: hasTime ? "row" : "column",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: hasTime ? "0.25em" : 0,
+                                    fontWeight: 800,
+                                    position: "relative",
+                                    lineHeight: 1,
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {isCross && crossHomeFaLi && (
+                                    <span
+                                      style={{
+                                        position: "absolute",
+                                        top: 0,
+                                        bottom: 0,
+                                        left: 0,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        fontSize: "0.75em",
+                                        fontWeight: 800,
+                                        lineHeight: 1,
+                                        background: crossHomeFaLi.colorBg,
+                                        color: crossHomeFaLi.colorText,
+                                        borderRadius: "2px 0 0 2px",
+                                        padding: "0 0.2em",
+                                        letterSpacing: "0.02em",
+                                      }}
+                                    >
+                                      {getFocusAreaInitials(crossHomeFaLi.name)}
+                                    </span>
+                                  )}
+                                  <span>{label}</span>
+                                  {hasTime && (
+                                    <span style={{ fontSize: "0.7em", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                      {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })()

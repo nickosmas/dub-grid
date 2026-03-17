@@ -70,7 +70,7 @@ function getDraftDateRangeFromState(
 }
 
 function SchedulerContent() {
-  const { canEditShifts, canEditNotes, canManageOrg, isSuperAdmin, isGridmaster, isLoading: permsLoading } = usePermissions();
+  const { canEditShifts, canEditNotes, canManageOrg, canManageOrgLabels, isSuperAdmin, isGridmaster, isLoading: permsLoading } = usePermissions();
   const today = useRef(new Date()).current;
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
@@ -1423,6 +1423,9 @@ function SchedulerContent() {
           onCertificationsChange={handleCertificationsChange}
           onOrgRolesChange={handleOrgRolesChange}
           canManageOrg={canManageOrg}
+          isSuperAdmin={isSuperAdmin}
+          isGridmaster={isGridmaster}
+          canManageOrgLabels={canManageOrgLabels}
         />
       )}
 

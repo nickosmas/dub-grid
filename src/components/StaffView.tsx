@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } fr
 import { createPortal } from "react-dom";
 import { getInitials, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
 import { borderColor } from "@/lib/colors";
-import { Employee, FocusArea, ShiftCode, RecurringShift, NamedItem } from "@/types";
+import { Employee, FocusArea, ShiftCode, NamedItem } from "@/types";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
 import * as db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,7 @@ import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EMPTY_CODE_MAP = new Map<number, string>();
 
 type StaffSection = "members" | "recurring-schedule" | "focus-areas" | "certifications" | "roles";
 
@@ -914,7 +915,6 @@ function RecurringScheduleSection({
 }) {
   // ── Data state ──
   const [allSchedules, setAllSchedules] = useState<Record<string, Record<number, string>>>({});
-  const [allRecurringShifts, setAllRecurringShifts] = useState<Record<string, RecurringShift[]>>({});
   const [loading, setLoading] = useState(true);
 
   // ── Edit state ──
@@ -933,33 +933,42 @@ function RecurringScheduleSection({
 
   // ── Single batch fetch + draft recovery from DB ──
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    Promise.all([
-      db.fetchRecurringShifts(orgId, undefined, shiftCodeMap),
-      db.getRecurringDraft(orgId),
-    ])
-      .then(([rows, draft]) => {
+
+    async function load() {
+      try {
+        const rows = await db.fetchRecurringShifts(orgId, undefined, shiftCodeMap);
+        if (cancelled) return;
+
         const schedules: Record<string, Record<number, string>> = {};
-        const shifts: Record<string, RecurringShift[]> = {};
         for (const rs of rows) {
           if (!schedules[rs.empId]) schedules[rs.empId] = {};
           if (!(rs.dayOfWeek in schedules[rs.empId])) {
             schedules[rs.empId][rs.dayOfWeek] = rs.shiftLabel;
           }
-          if (!shifts[rs.empId]) shifts[rs.empId] = [];
-          shifts[rs.empId].push(rs);
         }
         setAllSchedules(schedules);
-        setAllRecurringShifts(shifts);
 
-        // Load saved draft from DB — immediately apply so cells are visible
-        if (draft && draft.draftData && Object.keys(draft.draftData).length > 0) {
-          setDirtySchedules(draft.draftData);
-          setSavedDraftTimestamp(draft.savedAt);
+        // Load saved draft separately so a draft error doesn't block the main data
+        try {
+          const draft = await db.getRecurringDraft(orgId);
+          if (!cancelled && draft?.draftData && Object.keys(draft.draftData).length > 0) {
+            setDirtySchedules(draft.draftData);
+            setSavedDraftTimestamp(draft.savedAt);
+          }
+        } catch {
+          // Draft recovery is non-critical — ignore errors
         }
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      } catch (err: any) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
   }, [orgId, shiftCodeMap]);
 
   // ── Derived state ──
@@ -1018,7 +1027,6 @@ function RecurringScheduleSection({
     const todayKey = getTodayKey();
     try {
       for (const [empId, empDirty] of Object.entries(dirtySchedules)) {
-        const existing = allRecurringShifts[empId] ?? [];
         for (const [dayStr, newLabel] of Object.entries(empDirty)) {
           const day = Number(dayStr);
           if (newLabel) {
@@ -1026,24 +1034,21 @@ function RecurringScheduleSection({
             if (!sc) continue;
             await db.upsertRecurringShift(empId, orgId, day, sc.id, todayKey);
           } else {
-            const dayExisting = existing.filter((rs) => rs.dayOfWeek === day);
-            for (const rs of dayExisting) {
-              await db.deleteRecurringShift(empId, rs.dayOfWeek, rs.effectiveFrom);
-            }
+            await db.deleteRecurringShift(empId, day);
           }
         }
       }
-      // Merge dirty into allSchedules
-      setAllSchedules((prev) => {
-        const next = { ...prev };
-        for (const [empId, empDirty] of Object.entries(dirtySchedules)) {
-          next[empId] = { ...(next[empId] ?? {}), ...empDirty };
-          for (const [dayStr, label] of Object.entries(next[empId])) {
-            if (!label) delete next[empId][Number(dayStr)];
-          }
+      // Re-fetch from DB to keep both allSchedules and allRecurringShifts in sync
+      // Re-fetch from DB so allSchedules reflects what was actually persisted
+      const freshRows = await db.fetchRecurringShifts(orgId, undefined, shiftCodeMap);
+      const freshSchedules: Record<string, Record<number, string>> = {};
+      for (const rs of freshRows) {
+        if (!freshSchedules[rs.empId]) freshSchedules[rs.empId] = {};
+        if (!(rs.dayOfWeek in freshSchedules[rs.empId])) {
+          freshSchedules[rs.empId][rs.dayOfWeek] = rs.shiftLabel;
         }
-        return next;
-      });
+      }
+      setAllSchedules(freshSchedules);
       setDirtySchedules({});
       setSavedDraftTimestamp(null);
       await db.deleteRecurringDraft(orgId).catch(() => {});
@@ -1739,7 +1744,7 @@ export default function StaffView({
             employees={employees}
             orgId={orgId}
             shiftCodes={shiftCodes ?? []}
-            shiftCodeMap={shiftCodeMap ?? new Map()}
+            shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
             canEdit={canEditShifts ?? false}
             focusAreas={focusAreas}
             certifications={certifications}

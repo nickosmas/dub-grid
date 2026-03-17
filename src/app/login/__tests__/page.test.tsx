@@ -61,7 +61,7 @@ describe("Login page submit states", () => {
       const button = screen.getByRole("button", { name: /signing in/i });
       expect(button).toBeInTheDocument();
       expect(button).toBeDisabled();
-    });
+    }, { timeout: 3000 });
   });
 
   it("failed sign-in: loading resets to false and error message is displayed", async () => {

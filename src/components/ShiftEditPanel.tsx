@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDate, getCertName } from "@/lib/utils";
 import { EditModalState, ShiftCode, NoteType, IndicatorType, SeriesScope, FocusArea, NamedItem, DraftKind } from "@/types";
 import ShiftPicker from "./ShiftPicker";
@@ -86,14 +86,130 @@ function joinMultiTimes(times: (string | null)[]): string | null {
   return times.map(t => t ?? '').join('|');
 }
 
-// ── Per-pill custom time editor (select dropdowns, immediate save) ────────
+// ── Per-pill custom time editor (custom dropdown views, immediate save) ───
 const HOURS = [1,2,3,4,5,6,7,8,9,10,11,12];
 const MINUTES = ["00","05","10","15","20","25","30","35","40","45","50","55"];
-const pillSelStyle: React.CSSProperties = {
-  padding: "5px 2px", border: "1.5px solid var(--color-border)", borderRadius: 6,
-  fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: "#fff",
-  textAlign: "center", cursor: "pointer", outline: "none", boxSizing: "border-box",
+
+const triggerStyle: React.CSSProperties = {
+  padding: "6px 8px",
+  border: "1.5px solid var(--color-border)",
+  borderRadius: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  fontFamily: "inherit",
+  background: "#fff",
+  textAlign: "center",
+  cursor: "pointer",
+  outline: "none",
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+  userSelect: "none",
+  position: "relative",
 };
+
+const dropdownStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 4px)",
+  left: "50%",
+  transform: "translateX(-50%)",
+  background: "#fff",
+  border: "1.5px solid var(--color-border)",
+  borderRadius: 8,
+  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+  zIndex: 100,
+  maxHeight: 180,
+  overflowY: "auto",
+  overflowX: "hidden",
+  minWidth: 52,
+};
+
+const optionStyle: React.CSSProperties = {
+  padding: "8px 14px",
+  fontSize: 12,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  textAlign: "center",
+  whiteSpace: "nowrap",
+};
+
+function TimeDropdown({
+  value,
+  options,
+  onChange,
+  width,
+  placeholder,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (val: string) => void;
+  width: number;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) close();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open, close]);
+
+  const display = value || placeholder || "--";
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{ ...triggerStyle, width, color: value ? "inherit" : "var(--color-text-muted)" }}
+      >
+        {display}
+        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 1, flexShrink: 0 }}>
+          <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={dropdownStyle}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => { onChange(opt.value); close(); }}
+              style={{
+                ...optionStyle,
+                background: opt.value === value ? "#EEF2FF" : "transparent",
+                color: opt.value === value ? "#4338CA" : "var(--color-text)",
+                fontWeight: opt.value === value ? 700 : 500,
+              }}
+              onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "#F8FAFC"); }}
+              onMouseLeave={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "transparent"); }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const hourOptions = [
+  { value: "", label: "--" },
+  ...HOURS.map((h) => ({ value: String(h), label: String(h) })),
+];
+const minuteOptions = MINUTES.map((m) => ({ value: m, label: m }));
+const periodOptions = [
+  { value: "AM", label: "AM" },
+  { value: "PM", label: "PM" },
+];
 
 function PillTimeEditor({
   customStart,
@@ -155,35 +271,19 @@ function PillTimeEditor({
       {/* Start row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>START</span>
-        <select value={s.hour} onChange={(ev) => updateStart(ev.target.value, s.minute, s.period)} style={{ ...pillSelStyle, width: 46 }}>
-          <option value="">--</option>
-          {HOURS.map((h) => <option key={h} value={String(h)}>{h}</option>)}
-        </select>
+        <TimeDropdown value={s.hour} options={hourOptions} onChange={(v) => updateStart(v, s.minute, s.period)} width={50} placeholder="--" />
         <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
-        <select value={s.minute} onChange={(ev) => updateStart(s.hour, ev.target.value, s.period)} style={{ ...pillSelStyle, width: 46 }}>
-          {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <select value={s.period} onChange={(ev) => updateStart(s.hour, s.minute, ev.target.value as "AM" | "PM")} style={{ ...pillSelStyle, width: 50 }}>
-          <option value="AM">AM</option>
-          <option value="PM">PM</option>
-        </select>
+        <TimeDropdown value={s.minute} options={minuteOptions} onChange={(v) => updateStart(s.hour, v, s.period)} width={50} />
+        <TimeDropdown value={s.period} options={periodOptions} onChange={(v) => updateStart(s.hour, s.minute, v as "AM" | "PM")} width={54} />
       </div>
 
       {/* End row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>END</span>
-        <select value={e.hour} onChange={(ev) => updateEnd(ev.target.value, e.minute, e.period)} style={{ ...pillSelStyle, width: 46 }}>
-          <option value="">--</option>
-          {HOURS.map((h) => <option key={h} value={String(h)}>{h}</option>)}
-        </select>
+        <TimeDropdown value={e.hour} options={hourOptions} onChange={(v) => updateEnd(v, e.minute, e.period)} width={50} placeholder="--" />
         <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
-        <select value={e.minute} onChange={(ev) => updateEnd(e.hour, ev.target.value, e.period)} style={{ ...pillSelStyle, width: 46 }}>
-          {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <select value={e.period} onChange={(ev) => updateEnd(e.hour, e.minute, ev.target.value as "AM" | "PM")} style={{ ...pillSelStyle, width: 50 }}>
-          <option value="AM">AM</option>
-          <option value="PM">PM</option>
-        </select>
+        <TimeDropdown value={e.minute} options={minuteOptions} onChange={(v) => updateEnd(e.hour, v, e.period)} width={50} />
+        <TimeDropdown value={e.period} options={periodOptions} onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")} width={54} />
       </div>
     </div>
   );
