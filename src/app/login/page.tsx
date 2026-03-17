@@ -12,7 +12,7 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /** Returns true only after `delay` ms of `active` being true. Resets immediately when `active` becomes false. */
-function useDelayedFlag(active: boolean, delay = 400): boolean {
+function useDelayedFlag(active: boolean, delay = 2000): boolean {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     if (!active) { setVisible(false); return; }
