@@ -10,7 +10,7 @@
 -- 1. ENUM TYPES
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'nexus_architect', 'none');
+CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'none');
 CREATE TYPE public.org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly');
 CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
@@ -227,28 +227,19 @@ CREATE TABLE public.shifts (
 
 ALTER TABLE ONLY public.shifts REPLICA IDENTITY FULL;
 
+-- Shift data integrity constraints
+ALTER TABLE public.shifts ADD CONSTRAINT valid_shift_times
+  CHECK (
+    custom_start_time IS NULL
+    OR custom_end_time IS NULL
+    OR custom_start_time <> custom_end_time
+  );
 
--- ── schedule_notes ────────────────────────────────────────────────────────────
-
-CREATE TABLE public.schedule_notes (
-  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  org_id        UUID NOT NULL,
-  emp_id        UUID NOT NULL,
-  date          DATE NOT NULL,
-  note_type     TEXT NOT NULL DEFAULT 'readings',
-  status        TEXT NOT NULL DEFAULT 'published',
-  focus_area_id INTEGER,
-  created_by    UUID,
-  updated_by    UUID,
-  created_at    TIMESTAMPTZ DEFAULT now(),
-  updated_at    TIMESTAMPTZ DEFAULT now(),
-
-  CONSTRAINT schedule_notes_note_type_check CHECK (note_type IN ('readings', 'shower')),
-  CONSTRAINT schedule_notes_status_check CHECK (status IN ('published', 'draft', 'draft_deleted')),
-  UNIQUE (emp_id, date, note_type, focus_area_id)
-);
-
-ALTER TABLE ONLY public.schedule_notes REPLICA IDENTITY FULL;
+ALTER TABLE public.shifts ADD CONSTRAINT valid_draft_state
+  CHECK (
+    draft_is_delete = false
+    OR array_length(draft_shift_code_ids, 1) IS NULL
+  );
 
 
 -- ── indicator_types ───────────────────────────────────────────────────────────
@@ -262,6 +253,28 @@ CREATE TABLE public.indicator_types (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ
 );
+
+
+-- ── schedule_notes ────────────────────────────────────────────────────────────
+
+CREATE TABLE public.schedule_notes (
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id            UUID NOT NULL,
+  emp_id            UUID NOT NULL,
+  date              DATE NOT NULL,
+  indicator_type_id INTEGER NOT NULL REFERENCES public.indicator_types(id),
+  status            TEXT NOT NULL DEFAULT 'published',
+  focus_area_id     INTEGER,
+  created_by        UUID,
+  updated_by        UUID,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT schedule_notes_status_check CHECK (status IN ('published', 'draft', 'draft_deleted')),
+  UNIQUE (emp_id, date, indicator_type_id, focus_area_id)
+);
+
+ALTER TABLE ONLY public.schedule_notes REPLICA IDENTITY FULL;
 
 
 -- ── recurring_shifts ────────────────────────────────────────────────────────────
@@ -280,7 +293,8 @@ CREATE TABLE public.recurring_shifts (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  CONSTRAINT recurring_shifts_day_of_week_check CHECK (day_of_week >= 0 AND day_of_week <= 6)
+  CONSTRAINT recurring_shifts_day_of_week_check CHECK (day_of_week >= 0 AND day_of_week <= 6),
+  CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until)
 );
 
 
@@ -415,6 +429,22 @@ CREATE TABLE public.schedule_draft_sessions (
 );
 
 
+-- ── publish_history ──────────────────────────────────────────────────────────
+
+CREATE TABLE public.publish_history (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id        UUID NOT NULL,
+  published_by  UUID NOT NULL,
+  start_date    DATE NOT NULL,
+  end_date      DATE NOT NULL,
+  change_count  INTEGER NOT NULL DEFAULT 0,
+  changes       JSONB NOT NULL DEFAULT '[]'::JSONB,
+  published_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_publish_history_org_date ON public.publish_history(org_id, published_at DESC);
+
+
 -- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
 
 CREATE TABLE public.recurring_shifts_draft_sessions (
@@ -506,7 +536,7 @@ ALTER TABLE public.indicator_types
 ALTER TABLE public.recurring_shifts
   ADD CONSTRAINT recurring_shifts_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
   ADD CONSTRAINT recurring_shifts_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT recurring_shifts_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT recurring_shifts_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE SET NULL,
   ADD CONSTRAINT recurring_shifts_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT recurring_shifts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -514,7 +544,7 @@ ALTER TABLE public.recurring_shifts
 ALTER TABLE public.shift_series
   ADD CONSTRAINT shift_series_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_series_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT shift_series_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT shift_series_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -551,6 +581,11 @@ ALTER TABLE public.schedule_draft_sessions
 ALTER TABLE public.recurring_shifts_draft_sessions
   ADD CONSTRAINT recurring_shifts_draft_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT recurring_shifts_draft_user_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id);
+
+-- publish_history
+ALTER TABLE public.publish_history
+  ADD CONSTRAINT publish_history_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT publish_history_user_fkey FOREIGN KEY (published_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

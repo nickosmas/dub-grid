@@ -24,7 +24,6 @@ const defaultFocusAreas: FocusArea[] = [
 ];
 
 const defaultProps = {
-  viewMode: "schedule" as const,
   weekStart: new Date(2024, 0, 7), // Jan 7, 2024 (Sunday)
   spanWeeks: 1 as const,
   activeFocusArea: null as number | null,
@@ -73,53 +72,6 @@ describe("Toolbar — schedule mode rendering", () => {
   it("renders staff search input with placeholder Find staff…", () => {
     render(<Toolbar {...defaultProps} />);
     expect(screen.getByPlaceholderText("Find staff…")).toBeInTheDocument();
-  });
-});
-
-describe("Toolbar — non-schedule mode", () => {
-  const nonScheduleProps = { ...defaultProps, viewMode: "staff" as const };
-
-  it("does NOT render week nav buttons", () => {
-    render(<Toolbar {...nonScheduleProps} />);
-    expect(screen.queryByRole("button", { name: "‹" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "›" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Today" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("does NOT render span toggle buttons", () => {
-    render(<Toolbar {...nonScheduleProps} />);
-    expect(
-      screen.queryByRole("button", { name: "1W" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "2W" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "M" })).not.toBeInTheDocument();
-  });
-
-  it("does NOT render focus area filter buttons", () => {
-    render(<Toolbar {...nonScheduleProps} />);
-    expect(
-      screen.queryByRole("button", { name: "All" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "North" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("does NOT render staff search input", () => {
-    render(<Toolbar {...nonScheduleProps} />);
-    expect(
-      screen.queryByPlaceholderText("Find staff…"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("renders null (nothing) in non-schedule mode", () => {
-    const { container } = render(<Toolbar {...nonScheduleProps} />);
-    // The component returns null for non-schedule viewMode
-    expect(container.firstChild).toBeNull();
   });
 });
 

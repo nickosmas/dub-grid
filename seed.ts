@@ -344,7 +344,11 @@ function id(val: unknown): number {
 async function main() {
   let connectionString: string;
 
-  if (process.env.DATABASE_URL) {
+  if (process.env.FORCE_LOCAL_DB === "1") {
+    // Explicitly forced local (from npm run db:reset)
+    connectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+    console.log("Connecting to LOCAL Supabase...\n");
+  } else if (process.env.DATABASE_URL) {
     connectionString = process.env.DATABASE_URL;
   } else if (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("supabase.co")) {
     // Remote Supabase — derive pooler connection string from project ref
@@ -369,23 +373,29 @@ async function main() {
   // ── Cleanup ────────────────────────────────────────────────────────────
   console.log("Clearing existing seed data...");
   await db.query(`
-    TRUNCATE
-      public.organization_memberships,
-      public.schedule_notes,
-      public.shifts,
-      public.recurring_shifts,
-      public.shift_series,
-      public.schedule_draft_sessions,
-      public.employees,
-      public.shift_codes,
-      public.shift_categories,
-      public.indicator_types,
-      public.organization_roles,
-      public.certifications,
-      public.focus_areas
-    CASCADE;
-    DELETE FROM public.organizations
-    WHERE slug IN ('sunrise-senior', 'harbor-health', 'evergreen-care', 'pacific-wellness', 'mountain-view', 'ardenwood');
+    DO $$ BEGIN
+      TRUNCATE
+        public.organization_memberships,
+        public.schedule_notes,
+        public.shifts,
+        public.recurring_shifts,
+        public.shift_series,
+        public.schedule_draft_sessions,
+        public.recurring_shifts_draft_sessions,
+        public.publish_history,
+        public.employees,
+        public.shift_codes,
+        public.shift_categories,
+        public.indicator_types,
+        public.organization_roles,
+        public.certifications,
+        public.focus_areas
+      CASCADE;
+      DELETE FROM public.organizations
+      WHERE slug IN ('sunrise-senior', 'harbor-health', 'evergreen-care', 'pacific-wellness', 'mountain-view', 'ardenwood');
+    EXCEPTION WHEN undefined_table THEN
+      NULL; -- Tables don't exist yet on first run
+    END $$;
   `);
 
   console.log("Seeding 6 tenants...\n");
@@ -528,7 +538,7 @@ async function main() {
       });
     }
 
-    // 9. Shifts (March 1-21, 2026 — 3 weeks of data)
+    // 9. Shifts (March 22 – April 4, 2026 — 2 weeks of data)
     const workCodes = shiftCodeRows.filter((sc) => !sc.is_off_day);
     const offCode = shiftCodeRows.find((sc) => sc.is_off_day);
     let shiftCount = 0;
@@ -544,9 +554,12 @@ async function main() {
       );
       if (empWorkCodes.length === 0) continue;
 
-      for (let day = 1; day <= 21; day++) {
-        const dt = dateStr(2026, 3, day);
-        const dow = new Date(2026, 2, day).getDay();
+      const shiftStart = new Date(2026, 2, 22); // March 22, 2026
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(shiftStart);
+        d.setDate(d.getDate() + i);
+        const dt = dateStr(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        const dow = d.getDay();
         const rand = copycat.float(`${emp.id}-${dt}-shift`, { min: 0, max: 1 });
         if (rand > 0.92) continue; // ~8% chance of no shift
 
@@ -558,7 +571,7 @@ async function main() {
           codeId = offCode ? offCode.id : empWorkCodes[0].id;
           faId = offCode ? null : primaryFaId;
         } else {
-          const code = empWorkCodes[day % empWorkCodes.length];
+          const code = empWorkCodes[i % empWorkCodes.length];
           codeId = code.id;
           faId = code.focus_area_id ?? primaryFaId;
         }

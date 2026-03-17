@@ -129,57 +129,59 @@ export default function AdminPermissionsEditor({
 
   return (
     <Modal title={`Admin Permissions — ${userName}`} onClose={onClose} style={{ maxWidth: 520 }}>
-      <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16 }}>
-        Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.
-      </div>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16, flexShrink: 0 }}>
+          Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.
+        </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: 12 }}>Select All</button>
-        <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: 12 }}>Clear All</button>
-      </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexShrink: 0 }}>
+          <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: 12 }}>Select All</button>
+          <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: 12 }}>Clear All</button>
+        </div>
 
-      <div style={{ maxHeight: 380, overflowY: "auto" }}>
-        {PERMISSION_GROUPS.map((group) => (
-          <div key={group.label} style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-              {group.label}
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          {PERMISSION_GROUPS.map((group) => (
+            <div key={group.label} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                {group.label}
+              </div>
+              {group.permissions.map((p) => {
+                const checked = perms[p.key as keyof AdminPermissions] === true;
+                return (
+                  <label
+                    key={p.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "6px 0",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(p.key)}
+                      style={{ width: 16, height: 16, cursor: "pointer" }}
+                    />
+                    {p.label}
+                  </label>
+                );
+              })}
             </div>
-            {group.permissions.map((p) => {
-              const checked = perms[p.key as keyof AdminPermissions] === true;
-              return (
-                <label
-                  key={p.key}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "6px 0",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    color: "var(--color-text-primary)",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(p.key)}
-                    style={{ width: 16, height: 16, cursor: "pointer" }}
-                  />
-                  {p.label}
-                </label>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
-        <button className="dg-btn dg-btn-secondary" onClick={onClose} disabled={saving}>
-          Cancel
-        </button>
-        <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Permissions"}
-        </button>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 20, flexShrink: 0, borderTop: "1px solid var(--color-border-light)" }}>
+          <button className="dg-btn dg-btn-secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save Permissions"}
+          </button>
+        </div>
       </div>
     </Modal>
   );

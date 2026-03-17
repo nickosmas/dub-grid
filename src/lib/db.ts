@@ -9,7 +9,6 @@ import {
   ShiftCategory,
   ShiftCode,
   ScheduleNote,
-  NoteType,
   IndicatorType,
   RecurringShift,
   ShiftSeries,
@@ -189,6 +188,7 @@ interface DbShift {
   draft_shift_code_ids: number[];
   published_shift_code_ids: number[];
   draft_is_delete: boolean;
+  version: number;
   series_id?: string | null;
   from_recurring?: boolean;
   custom_start_time?: string | null;
@@ -200,7 +200,7 @@ interface DbScheduleNote {
   org_id: string;
   emp_id: string;
   date: string;
-  note_type: NoteType;
+  indicator_type_id: number;
   focus_area_id: number | null;
   status: 'published' | 'draft' | 'draft_deleted';
   created_by: string | null;
@@ -837,7 +837,7 @@ export async function fetchShifts(
 ): Promise<ShiftMap> {
   const { data, error } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, series_id, from_recurring, custom_start_time, custom_end_time, employees!inner(org_id)")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, version, series_id, from_recurring, custom_start_time, custom_end_time, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (error) throw error;
   const map: ShiftMap = {};
@@ -880,6 +880,7 @@ export async function fetchShifts(
         fromRecurring: row.from_recurring ?? false,
         customStartTime: row.custom_start_time ?? null,
         customEndTime: row.custom_end_time ?? null,
+        version: row.version,
       };
     }
   }
@@ -893,6 +894,7 @@ export async function upsertShift(
   orgId?: string | null,
   customStartTime?: string | null,
   customEndTime?: string | null,
+  expectedVersion?: number,
 ): Promise<void> {
   const payload: Record<string, unknown> = {
     emp_id: empId,
@@ -903,10 +905,44 @@ export async function upsertShift(
   if (orgId) payload.org_id = orgId;
   if (customStartTime !== undefined) payload.custom_start_time = customStartTime;
   if (customEndTime !== undefined) payload.custom_end_time = customEndTime;
-  const { error } = await supabase
-    .from("shifts")
-    .upsert(payload, { onConflict: "emp_id,date" });
-  if (error) throw error;
+
+  if (expectedVersion !== undefined) {
+    // Existing shift: use update with optimistic lock
+    payload.version = expectedVersion + 1;
+    const { data, error } = await supabase
+      .from("shifts")
+      .update(payload)
+      .eq("emp_id", empId)
+      .eq("date", date)
+      .eq("version", expectedVersion)
+      .select("version")
+      .single();
+    if (error) {
+      if (error.code === "PGRST116") {
+        const { data: currentShift } = await supabase
+          .from("shifts")
+          .select("version")
+          .eq("emp_id", empId)
+          .eq("date", date)
+          .single();
+        throw new OptimisticLockError(
+          `${empId}:${date}`,
+          expectedVersion,
+          currentShift?.version,
+        );
+      }
+      throw error;
+    }
+    if (!data) {
+      throw new OptimisticLockError(`${empId}:${date}`, expectedVersion);
+    }
+  } else {
+    // New shift: plain upsert (version starts at 0 via DB default)
+    const { error } = await supabase
+      .from("shifts")
+      .upsert(payload, { onConflict: "emp_id,date" });
+    if (error) throw error;
+  }
 }
 
 /** Updates only the custom start/end time for an existing shift row. */
@@ -941,13 +977,37 @@ export async function publishSchedule(
   orgId: string,
   startDate: Date,
   endDate: Date
-): Promise<void> {
-  const { error } = await supabase.rpc("publish_schedule", {
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc("publish_schedule", {
     p_org_id: orgId,
     p_start_date: startDate.toISOString().split("T")[0],
     p_end_date: endDate.toISOString().split("T")[0],
   });
   if (error) throw error;
+  return data as string | null;
+}
+
+export async function fetchLatestPublishHistory(
+  orgId: string
+): Promise<import("@/types").PublishHistoryEntry | null> {
+  const { data, error } = await supabase
+    .from("publish_history")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    id: data.id,
+    publishedBy: data.published_by,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    changeCount: data.change_count,
+    changes: data.changes as import("@/types").PublishChange[],
+    publishedAt: data.published_at,
+  };
 }
 
 export async function discardScheduleDrafts(
@@ -1040,7 +1100,7 @@ export async function discardScheduleDrafts(
 export async function fetchScheduleNotes(orgId: string): Promise<ScheduleNote[]> {
   const { data, error } = await supabase
     .from("schedule_notes")
-    .select("id, org_id, emp_id, date, note_type, focus_area_id, status, created_by, created_at, updated_at")
+    .select("id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at")
     .eq("org_id", orgId);
   if (error) throw error;
 
@@ -1049,7 +1109,7 @@ export async function fetchScheduleNotes(orgId: string): Promise<ScheduleNote[]>
     orgId: row.org_id,
     empId: row.emp_id,
     date: row.date,
-    noteType: row.note_type,
+    indicatorTypeId: row.indicator_type_id,
     focusAreaId: row.focus_area_id,
     status: row.status,
     createdBy: row.created_by,
@@ -1062,7 +1122,7 @@ export async function upsertScheduleNote(
   orgId: string,
   empId: string,
   date: string,
-  noteType: NoteType,
+  indicatorTypeId: number,
   focusAreaId: number,
   existingStatus?: 'published' | 'draft' | 'draft_deleted',
 ): Promise<void> {
@@ -1078,11 +1138,11 @@ export async function upsertScheduleNote(
       org_id: orgId,
       emp_id: empId,
       date,
-      note_type: noteType,
+      indicator_type_id: indicatorTypeId,
       focus_area_id: focusAreaId,
       status,
     },
-    { onConflict: "emp_id,date,note_type,focus_area_id" },
+    { onConflict: "emp_id,date,indicator_type_id,focus_area_id" },
   );
   if (error) throw error;
 }
@@ -1090,7 +1150,7 @@ export async function upsertScheduleNote(
 export async function deleteScheduleNote(
   empId: string,
   date: string,
-  noteType: NoteType,
+  indicatorTypeId: number,
   focusAreaId: number,
   existingStatus?: 'published' | 'draft' | 'draft_deleted',
 ): Promise<void> {
@@ -1101,7 +1161,7 @@ export async function deleteScheduleNote(
       .delete()
       .eq("emp_id", empId)
       .eq("date", date)
-      .eq("note_type", noteType)
+      .eq("indicator_type_id", indicatorTypeId)
       .eq("focus_area_id", focusAreaId);
     if (error) throw error;
   } else {
@@ -1111,7 +1171,7 @@ export async function deleteScheduleNote(
       .update({ status: 'draft_deleted' })
       .eq("emp_id", empId)
       .eq("date", date)
-      .eq("note_type", noteType)
+      .eq("indicator_type_id", indicatorTypeId)
       .eq("focus_area_id", focusAreaId);
     if (error) throw error;
   }
@@ -1528,7 +1588,7 @@ export async function applyRecurringSchedules(
   endDate: Date,
   recurringShifts: RecurringShift[],
   existingShifts: ShiftMap,
-): Promise<{ empId: string; date: string; label: string }[]> {
+): Promise<{ empId: string; date: string; label: string; shiftCodeId: number }[]> {
   // Group recurring shifts by employee
   const byEmp: Record<string, RecurringShift[]> = {};
   for (const rs of recurringShifts) {
@@ -1537,7 +1597,7 @@ export async function applyRecurringSchedules(
   }
 
   const toInsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; draft_is_delete: boolean; org_id: string; from_recurring: boolean }[] = [];
-  const generated: { empId: string; date: string; label: string }[] = [];
+  const generated: { empId: string; date: string; label: string; shiftCodeId: number }[] = [];
 
   const current = new Date(startDate);
   current.setHours(0, 0, 0, 0);
@@ -1580,7 +1640,7 @@ export async function applyRecurringSchedules(
 
       if (regular) {
         toInsert.push({ emp_id: empId, date: dateKey, draft_shift_code_ids: [regular.shiftCodeId], draft_is_delete: false, org_id: orgId, from_recurring: true });
-        generated.push({ empId, date: dateKey, label: regular.shiftLabel });
+        generated.push({ empId, date: dateKey, label: regular.shiftLabel, shiftCodeId: regular.shiftCodeId });
       }
     }
 
@@ -1632,19 +1692,36 @@ export async function saveDraftSession(
   startDate: Date,
   endDate: Date,
 ): Promise<void> {
-  const { error } = await supabase
+  // Use select + insert/update instead of upsert to avoid RLS + ON CONFLICT issues
+  const { data: existing } = await supabase
     .from("schedule_draft_sessions")
-    .upsert(
-      {
+    .select("id")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("schedule_draft_sessions")
+      .update({
+        saved_by: savedBy,
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+        saved_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("schedule_draft_sessions")
+      .insert({
         org_id: orgId,
         saved_by: savedBy,
         start_date: startDate.toISOString().split("T")[0],
         end_date: endDate.toISOString().split("T")[0],
         saved_at: new Date().toISOString(),
-      },
-      { onConflict: "org_id" },
-    );
-  if (error) throw error;
+      });
+    if (error) throw error;
+  }
 }
 
 export async function deleteDraftSession(orgId: string): Promise<void> {
@@ -1687,18 +1764,34 @@ export async function saveRecurringDraft(
   savedBy: string,
   draftData: Record<string, Record<number, string>>,
 ): Promise<void> {
-  const { error } = await supabase
+  // Use select + insert/update instead of upsert to avoid RLS + ON CONFLICT issues
+  const { data: existing } = await supabase
     .from("recurring_shifts_draft_sessions")
-    .upsert(
-      {
+    .select("id")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("recurring_shifts_draft_sessions")
+      .update({
+        saved_by: savedBy,
+        draft_data: draftData,
+        saved_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("recurring_shifts_draft_sessions")
+      .insert({
         org_id: orgId,
         saved_by: savedBy,
         draft_data: draftData,
         saved_at: new Date().toISOString(),
-      },
-      { onConflict: "org_id" },
-    );
-  if (error) throw error;
+      });
+    if (error) throw error;
+  }
 }
 
 export async function deleteRecurringDraft(orgId: string): Promise<void> {
@@ -1754,7 +1847,7 @@ function generateSeriesDates(
   const dates: string[] = [];
   const start = new Date(startDate + 'T00:00:00');
   const end = endDate ? new Date(endDate + 'T00:00:00') : null;
-  const cap = maxOccurrences ?? 730; // Safety cap: 2 years of daily shifts
+  const cap = maxOccurrences ?? 183; // Safety cap: 6 months of daily shifts
 
   const current = new Date(start);
 
@@ -1769,14 +1862,17 @@ function generateSeriesDates(
     const dayOfWeek = current.getDay();
 
     let include = false;
+    const dayMatch = (daysOfWeek === null || daysOfWeek.length === 0)
+      ? dayOfWeek === start.getDay()
+      : daysOfWeek.includes(dayOfWeek);
     if (frequency === 'daily') {
       include = true;
     } else if (frequency === 'weekly') {
-      include = !daysOfWeek?.length || daysOfWeek.includes(dayOfWeek);
+      include = dayMatch;
     } else if (frequency === 'biweekly') {
-      const diffDays = Math.round((current.getTime() - start.getTime()) / 86400000);
+      const diffDays = Math.floor((current.getTime() - start.getTime()) / 86400000);
       const weekNum = Math.floor(diffDays / 7);
-      include = weekNum % 2 === 0 && (!daysOfWeek?.length || daysOfWeek.includes(dayOfWeek));
+      include = weekNum % 2 === 0 && dayMatch;
     }
 
     if (include) dates.push(dateKey);
@@ -1872,11 +1968,12 @@ export async function updateSeriesAllShifts(seriesId: string, newShiftCodeId: nu
  * Deletes all shifts in a series (sets draft_is_delete for all).
  * Also archives the series master record (soft-delete).
  */
-export async function deleteShiftSeries(seriesId: string): Promise<void> {
-  const { error } = await supabase
+export async function deleteShiftSeries(seriesId: string): Promise<number> {
+  const { data, error } = await supabase
     .from("shifts")
     .update({ draft_is_delete: true, draft_shift_code_ids: [], series_id: null })
-    .eq("series_id", seriesId);
+    .eq("series_id", seriesId)
+    .select("emp_id");
   if (error) throw new Error(error.message);
 
   const { error: seriesError } = await supabase
@@ -1884,6 +1981,8 @@ export async function deleteShiftSeries(seriesId: string): Promise<void> {
     .update({ archived_at: new Date().toISOString() })
     .eq("id", seriesId);
   if (seriesError) throw new Error(seriesError.message);
+
+  return data?.length ?? 0;
 }
 
 // ── Gridmaster: Tenant Management ─────────────────────────────────────────────

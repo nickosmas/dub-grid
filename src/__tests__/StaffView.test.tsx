@@ -26,6 +26,14 @@ vi.mock("@/components/EditEmployeePanel", () => ({
   default: () => <div data-testid="edit-panel" />,
 }));
 
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/staff",
+}));
+
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: any) => <a href={href} {...rest}>{children}</a>,
+}));
+
 const focusAreas: FocusArea[] = [
   {
     id: 1,

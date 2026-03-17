@@ -112,6 +112,24 @@ export interface Employee {
 
 export type DraftKind = 'new' | 'modified' | 'deleted' | null;
 
+export interface PublishChange {
+  empId: string;
+  date: string;
+  kind: 'new' | 'modified' | 'deleted';
+  from: number[];
+  to: number[];
+}
+
+export interface PublishHistoryEntry {
+  id: string;
+  publishedBy: string;
+  startDate: string;
+  endDate: string;
+  changeCount: number;
+  changes: PublishChange[];
+  publishedAt: string;
+}
+
 export type ShiftMap = Record<string, {
   label: string;
   shiftCodeIds: number[];
@@ -127,6 +145,8 @@ export type ShiftMap = Record<string, {
   fromRecurring?: boolean;
   customStartTime?: string | null;
   customEndTime?: string | null;
+  /** Optimistic lock version. undefined for new (not-yet-persisted) shifts. */
+  version?: number;
 }>;
 
 export type SeriesFrequency = 'daily' | 'weekly' | 'biweekly';
@@ -176,9 +196,6 @@ export interface EditModalState {
   activeFocusAreaId?: number | null;
 }
 
-/** Dynamic indicator name — matches indicator_types.name in the DB */
-export type NoteType = string;
-
 export interface IndicatorType {
   id: number;
   orgId: string;
@@ -194,7 +211,8 @@ export interface ScheduleNote {
   orgId: string;
   empId: string;
   date: string;
-  noteType: NoteType;
+  /** FK to indicator_types.id — consistent with how shifts reference shift_codes by ID */
+  indicatorTypeId: number;
   focusAreaId: number | null;
   status: 'published' | 'draft' | 'draft_deleted';
   createdBy: string | null;

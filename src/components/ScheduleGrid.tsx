@@ -4,7 +4,7 @@ import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, NoteType, IndicatorType, NamedItem, DraftKind } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange } from "@/types";
 import { getCertAbbr, getRoleAbbrs } from "@/lib/utils";
 import { borderColor } from "@/lib/colors";
 
@@ -37,9 +37,20 @@ const DRAFT_BORDER_COLORS: Record<string, string> = {
   deleted: '#DC2626',
 };
 
+const PUBLISH_DIFF_BORDER_COLORS: Record<string, string> = {
+  new: '#059669',
+  modified: '#6366F1',
+  deleted: '#DC2626',
+};
+
 function getDraftBorder(draftKind: DraftKind, fallback: string): string {
   if (!draftKind) return fallback;
   return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
+}
+
+function getPublishDiffBoxShadow(kind: string, fallback: string): string {
+  const color = PUBLISH_DIFF_BORDER_COLORS[kind] ?? fallback;
+  return `0 0 0 1px #fff, 0 0 0 2.5px ${color}`;
 }
 
 interface ScheduleGridProps {
@@ -60,16 +71,17 @@ interface ScheduleGridProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
-  noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
+  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
-  isEditMode?: boolean;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
+  cellLocks?: Map<string, { userName: string }>;
 }
 
 
@@ -92,16 +104,17 @@ interface SectionBlockProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
-  noteTypesForKey?: (empId: string, date: Date, focusAreaId?: number) => NoteType[];
+  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  isEditMode?: boolean;
+  cellLocks?: Map<string, { userName: string }>;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -122,16 +135,17 @@ const SectionBlock = memo(function SectionBlock({
   shiftCategories,
   indicatorTypes,
   isCellInteractive,
-  noteTypesForKey,
+  activeIndicatorIdsForKey,
   onTooltipChange,
   getCustomShiftTimes,
   draftKindForKey,
   showDiffOverlay,
   publishedLabelForKey,
   publishedShiftCodeIdsForKey,
+  publishDiffForKey,
   certifications,
   orgRoles,
-  isEditMode,
+  cellLocks,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
@@ -448,16 +462,19 @@ const SectionBlock = memo(function SectionBlock({
                   const shiftCode = shiftForKey(emp.id, date);
                   const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
                   const draftKind = draftKindForKey?.(emp.id, date) ?? null;
+                  const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
                   const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
                   const publishedCodeIds = publishedShiftCodeIdsForKey?.(emp.id, date) ?? [];
-                  const noteTypes = noteTypesForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
+                  const noteTypes = activeIndicatorIdsForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                   const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
+                  const cellLock = cellLocks?.get(`${emp.id}_${dateKey}`);
+                  const isLocked = !!cellLock;
 
                   return (
                     <div
                       key={dateKey}
                       onClick={() => {
-                        if (isCellInteractive) handleCellClick(emp, date, sectionName);
+                        if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
                       }}
                       style={{
                         height: 48,
@@ -470,10 +487,12 @@ const SectionBlock = memo(function SectionBlock({
                           ? "2px solid var(--color-dark)"
                           : "1px solid var(--color-border-light)",
                         boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 var(--color-border-light)" : undefined,
-                        background: isToday
-                          ? "var(--color-today-bg)"
-                          : "transparent",
-                        cursor: isCellInteractive ? "pointer" : "default",
+                        background: isLocked
+                          ? "rgba(99, 102, 241, 0.08)"
+                          : isToday
+                            ? "var(--color-today-bg)"
+                            : "transparent",
+                        cursor: isLocked ? "not-allowed" : isCellInteractive ? "pointer" : "default",
                         transition: "background 0.1s",
                       }}
                       onMouseEnter={(e) => {
@@ -513,6 +532,31 @@ const SectionBlock = memo(function SectionBlock({
                       {shiftCode && shiftCode !== "OFF" ? (
                         (() => {
                           const labels = shiftCode.split("/");
+
+                          // Per-pill publish diff: compare from[i] vs to[i] positionally
+                          const isPubDiff = !draftKind && publishDiff;
+                          const pubFrom = isPubDiff ? publishDiff!.from : [];
+                          const pubTo = isPubDiff ? publishDiff!.to : [];
+
+                          // For each pill index, determine if it changed vs the old state
+                          function pillPublishStatus(pillIndex: number): 'new' | 'modified' | 'unchanged' | null {
+                            if (!isPubDiff) return null;
+                            const toId = pubTo[pillIndex];
+                            const fromId = pubFrom[pillIndex];
+                            if (fromId == null) return 'new';        // no old pill at this index → added
+                            if (fromId !== toId) return 'modified';  // old pill differs → changed
+                            return 'unchanged';                      // same code at same position
+                          }
+
+                          // Cell-level label below the pill(s)
+                          const publishBadge = isPubDiff
+                            ? publishDiff!.kind === 'new'
+                              ? { text: 'New', color: '#059669' }
+                              : publishDiff!.kind === 'modified'
+                                ? { text: `was: ${pubFrom.map(id => shiftCodeById.get(id)?.label ?? '?').join('/')}`, color: '#6366F1' }
+                                : null
+                            : null;
+
                           if (labels.length === 1) {
                             const label = labels[0];
                             const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
@@ -523,20 +567,32 @@ const SectionBlock = memo(function SectionBlock({
                             const crossHomeFa = isCross
                               ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
                               : undefined;
+                            // Compute effective border: draft indicators use dashed border
+                            const effectiveBorder = draftKind
+                              ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
+                              : `1px solid ${borderColor(style.text)}`;
+                            // Corner triangle color (draft only)
+                            const cornerColor = draftKind === 'new' ? '#16A34A'
+                              : draftKind === 'modified' ? '#D97706'
+                              : null;
+
                              return (
+                               <>
                                <div
                                  style={{
                                    position: "absolute",
                                    top: customTimes ? "3px" : "4px",
                                    right: "4px",
-                                   bottom: customTimes ? "3px" : "4px",
+                                   bottom: publishBadge ? "16px" : customTimes ? "3px" : "4px",
                                    left: "4px",
                                    background: isCross ? "#ffffff" : style.color,
                                    opacity: draftKind === 'deleted' ? 0.5 : 1,
-                                   border: getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`),
+                                   border: effectiveBorder,
                                    borderRadius: 3,
                                    color: style.text,
-                                   boxShadow: "none",
+                                   boxShadow: pillPublishStatus(0) === 'new' || pillPublishStatus(0) === 'modified'
+                                     ? getPublishDiffBoxShadow(pillPublishStatus(0)!, borderColor(style.text))
+                                     : "none",
                                    cursor: "pointer",
                                    display: "flex",
                                    flexDirection: "column",
@@ -570,7 +626,7 @@ const SectionBlock = memo(function SectionBlock({
                                      {getFocusAreaInitials(crossHomeFa.name)}
                                    </span>
                                  )}
-                                 {draftKind === 'new' && (
+                                 {cornerColor && (
                                    <span
                                      style={{
                                        position: "absolute",
@@ -580,22 +636,7 @@ const SectionBlock = memo(function SectionBlock({
                                        height: 0,
                                        borderStyle: "solid",
                                        borderWidth: "0 12px 12px 0",
-                                       borderColor: "transparent #16A34A transparent transparent",
-                                       pointerEvents: "none",
-                                     }}
-                                   />
-                                 )}
-                                 {draftKind === 'modified' && (
-                                   <span
-                                     style={{
-                                       position: "absolute",
-                                       top: 0,
-                                       right: 0,
-                                       width: 0,
-                                       height: 0,
-                                       borderStyle: "solid",
-                                       borderWidth: "0 12px 12px 0",
-                                       borderColor: "transparent #D97706 transparent transparent",
+                                       borderColor: `transparent ${cornerColor} transparent transparent`,
                                        pointerEvents: "none",
                                      }}
                                    />
@@ -654,7 +695,7 @@ const SectionBlock = memo(function SectionBlock({
                                        gap: 2,
                                      }}
                                    >
-                                     {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
+                                     {indicatorTypes.filter(ind => noteTypes.includes(ind.id)).map(ind => (
                                        <div
                                          key={ind.name}
                                          title={ind.name}
@@ -671,158 +712,38 @@ const SectionBlock = memo(function SectionBlock({
                                    </div>
                                  )}
                                </div>
+                               {publishBadge && (
+                                 <span
+                                   style={{
+                                     position: "absolute",
+                                     bottom: 2,
+                                     left: "50%",
+                                     transform: "translateX(-50%)",
+                                     fontSize: 11,
+                                     fontWeight: 700,
+                                     lineHeight: 1,
+                                     color: publishBadge.color,
+                                     pointerEvents: "none",
+                                     whiteSpace: "nowrap",
+                                   }}
+                                 >
+                                   {publishBadge.text}
+                                 </span>
+                               )}
+                             </>
                              );
                           }
 
-                          // Edit mode: render each shift as a separate vertical pill
-                          if (isEditMode) {
-                            return (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: "3px",
-                                  right: "4px",
-                                  bottom: "3px",
-                                  left: "4px",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 2,
-                                  alignItems: "stretch",
-                                  opacity: draftKind === 'deleted' ? 0.5 : 1,
-                                }}
-                              >
-                                {labels.map((label, li) => {
-                                  const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
-                                  const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
-                                  const isCross = label !== "X"
-                                    && codeEntryLi?.focusAreaId != null
-                                    && sectionFocusArea != null
-                                    && codeEntryLi.focusAreaId !== sectionFocusArea.id;
-                                  const crossHomeFaLi = isCross
-                                    ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
-                                    : undefined;
-                                  const isNewPill = draftKind && publishedCodeIds.length > 0
-                                    && cellCodeIds[li] != null
-                                    && !publishedCodeIds.includes(cellCodeIds[li]);
-                                  const pillBorder = isNewPill
-                                    ? `2px dashed ${DRAFT_BORDER_COLORS[draftKind!]}`
-                                    : draftKind === 'new'
-                                      ? `2px dashed ${DRAFT_BORDER_COLORS.new}`
-                                      : `1px solid ${borderColor(style.text)}`;
-                                  const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
-                                  const hasTime = pillTime && (pillTime.start || pillTime.end);
-                                  return (
-                                    <div
-                                      key={li}
-                                      style={{
-                                        flex: 1,
-                                        background: isCross ? "#ffffff" : style.color,
-                                        border: draftKind === 'deleted'
-                                          ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
-                                          : pillBorder,
-                                        borderRadius: 3,
-                                        color: style.text,
-                                        display: "flex",
-                                        flexDirection: hasTime ? "row" : "column",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        gap: hasTime ? 3 : 0,
-                                        fontSize: 14,
-                                        fontWeight: 800,
-                                        position: "relative",
-                                        cursor: "pointer",
-                                        textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
-                                        lineHeight: 1,
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      {isCross && crossHomeFaLi && (
-                                        <span
-                                          style={{
-                                            position: "absolute",
-                                            top: 0,
-                                            bottom: 0,
-                                            left: 0,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            fontSize: 9,
-                                            fontWeight: 800,
-                                            lineHeight: 1,
-                                            background: crossHomeFaLi.colorBg,
-                                            color: crossHomeFaLi.colorText,
-                                            borderRadius: "2px 0 0 2px",
-                                            padding: "0 2px",
-                                            letterSpacing: "0.02em",
-                                            pointerEvents: "none",
-                                          }}
-                                        >
-                                          {getFocusAreaInitials(crossHomeFaLi.name)}
-                                        </span>
-                                      )}
-                                      {isNewPill && (
-                                        <span
-                                          style={{
-                                            position: "absolute",
-                                            top: 0,
-                                            right: 0,
-                                            width: 0,
-                                            height: 0,
-                                            borderStyle: "solid",
-                                            borderWidth: "0 6px 6px 0",
-                                            borderColor: `transparent ${DRAFT_BORDER_COLORS[draftKind!]} transparent transparent`,
-                                            pointerEvents: "none",
-                                          }}
-                                        />
-                                      )}
-                                      <span>{label}</span>
-                                      {hasTime && (
-                                        <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
-                                          {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                {noteTypes.length > 0 && (
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: 1,
-                                      right: 2,
-                                      display: "flex",
-                                      gap: 2,
-                                      zIndex: 1,
-                                    }}
-                                  >
-                                    {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
-                                      <div
-                                        key={ind.name}
-                                        title={ind.name}
-                                        style={{
-                                          width: 7,
-                                          height: 7,
-                                          borderRadius: "50%",
-                                          background: ind.color,
-                                          border: "1px solid rgba(255,255,255,0.8)",
-                                          flexShrink: 0,
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }
-
-                          // View mode: render as separate vertical pills (like edit mode)
-                          // Each pill independently shows dashed (new) or solid (existing) border
+                          // Multi-pill: render each shift as a separate vertical pill
+                          const hasMultiPillLabel = (showDiffOverlay && draftKind && draftKind !== 'deleted') || publishBadge;
                           return (
+                            <>
                             <div
                               style={{
                                 position: "absolute",
                                 top: "3px",
                                 right: "4px",
-                                bottom: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "18px" : "3px",
+                                bottom: hasMultiPillLabel ? "16px" : "3px",
                                 left: "4px",
                                 display: "flex",
                                 flexDirection: "column",
@@ -863,6 +784,12 @@ const SectionBlock = memo(function SectionBlock({
                                         : pillBorder,
                                       borderRadius: 3,
                                       color: style.text,
+                                      boxShadow: (() => {
+                                        const ps = pillPublishStatus(li);
+                                        return ps === 'new' || ps === 'modified'
+                                          ? getPublishDiffBoxShadow(ps, borderColor(style.text))
+                                          : "none";
+                                      })(),
                                       display: "flex",
                                       flexDirection: hasTime ? "row" : "column",
                                       alignItems: "center",
@@ -924,39 +851,6 @@ const SectionBlock = memo(function SectionBlock({
                                   </div>
                                 );
                               })}
-                              {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
-                                <span style={{
-                                  position: "absolute",
-                                  bottom: -14,
-                                  left: "50%",
-                                  transform: "translateX(-50%)",
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  color: "#D97706",
-                                  whiteSpace: "nowrap",
-                                  pointerEvents: "none",
-                                  lineHeight: 1,
-                                  zIndex: 1,
-                                }}>
-                                  was: {publishedLabel}
-                                </span>
-                              )}
-                              {showDiffOverlay && draftKind === 'new' && (
-                                <span style={{
-                                  position: "absolute",
-                                  bottom: -14,
-                                  left: "50%",
-                                  transform: "translateX(-50%)",
-                                  fontSize: 13,
-                                  fontWeight: 800,
-                                  color: "#16A34A",
-                                  whiteSpace: "nowrap",
-                                  pointerEvents: "none",
-                                  zIndex: 1,
-                                }}>
-                                  new
-                                </span>
-                              )}
                               {noteTypes.length > 0 && (
                                 <div
                                   style={{
@@ -968,7 +862,7 @@ const SectionBlock = memo(function SectionBlock({
                                     zIndex: 1,
                                   }}
                                 >
-                                  {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
+                                  {indicatorTypes.filter(ind => noteTypes.includes(ind.id)).map(ind => (
                                     <div
                                       key={ind.name}
                                       title={ind.name}
@@ -985,6 +879,57 @@ const SectionBlock = memo(function SectionBlock({
                                 </div>
                               )}
                             </div>
+                            {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
+                              <span style={{
+                                position: "absolute",
+                                bottom: 2,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#D97706",
+                                whiteSpace: "nowrap",
+                                pointerEvents: "none",
+                                lineHeight: 1,
+                                zIndex: 1,
+                              }}>
+                                was: {publishedLabel}
+                              </span>
+                            )}
+                            {showDiffOverlay && draftKind === 'new' && (
+                              <span style={{
+                                position: "absolute",
+                                bottom: 2,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: "#16A34A",
+                                whiteSpace: "nowrap",
+                                pointerEvents: "none",
+                                zIndex: 1,
+                              }}>
+                                new
+                              </span>
+                            )}
+                            {publishBadge && (
+                              <span style={{
+                                position: "absolute",
+                                bottom: 2,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: publishBadge.color,
+                                whiteSpace: "nowrap",
+                                pointerEvents: "none",
+                                lineHeight: 1,
+                                zIndex: 1,
+                              }}>
+                                {publishBadge.text}
+                              </span>
+                            )}
+                            </>
                           );
                         })()
                       ) : showDiffOverlay && draftKind === 'deleted' && publishedLabel ? (
@@ -1010,6 +955,52 @@ const SectionBlock = memo(function SectionBlock({
                             {publishedLabel}
                           </span>
                         </div>
+                      ) : publishDiff?.kind === 'deleted' && publishDiff.from.length > 0 ? (
+                        <>
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "4px",
+                              right: "4px",
+                              bottom: "16px",
+                              left: "4px",
+                              background: "#FEF2F2",
+                              border: "1px solid #FECACA",
+                              borderRadius: 3,
+                              boxShadow: "0 0 0 1px #fff, 0 0 0 2.5px #DC2626",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#DC2626",
+                            }}
+                          >
+                            <span style={{
+                              fontSize: 16,
+                              fontWeight: 800,
+                              lineHeight: 1,
+                              textDecoration: "line-through",
+                              textDecorationThickness: "2px",
+                            }}>
+                              {publishDiff.from.map(id => shiftCodeById.get(id)?.label ?? '?').join('/')}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              position: "absolute",
+                              bottom: 2,
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              color: "#DC2626",
+                              pointerEvents: "none",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Deleted
+                          </span>
+                        </>
                       ) : (
                         <>
                           <div
@@ -1033,7 +1024,7 @@ const SectionBlock = memo(function SectionBlock({
                                 gap: 2,
                               }}
                             >
-                              {indicatorTypes.filter(ind => noteTypes.includes(ind.name)).map(ind => (
+                              {indicatorTypes.filter(ind => noteTypes.includes(ind.id)).map(ind => (
                                 <div
                                   key={ind.name}
                                   title={ind.name}
@@ -1050,6 +1041,31 @@ const SectionBlock = memo(function SectionBlock({
                             </div>
                           )}
                         </>
+                      )}
+                      {isLocked && cellLock && (
+                        <span
+                          title={`Being edited by ${cellLock.userName}`}
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            right: 2,
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: "#6366F1",
+                            color: "#fff",
+                            fontSize: 8,
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            lineHeight: 1,
+                            zIndex: 2,
+                            pointerEvents: "none",
+                          }}
+                        >
+                          {cellLock.userName.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                        </span>
                       )}
                     </div>
                   );
@@ -1144,16 +1160,17 @@ export default function ScheduleGrid({
   shiftCategories,
   indicatorTypes = [],
   isCellInteractive = true,
-  noteTypesForKey,
+  activeIndicatorIdsForKey,
   activeFocusArea = null,
   certifications = [],
   orgRoles = [],
-  isEditMode = true,
   getCustomShiftTimes,
   draftKindForKey,
   showDiffOverlay,
   publishedLabelForKey,
   publishedShiftCodeIdsForKey,
+  publishDiffForKey,
+  cellLocks,
 }: ScheduleGridProps) {
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
@@ -1225,7 +1242,7 @@ export default function ScheduleGrid({
     const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
     const sectionId = focusAreaIdByName[section];
     const rawHomeEmps = filteredEmployees.filter((e) => sectionId != null && e.focusAreaIds.includes(sectionId));
-    const homeEmps = isEditMode
+    const homeEmps = isCellInteractive
       ? rawHomeEmps
       : rawHomeEmps.filter((emp) =>
           allDates.some((date) => {
@@ -1271,7 +1288,7 @@ export default function ScheduleGrid({
               No shifts found for this period
             </div>
             <div style={{ fontSize: 13 }}>
-              {isEditMode
+              {isCellInteractive
                 ? "No employees are assigned to this focus area. Add employees in the Staff view."
                 : "No shifts have been published for this period yet."}
             </div>
@@ -1330,7 +1347,7 @@ export default function ScheduleGrid({
         const rawHomeEmps = filteredEmployees.filter((e) =>
           sectionId != null && e.focusAreaIds.includes(sectionId),
         );
-        const homeEmps = isEditMode
+        const homeEmps = isCellInteractive
           ? rawHomeEmps
           : rawHomeEmps.filter((emp) =>
               allDates.some((date) => {
@@ -1368,16 +1385,17 @@ export default function ScheduleGrid({
             shiftCategories={shiftCategories}
             indicatorTypes={indicatorTypes}
             isCellInteractive={isCellInteractive}
-            noteTypesForKey={noteTypesForKey}
+            activeIndicatorIdsForKey={activeIndicatorIdsForKey}
             onTooltipChange={setTooltip}
             getCustomShiftTimes={getCustomShiftTimes}
             draftKindForKey={draftKindForKey}
             showDiffOverlay={showDiffOverlay}
             publishedLabelForKey={publishedLabelForKey}
             publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+            publishDiffForKey={publishDiffForKey}
             certifications={certifications}
             orgRoles={orgRoles}
-            isEditMode={isEditMode}
+            cellLocks={cellLocks}
           />
         );
       })}

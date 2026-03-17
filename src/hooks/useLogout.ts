@@ -1,6 +1,9 @@
 // src/hooks/useLogout.ts
 import { supabase } from "@/lib/supabase";
 import { parseHost } from "@/lib/subdomain";
+import { clearOrgDataCache } from "./useOrganizationData";
+import { clearEmployeeCache } from "./useEmployees";
+import { clearPermsCache } from "./usePermissions";
 
 /**
  * Per-device logout helper.
@@ -9,6 +12,9 @@ import { parseHost } from "@/lib/subdomain";
  */
 export function useLogout() {
   async function signOutLocal(): Promise<void> {
+    clearOrgDataCache();
+    clearEmployeeCache();
+    clearPermsCache();
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;
     sessionStorage.removeItem("dg_user_name");

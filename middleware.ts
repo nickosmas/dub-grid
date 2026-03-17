@@ -184,14 +184,24 @@ export async function middleware(req: NextRequest) {
 
   // Route guards - Requirements 11.2, 11.3
 
-  // Redirect users below admin (level < 3) away from /settings
-  if (pathname.startsWith("/settings") && level < 3) {
+  // Staff page: requires admin+ (level >= 2)
+  if (pathname.startsWith("/staff") && level < 2) {
+    return NextResponse.redirect(new URL("/schedule", req.url));
+  }
+
+  // Settings page: requires admin+ (level >= 2); component enforces fine-grained access
+  if (pathname.startsWith("/settings") && level < 2) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
   // Gridmaster-only route
   if (pathname.startsWith("/gridmaster") && effectiveRole !== "gridmaster") {
     return NextResponse.redirect(new URL("/schedule", req.url));
+  }
+
+  // Legacy /dashboard redirect → /gridmaster
+  if (pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL(pathname.replace(/^\/dashboard/, "/gridmaster"), req.url));
   }
 
   // Inject headers - Requirement 11.5

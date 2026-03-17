@@ -656,7 +656,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
 
             if (rpcError || !orgs) {
-              await supabase.auth.signOut();
+              await supabase.auth.signOut({ scope: "local" });
               setMessage("Unable to verify workspace access.");
               setIsError(true);
               setLoading(false);
@@ -672,7 +672,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               });
 
               if (switchError) {
-                await supabase.auth.signOut();
+                await supabase.auth.signOut({ scope: "local" });
                 setMessage("Failed to switch workspace context.");
                 setIsError(true);
                 setLoading(false);
@@ -681,7 +681,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
               await supabase.auth.refreshSession();
             } else {
-              await supabase.auth.signOut();
+              await supabase.auth.signOut({ scope: "local" });
               setMessage("Your account is not associated with this workspace.");
               setIsError(true);
               setLoading(false);
@@ -777,7 +777,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <button
               type="button"
               onClick={async () => {
-                await supabase.auth.signOut();
+                await supabase.auth.signOut({ scope: "local" });
                 setMessage("");
                 setIsError(false);
                 window.location.reload();

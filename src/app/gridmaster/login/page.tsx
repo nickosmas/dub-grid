@@ -29,7 +29,7 @@ export default function SuperAdminLoginPage() {
 
 
       // Navigate directly instead of waiting for PublicRoute to propagate
-      window.location.replace("/dashboard");
+      window.location.replace("/gridmaster");
 
       // Safety net: if navigation hasn't happened within 8s, reset
       setTimeout(() => {

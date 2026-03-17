@@ -228,24 +228,6 @@ $$;
 -- 4. CASCADE TRIGGERS
 -- ══════════════════════════════════════════════════════════════════════════════
 
--- Focus area rename → propagate to schedule_notes
-CREATE OR REPLACE FUNCTION public.cascade_wing_rename()
-RETURNS TRIGGER
-LANGUAGE PLPGSQL SECURITY DEFINER
-SET search_path = 'public'
-AS $$
-BEGIN
-  IF NEW.name IS DISTINCT FROM OLD.name THEN
-    UPDATE public.schedule_notes
-    SET focus_area_name = NEW.name
-    WHERE org_id = NEW.org_id
-      AND focus_area_name = OLD.name;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
-
 -- Certification delete → remove from shift_codes.required_certification_ids
 CREATE OR REPLACE FUNCTION public.remove_certification_from_shift_codes()
 RETURNS TRIGGER
@@ -628,9 +610,16 @@ CREATE OR REPLACE FUNCTION public.publish_schedule(
   p_org_id     UUID,
   p_start_date DATE,
   p_end_date   DATE
-) RETURNS VOID
+) RETURNS UUID
 LANGUAGE PLPGSQL SECURITY DEFINER
 AS $$
+DECLARE
+  v_changes JSONB := '[]'::JSONB;
+  v_change_count INTEGER := 0;
+  v_history_id UUID;
+  v_note_new INTEGER := 0;
+  v_note_deleted INTEGER := 0;
+  r RECORD;
 BEGIN
   IF NOT (
     public.is_gridmaster()
@@ -641,6 +630,63 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Unauthorized: insufficient permissions to publish schedule';
   END IF;
+
+  -- Enforce canPublishSchedule for admins (super_admin and gridmaster bypass)
+  IF public.caller_org_role()::TEXT = 'admin' AND NOT public.is_gridmaster() THEN
+    IF NOT COALESCE(
+      (SELECT (cm.admin_permissions->>'canPublishSchedule')::BOOLEAN
+       FROM public.organization_memberships cm
+       WHERE cm.user_id = auth.uid() AND cm.org_id = p_org_id),
+      FALSE
+    ) THEN
+      RAISE EXCEPTION 'Unauthorized: you do not have permission to publish the schedule';
+    END IF;
+  END IF;
+
+  -- Advisory lock prevents concurrent publishes for same org
+  PERFORM pg_advisory_xact_lock(hashtext('publish_schedule_' || p_org_id::TEXT));
+
+  -- Capture shift changes BEFORE applying them
+  FOR r IN
+    SELECT s.emp_id, s.date,
+           s.published_shift_code_ids AS old_ids,
+           s.draft_shift_code_ids AS new_ids,
+           s.draft_is_delete
+    FROM public.shifts s
+    WHERE s.org_id = p_org_id
+      AND s.date >= p_start_date AND s.date <= p_end_date
+      AND (
+        (s.draft_is_delete = TRUE AND array_length(s.published_shift_code_ids, 1) IS NOT NULL)
+        OR (array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+            AND s.draft_shift_code_ids IS DISTINCT FROM s.published_shift_code_ids)
+      )
+  LOOP
+    v_change_count := v_change_count + 1;
+    v_changes := v_changes || jsonb_build_array(jsonb_build_object(
+      'empId', r.emp_id,
+      'date', r.date,
+      'kind', CASE
+        WHEN r.draft_is_delete THEN 'deleted'
+        WHEN array_length(r.old_ids, 1) IS NULL THEN 'new'
+        ELSE 'modified'
+      END,
+      'from', COALESCE(to_jsonb(r.old_ids), '[]'::JSONB),
+      'to', CASE WHEN r.draft_is_delete THEN '[]'::JSONB ELSE COALESCE(to_jsonb(r.new_ids), '[]'::JSONB) END
+    ));
+  END LOOP;
+
+  -- Count note changes
+  SELECT COUNT(*) INTO v_note_new FROM public.schedule_notes
+  WHERE org_id = p_org_id AND date >= p_start_date AND date <= p_end_date AND status = 'draft';
+  SELECT COUNT(*) INTO v_note_deleted FROM public.schedule_notes
+  WHERE org_id = p_org_id AND date >= p_start_date AND date <= p_end_date AND status = 'draft_deleted';
+
+  v_change_count := v_change_count + v_note_new + v_note_deleted;
+
+  -- Insert publish_history record
+  INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count, changes)
+  VALUES (p_org_id, auth.uid(), p_start_date, p_end_date, v_change_count, v_changes)
+  RETURNING id INTO v_history_id;
 
   -- Promote drafts → published
   UPDATE public.shifts
@@ -680,6 +726,18 @@ BEGIN
   WHERE org_id = p_org_id
     AND date >= p_start_date AND date <= p_end_date
     AND status = 'draft_deleted';
+
+  -- Purge old history (keep last 20 per org)
+  DELETE FROM public.publish_history
+  WHERE org_id = p_org_id
+    AND id NOT IN (
+      SELECT id FROM public.publish_history
+      WHERE org_id = p_org_id
+      ORDER BY published_at DESC
+      LIMIT 20
+    );
+
+  RETURN v_history_id;
 END;
 $$;
 

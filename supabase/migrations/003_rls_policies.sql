@@ -30,6 +30,7 @@ ALTER TABLE public.impersonation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.publish_history ENABLE ROW LEVEL SECURITY;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -355,6 +356,17 @@ CREATE POLICY "admin_delete_recurring_drafts"
   USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
 
 
+-- ── publish_history ──────────────────────────────────────────────────────────
+
+CREATE POLICY "gridmaster_all_publish_history"
+  ON public.publish_history FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_publish_history"
+  ON public.publish_history FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 6. SHIFTS (employee-scoped — uses EXISTS subquery for org check)
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -378,7 +390,10 @@ CREATE POLICY "admin_insert_shifts"
     public.caller_org_role() IN ('admin', 'super_admin')
     AND EXISTS (
       SELECT 1 FROM public.employees e
-      WHERE e.id = emp_id AND e.org_id = public.caller_org_id()
+      WHERE e.id = emp_id
+        AND e.org_id = public.caller_org_id()
+        AND e.status IN ('active', 'benched')
+        AND e.archived_at IS NULL
     )
   );
 
@@ -388,7 +403,10 @@ CREATE POLICY "admin_update_shifts"
     public.caller_org_role() IN ('admin', 'super_admin')
     AND EXISTS (
       SELECT 1 FROM public.employees e
-      WHERE e.id = shifts.emp_id AND e.org_id = public.caller_org_id()
+      WHERE e.id = shifts.emp_id
+        AND e.org_id = public.caller_org_id()
+        AND e.status IN ('active', 'benched')
+        AND e.archived_at IS NULL
     )
   );
 

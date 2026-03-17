@@ -27,7 +27,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
-import SuperAdminLoginPage from "@/app/dashboard/login/page";
+import SuperAdminLoginPage from "@/app/gridmaster/login/page";
 
 /** Helper: fill and submit the gridmaster login form */
 function submitForm(container: HTMLElement) {
@@ -65,7 +65,7 @@ describe("Gridmaster login page submit states", () => {
       const button = screen.getByRole("button", { name: /authenticating/i });
       expect(button).toBeInTheDocument();
       expect(button).toBeDisabled();
-      expect(window.location.replace).toHaveBeenCalledWith("/dashboard");
+      expect(window.location.replace).toHaveBeenCalledWith("/gridmaster");
     });
   });
 

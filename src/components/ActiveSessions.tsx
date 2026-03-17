@@ -13,9 +13,9 @@ function formatRelativeTime(iso: string): string {
   const days = Math.floor(hours / 24);
 
   if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
+  if (mins < 60) return `${mins} min ago`;
+  if (hours < 24) return `${hours} hr ago`;
+  return `${days} day${days !== 1 ? "s" : ""} ago`;
 }
 
 export default function ActiveSessions() {

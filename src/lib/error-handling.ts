@@ -3,9 +3,9 @@ import { supabase } from "@/lib/supabase";
 
 export async function handleApiError(error: unknown) {
     if (error instanceof Error) {
-        if (error.message.includes("jwt expired")) {
+        if (error.message.includes("jwt expired") || error.message.includes("Refresh Token Not Found")) {
             toast.error("Your session has expired. Please log in again.", { duration: 5000 });
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: "local" });
             window.location.replace("/");
             return;
         }
