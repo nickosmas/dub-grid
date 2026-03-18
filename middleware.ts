@@ -145,11 +145,20 @@ export async function middleware(req: NextRequest) {
     !claims.org_role ||
     (!isGridmaster && (!claims.org_id || !claims.org_slug))
   ) {
-    const { data: profile } = await supabase
+    let query = supabase
       .from("profiles")
       .select("org_id, platform_role, organization_memberships(org_role), organizations(slug)")
-      .eq("id", session.user.id)
-      .maybeSingle<any>();
+      .eq("id", session.user.id);
+
+    // If we have a subdomain, prioritize fetching the role for THAT organization.
+    // This prevents multi-org users from being stuck with the wrong role.
+    if (subdomain && subdomain !== "gridmaster") {
+      query = query
+        .eq("organizations.slug", subdomain)
+        .eq("organization_memberships.organizations.slug", subdomain);
+    }
+
+    const { data: profile } = await query.maybeSingle<any>();
 
     if (profile) {
       const memberships = profile.organization_memberships as any;
@@ -157,7 +166,7 @@ export async function middleware(req: NextRequest) {
       claims = {
         platform_role: claims.platform_role ?? profile.platform_role ?? "none",
         org_role: claims.org_role ?? (Array.isArray(memberships) ? memberships[0]?.org_role : memberships?.org_role) ?? "user",
-        org_id: claims.org_id ?? profile.org_id ?? undefined,
+        org_id: claims.org_id ?? (Array.isArray(orgs) ? orgs[0]?.org_id : profile.org_id) ?? undefined,
         org_slug: claims.org_slug ?? (Array.isArray(orgs) ? orgs[0]?.slug : orgs?.slug) ?? undefined,
       };
     }

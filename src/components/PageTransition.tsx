@@ -70,13 +70,21 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   }, [transitioning]);
 
   // If pathname changes without startNavigation (e.g. browser back/forward),
-  // clear any stale transition state
-  const prevPathRef = useRef(pathname);
+  // clear any stale transition state.
+  // ALSO: If a navigation was started but the pathname remains the same (e.g. redirect back),
+  // clear the transition after a short grace period so the UI doesn't stay hidden.
   useEffect(() => {
-    if (pathname !== prevPathRef.current) {
-      prevPathRef.current = pathname;
-    }
-  }, [pathname]);
+    if (!transitioning) return;
+
+    const checkTimer = setTimeout(() => {
+      // If we're still transitioning after 2s, and it's because setPageReady was never called
+      // (likely due to a redirect back to the same page), force clear it.
+      setTransitioning(false);
+      if (snapshotRef.current) snapshotRef.current.innerHTML = "";
+    }, 2000);
+
+    return () => clearTimeout(checkTimer);
+  }, [transitioning, pathname]);
 
   return (
     <PageTransitionContext.Provider value={{ startNavigation, setPageReady }}>
