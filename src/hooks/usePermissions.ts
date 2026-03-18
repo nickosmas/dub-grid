@@ -78,9 +78,8 @@ function buildPerms(
   if (isGridmaster || isSuperAdmin) {
     p = ALL_PERMS;
   } else if (role === "admin") {
-    // Merge configured perms over the read-only baseline; always preserve view flags.
     p = adminPerms
-      ? { ...adminPerms, canViewSchedule: true, canViewStaff: true }
+      ? { ...adminPerms, canViewSchedule: true }
       : READ_ONLY_PERMS;
   } else {
     p = READ_ONLY_PERMS;

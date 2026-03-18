@@ -31,6 +31,7 @@ const PERMISSION_GROUPS = [
   {
     label: "Staff",
     permissions: [
+      { key: "canViewStaff", label: "View Staff" },
       { key: "canManageEmployees", label: "Manage Employees" },
     ],
   },
@@ -80,9 +81,8 @@ export default function AdminPermissionsEditor({
   const [perms, setPerms] = useState<AdminPermissions>({
     ...DEFAULT_PERMISSIONS,
     ...(currentPermissions ?? {}),
-    // These are always true and not editable
+    // canViewSchedule is always true and not editable
     canViewSchedule: true,
-    canViewStaff: true,
   });
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +131,7 @@ export default function AdminPermissionsEditor({
     <Modal title={`Admin Permissions — ${userName}`} onClose={onClose} style={{ maxWidth: 520 }}>
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16, flexShrink: 0 }}>
-          Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.
+          Configure which actions this admin can perform. <em>View Schedule</em> is always enabled.
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexShrink: 0 }}>

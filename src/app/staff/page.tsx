@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 
 function StaffPageContent() {
-  const { canEditShifts, canManageEmployees, isLoading: permsLoading } = usePermissions();
+  const { canViewStaff, canEditShifts, canManageEmployees, isLoading: permsLoading } = usePermissions();
   const {
     org, focusAreas, shiftCodes, certifications, orgRoles, shiftCodeMap,
     loading: refLoading, loadError,
@@ -29,6 +29,12 @@ function StaffPageContent() {
   useEffect(() => {
     if (!isLoading || (loadError && !org)) setPageReady();
   }, [isLoading, loadError, org, setPageReady]);
+  
+  useEffect(() => {
+    if (!permsLoading && !canViewStaff) {
+      window.location.replace("/schedule");
+    }
+  }, [permsLoading, canViewStaff]);
 
   const staffEmployees = useMemo(
     () =>
