@@ -11,6 +11,9 @@ interface ConfirmDialogProps {
   isLoading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  secondaryConfirmLabel?: string;
+  onSecondaryConfirm?: () => void;
+  isSecondaryLoading?: boolean;
 }
 
 export default function ConfirmDialog({
@@ -22,6 +25,9 @@ export default function ConfirmDialog({
   isLoading = false,
   onConfirm,
   onCancel,
+  secondaryConfirmLabel,
+  onSecondaryConfirm,
+  isSecondaryLoading = false,
 }: ConfirmDialogProps) {
   const confirmClass =
     variant === "danger"
@@ -49,7 +55,7 @@ export default function ConfirmDialog({
         <button
           className="dg-btn dg-btn-secondary"
           onClick={onCancel}
-          disabled={isLoading}
+          disabled={isLoading || isSecondaryLoading}
         >
           {cancelLabel}
         </button>
@@ -57,7 +63,7 @@ export default function ConfirmDialog({
           className={confirmClass}
           style={confirmStyle}
           onClick={onConfirm}
-          disabled={isLoading}
+          disabled={isLoading || isSecondaryLoading}
         >
           {isLoading ? (
             <>
@@ -78,6 +84,33 @@ export default function ConfirmDialog({
             confirmLabel
           )}
         </button>
+        {secondaryConfirmLabel && onSecondaryConfirm && (
+          <button
+            className={confirmClass}
+            style={confirmStyle}
+            onClick={onSecondaryConfirm}
+            disabled={isLoading || isSecondaryLoading}
+          >
+            {isSecondaryLoading ? (
+              <>
+                <svg
+                  className="dg-spinner"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                {secondaryConfirmLabel}
+              </>
+            ) : (
+              secondaryConfirmLabel
+            )}
+          </button>
+        )}
       </div>
     </Modal>
   );

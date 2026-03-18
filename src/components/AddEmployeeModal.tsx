@@ -24,7 +24,6 @@ function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEnt
 interface AddEmployeeModalProps {
   focusAreas: FocusArea[];
   certifications: NamedItem[];
-  roles: NamedItem[];
   focusAreaLabel?: string;
   certificationLabel?: string;
   onAdd: (employees: Omit<Employee, "id" | "seniority">[]) => void;

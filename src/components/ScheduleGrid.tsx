@@ -1,20 +1,12 @@
 "use client";
 
 import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
-import { DAY_LABELS } from "@/lib/constants";
+import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
-import { computeDailyTallies, DailyTallies, Tally } from "@/lib/schedule-logic";
+import { computeDailyTallies, Tally } from "@/lib/schedule-logic";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange } from "@/types";
 import { getCertAbbr, getRoleAbbrs } from "@/lib/utils";
-import { borderColor } from "@/lib/colors";
-
-const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
-  JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },      // Purple
-  "CSN III": { bg: "#DBEAFE", text: "#1D4ED8" },  // Blue
-  "CSN II": { bg: "#CCFBF1", text: "#0E7490" },   // Teal
-  STAFF: { bg: "#F1F5F9", text: "#475569" },     // Slate
-};
-const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
+import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
 
 function getFocusAreaInitials(name: string): string {
   return name
@@ -30,12 +22,6 @@ function fmt12hShort(time24: string): string {
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
-
-const DRAFT_BORDER_COLORS: Record<string, string> = {
-  new: '#16A34A',
-  modified: '#D97706',
-  deleted: '#DC2626',
-};
 
 const PUBLISH_DIFF_BORDER_COLORS: Record<string, string> = {
   new: '#059669',
@@ -82,6 +68,10 @@ interface ScheduleGridProps {
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
   cellLocks?: Map<string, { userName: string }>;
+  /** When true, show who created each shift below the cell */
+  showAudit?: boolean;
+  /** Returns the creator's first name for compact grid display */
+  createdByNameForKey?: (empId: string, date: Date) => string | null;
 }
 
 
@@ -115,6 +105,8 @@ interface SectionBlockProps {
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   cellLocks?: Map<string, { userName: string }>;
+  showAudit?: boolean;
+  createdByNameForKey?: (empId: string, date: Date) => string | null;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -146,6 +138,8 @@ const SectionBlock = memo(function SectionBlock({
   certifications,
   orgRoles,
   cellLocks,
+  showAudit,
+  createdByNameForKey,
 }: SectionBlockProps) {
   if (employees.length === 0) return null;
 
@@ -287,7 +281,7 @@ const SectionBlock = memo(function SectionBlock({
           borderRadius: 12,
           border: "1px solid var(--color-border)",
           overflowX: "auto",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: BOX_SHADOW_CARD,
         }}
       >
         <div
@@ -305,7 +299,7 @@ const SectionBlock = memo(function SectionBlock({
               style={{
                 position: "sticky",
                 left: 0,
-                zIndex: 2,
+                zIndex: 4,
                 background: "var(--color-bg)",
                 padding: "10px 14px",
                 fontSize: 12,
@@ -393,7 +387,7 @@ const SectionBlock = memo(function SectionBlock({
                   style={{
                     position: "sticky",
                     left: 0,
-                    zIndex: 1,
+                    zIndex: 3,
                     background: rowBg,
                     padding: "7px 12px 7px 14px",
                     display: "flex",
@@ -469,6 +463,7 @@ const SectionBlock = memo(function SectionBlock({
                   const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
                   const cellLock = cellLocks?.get(`${emp.id}_${dateKey}`);
                   const isLocked = !!cellLock;
+                  const auditName = showAudit ? createdByNameForKey?.(emp.id, date) ?? null : null;
 
                   return (
                     <div
@@ -477,7 +472,7 @@ const SectionBlock = memo(function SectionBlock({
                         if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
                       }}
                       style={{
-                        height: 48,
+                        height: showAudit ? 62 : 48,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -571,10 +566,6 @@ const SectionBlock = memo(function SectionBlock({
                             const effectiveBorder = draftKind
                               ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
                               : `1px solid ${borderColor(style.text)}`;
-                            // Corner triangle color (draft only)
-                            const cornerColor = draftKind === 'new' ? '#16A34A'
-                              : draftKind === 'modified' ? '#D97706'
-                              : null;
 
                              return (
                                <>
@@ -583,12 +574,12 @@ const SectionBlock = memo(function SectionBlock({
                                    position: "absolute",
                                    top: customTimes ? "3px" : "4px",
                                    right: "4px",
-                                   bottom: publishBadge ? "16px" : customTimes ? "3px" : "4px",
+                                   bottom: (publishBadge && auditName) ? "28px" : (publishBadge || auditName) ? "16px" : customTimes ? "3px" : "4px",
                                    left: "4px",
                                    background: isCross ? "#ffffff" : style.color,
                                    opacity: draftKind === 'deleted' ? 0.5 : 1,
                                    border: effectiveBorder,
-                                   borderRadius: 3,
+                                   borderRadius: 6,
                                    color: style.text,
                                    boxShadow: pillPublishStatus(0) === 'new' || pillPublishStatus(0) === 'modified'
                                      ? getPublishDiffBoxShadow(pillPublishStatus(0)!, borderColor(style.text))
@@ -625,21 +616,6 @@ const SectionBlock = memo(function SectionBlock({
                                    >
                                      {getFocusAreaInitials(crossHomeFa.name)}
                                    </span>
-                                 )}
-                                 {cornerColor && (
-                                   <span
-                                     style={{
-                                       position: "absolute",
-                                       top: 0,
-                                       right: 0,
-                                       width: 0,
-                                       height: 0,
-                                       borderStyle: "solid",
-                                       borderWidth: "0 12px 12px 0",
-                                       borderColor: `transparent ${cornerColor} transparent transparent`,
-                                       pointerEvents: "none",
-                                     }}
-                                   />
                                  )}
                                  <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{label}</span>
                                  {customTimes && (
@@ -712,6 +688,35 @@ const SectionBlock = memo(function SectionBlock({
                                    </div>
                                  )}
                                </div>
+                               {auditName && (
+                                 <span
+                                   style={{
+                                     position: "absolute",
+                                     bottom: publishBadge ? 16 : 2,
+                                     left: "50%",
+                                     transform: "translateX(-50%)",
+                                     maxWidth: "calc(100% - 12px)",
+                                     fontSize: 9,
+                                     fontWeight: 600,
+                                     lineHeight: 1,
+                                     textAlign: "center",
+                                     color: "#475569",
+                                     pointerEvents: "none",
+                                     overflow: "hidden",
+                                     textOverflow: "ellipsis",
+                                     whiteSpace: "nowrap",
+                                     padding: "1px 5px",
+                                     background: "#fff",
+                                     borderRadius: 4,
+                                     border: "1px solid rgba(0,0,0,0.08)",
+                                     boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
+                                     zIndex: 2,
+                                     textDecoration: "none",
+                                   }}
+                                 >
+                                   {auditName}
+                                 </span>
+                               )}
                                {publishBadge && (
                                  <span
                                    style={{
@@ -736,6 +741,7 @@ const SectionBlock = memo(function SectionBlock({
 
                           // Multi-pill: render each shift as a separate vertical pill
                           const hasMultiPillLabel = (showDiffOverlay && draftKind && draftKind !== 'deleted') || publishBadge;
+                          const hasBottomLabel = hasMultiPillLabel || auditName;
                           return (
                             <>
                             <div
@@ -743,7 +749,7 @@ const SectionBlock = memo(function SectionBlock({
                                 position: "absolute",
                                 top: "3px",
                                 right: "4px",
-                                bottom: hasMultiPillLabel ? "16px" : "3px",
+                                bottom: (hasMultiPillLabel && auditName) ? "28px" : hasBottomLabel ? "16px" : "3px",
                                 left: "4px",
                                 display: "flex",
                                 flexDirection: "column",
@@ -752,6 +758,7 @@ const SectionBlock = memo(function SectionBlock({
                                 opacity: draftKind === 'deleted' ? 0.5 : 1,
                               }}
                             >
+                              <div style={{ display: "flex", flexDirection: "row", gap: 2, flex: 1, minHeight: 0, alignItems: "stretch" }}>
                               {labels.map((label, li) => {
                                 const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
                                 const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
@@ -782,7 +789,7 @@ const SectionBlock = memo(function SectionBlock({
                                       border: draftKind === 'deleted'
                                         ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
                                         : pillBorder,
-                                      borderRadius: 3,
+                                      borderRadius: 6,
                                       color: style.text,
                                       boxShadow: (() => {
                                         const ps = pillPublishStatus(li);
@@ -791,11 +798,11 @@ const SectionBlock = memo(function SectionBlock({
                                           : "none";
                                       })(),
                                       display: "flex",
-                                      flexDirection: hasTime ? "row" : "column",
+                                      flexDirection: "column",
                                       alignItems: "center",
                                       justifyContent: "center",
-                                      gap: hasTime ? 3 : 0,
-                                      fontSize: 14,
+                                      gap: 1,
+                                      fontSize: 13,
                                       fontWeight: 800,
                                       position: "relative",
                                       cursor: "pointer",
@@ -827,21 +834,6 @@ const SectionBlock = memo(function SectionBlock({
                                         {getFocusAreaInitials(crossHomeFaLi.name)}
                                       </span>
                                     )}
-                                    {isNewPill && (
-                                      <span
-                                        style={{
-                                          position: "absolute",
-                                          top: 0,
-                                          right: 0,
-                                          width: 0,
-                                          height: 0,
-                                          borderStyle: "solid",
-                                          borderWidth: "0 6px 6px 0",
-                                          borderColor: `transparent ${DRAFT_BORDER_COLORS[draftKind!]} transparent transparent`,
-                                          pointerEvents: "none",
-                                        }}
-                                      />
-                                    )}
                                     <span>{label}</span>
                                     {hasTime && (
                                       <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
@@ -851,6 +843,7 @@ const SectionBlock = memo(function SectionBlock({
                                   </div>
                                 );
                               })}
+                              </div>
                               {noteTypes.length > 0 && (
                                 <div
                                   style={{
@@ -879,6 +872,35 @@ const SectionBlock = memo(function SectionBlock({
                                 </div>
                               )}
                             </div>
+                            {auditName && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  bottom: hasMultiPillLabel ? 16 : 2,
+                                  left: "50%",
+                                  transform: "translateX(-50%)",
+                                  maxWidth: "calc(100% - 12px)",
+                                  fontSize: 9,
+                                  fontWeight: 600,
+                                  lineHeight: 1,
+                                  textAlign: "center",
+                                  color: "#475569",
+                                  pointerEvents: "none",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  padding: "1px 5px",
+                                  background: "#fff",
+                                  borderRadius: 4,
+                                  border: "1px solid rgba(0,0,0,0.08)",
+                                  boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
+                                  zIndex: 2,
+                                  textDecoration: "none",
+                                }}
+                              >
+                                {auditName}
+                              </span>
+                            )}
                             {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
                               <span style={{
                                 position: "absolute",
@@ -932,75 +954,84 @@ const SectionBlock = memo(function SectionBlock({
                             </>
                           );
                         })()
-                      ) : showDiffOverlay && draftKind === 'deleted' && publishedLabel ? (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "4px",
-                            right: "4px",
-                            bottom: "4px",
-                            left: "4px",
-                            background: "#FEE2E2",
-                            opacity: 0.35,
-                            border: "2px dashed #DC2626",
-                            borderRadius: 3,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            textDecoration: "line-through",
-                            color: "#DC2626",
-                          }}
-                        >
-                          <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1 }}>
-                            {publishedLabel}
-                          </span>
-                        </div>
-                      ) : publishDiff?.kind === 'deleted' && publishDiff.from.length > 0 ? (
-                        <>
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "4px",
-                              right: "4px",
-                              bottom: "16px",
-                              left: "4px",
-                              background: "#FEF2F2",
-                              border: "1px solid #FECACA",
-                              borderRadius: 3,
-                              boxShadow: "0 0 0 1px #fff, 0 0 0 2.5px #DC2626",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#DC2626",
-                            }}
-                          >
-                            <span style={{
-                              fontSize: 16,
-                              fontWeight: 800,
-                              lineHeight: 1,
-                              textDecoration: "line-through",
-                              textDecorationThickness: "2px",
-                            }}>
-                              {publishDiff.from.map(id => shiftCodeById.get(id)?.label ?? '?').join('/')}
-                            </span>
-                          </div>
-                          <span
-                            style={{
-                              position: "absolute",
-                              bottom: 2,
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              fontSize: 11,
-                              fontWeight: 700,
-                              lineHeight: 1,
-                              color: "#DC2626",
-                              pointerEvents: "none",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            Deleted
-                          </span>
-                        </>
+                      ) : (showDiffOverlay && draftKind === 'deleted' && publishedLabel) || (publishDiff?.kind === 'deleted' && publishDiff.from.length > 0) ? (
+                        (() => {
+                          const isDraftDelete = draftKind === 'deleted';
+                          const deletedLabel = isDraftDelete
+                            ? publishedLabel!
+                            : publishDiff!.from.map(id => shiftCodeById.get(id)?.label ?? '?').join('/');
+                          return (
+                            <>
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "4px",
+                                right: "4px",
+                                bottom: auditName ? "16px" : "4px",
+                                left: "4px",
+                                background: "#FEF2F2",
+                                border: isDraftDelete ? "2px dashed #DC2626" : "1px solid #FECACA",
+                                borderRadius: 6,
+                                ...(isDraftDelete ? {} : { boxShadow: "0 0 0 1px #fff, 0 0 0 2.5px #DC2626" }),
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#DC2626",
+                                overflow: "hidden",
+                              }}
+                            >
+                              <span style={{
+                                fontSize: 16,
+                                fontWeight: 800,
+                                lineHeight: 1,
+                              }}>
+                                {deletedLabel}
+                              </span>
+                              <span style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                lineHeight: 1,
+                                color: "#DC2626",
+                                pointerEvents: "none",
+                                whiteSpace: "nowrap",
+                                marginTop: 2,
+                              }}>
+                                Deleted
+                              </span>
+                            </div>
+                            {auditName && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  bottom: 2,
+                                  left: "50%",
+                                  transform: "translateX(-50%)",
+                                  maxWidth: "calc(100% - 12px)",
+                                  fontSize: 9,
+                                  fontWeight: 600,
+                                  lineHeight: 1,
+                                  textAlign: "center",
+                                  color: "#475569",
+                                  pointerEvents: "none",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  padding: "1px 5px",
+                                  background: "#fff",
+                                  borderRadius: 4,
+                                  border: "1px solid rgba(0,0,0,0.08)",
+                                  boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
+                                  zIndex: 2,
+                                  textDecoration: "none",
+                                }}
+                              >
+                                {auditName}
+                              </span>
+                            )}
+                            </>
+                          );
+                        })()
                       ) : (
                         <>
                           <div
@@ -1171,6 +1202,8 @@ export default function ScheduleGrid({
   publishedShiftCodeIdsForKey,
   publishDiffForKey,
   cellLocks,
+  showAudit,
+  createdByNameForKey,
 }: ScheduleGridProps) {
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
@@ -1396,6 +1429,8 @@ export default function ScheduleGrid({
             certifications={certifications}
             orgRoles={orgRoles}
             cellLocks={cellLocks}
+            showAudit={showAudit}
+            createdByNameForKey={createdByNameForKey}
           />
         );
       })}

@@ -289,10 +289,10 @@ DECLARE
   role_actcor bigint;
   role_scasst bigint;
   -- Focus Area IDs
-  fa_snw  integer;
-  fa_sc   integer;
-  fa_ns   integer;
-  fa_vcsn integer;
+  fa_snw  bigint;
+  fa_sc   bigint;
+  fa_ns   bigint;
+  fa_vcsn bigint;
 BEGIN
 
   -- ── Certifications ──────────────────────────────────────────────────────────
@@ -397,32 +397,32 @@ DO $$
 DECLARE
   org  uuid := 'dae224d9-4125-4dba-be4d-b8b27149f846';
   -- Focus area IDs
-  snw  integer;
-  sc   integer;
-  ns   integer;
-  vc   integer;
+  snw  bigint;
+  sc   bigint;
+  ns   bigint;
+  vc   bigint;
   -- Shift code IDs (global)
-  c_x    integer;  -- Off
-  c_ofc  integer;  -- Office
-  c_03   integer;  -- Partial (0.3)
+  c_x    bigint;  -- Off
+  c_ofc  bigint;  -- Office
+  c_03   bigint;  -- Partial (0.3)
   -- SNW codes
-  c_d_snw    integer;
-  c_ds_snw   integer;
-  c_dcn_snw  integer;
-  c_fd_snw   integer;  -- (D) float
-  c_e_snw    integer;
-  c_es_snw   integer;
-  c_ecn_snw  integer;
+  c_d_snw    bigint;
+  c_ds_snw   bigint;
+  c_dcn_snw  bigint;
+  c_fd_snw   bigint;  -- (D) float
+  c_e_snw    bigint;
+  c_es_snw   bigint;
+  c_ecn_snw  bigint;
   -- SC codes
-  c_d_sc     integer;
-  c_dcn_sc   integer;
-  c_e_sc     integer;
-  c_ecn_sc   integer;
+  c_d_sc     bigint;
+  c_dcn_sc   bigint;
+  c_e_sc     bigint;
+  c_ecn_sc   bigint;
   -- Night codes
-  c_n        integer;
-  c_ns       integer;
+  c_n        bigint;
+  c_ns       bigint;
   -- Visiting codes
-  c_vn       integer;
+  c_vn       bigint;
 BEGIN
   -- Focus areas
   SELECT id INTO snw FROM public.focus_areas WHERE org_id = org AND name = 'Skilled Nursing';
@@ -464,7 +464,7 @@ BEGIN
   FROM (VALUES
 
     -- Connie Wahl ─────────────────────────────────────────────────────────────
-    ('Connie Wahl'::text, '2026-03-22'::date, ARRAY[c_x],   NULL::integer, NULL::text, NULL::text),
+    ('Connie Wahl'::text, '2026-03-22'::date, ARRAY[c_x],   NULL::bigint, NULL::text, NULL::text),
     ('Connie Wahl',       '2026-03-23', ARRAY[c_x],   NULL, NULL, NULL),
     ('Connie Wahl',       '2026-03-24', ARRAY[c_ofc], NULL, NULL, NULL),
     ('Connie Wahl',       '2026-03-25', ARRAY[c_ofc], NULL, NULL, NULL),

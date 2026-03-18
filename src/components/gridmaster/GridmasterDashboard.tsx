@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { Organization, AuditLogEntry } from "@/types";
 import type { TenantStats } from "@/lib/db";
 import { fetchAuditLog } from "@/lib/db";
+import { BOX_SHADOW_CARD } from "@/lib/constants";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
         borderRadius: 12,
         border: "1px solid var(--color-border)",
         padding: "20px 24px",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        boxShadow: BOX_SHADOW_CARD,
         flex: 1,
         minWidth: 140,
       }}
@@ -131,7 +132,7 @@ export default function GridmasterDashboard({
               borderRadius: 12,
               border: "1px solid var(--color-border)",
               padding: "4px 20px",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+              boxShadow: BOX_SHADOW_CARD,
             }}
           >
             {recentActivity.map((entry) => (
@@ -151,7 +152,7 @@ export default function GridmasterDashboard({
           borderRadius: 12,
           border: "1px solid var(--color-border)",
           overflow: "hidden",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: BOX_SHADOW_CARD,
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>

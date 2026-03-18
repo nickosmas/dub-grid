@@ -118,6 +118,7 @@ export interface PublishChange {
   kind: 'new' | 'modified' | 'deleted';
   from: number[];
   to: number[];
+  updatedBy?: string | null;
 }
 
 export interface PublishHistoryEntry {
@@ -147,6 +148,14 @@ export type ShiftMap = Record<string, {
   customEndTime?: string | null;
   /** Optimistic lock version. undefined for new (not-yet-persisted) shifts. */
   version?: number;
+  /** UUID of the user who created this shift. */
+  createdBy?: string | null;
+  /** UUID of the user who last updated this shift. */
+  updatedBy?: string | null;
+  /** Timestamp when the shift was created. */
+  createdAt?: string | null;
+  /** Timestamp when the shift was last updated. */
+  updatedAt?: string | null;
 }>;
 
 export type SeriesFrequency = 'daily' | 'weekly' | 'biweekly';
@@ -296,17 +305,6 @@ export interface OrganizationUser {
   adminPermissions: AdminPermissions | null;
   createdAt: string;
 }
-
-export interface RoleChangeLog {
-  id: string;
-  targetUserId: string;
-  changedById: string;
-  fromRole: string;
-  toRole: string;
-  idempotencyKey: string;
-  createdAt: string;
-}
-
 
 export interface UserSession {
   id: string;

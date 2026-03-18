@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { SeriesFrequency, ShiftCode } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { MAX_SERIES_OCCURRENCES, MS_PER_DAY } from "@/lib/constants";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -43,7 +44,7 @@ function countOccurrences(
   const dates: string[] = [];
   const start = new Date(startDate + 'T00:00:00');
   const end = endDate ? new Date(endDate + 'T00:00:00') : null;
-  const cap = maxOccurrences ?? 183; // 6 months
+  const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES; // 6 months
 
   const current = new Date(start);
 
@@ -61,7 +62,7 @@ function countOccurrences(
     } else if (frequency === 'weekly') {
       include = !daysOfWeek?.length || daysOfWeek.includes(dayOfWeek);
     } else if (frequency === 'biweekly') {
-      const diffDays = Math.round((current.getTime() - start.getTime()) / 86400000);
+      const diffDays = Math.round((current.getTime() - start.getTime()) / MS_PER_DAY);
       const weekNum = Math.floor(diffDays / 7);
       include = weekNum % 2 === 0 && (!daysOfWeek?.length || daysOfWeek.includes(dayOfWeek));
     }
@@ -146,7 +147,7 @@ export default function RepeatForm({
 
   const showDayPicker = frequency === 'weekly' || frequency === 'biweekly';
   const canConfirm = (!showDayPicker || daysOfWeek.length > 0) && !endDateInvalid && preview.total > 0;
-  const isCapped = preview.total >= 183 && endType !== 'after_n';
+  const isCapped = preview.total >= MAX_SERIES_OCCURRENCES && endType !== 'after_n';
 
   return (
     <div>
@@ -304,9 +305,9 @@ export default function RepeatForm({
                 <input
                   type="number"
                   min={1}
-                  max={183}
+                  max={MAX_SERIES_OCCURRENCES}
                   value={afterN}
-                  onChange={e => setAfterN(Math.min(183, Math.max(1, parseInt(e.target.value) || 1)))}
+                  onChange={e => setAfterN(Math.min(MAX_SERIES_OCCURRENCES, Math.max(1, parseInt(e.target.value) || 1)))}
                   className="dg-input"
                   style={{ fontSize: 12, padding: "4px 8px", width: 70 }}
                 />
@@ -343,7 +344,7 @@ export default function RepeatForm({
           </div>
           {isCapped && (
             <div style={{ marginTop: 4, color: "#92400E", fontWeight: 500 }}>
-              Series capped at 183 occurrences (~6 months). Use a shorter date range or &ldquo;After N occurrences&rdquo; for more control.
+              Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date range or &ldquo;After N occurrences&rdquo; for more control.
             </div>
           )}
           {preview.overwrites > 0 && (

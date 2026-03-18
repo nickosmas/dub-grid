@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { arraysEqual } from "@/lib/utils";
+import { MAX_SERIES_OCCURRENCES, MS_PER_DAY } from "@/lib/constants";
 
 import {
   Employee,
@@ -15,8 +17,6 @@ import {
   SeriesFrequency,
   OrganizationUser,
   NamedItem,
-  Invitation,
-  AssignableOrganizationRole,
   DraftKind,
 } from "@/types";
 
@@ -38,74 +38,9 @@ export class OptimisticLockError extends Error {
 
 // ── Shift Types ──────────────────────────────────────────────────────────────
 
-export interface ShiftV2 {
-  empId: string;
-  date: string;
-  shiftLabel: string;
-  shiftCodeIds: number[];
-  orgId: string | null;
-  userId: string | null;
-  version: number;
-  createdBy: string | null;
-  updatedBy: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ShiftV2Insert {
-  empId: string;
-  date: string;
-  shiftLabel: string;
-  shiftCodeIds: number[];
-  orgId?: string | null;
-  userId?: string | null;
-  createdBy?: string | null;
-}
-
-export interface ShiftV2Update {
-  shiftLabel?: string;
-  shiftCodeIds?: number[];
-  userId?: string | null;
-  updatedBy?: string | null;
-}
-
-interface DbShiftV2 {
-  emp_id: string;
-  date: string;
-  draft_shift_code_ids: number[];
-  published_shift_code_ids: number[];
-  draft_is_delete: boolean;
-  org_id: string | null;
-  user_id: string | null;
-  version: number;
-  created_by: string | null;
-  updated_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 /** Resolve an array of shift_code IDs to a slash-separated label string. */
 function resolveCodeLabels(ids: number[], codeMap: Map<number, string>): string {
   return ids.map(id => codeMap.get(id) ?? '?').join('/');
-}
-
-function rowToShiftV2(row: DbShiftV2, codeMap: Map<number, string>): ShiftV2 {
-  const draftIds = row.draft_shift_code_ids ?? [];
-  const pubIds = row.published_shift_code_ids ?? [];
-  const effectiveIds = draftIds.length > 0 ? draftIds : pubIds;
-  return {
-    empId: row.emp_id,
-    date: row.date,
-    shiftLabel: resolveCodeLabels(effectiveIds, codeMap),
-    shiftCodeIds: effectiveIds,
-    orgId: row.org_id,
-    userId: row.user_id,
-    version: row.version,
-    createdBy: row.created_by,
-    updatedBy: row.updated_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
 // ── DB row shapes ─────────────────────────────────────────────────────────────
@@ -193,6 +128,10 @@ interface DbShift {
   from_recurring?: boolean;
   custom_start_time?: string | null;
   custom_end_time?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 interface DbScheduleNote {
@@ -405,34 +344,26 @@ export async function saveCertifications(
     .map((item, i) => ({ item, sortOrder: i }))
     .filter(({ item }) => !item.id || !existingIds.has(item.id));
 
-  if (toUpdate.length > 0) {
+  const upsertRows = [
+    ...toUpdate.map(({ item, sortOrder }) => ({
+      id: item.id,
+      org_id: orgId,
+      name: item.name,
+      abbr: item.abbr,
+      sort_order: sortOrder,
+      archived_at: null,
+    })),
+    ...toInsert.map(({ item, sortOrder }) => ({
+      org_id: orgId,
+      name: item.name,
+      abbr: item.abbr,
+      sort_order: sortOrder,
+    })),
+  ];
+  if (upsertRows.length > 0) {
     const { error } = await supabase
       .from("certifications")
-      .upsert(
-        toUpdate.map(({ item, sortOrder }) => ({
-          id: item.id,
-          org_id: orgId,
-          name: item.name,
-          abbr: item.abbr,
-          sort_order: sortOrder,
-          archived_at: null,
-        })),
-        { onConflict: "id" },
-      );
-    if (error) throw error;
-  }
-
-  if (toInsert.length > 0) {
-    const { error } = await supabase
-      .from("certifications")
-      .insert(
-        toInsert.map(({ item, sortOrder }) => ({
-          org_id: orgId,
-          name: item.name,
-          abbr: item.abbr,
-          sort_order: sortOrder,
-        })),
-      );
+      .upsert(upsertRows, { onConflict: "id" });
     if (error) throw error;
   }
 
@@ -478,34 +409,26 @@ export async function saveOrganizationRoles(
     .map((item, i) => ({ item, sortOrder: i }))
     .filter(({ item }) => !item.id || !existingIds.has(item.id));
 
-  if (toUpdate.length > 0) {
+  const upsertRows = [
+    ...toUpdate.map(({ item, sortOrder }) => ({
+      id: item.id,
+      org_id: orgId,
+      name: item.name,
+      abbr: item.abbr,
+      sort_order: sortOrder,
+      archived_at: null,
+    })),
+    ...toInsert.map(({ item, sortOrder }) => ({
+      org_id: orgId,
+      name: item.name,
+      abbr: item.abbr,
+      sort_order: sortOrder,
+    })),
+  ];
+  if (upsertRows.length > 0) {
     const { error } = await supabase
       .from("organization_roles")
-      .upsert(
-        toUpdate.map(({ item, sortOrder }) => ({
-          id: item.id,
-          org_id: orgId,
-          name: item.name,
-          abbr: item.abbr,
-          sort_order: sortOrder,
-          archived_at: null,
-        })),
-        { onConflict: "id" },
-      );
-    if (error) throw error;
-  }
-
-  if (toInsert.length > 0) {
-    const { error } = await supabase
-      .from("organization_roles")
-      .insert(
-        toInsert.map(({ item, sortOrder }) => ({
-          org_id: orgId,
-          name: item.name,
-          abbr: item.abbr,
-          sort_order: sortOrder,
-        })),
-      );
+      .upsert(upsertRows, { onConflict: "id" });
     if (error) throw error;
   }
 
@@ -815,19 +738,6 @@ export async function activateEmployee(empId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function terminateEmployee(empId: string): Promise<void> {
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("employees")
-    .update({
-      status: 'terminated' as EmployeeStatus,
-      status_changed_at: now,
-      archived_at: now,
-    })
-    .eq("id", empId);
-  if (error) throw error;
-}
-
 // ── Shifts ────────────────────────────────────────────────────────────────────
 
 export async function fetchShifts(
@@ -837,7 +747,7 @@ export async function fetchShifts(
 ): Promise<ShiftMap> {
   const { data, error } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, version, series_id, from_recurring, custom_start_time, custom_end_time, employees!inner(org_id)")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, version, series_id, from_recurring, custom_start_time, custom_end_time, created_by, updated_by, created_at, updated_at, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (error) throw error;
   const map: ShiftMap = {};
@@ -851,7 +761,7 @@ export async function fetchShifts(
       ? (hasDraft ? draftIds : pubIds)
       : pubIds;
 
-    const isDraft = hasDraft && JSON.stringify(draftIds) !== JSON.stringify(pubIds);
+    const isDraft = hasDraft && !arraysEqual(draftIds, pubIds);
 
     // Classify draft change type
     let draftKind: DraftKind = null;
@@ -881,6 +791,10 @@ export async function fetchShifts(
         customStartTime: row.custom_start_time ?? null,
         customEndTime: row.custom_end_time ?? null,
         version: row.version,
+        createdBy: row.created_by ?? null,
+        updatedBy: row.updated_by ?? null,
+        createdAt: row.created_at ?? null,
+        updatedAt: row.updated_at ?? null,
       };
     }
   }
@@ -1012,19 +926,15 @@ export async function fetchLatestPublishHistory(
 
 export async function discardScheduleDrafts(
   orgId: string,
-  startDate: Date,
-  endDate: Date
+  userId?: string,
 ): Promise<void> {
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
-
-  // 1. Fetch all shifts in the date range (filter by org via employees join)
-  const { data: shifts, error: fetchError } = await supabase
+  // 1. Fetch shifts — scoped to this user if userId provided, otherwise all org drafts
+  let query = supabase
     .from("shifts")
     .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, employees!inner(org_id)")
-    .eq("employees.org_id", orgId)
-    .gte("date", startStr)
-    .lte("date", endStr);
+    .eq("employees.org_id", orgId);
+  if (userId) query = query.eq("updated_by", userId);
+  const { data: shifts, error: fetchError } = await query;
 
   if (fetchError) throw fetchError;
   if (!shifts || shifts.length === 0) return;
@@ -1037,7 +947,7 @@ export async function discardScheduleDrafts(
     const draftIds = shift.draft_shift_code_ids ?? [];
     const pubIds = shift.published_shift_code_ids ?? [];
     const hasDraftChange = shift.draft_is_delete ||
-      (draftIds.length > 0 && JSON.stringify(draftIds) !== JSON.stringify(pubIds));
+      (draftIds.length > 0 && !arraysEqual(draftIds, pubIds));
 
     if (hasDraftChange) {
       if (pubIds.length > 0) {
@@ -1074,23 +984,23 @@ export async function discardScheduleDrafts(
   }
 
   // 4. Handle Schedule Notes Drafts
-  const { error: noteDeleteError } = await supabase
+  let noteDeleteQuery = supabase
     .from("schedule_notes")
     .delete()
     .eq("org_id", orgId)
-    .gte("date", startStr)
-    .lte("date", endStr)
     .eq("status", "draft");
+  if (userId) noteDeleteQuery = noteDeleteQuery.eq("updated_by", userId);
+  const { error: noteDeleteError } = await noteDeleteQuery;
 
   if (noteDeleteError) throw noteDeleteError;
 
-  const { error: noteRevertError } = await supabase
+  let noteRevertQuery = supabase
     .from("schedule_notes")
     .update({ status: "published" })
     .eq("org_id", orgId)
-    .gte("date", startStr)
-    .lte("date", endStr)
     .eq("status", "draft_deleted");
+  if (userId) noteRevertQuery = noteRevertQuery.eq("updated_by", userId);
+  const { error: noteRevertError } = await noteRevertQuery;
 
   if (noteRevertError) throw noteRevertError;
 }
@@ -1248,121 +1158,6 @@ export async function deleteIndicatorType(id: number): Promise<void> {
 }
 
 
-// ── Shift Operations ─────────────────────────────────────────────────────────
-
-/**
- * Updates a shift with optimistic locking.
- * @throws OptimisticLockError if the version doesn't match
- */
-export async function updateShiftV2(
-  empId: string,
-  date: string,
-  updates: ShiftV2Update,
-  expectedVersion: number,
-  shiftCodeMap?: Map<number, string>,
-): Promise<ShiftV2> {
-  const updateData: Record<string, unknown> = {
-    version: expectedVersion + 1,
-  };
-
-  if (updates.shiftCodeIds !== undefined) {
-    updateData.draft_shift_code_ids = updates.shiftCodeIds;
-    updateData.draft_is_delete = false;
-  }
-  if (updates.userId !== undefined) {
-    updateData.user_id = updates.userId;
-  }
-  if (updates.updatedBy !== undefined) {
-    updateData.updated_by = updates.updatedBy;
-  }
-
-  const { data, error } = await supabase
-    .from("shifts")
-    .update(updateData)
-    .eq("emp_id", empId)
-    .eq("date", date)
-    .eq("version", expectedVersion)
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      const { data: currentShift } = await supabase
-        .from("shifts")
-        .select("version")
-        .eq("emp_id", empId)
-        .eq("date", date)
-        .single();
-      throw new OptimisticLockError(
-        `${empId}:${date}`,
-        expectedVersion,
-        currentShift?.version
-      );
-    }
-    throw error;
-  }
-
-  if (!data) {
-    throw new OptimisticLockError(`${empId}:${date}`, expectedVersion);
-  }
-
-  return rowToShiftV2(data as DbShiftV2, shiftCodeMap ?? new Map());
-}
-
-/**
- * Inserts or replaces a shift (upsert by primary key emp_id + date).
- */
-export async function insertShiftV2(
-  shift: ShiftV2Insert,
-  shiftCodeMap?: Map<number, string>,
-): Promise<ShiftV2 | null> {
-  const insertData = {
-    emp_id: shift.empId,
-    date: shift.date,
-    draft_shift_code_ids: shift.shiftCodeIds,
-    draft_is_delete: false,
-    org_id: shift.orgId ?? null,
-    user_id: shift.userId ?? null,
-    created_by: shift.createdBy ?? null,
-  };
-
-  const { data, error } = await supabase
-    .from("shifts")
-    .upsert(insertData, { onConflict: "emp_id,date" })
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") return null;
-    throw error;
-  }
-
-  return data ? rowToShiftV2(data as DbShiftV2, shiftCodeMap ?? new Map()) : null;
-}
-
-/**
- * Fetches a shift by employee + date.
- */
-export async function fetchShiftV2(
-  empId: string,
-  date: string,
-  shiftCodeMap?: Map<number, string>,
-): Promise<ShiftV2 | null> {
-  const { data, error } = await supabase
-    .from("shifts")
-    .select("*")
-    .eq("emp_id", empId)
-    .eq("date", date)
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") return null;
-    throw error;
-  }
-
-  return data ? rowToShiftV2(data as DbShiftV2, shiftCodeMap ?? new Map()) : null;
-}
-
 // ── RBAC helper operations ───────────────────────────────────────────────────
 
 export async function assignOrgRoleByEmail(
@@ -1421,33 +1216,6 @@ export async function endImpersonation(sessionId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function forceLogoutUser(targetUserId: string): Promise<void> {
-  const { error } = await supabase.rpc("force_logout_user", {
-    p_target_user_id: targetUserId,
-  });
-  if (error) throw error;
-}
-
-// ── Invitations ───────────────────────────────────────────────────────────────
-
-export async function sendInvitation(
-  email: string,
-  role: AssignableOrganizationRole,
-  orgId: string,
-): Promise<{ invitationId: string; token: string; expiresAt: string }> {
-  const { data, error } = await supabase.rpc("send_invitation", {
-    p_email: email,
-    p_role: role,
-    p_org_id: orgId,
-  });
-  if (error) throw error;
-  return {
-    invitationId: data.invitation_id,
-    token: data.token,
-    expiresAt: data.expires_at,
-  };
-}
-
 export async function acceptInvitation(
   token: string,
 ): Promise<{ status: string; orgId: string; role: string }> {
@@ -1460,35 +1228,6 @@ export async function acceptInvitation(
     orgId: data.org_id,
     role: data.role,
   };
-}
-
-export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
-  const { data, error } = await supabase
-    .from("invitations")
-    .select("*")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    orgId: row.org_id as string,
-    invitedBy: (row.invited_by as string) ?? null,
-    email: row.email as string,
-    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-    token: row.token as string,
-    expiresAt: row.expires_at as string,
-    acceptedAt: (row.accepted_at as string) ?? null,
-    revokedAt: (row.revoked_at as string) ?? null,
-    createdAt: row.created_at as string,
-  }));
-}
-
-export async function revokeInvitation(invitationId: string): Promise<void> {
-  const { error } = await supabase
-    .from("invitations")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", invitationId);
-  if (error) throw error;
 }
 
 // ── Recurring Shifts ──────────────────────────────────────────────────────────
@@ -1657,81 +1396,6 @@ export async function applyRecurringSchedules(
   return generated;
 }
 
-// ── Draft Sessions ────────────────────────────────────────────────────────────
-
-export interface DraftSession {
-  id: string;
-  orgId: string;
-  savedBy: string;
-  startDate: string;
-  endDate: string;
-  savedAt: string;
-}
-
-export async function getDraftSession(orgId: string): Promise<DraftSession | null> {
-  const { data, error } = await supabase
-    .from("schedule_draft_sessions")
-    .select("*")
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  return {
-    id: data.id,
-    orgId: data.org_id,
-    savedBy: data.saved_by,
-    startDate: data.start_date,
-    endDate: data.end_date,
-    savedAt: data.saved_at,
-  };
-}
-
-export async function saveDraftSession(
-  orgId: string,
-  savedBy: string,
-  startDate: Date,
-  endDate: Date,
-): Promise<void> {
-  // Use select + insert/update instead of upsert to avoid RLS + ON CONFLICT issues
-  const { data: existing } = await supabase
-    .from("schedule_draft_sessions")
-    .select("id")
-    .eq("org_id", orgId)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from("schedule_draft_sessions")
-      .update({
-        saved_by: savedBy,
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-        saved_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from("schedule_draft_sessions")
-      .insert({
-        org_id: orgId,
-        saved_by: savedBy,
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-        saved_at: new Date().toISOString(),
-      });
-    if (error) throw error;
-  }
-}
-
-export async function deleteDraftSession(orgId: string): Promise<void> {
-  const { error } = await supabase
-    .from("schedule_draft_sessions")
-    .delete()
-    .eq("org_id", orgId);
-  if (error) throw error;
-}
-
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
 
 export interface RecurringDraft {
@@ -1764,7 +1428,6 @@ export async function saveRecurringDraft(
   savedBy: string,
   draftData: Record<string, Record<number, string>>,
 ): Promise<void> {
-  // Use select + insert/update instead of upsert to avoid RLS + ON CONFLICT issues
   const { data: existing } = await supabase
     .from("recurring_shifts_draft_sessions")
     .select("id")
@@ -1847,7 +1510,7 @@ function generateSeriesDates(
   const dates: string[] = [];
   const start = new Date(startDate + 'T00:00:00');
   const end = endDate ? new Date(endDate + 'T00:00:00') : null;
-  const cap = maxOccurrences ?? 183; // Safety cap: 6 months of daily shifts
+  const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
 
   const current = new Date(start);
 
@@ -1870,7 +1533,7 @@ function generateSeriesDates(
     } else if (frequency === 'weekly') {
       include = dayMatch;
     } else if (frequency === 'biweekly') {
-      const diffDays = Math.floor((current.getTime() - start.getTime()) / 86400000);
+      const diffDays = Math.floor((current.getTime() - start.getTime()) / MS_PER_DAY);
       const weekNum = Math.floor(diffDays / 7);
       include = weekNum % 2 === 0 && dayMatch;
     }
@@ -2076,28 +1739,6 @@ export async function fetchAuditLog(options?: {
     createdAt: row.created_at as string,
     orgId: (row.org_id as string | null) ?? null,
     orgName: (row.org_name as string | null) ?? null,
-  }));
-}
-
-export async function fetchOrganizationMemberships(
-  orgId: string,
-): Promise<import("@/types").OrganizationMembership[]> {
-  const { data, error } = await supabase
-    .from("organization_memberships")
-    .select("id, user_id, org_id, org_role, admin_permissions, joined_at")
-    .eq("org_id", orgId)
-    .order("joined_at");
-  if (error) throw error;
-  return (data ?? []).map((row: any) => ({
-    id: row.id as number,
-    userId: row.user_id as string,
-    orgId: row.org_id as string,
-    orgRole: row.org_role as import("@/types").OrganizationRole,
-    adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
-    joinedAt: row.joined_at as string,
-    email: null,
-    firstName: null,
-    lastName: null,
   }));
 }
 

@@ -299,7 +299,7 @@ CREATE TRIGGER trigger_organizations_audit
   BEFORE INSERT OR UPDATE ON public.organizations
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
-CREATE TRIGGER trigger_wings_audit
+CREATE TRIGGER trigger_focus_areas_audit
   BEFORE INSERT OR UPDATE ON public.focus_areas
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
@@ -307,7 +307,7 @@ CREATE TRIGGER trigger_employees_audit
   BEFORE INSERT OR UPDATE ON public.employees
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
-CREATE TRIGGER trigger_shift_types_audit
+CREATE TRIGGER trigger_shift_codes_audit
   BEFORE INSERT OR UPDATE ON public.shift_codes
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
@@ -651,7 +651,8 @@ BEGIN
     SELECT s.emp_id, s.date,
            s.published_shift_code_ids AS old_ids,
            s.draft_shift_code_ids AS new_ids,
-           s.draft_is_delete
+           s.draft_is_delete,
+           s.updated_by
     FROM public.shifts s
     WHERE s.org_id = p_org_id
       AND s.date >= p_start_date AND s.date <= p_end_date
@@ -671,7 +672,8 @@ BEGIN
         ELSE 'modified'
       END,
       'from', COALESCE(to_jsonb(r.old_ids), '[]'::JSONB),
-      'to', CASE WHEN r.draft_is_delete THEN '[]'::JSONB ELSE COALESCE(to_jsonb(r.new_ids), '[]'::JSONB) END
+      'to', CASE WHEN r.draft_is_delete THEN '[]'::JSONB ELSE COALESCE(to_jsonb(r.new_ids), '[]'::JSONB) END,
+      'updatedBy', r.updated_by
     ));
   END LOOP;
 

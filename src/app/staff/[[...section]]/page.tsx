@@ -96,7 +96,6 @@ function StaffPageContent() {
             <AddEmployeeModal
               focusAreas={focusAreas}
               certifications={certifications}
-              roles={orgRoles}
               onAdd={async (dataList) => {
                 await handleAddEmployee(dataList);
                 setShowAddModal(false);

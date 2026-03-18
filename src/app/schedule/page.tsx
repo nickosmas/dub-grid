@@ -20,6 +20,7 @@ import { OptimisticLockError } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { supabase } from "@/lib/supabase";
 import { usePermissions, useOrganizationData, useEmployees, useCellLocks } from "@/hooks";
+import { useAuth } from "@/components/AuthProvider";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { toast } from "sonner";
@@ -38,7 +39,8 @@ import {
 } from "@/types";
 
 function SchedulerContent() {
-  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, isLoading: permsLoading } = usePermissions();
+  const { user: authUser } = useAuth();
+  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, isSuperAdmin, isLoading: permsLoading } = usePermissions();
   const {
     org, focusAreas, shiftCodes, allShiftCodesRef, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,
@@ -62,7 +64,7 @@ function SchedulerContent() {
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
-  const [isCanceling, setIsCanceling] = useState(false);
+  const [cancelingMode, setCancelingMode] = useState<null | 'mine' | 'all'>(null);
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
@@ -85,32 +87,61 @@ function SchedulerContent() {
 
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
 
+  // Audit mode: toggle to show who created each shift under grid cells
+  const [showAudit, setShowAudit] = useState(false);
+  const profileNameCache = useRef<Map<string, string>>(new Map());
+  const [auditInfo, setAuditInfo] = useState<{
+    createdByName: string | null;
+    updatedByName: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+  } | null>(null);
+
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const skipNextBroadcastRef = useRef(false);
   const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Shared refetch helper (eliminates 4x duplication) ──────────────────────
+  const refetchScheduleData = useCallback(async () => {
+    if (!org) return;
+    const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
+    const [shiftData, noteRows] = await Promise.all([
+      db.fetchShifts(org.id, canEditShifts, cMap),
+      db.fetchScheduleNotes(org.id),
+    ]);
+    const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+    for (const note of noteRows) {
+      const key = note.focusAreaId != null
+        ? `${note.empId}_${note.date}_${note.focusAreaId}`
+        : `${note.empId}_${note.date}`;
+      if (!noteMap[key]) noteMap[key] = [];
+      noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
+    }
+    setShifts(shiftData);
+    setNotes(noteMap);
+  }, [org, canEditShifts]);
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
+  const initialLoadUsedEditPerms = useRef(false);
   useEffect(() => {
     if (orgLoading || !org || scheduleLoadStarted.current) return;
     scheduleLoadStarted.current = true;
+    initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
 
     async function fetchCurrentUser(): Promise<{ id: string; name: string } | null> {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user;
-        if (!user) return null;
+        if (!authUser) return null;
         const { data: profile } = await supabase
           .from("profiles")
           .select("first_name, last_name")
-          .eq("id", user.id)
+          .eq("id", authUser.id)
           .maybeSingle();
         const first = profile?.first_name?.trim() || "";
         const last = profile?.last_name?.trim() || "";
         const full = [first, last].filter(Boolean).join(" ");
-        const name = full || user.email?.split("@")[0] || "Unknown";
-        return { id: user.id, name };
+        const name = full || authUser.email?.split("@")[0] || "Unknown";
+        return { id: authUser.id, name };
       } catch {
         return null;
       }
@@ -152,30 +183,159 @@ function SchedulerContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgLoading, org]);
 
-  const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence } = useCellLocks(realtimeChannelRef, currentUser);
+  // Resolve a user UUID to a display name via profiles table (cached).
+  const resolveUserName = useCallback(async (userId: string | null | undefined): Promise<string | null> => {
+    if (!userId) return null;
+    const cached = profileNameCache.current.get(userId);
+    if (cached) return cached;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", userId)
+        .maybeSingle();
+      const first = data?.first_name?.trim() || "";
+      const last = data?.last_name?.trim() || "";
+      const name = [first, last].filter(Boolean).join(" ") || null;
+      if (name) {
+        profileNameCache.current.set(userId, name);
+        return name;
+      }
+      // Profile deleted or has no name — cache fallback to avoid re-fetching
+      profileNameCache.current.set(userId, "Deleted user");
+      return "Deleted user";
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Resolve audit metadata (created/updated by names) when the edit panel opens.
+  useEffect(() => {
+    if (!editPanel) { setAuditInfo(null); return; }
+    const key = `${editPanel.empId}_${formatDateKey(editPanel.date)}`;
+    const meta = shifts[key];
+    if (!meta?.createdBy && !meta?.updatedBy) { setAuditInfo(null); return; }
+
+    let cancelled = false;
+    (async () => {
+      const [createdByName, updatedByName] = await Promise.all([
+        resolveUserName(meta.createdBy),
+        resolveUserName(meta.updatedBy),
+      ]);
+      if (!cancelled) {
+        // Only include "updated by" if the update was meaningfully later (>5s) than creation
+        const cTime = meta.createdAt ? new Date(meta.createdAt).getTime() : 0;
+        const uTime = meta.updatedAt ? new Date(meta.updatedAt).getTime() : 0;
+        const wasActuallyUpdated = Math.abs(uTime - cTime) > 5000;
+        setAuditInfo({
+          createdByName,
+          updatedByName: wasActuallyUpdated ? updatedByName : null,
+          createdAt: meta.createdAt ?? null,
+          updatedAt: wasActuallyUpdated ? (meta.updatedAt ?? null) : null,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editPanel, shifts, resolveUserName]);
+
+  // Batch-fetch profile names for all shift creators when audit mode is toggled on.
+  const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
+  const needsAuditNames = showAudit;
+  useEffect(() => {
+    if (!needsAuditNames) return;
+    // Collect unique creator/updater UUIDs not yet in the cache
+    const uncached = new Set<string>();
+    for (const entry of Object.values(shifts)) {
+      if (entry.createdBy && !profileNameCache.current.has(entry.createdBy)) uncached.add(entry.createdBy);
+      if (entry.updatedBy && !profileNameCache.current.has(entry.updatedBy)) uncached.add(entry.updatedBy);
+    }
+    // Also collect updatedBy UUIDs from publish history changes (for deleted shifts whose rows are gone)
+    if (publishHistory) {
+      for (const change of publishHistory.changes) {
+        if (change.updatedBy && !profileNameCache.current.has(change.updatedBy)) uncached.add(change.updatedBy);
+      }
+    }
+    if (uncached.size === 0) {
+      // All already cached — just build the map from cache
+      setAuditNames(new Map(profileNameCache.current));
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = Array.from(uncached);
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", ids);
+        if (cancelled) return;
+        for (const row of data ?? []) {
+          const first = row.first_name?.trim() || "";
+          const last = row.last_name?.trim() || "";
+          const name = [first, last].filter(Boolean).join(" ");
+          if (name) profileNameCache.current.set(row.id, name);
+        }
+        // Cache fallback for deleted/missing profiles to avoid re-fetching
+        for (const id of ids) {
+          if (!profileNameCache.current.has(id)) {
+            profileNameCache.current.set(id, "Deleted user");
+          }
+        }
+        setAuditNames(new Map(profileNameCache.current));
+      } catch {
+        // Silently fail — audit names are non-critical
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [needsAuditNames, shifts, publishHistory]);
+
+  // Build a lookup map from publish history changes for O(1) access
+  const publishChangesMap = useMemo(() => {
+    if (!publishHistory) return null;
+    const map = new Map<string, PublishChange>();
+    for (const change of publishHistory.changes) {
+      map.set(`${change.empId}_${change.date}`, change);
+    }
+    return map;
+  }, [publishHistory]);
+
+  // Lookup function for grid cells: returns "F. LastName" for compact display.
+  // Shows who last touched each cell (updatedBy, falling back to createdBy).
+  // Also resolves from publish history changes for cells whose rows are gone after publish.
+  const createdByNameForKey = useCallback(
+    (empId: string, date: Date): string | null => {
+      const key = `${empId}_${formatDateKey(date)}`;
+      const entry = shifts[key];
+      let userId: string | null = null;
+      if (entry) {
+        userId = (entry.updatedBy || entry.createdBy) || null;
+      } else if (publishChangesMap) {
+        // Shift row was deleted after publish — resolve from publish history
+        const change = publishChangesMap.get(key);
+        userId = change?.updatedBy || null;
+      }
+      if (!userId) return null;
+      const fullName = auditNames.get(userId);
+      if (!fullName) return null;
+      const parts = fullName.split(" ").filter(Boolean);
+      let compact: string;
+      if (parts.length === 1) {
+        compact = parts[0];
+      } else {
+        compact = `${parts[0][0]}. ${parts[parts.length - 1]}`;
+      }
+      // Cap at 14 chars to prevent overflow in narrow cells
+      return compact.length > 14 ? compact.slice(0, 13) + "\u2026" : compact;
+    },
+    [shifts, auditNames, publishChangesMap],
+  );
+
+  const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser);
 
   // Subscribe to real-time schedule broadcasts so other tabs/users see
   // published and draft changes immediately without a manual refresh.
   useEffect(() => {
     if (!org) return;
-
-    const refetchScheduleData = async () => {
-      const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-      const [shiftData, noteRows] = await Promise.all([
-        db.fetchShifts(org.id, canEditShifts, cMap),
-        db.fetchScheduleNotes(org.id),
-      ]);
-      const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
-      for (const note of noteRows) {
-        const key = note.focusAreaId != null
-          ? `${note.empId}_${note.date}_${note.focusAreaId}`
-          : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
-      }
-      setShifts(shiftData);
-      setNotes(noteMap);
-    };
 
     const channel = supabase
       .channel(`schedule:${org.id}`)
@@ -188,13 +348,37 @@ function SchedulerContent() {
           console.error('Failed to sync schedule update:', err);
         }
       })
-      .on('broadcast', { event: 'draft_changed' }, () => {
-        // Skip if we sent this broadcast ourselves
-        if (skipNextBroadcastRef.current) {
-          skipNextBroadcastRef.current = false;
-          return;
+      .on('broadcast', { event: 'drafts_discarded' }, async () => {
+        // Immediate refetch — a super_admin discarded all drafts
+        try {
+          await refetchScheduleData();
+        } catch (err) {
+          console.error('Failed to sync drafts discard:', err);
         }
-        // Debounce rapid changes (500ms)
+      })
+      .on('broadcast', { event: 'draft_changed' }, (msg: { payload?: Record<string, unknown> }) => {
+        // Skip our own broadcasts
+        if (msg.payload?.senderId === currentUser?.id) return;
+
+        const p = msg.payload;
+        if (p?.shifts) {
+          // Optimistic: apply shift changes directly without DB round-trip
+          const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
+          setShifts(prev => {
+            const next = { ...prev };
+            for (const [key, value] of Object.entries(shiftUpdates)) {
+              if (value === null) delete next[key];
+              else next[key] = value;
+            }
+            return next;
+          });
+        }
+        if (p?.notes) {
+          // Optimistic: apply note changes directly
+          const noteUpdates = p.notes as Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>;
+          setNotes(prev => ({ ...prev, ...noteUpdates }));
+        }
+        // Always schedule a background refetch for consistency
         if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
         draftChangedDebounceRef.current = setTimeout(async () => {
           try {
@@ -202,7 +386,13 @@ function SchedulerContent() {
           } catch (err) {
             console.error('Failed to sync draft change:', err);
           }
-        }, 500);
+        }, p?.shifts || p?.notes ? 2000 : 150);
+      })
+      .on('broadcast', { event: 'cell_locked' }, (msg: { payload?: { cellKey: string; userId: string; userName: string } }) => {
+        if (msg.payload) handleLockBroadcast(msg.payload);
+      })
+      .on('broadcast', { event: 'cell_unlocked' }, (msg: { payload?: { userId: string } }) => {
+        if (msg.payload) handleUnlockBroadcast(msg.payload);
       })
       .on('presence', { event: 'sync' }, syncPresence)
       .subscribe(async (status: string) => {
@@ -218,15 +408,32 @@ function SchedulerContent() {
       if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [org, canEditShifts, currentUser, syncPresence]);
+  }, [org, canEditShifts, currentUser, syncPresence, handleLockBroadcast, handleUnlockBroadcast, refetchScheduleData]);
+
+  // Refetch when the tab regains focus — catches any missed broadcasts
+  // (e.g. browser throttled WebSocket while tab was backgrounded).
+  useEffect(() => {
+    if (!org) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetchScheduleData().catch((err) => {
+          console.error("Tab refetch failed:", err);
+          toast.error("Failed to refresh schedule — try reloading the page");
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [org, refetchScheduleData]);
 
   // Re-fetch with scheduler visibility once permissions resolve, so editors
   // see draft data even if the initial load ran before permissions were ready.
+  // Skip if the initial load already used canEditShifts=true (no extra fetch needed).
   const draftCheckStarted = useRef(false);
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
     if (permsLoading || !org || scheduleLoading || draftCheckStarted.current) return;
-    if (!canEditShifts) { setDraftCheckComplete(true); return; }
+    if (!canEditShifts || initialLoadUsedEditPerms.current) { setDraftCheckComplete(true); return; }
     draftCheckStarted.current = true;
 
     (async () => {
@@ -319,15 +526,6 @@ function SchedulerContent() {
     [shifts],
   );
 
-  // Build a lookup map from publish history changes for O(1) access
-  const publishChangesMap = useMemo(() => {
-    if (!publishHistory) return null;
-    const map = new Map<string, PublishChange>();
-    for (const change of publishHistory.changes) {
-      map.set(`${change.empId}_${change.date}`, change);
-    }
-    return map;
-  }, [publishHistory]);
 
   const publishDiffKindForKey = useCallback(
     (empId: string, date: Date): PublishChange | null => {
@@ -388,14 +586,13 @@ function SchedulerContent() {
     [notes],
   );
 
-  const broadcastDraftChanged = useCallback(() => {
-    skipNextBroadcastRef.current = true;
+  const broadcastDraftChanged = useCallback((payload?: Record<string, unknown>) => {
     realtimeChannelRef.current?.send({
       type: 'broadcast',
       event: 'draft_changed',
-      payload: {},
+      payload: { ...payload, senderId: currentUser?.id },
     });
-  }, []);
+  }, [currentUser]);
 
   const setShift = useCallback(
     (empId: string, date: Date, label: string, shiftCodeIds: number[]) => {
@@ -417,22 +614,21 @@ function SchedulerContent() {
       };
 
       if (label === "OFF" || shiftCodeIds.length === 0) {
-        setShifts((prev) => {
-          const next = { ...prev };
-          const ex = prev[key];
-          next[key] = {
-            label: "OFF", shiftCodeIds: [], isDraft: true, isDelete: true,
-            draftKind: ex?.publishedShiftCodeIds?.length ? 'deleted' : 'new',
-            publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
-            publishedLabel: ex?.publishedLabel ?? '',
-          };
-          return next;
-        });
+        const ex = shifts[key];
+        const deleteValue = {
+          label: "OFF", shiftCodeIds: [] as number[], isDraft: true, isDelete: true,
+          draftKind: (ex?.publishedShiftCodeIds?.length ? 'deleted' : 'new') as 'deleted' | 'new',
+          publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
+          publishedLabel: ex?.publishedLabel ?? '',
+          createdBy: ex?.createdBy ?? null,
+          updatedBy: currentUser?.id ?? null,
+        };
+        setShifts((prev) => ({ ...prev, [key]: deleteValue }));
         db.deleteShift(empId, dateKey).catch((err) => {
           toast.error("Failed to delete shift");
           console.error(err);
         });
-        broadcastDraftChanged();
+        broadcastDraftChanged({ shifts: { [key]: deleteValue } });
       } else {
         // Filter out any stale/archived shift code IDs
         const validCodeIds = shiftCodeIds.filter((id) => shiftCodeMap.has(id));
@@ -443,19 +639,15 @@ function SchedulerContent() {
         if (validCodeIds.length < shiftCodeIds.length) {
           toast.warning("Some shift codes were removed (no longer available)");
         }
-        setShifts((prev) => {
-          const ex = prev[key];
-          const hasPublished = ex?.publishedShiftCodeIds?.length ?? 0;
-          return {
-            ...prev,
-            [key]: {
-              label, shiftCodeIds: validCodeIds, isDraft: true,
-              draftKind: hasPublished ? 'modified' : 'new',
-              publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
-              publishedLabel: ex?.publishedLabel ?? '',
-            },
-          };
-        });
+        const ex = shifts[key];
+        const hasPublished = ex?.publishedShiftCodeIds?.length ?? 0;
+        const upsertValue = {
+          label, shiftCodeIds: validCodeIds, isDraft: true,
+          draftKind: (hasPublished ? 'modified' : 'new') as 'modified' | 'new',
+          publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
+          publishedLabel: ex?.publishedLabel ?? '',
+        };
+        setShifts((prev) => ({ ...prev, [key]: upsertValue }));
         db.upsertShift(empId, dateKey, validCodeIds, orgId, undefined, undefined, existingVersion).catch((err) => {
           if (err instanceof OptimisticLockError) {
             handleConflict();
@@ -464,7 +656,7 @@ function SchedulerContent() {
             console.error(err);
           }
         });
-        broadcastDraftChanged();
+        broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
     [org?.id, shifts, canEditShifts, shiftCodeMap, broadcastDraftChanged],
@@ -732,29 +924,24 @@ function SchedulerContent() {
       const dateKey = formatDateKey(editPanel.date);
       const key = `${editPanel.empId}_${dateKey}_${focusAreaId}`;
 
-      let existingStatus: 'published' | 'draft' | 'draft_deleted' | undefined;
-      setNotes((prev) => {
-        const existing = prev[key] ?? [];
-        existingStatus = existing.find(n => n.indicatorTypeId === indicatorTypeId)?.status;
+      const existing = notes[key] ?? [];
+      const existingStatus = existing.find(n => n.indicatorTypeId === indicatorTypeId)?.status;
 
-        let updated: { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[];
-        if (active) {
-          // "Adding" or "Restoring"
-          if (existingStatus === 'draft_deleted') {
-            updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'published' as const } : n);
-          } else {
-            updated = [...existing.filter(n => n.indicatorTypeId !== indicatorTypeId), { indicatorTypeId, status: 'draft' as const }];
-          }
+      let updated: { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[];
+      if (active) {
+        if (existingStatus === 'draft_deleted') {
+          updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'published' as const } : n);
         } else {
-          // "Deleting" or "Canceling draft"
-          if (existingStatus === 'published') {
-            updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'draft_deleted' as const } : n);
-          } else {
-            updated = existing.filter(n => n.indicatorTypeId !== indicatorTypeId);
-          }
+          updated = [...existing.filter(n => n.indicatorTypeId !== indicatorTypeId), { indicatorTypeId, status: 'draft' as const }];
         }
-        return { ...prev, [key]: updated };
-      });
+      } else {
+        if (existingStatus === 'published') {
+          updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'draft_deleted' as const } : n);
+        } else {
+          updated = existing.filter(n => n.indicatorTypeId !== indicatorTypeId);
+        }
+      }
+      setNotes(prev => ({ ...prev, [key]: updated }));
 
       try {
         if (active) {
@@ -775,12 +962,12 @@ function SchedulerContent() {
             existingStatus
           );
         }
-        broadcastDraftChanged();
+        broadcastDraftChanged({ notes: { [key]: updated } });
       } catch (error) {
         console.error(error);
       }
     },
-    [editPanel, org, broadcastDraftChanged],
+    [editPanel, org, notes, broadcastDraftChanged],
   );
 
   const handlePrev = useCallback(() => {
@@ -825,20 +1012,7 @@ function SchedulerContent() {
 
       await db.publishSchedule(org.id, startDate, endDate);
 
-      const [shiftData, noteRows] = await Promise.all([
-        db.fetchShifts(org.id, canEditShifts, shiftCodeMap),
-        db.fetchScheduleNotes(org.id),
-      ]);
-      const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
-      for (const note of noteRows) {
-        const key = note.focusAreaId != null
-          ? `${note.empId}_${note.date}_${note.focusAreaId}`
-          : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
-      }
-      setShifts(shiftData);
-      setNotes(noteMap);
+      await refetchScheduleData();
       const latestPublish = await db.fetchLatestPublishHistory(org.id);
       setPublishHistory(latestPublish);
       setShowPublishDiff(false);
@@ -859,50 +1033,36 @@ function SchedulerContent() {
     } finally {
       setIsPublishing(false);
     }
-  }, [org, weekStart, monthStart, spanWeeks, canEditShifts, setIsPublishing]);
+  }, [org, weekStart, monthStart, spanWeeks, canEditShifts, setIsPublishing, refetchScheduleData]);
 
-  const handleCancelChanges = useCallback(async () => {
-    if (!org) return;
-    setIsCanceling(true);
+  const handleCancelChanges = useCallback(async (discardAll = false) => {
+    if (!org || !currentUser) return;
+    setCancelingMode(discardAll ? 'all' : 'mine');
     try {
-      let startDate: Date;
-      let endDate: Date;
+      await db.discardScheduleDrafts(org.id, discardAll ? undefined : currentUser.id);
 
-      if (spanWeeks === "month") {
-        startDate = new Date(monthStart);
-        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0); // Last day of month
-      } else {
-        startDate = new Date(weekStart);
-        endDate = addDays(weekStart, (spanWeeks * 7) - 1);
-      }
-
-      await db.discardScheduleDrafts(org.id, startDate, endDate);
-
-      const [shiftData, noteRows] = await Promise.all([
-        db.fetchShifts(org.id, canEditShifts, shiftCodeMap),
-        db.fetchScheduleNotes(org.id),
-      ]);
-      const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
-      for (const note of noteRows) {
-        const key = note.focusAreaId != null
-          ? `${note.empId}_${note.date}_${note.focusAreaId}`
-          : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
-      }
-      setShifts(shiftData);
-      setNotes(noteMap);
+      await refetchScheduleData();
       unlockCell();
       setEditPanel(null);
       setShowDiffOverlay(false);
-      toast.success("Changes discarded");
+      if (discardAll) {
+        // Dedicated event for discard-all — triggers immediate refetch on all clients
+        realtimeChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'drafts_discarded',
+          payload: {},
+        });
+      } else {
+        broadcastDraftChanged();
+      }
+      toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
     } catch (err: any) {
       toast.error("Failed to discard changes");
       console.error(err);
     } finally {
-      setIsCanceling(false);
+      setCancelingMode(null);
     }
-  }, [org, weekStart, monthStart, spanWeeks, canEditShifts, shiftCodeMap]);
+  }, [org, currentUser, canEditShifts, shiftCodeMap, broadcastDraftChanged, refetchScheduleData]);
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
@@ -1033,6 +1193,7 @@ function SchedulerContent() {
               position: "sticky",
               top: 0,
               zIndex: 99,
+              background: "var(--color-bg)",
             }}
           >
             {canEditShifts && hasUnpublishedChanges && (
@@ -1040,7 +1201,7 @@ function SchedulerContent() {
                 onPublish={() => setShowPublishConfirm(true)}
                 onCancel={() => setShowDiscardConfirm(true)}
                 isPublishing={isPublishing}
-                isCanceling={isCanceling}
+                isCanceling={cancelingMode !== null}
                 breakdown={draftBreakdown}
                 showDiff={showDiffOverlay}
                 onToggleDiff={() => setShowDiffOverlay(v => !v)}
@@ -1099,6 +1260,8 @@ function SchedulerContent() {
                 isApplyingRecurring={isApplyingRecurring}
                 onPrintOpen={() => setShowPrintOptions(true)}
                 presenceSlot={<PresenceAvatars onlineUsers={onlineUsers} />}
+                showAudit={showAudit}
+                onAuditToggle={canEditShifts ? () => setShowAudit(prev => !prev) : undefined}
               />
             </div>
           </div>
@@ -1135,6 +1298,8 @@ function SchedulerContent() {
               publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
               publishDiffForKey={publishDiffKindForKey}
               cellLocks={lockedCells}
+              showAudit={showAudit}
+              createdByNameForKey={createdByNameForKey}
             />
           </div>
         )}
@@ -1180,6 +1345,7 @@ function SchedulerContent() {
           onCustomTimeChange={canEditShifts ? handleCustomTimeChange : undefined}
           publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
           draftKind={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.draftKind}
+          auditInfo={canEditShifts ? auditInfo : undefined}
         />
       )}
 
@@ -1222,15 +1388,21 @@ function SchedulerContent() {
       {showDiscardConfirm && (
         <ConfirmDialog
           title="Discard Changes?"
-          message="All unpublished changes will be lost. This cannot be undone."
-          confirmLabel="Discard"
+          message="Your unpublished changes will be lost. This cannot be undone."
+          confirmLabel="Discard my edits"
           variant="danger"
-          isLoading={isCanceling}
-          onConfirm={async () => {
-            await handleCancelChanges();
+          isLoading={cancelingMode === 'mine'}
+          onConfirm={() => {
             setShowDiscardConfirm(false);
+            handleCancelChanges();
           }}
           onCancel={() => setShowDiscardConfirm(false)}
+          secondaryConfirmLabel={isSuperAdmin ? "Discard all edits" : undefined}
+          isSecondaryLoading={cancelingMode === 'all'}
+          onSecondaryConfirm={isSuperAdmin ? () => {
+            setShowDiscardConfirm(false);
+            handleCancelChanges(true);
+          } : undefined}
         />
       )}
 
@@ -1241,9 +1413,9 @@ function SchedulerContent() {
           confirmLabel="Publish"
           variant="info"
           isLoading={isPublishing}
-          onConfirm={async () => {
-            await handlePublish();
+          onConfirm={() => {
             setShowPublishConfirm(false);
+            handlePublish();
           }}
           onCancel={() => setShowPublishConfirm(false)}
         />

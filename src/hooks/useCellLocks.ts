@@ -28,6 +28,8 @@ interface UseCellLocksReturn {
   lockedCells: Map<string, CellLock>;
   onlineUsers: OnlineUser[];
   syncPresence: () => void;
+  handleLockBroadcast: (payload: { cellKey: string; userId: string; userName: string }) => void;
+  handleUnlockBroadcast: (payload: { userId: string }) => void;
 }
 
 export function useCellLocks(
@@ -96,10 +98,17 @@ export function useCellLocks(
       const channel = channelRef.current;
       const user = currentUserRef.current;
       if (!channel || !user) return;
+      // Presence for consistency (slower, server round-trip)
       void channel.track({
         editingCell: cellKey,
         userId: user.id,
         userName: user.name,
+      });
+      // Broadcast for instant delivery to other clients
+      void channel.send({
+        type: 'broadcast',
+        event: 'cell_locked',
+        payload: { cellKey, userId: user.id, userName: user.name },
       });
     },
     [channelRef],
@@ -114,7 +123,45 @@ export function useCellLocks(
       userId: user.id,
       userName: user.name,
     });
+    void channel.send({
+      type: 'broadcast',
+      event: 'cell_unlocked',
+      payload: { userId: user.id },
+    });
   }, [channelRef]);
+
+  // Optimistic lock application from broadcast (instant, no server round-trip)
+  const handleLockBroadcast = useCallback(
+    (payload: { cellKey: string; userId: string; userName: string }) => {
+      if (payload.userId === currentUserRef.current?.id) return;
+      setLockedCells(prev => {
+        const next = new Map(prev);
+        next.set(payload.cellKey, {
+          userId: payload.userId,
+          userName: payload.userName,
+          cellKey: payload.cellKey,
+        });
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Optimistic unlock application from broadcast
+  const handleUnlockBroadcast = useCallback(
+    (payload: { userId: string }) => {
+      if (payload.userId === currentUserRef.current?.id) return;
+      setLockedCells(prev => {
+        const next = new Map<string, CellLock>();
+        for (const [key, lock] of prev) {
+          if (lock.userId !== payload.userId) next.set(key, lock);
+        }
+        if (next.size === prev.size) return prev; // no change
+        return next;
+      });
+    },
+    [],
+  );
 
   const getCellLock = useCallback(
     (cellKey: string): CellLock | null => {
@@ -123,5 +170,5 @@ export function useCellLocks(
     [lockedCells],
   );
 
-  return { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence };
+  return { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast };
 }
