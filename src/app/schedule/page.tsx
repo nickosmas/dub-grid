@@ -124,7 +124,7 @@ function SchedulerContent() {
   const scheduleLoadStarted = useRef(false);
   const initialLoadUsedEditPerms = useRef(false);
   useEffect(() => {
-    if (orgLoading || !org || scheduleLoadStarted.current) return;
+    if (orgLoading || permsLoading || !org || scheduleLoadStarted.current) return;
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
@@ -1075,6 +1075,16 @@ function SchedulerContent() {
     if (!isLoading || (loadError && !org)) setPageReady();
   }, [isLoading, loadError, org, setPageReady]);
 
+  if (orgLoading || permsLoading || (scheduleLoading && !org)) {
+    return (
+      <div className="dg-page" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100vh - 64px)" }}>
+        <ProgressBar loading={true} />
+        <div style={{ color: "var(--color-text-muted)", fontSize: 14, fontWeight: 500 }}>
+          Loading Organization & Permissions…
+        </div>
+      </div>
+    );
+  }
   if (loadError && !org) {
     return (
       <div

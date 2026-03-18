@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 
-function PresetColorPicker({ valueBg, onChange }: { valueBg: string; onChange: (c: PredefinedColor) => void }) {
+function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: string; onChange: (c: PredefinedColor) => void; disabled?: boolean }) {
   const active = getPresetByBg(valueBg);
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -22,18 +22,20 @@ function PresetColorPicker({ valueBg, onChange }: { valueBg: string; onChange: (
         <button
           key={c.id}
           type="button"
-          onClick={() => onChange(c)}
+          onClick={() => !disabled && onChange(c)}
+          disabled={disabled}
           style={{
             width: 24,
             height: 24,
             borderRadius: "50%",
             background: c.bg,
             border: active.id === c.id ? `2px solid ${c.text}` : "1px solid var(--color-border)",
-            cursor: "pointer",
+            cursor: disabled ? "not-allowed" : "pointer",
             padding: 0,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            opacity: disabled ? 0.6 : 1,
           }}
           title={c.name}
         >
@@ -63,6 +65,10 @@ interface SettingsPageProps {
   isSuperAdmin: boolean;
   isGridmaster: boolean;
   canManageOrgLabels: boolean;
+  canManageFocusAreas: boolean;
+  canManageShiftCodes: boolean;
+  canManageIndicatorTypes: boolean;
+  canManageOrgSettings: boolean;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -146,7 +152,7 @@ const TIMEZONES = [
 ];
 
 // ── 12-hour time picker ───────────────────────────────────────────────────────
-function TimeInput12h({ value, onChange }: { value: string | null | undefined; onChange: (v: string | null) => void }) {
+function TimeInput12h({ value, onChange, disabled }: { value: string | null | undefined; onChange: (v: string | null) => void; disabled?: boolean }) {
   const init = parseTo12h(value);
   const [hour, setHour] = useState(init.hour);
   const [minute, setMinute] = useState(init.minute);
@@ -163,7 +169,9 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
     ...inputStyle,
     padding: "7px 4px",
     textAlign: "center",
-    cursor: "pointer",
+    cursor: disabled ? "not-allowed" : "pointer",
+    background: disabled ? "var(--color-bg-subtle)" : "#fff",
+    color: disabled ? "var(--color-text-faint)" : "var(--color-text-primary)",
   };
 
   return (
@@ -171,6 +179,7 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
       <select
         value={hour}
         onChange={(e) => { setHour(e.target.value); onChange(to24h(e.target.value, minute, period)); }}
+        disabled={disabled}
         style={{ ...selStyle, width: 52 }}
       >
         <option value="">--</option>
@@ -182,6 +191,7 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
       <select
         value={minute}
         onChange={(e) => { setMinute(e.target.value); onChange(to24h(hour, e.target.value, period)); }}
+        disabled={disabled}
         style={{ ...selStyle, width: 52 }}
       >
         {["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => (
@@ -191,6 +201,7 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
       <select
         value={period}
         onChange={(e) => { const p = e.target.value as "AM" | "PM"; setPeriod(p); onChange(to24h(hour, minute, p)); }}
+        disabled={disabled}
         style={{ ...selStyle, width: 58 }}
       >
         <option value="AM">AM</option>
@@ -204,9 +215,11 @@ function TimeInput12h({ value, onChange }: { value: string | null | undefined; o
 function OrganizationDetailsSettings({
   organization,
   onSave,
+  canManageOrgSettings,
 }: {
   organization: Organization;
   onSave: (o: Organization) => void;
+  canManageOrgSettings: boolean;
 }) {
   const [form, setForm] = useState({
     name: organization.name,
@@ -339,9 +352,11 @@ function OrganizationDetailsSettings({
 function OrganizationLabelsSettings({
   organization,
   onSave,
+  canManageOrgLabels,
 }: {
   organization: Organization;
   onSave: (o: Organization) => void;
+  canManageOrgLabels: boolean;
 }) {
   const [form, setForm] = useState({
     focusAreaLabel: organization.focusAreaLabel,
@@ -461,10 +476,12 @@ function FocusAreaRow({
   onDragOver,
   onDrop,
   onDragEnd,
+  canManageFocusAreas,
 }: {
   focusArea: FocusArea & { isNew?: boolean };
   onDeleted: (id: number) => void;
   onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
+  canManageFocusAreas: boolean;
   isDragging: boolean;
   isDropTarget: boolean;
   isReordering: boolean;
@@ -655,11 +672,13 @@ function FocusAreasSettings({
   orgId,
   label,
   onChange,
+  canManageFocusAreas,
 }: {
   focusAreas: FocusArea[];
   orgId: string;
   label: string;
   onChange: (focusAreas: FocusArea[]) => void;
+  canManageFocusAreas: boolean;
 }) {
   const [localFocusAreas, setLocalFocusAreas] =
     useState<(FocusArea & { isNew?: boolean })[]>(focusAreas);
@@ -824,6 +843,7 @@ function FocusAreasSettings({
               onDragOver={(e) => handleDragOver(e, i)}
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
+              canManageFocusAreas={canManageFocusAreas}
             />
           );
         })}
@@ -851,7 +871,7 @@ function FocusAreasSettings({
 
 // ── Shift Code row ────────────────────────────────────────────────────────────
 function ShiftCodeRow({
-    st,
+  st,
   focusAreas,
   shiftCategories,
   orgId,
@@ -862,6 +882,7 @@ function ShiftCodeRow({
   hideFocusAreaSelect,
   onSaved,
   onDeleted,
+  canManageShiftCodes,
 }: {
   st: ShiftCode & { isNew?: boolean };
   focusAreas: FocusArea[];
@@ -874,6 +895,7 @@ function ShiftCodeRow({
   hideFocusAreaSelect?: boolean;
   onSaved: (s: ShiftCode, prevId: number) => void;
   onDeleted: (id: number) => void;
+  canManageShiftCodes: boolean;
 }) {
   const [form, setForm] = useState({
     label: st.label,
@@ -1079,6 +1101,7 @@ function ShiftCodeRow({
                 }
                 placeholder="e.g. D"
                 style={inputStyle}
+                disabled={!canManageShiftCodes}
               />
             </div>
             <div>
@@ -1090,6 +1113,7 @@ function ShiftCodeRow({
                 }
                 placeholder="e.g. Day Shift"
                 style={inputStyle}
+                disabled={!canManageShiftCodes}
               />
             </div>
           </div>
@@ -1113,6 +1137,7 @@ function ShiftCodeRow({
                   }))
                 }
                 style={{ width: "100%", marginTop: 4 }}
+                disabled={!canManageShiftCodes}
               />
             </div>
           )}
@@ -1134,6 +1159,7 @@ function ShiftCodeRow({
                 ]}
                 onChange={(v) => setForm((p) => ({ ...p, categoryId: v ? Number(v) : null }))}
                 style={{ width: "100%", marginTop: 4 }}
+                disabled={!canManageShiftCodes}
               />
             </div>
           )}
@@ -1141,9 +1167,10 @@ function ShiftCodeRow({
           {/* Colors */}
           <div>
             <label style={labelStyle}>COLOR PRESET</label>
-            <PresetColorPicker 
-              valueBg={form.color} 
-              onChange={c => setForm(p => ({ ...p, color: c.bg, text: c.text, border: TRANSPARENT_BORDER }))} 
+            <PresetColorPicker
+              valueBg={form.color}
+              onChange={c => setForm(p => ({ ...p, color: c.bg, text: c.text, border: TRANSPARENT_BORDER }))}
+              disabled={!canManageShiftCodes}
             />
           </div>
 
@@ -1164,7 +1191,7 @@ function ShiftCodeRow({
                         alignItems: "center",
                         gap: 6,
                         fontSize: 13,
-                        cursor: "pointer",
+                        cursor: canManageShiftCodes ? "pointer" : "default",
                         padding: "4px 10px",
                         borderRadius: 20,
                         border: `1.5px solid ${
@@ -1186,6 +1213,7 @@ function ShiftCodeRow({
                               : p.requiredCertificationIds.filter((d) => d !== desig.id),
                           }))
                         }
+                        disabled={!canManageShiftCodes}
                       />
                       <span
                         style={{
@@ -1218,17 +1246,17 @@ function ShiftCodeRow({
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               onClick={handleSave}
-              disabled={saving || !canSave}
+              disabled={saving || !canSave || !canManageShiftCodes}
               style={{
-                background: canSave ? "var(--color-accent-gradient)" : "var(--color-border-light)",
+                background: canSave && canManageShiftCodes ? "var(--color-accent-gradient)" : "var(--color-border-light)",
                 border: "none",
-                color: canSave ? "#fff" : "var(--color-text-muted)",
+                color: canSave && canManageShiftCodes ? "#fff" : "var(--color-text-muted)",
                 borderRadius: 7,
                 padding: "8px 18px",
                 fontSize: 13,
                 fontWeight: 700,
-                cursor: canSave ? "pointer" : "default",
-                opacity: canSave ? 1 : 0.6,
+                cursor: canSave && canManageShiftCodes ? "pointer" : "default",
+                opacity: canSave && canManageShiftCodes ? 1 : 0.6,
               }}
             >
               {saving ? "Saving…" : "Save"}
@@ -1248,22 +1276,24 @@ function ShiftCodeRow({
               Cancel
             </button>
             <div style={{ flex: 1 }} />
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={deleting}
-              style={{
-                background: "none",
-                border: "1px solid #FEE2E2",
-                borderRadius: 7,
-                color: "#EF4444",
-                padding: "8px 14px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {deleting ? "…" : "Delete"}
-            </button>
+            {canManageShiftCodes && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting}
+                style={{
+                  background: "none",
+                  border: "1px solid #FEE2E2",
+                  borderRadius: 7,
+                  color: "#EF4444",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {deleting ? "…" : "Delete"}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1292,6 +1322,7 @@ function ShiftCodesSettings({
   certificationLabel,
   focusAreaLabel,
   onChange,
+  canManageShiftCodes,
 }: {
   shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
@@ -1301,6 +1332,7 @@ function ShiftCodesSettings({
   certificationLabel: string;
   focusAreaLabel: string;
   onChange: (types: ShiftCode[]) => void;
+  canManageShiftCodes: boolean;
 }) {
   const [local, setLocal] =
     useState<(ShiftCode & { isNew?: boolean })[]>(shiftCodes);
@@ -1373,6 +1405,7 @@ function ShiftCodesSettings({
         hideFocusAreaSelect={hideAreaSelect}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
+        canManageShiftCodes={canManageShiftCodes}
       />
     ));
 
@@ -1408,11 +1441,13 @@ function ShiftCodesSettings({
                 {renderRows(areaCodes, false, true)}
               </div>
             )}
-            <div style={{ padding: "8px 16px" }}>
-              <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
-                + Add Shift Code
-              </button>
-            </div>
+            {canManageShiftCodes && (
+              <div style={{ padding: "8px 16px" }}>
+                <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                  + Add Shift Code
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
@@ -1430,11 +1465,13 @@ function ShiftCodesSettings({
                 {renderRows(generalCodes, false, true)}
               </div>
             )}
-            <div style={{ padding: "8px 16px" }}>
-              <button onClick={() => handleAdd(null)} style={addBtnStyle}>
-                + Add General Code
-              </button>
-            </div>
+            {canManageShiftCodes && (
+              <div style={{ padding: "8px 16px" }}>
+                <button onClick={() => handleAdd(null)} style={addBtnStyle}>
+                  + Add General Code
+                </button>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1472,11 +1509,13 @@ function StringListSettings({
   items,
   onSave,
   placeholder,
+  canEdit = true,
 }: {
   label: string;
   items: NamedItem[];
   onSave: (items: NamedItem[]) => Promise<void>;
   placeholder: string;
+  canEdit?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [local, setLocal] = useState<NamedItem[]>(items);
@@ -1834,10 +1873,12 @@ function IndicatorTypesSettings({
   indicatorTypes,
   orgId,
   onChange,
+  canManageIndicatorTypes,
 }: {
   indicatorTypes: IndicatorType[];
   orgId: string;
   onChange: (types: IndicatorType[]) => void;
+  canManageIndicatorTypes: boolean;
 }) {
   const [local, setLocal] = useState<(IndicatorType & { isNew?: boolean })[]>(indicatorTypes);
   const [saving, setSaving] = useState<number | null>(null);
@@ -1958,40 +1999,44 @@ function IndicatorTypesSettings({
                 }}
               />
             </div>
-            <button
-              onClick={() => handleSave(indicator)}
-              disabled={isSavingThis || !indicator.name.trim()}
-              style={{
-                background: indicator.name.trim() ? "var(--color-accent-gradient)" : "#ccc",
-                border: "none",
-                color: "#fff",
-                borderRadius: 7,
-                padding: "7px 14px",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: indicator.name.trim() ? "pointer" : "not-allowed",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {isSavingThis ? "…" : "Save"}
-            </button>
-            <button
-              onClick={() => indicator.isNew ? handleDelete(indicator) : setConfirmDeleteId(indicator.id)}
-              disabled={isDeletingThis}
-              style={{
-                background: "none",
-                border: "1px solid #FEE2E2",
-                borderRadius: 7,
-                color: "#EF4444",
-                padding: "7px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {isDeletingThis ? "…" : "Delete"}
-            </button>
+            {canManageIndicatorTypes && (
+              <button
+                onClick={() => handleSave(indicator)}
+                disabled={isSavingThis || !indicator.name.trim()}
+                style={{
+                  background: indicator.name.trim() ? "var(--color-accent-gradient)" : "#ccc",
+                  border: "none",
+                  color: "#fff",
+                  borderRadius: 7,
+                  padding: "7px 14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: indicator.name.trim() ? "pointer" : "not-allowed",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isSavingThis ? "…" : "Save"}
+              </button>
+            )}
+            {canManageIndicatorTypes && (
+              <button
+                onClick={() => indicator.isNew ? handleDelete(indicator) : setConfirmDeleteId(indicator.id)}
+                disabled={isDeletingThis}
+                style={{
+                  background: "none",
+                  border: "1px solid #FEE2E2",
+                  borderRadius: 7,
+                  color: "#EF4444",
+                  padding: "7px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isDeletingThis ? "…" : "Delete"}
+              </button>
+            )}
           </div>
         );
       })}
@@ -2038,11 +2083,13 @@ function ShiftCategoriesSettings({
   focusAreas,
   orgId,
   onChange,
+  canManageShiftCodes,
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];
   orgId: string;
   onChange: (categories: ShiftCategory[]) => void;
+  canManageShiftCodes: boolean;
 }) {
   const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
   const [saving, setSaving] = useState<number | null>(null);
@@ -2184,22 +2231,24 @@ function ShiftCategoriesSettings({
               </span>
             )}
           </div>
-          <button
-            onClick={() => setEditingId(cat.id)}
-            style={{
-              background: "none",
-              border: "1px solid var(--color-border)",
-              borderRadius: 7,
-              color: "var(--color-text-primary)",
-              padding: "6px 12px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Edit
-          </button>
+          {canManageShiftCodes && (
+            <button
+              onClick={() => setEditingId(cat.id)}
+              style={{
+                background: "none",
+                border: "1px solid var(--color-border)",
+                borderRadius: 7,
+                color: "var(--color-text-primary)",
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Edit
+            </button>
+          )}
         </div>
       );
     }
@@ -2229,6 +2278,7 @@ function ShiftCategoriesSettings({
               placeholder="e.g. Day Shift"
               style={{ ...inputStyle }}
               autoFocus
+              disabled={!canManageShiftCodes}
             />
           </div>
           <div>
@@ -2236,6 +2286,7 @@ function ShiftCategoriesSettings({
             <TimeInput12h
               value={cat.startTime}
               onChange={(v) => handleChange(cat.id, "startTime", v)}
+              disabled={!canManageShiftCodes}
             />
           </div>
           <div>
@@ -2243,22 +2294,23 @@ function ShiftCategoriesSettings({
             <TimeInput12h
               value={cat.endTime}
               onChange={(v) => handleChange(cat.id, "endTime", v)}
+              disabled={!canManageShiftCodes}
             />
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => handleSave(cat)}
-            disabled={isSavingThis || !cat.name.trim() || !isDirty}
+            disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
             style={{
-              background: cat.name.trim() && isDirty ? "var(--color-accent-gradient)" : "#ccc",
+              background: cat.name.trim() && isDirty && canManageShiftCodes ? "var(--color-accent-gradient)" : "#ccc",
               border: "none",
               color: "#fff",
               borderRadius: 7,
               padding: "7px 14px",
               fontSize: 12,
               fontWeight: 700,
-              cursor: cat.name.trim() && isDirty ? "pointer" : "not-allowed",
+              cursor: cat.name.trim() && isDirty && canManageShiftCodes ? "pointer" : "not-allowed",
               whiteSpace: "nowrap",
             }}
           >
@@ -2281,24 +2333,26 @@ function ShiftCategoriesSettings({
           >
             Cancel
           </button>
-          <button
-            onClick={() => cat.isNew ? handleDelete(cat) : setConfirmDeleteId(cat.id)}
-            disabled={isDeletingThis}
-            style={{
-              background: "none",
-              border: "1px solid #FEE2E2",
-              borderRadius: 7,
-              color: "#EF4444",
-              padding: "7px 12px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              marginLeft: "auto",
-            }}
-          >
-            {isDeletingThis ? "…" : "Delete"}
-          </button>
+          {canManageShiftCodes && (
+            <button
+              onClick={() => cat.isNew ? handleDelete(cat) : setConfirmDeleteId(cat.id)}
+              disabled={isDeletingThis}
+              style={{
+                background: "none",
+                border: "1px solid #FEE2E2",
+                borderRadius: 7,
+                color: "#EF4444",
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                marginLeft: "auto",
+              }}
+            >
+              {isDeletingThis ? "…" : "Delete"}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -2339,11 +2393,13 @@ function ShiftCategoriesSettings({
                 {areaCats.map(renderCategoryRow)}
               </div>
             )}
-            <div style={{ padding: "8px 16px" }}>
-              <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
-                + Add Category
-              </button>
-            </div>
+            {canManageShiftCodes && (
+              <div style={{ padding: "8px 16px" }}>
+                <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                  + Add Category
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
@@ -2954,6 +3010,10 @@ export default function SettingsPage({
   isSuperAdmin,
   isGridmaster,
   canManageOrgLabels,
+  canManageFocusAreas,
+  canManageShiftCodes,
+  canManageIndicatorTypes,
+  canManageOrgSettings,
 }: SettingsPageProps) {
   const pathname = usePathname();
   const VALID_SECTIONS = ["organization", "shift-categories", "shift-codes", "indicators", "staff-config", "users", "impersonation"];
@@ -3023,12 +3083,20 @@ export default function SettingsPage({
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
             {isSuperAdmin && (
               <Section title="Organization Details">
-                <OrganizationDetailsSettings organization={organization} onSave={onOrganizationSave} />
+                <OrganizationDetailsSettings
+                  organization={organization}
+                  onSave={onOrganizationSave}
+                  canManageOrgSettings={canManageOrgSettings}
+                />
               </Section>
             )}
             {(isSuperAdmin || canManageOrgLabels) && (
               <Section title="Custom Labels">
-                <OrganizationLabelsSettings organization={organization} onSave={onOrganizationSave} />
+                <OrganizationLabelsSettings
+                  organization={organization}
+                  onSave={onOrganizationSave}
+                  canManageOrgLabels={canManageOrgLabels}
+                />
               </Section>
             )}
             <Section title={focusAreaLabel}>
@@ -3037,6 +3105,7 @@ export default function SettingsPage({
                 orgId={organization.id}
                 label={focusAreaLabel.replace(/s$/, "")}
                 onChange={onFocusAreasChange}
+                canManageFocusAreas={canManageFocusAreas}
               />
             </Section>
           </div>
@@ -3049,6 +3118,7 @@ export default function SettingsPage({
               focusAreas={focusAreas}
               orgId={organization.id}
               onChange={onShiftCategoriesChange}
+              canManageShiftCodes={canManageShiftCodes}
             />
           </Section>
         )}
@@ -3064,6 +3134,7 @@ export default function SettingsPage({
               certificationLabel={certificationLabel}
               focusAreaLabel={focusAreaLabel}
               onChange={onShiftCodesChange}
+              canManageShiftCodes={canManageShiftCodes}
             />
           </Section>
         )}
@@ -3074,6 +3145,7 @@ export default function SettingsPage({
               indicatorTypes={indicatorTypes}
               orgId={organization.id}
               onChange={onIndicatorTypesChange}
+              canManageIndicatorTypes={canManageIndicatorTypes}
             />
           </Section>
         )}
@@ -3095,6 +3167,7 @@ export default function SettingsPage({
                     throw err;
                   }
                 }}
+                canEdit={canManageOrgLabels}
               />
             </Section>
             <Section title={roleLabel}>
@@ -3112,6 +3185,7 @@ export default function SettingsPage({
                     throw err;
                   }
                 }}
+                canEdit={canManageOrgLabels}
               />
             </Section>
           </div>

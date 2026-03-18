@@ -37,6 +37,7 @@ interface StaffViewProps {
   /** Full code map (including archived) for resolving historical labels. */
   shiftCodeMap?: Map<number, string>;
   canEditShifts?: boolean;
+  canManageEmployees?: boolean;
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
@@ -190,6 +191,7 @@ function MembersSection({
   onBench,
   onActivate,
   onAdd,
+  canManageEmployees,
   focusAreaLabel,
   certificationLabel,
   roleLabel,
@@ -205,6 +207,7 @@ function MembersSection({
   onBench: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onAdd: () => void;
+  canManageEmployees: boolean;
   focusAreaLabel: string;
   certificationLabel: string;
   roleLabel: string;
@@ -495,7 +498,7 @@ function MembersSection({
             </div>
           )}
 
-          {activeTab === "active" && sortBy === "seniority" && !searchQuery && !filterFocusArea && !filterRole && !isReordering && (
+          {activeTab === "active" && sortBy === "seniority" && !searchQuery && !filterFocusArea && !filterRole && !isReordering && canManageEmployees && (
             <button
               onClick={handleEnterReorder}
               className="dg-btn"
@@ -519,7 +522,7 @@ function MembersSection({
             </button>
           )}
 
-          {!isReordering && activeTab === "active" && (
+          {!isReordering && activeTab === "active" && canManageEmployees && (
             <button
               onClick={onAdd}
               className="dg-btn dg-btn-primary"
@@ -582,7 +585,7 @@ function MembersSection({
                 onDragOver={isReordering ? (e) => handleDragOver(e, i) : undefined}
                 onDrop={isReordering ? handleDrop : undefined}
                 onDragEnd={isReordering ? handleDragEnd : undefined}
-                onClick={!isReordering ? () => setExpandedEmpId(isExpanded ? null : emp.id) : undefined}
+                onClick={!isReordering && canManageEmployees ? () => setExpandedEmpId(isExpanded ? null : emp.id) : undefined}
                 style={{
                   display: "grid",
                   gridTemplateColumns: gridCols,
@@ -596,7 +599,7 @@ function MembersSection({
                   background: isExpanded
                     ? "var(--color-today-bg)"
                     : "#fff",
-                  cursor: isReordering ? "grab" : "pointer",
+                  cursor: isReordering ? "grab" : canManageEmployees ? "pointer" : "default",
                   transition: "all 0.15s ease",
                   opacity: isDragging ? 0.4 : 1,
                   borderLeft: isExpanded ? "4px solid var(--color-today-text)" : "4px solid transparent",
@@ -1785,6 +1788,7 @@ export default function StaffView({
             onBench={onBench}
             onActivate={onActivate}
             onAdd={onAdd}
+            canManageEmployees={canManageEmployees ?? false}
             focusAreaLabel={focusAreaLabel}
             certificationLabel={certificationLabel}
             roleLabel={roleLabel}

@@ -9,7 +9,16 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, usePermissions } from "@/hooks";
 
 function SettingsPageContent() {
-  const { canManageOrg, isSuperAdmin, isGridmaster, canManageOrgLabels } = usePermissions();
+  const { 
+    canManageOrg, 
+    isSuperAdmin, 
+    isGridmaster, 
+    canManageOrgLabels,
+    canManageFocusAreas,
+    canManageShiftCodes,
+    canManageIndicatorTypes,
+    canManageOrgSettings,
+  } = usePermissions();
   const {
     org, focusAreas, shiftCodes, shiftCategories, indicatorTypes,
     certifications, orgRoles, loading, loadError,
@@ -74,6 +83,10 @@ function SettingsPageContent() {
           isSuperAdmin={isSuperAdmin}
           isGridmaster={isGridmaster}
           canManageOrgLabels={canManageOrgLabels}
+          canManageFocusAreas={canManageFocusAreas}
+          canManageShiftCodes={canManageShiftCodes}
+          canManageIndicatorTypes={canManageIndicatorTypes}
+          canManageOrgSettings={canManageOrgSettings}
         />
       )}
     </div>

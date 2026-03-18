@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 
 function StaffPageContent() {
-  const { canEditShifts } = usePermissions();
+  const { canEditShifts, canManageEmployees, isLoading: permsLoading } = usePermissions();
   const {
     org, focusAreas, shiftCodes, certifications, orgRoles, shiftCodeMap,
     loading: refLoading, loadError,
@@ -24,7 +24,7 @@ function StaffPageContent() {
 
   const { setPageReady } = usePageTransition();
   const [showAddModal, setShowAddModal] = useState(false);
-  const isLoading = refLoading || empLoading;
+  const isLoading = refLoading || empLoading || permsLoading;
 
   useEffect(() => {
     if (!isLoading || (loadError && !org)) setPageReady();
@@ -87,6 +87,7 @@ function StaffPageContent() {
             shiftCodes={shiftCodes}
             shiftCodeMap={shiftCodeMap}
             canEditShifts={canEditShifts}
+            canManageEmployees={canManageEmployees}
             focusAreaLabel={org?.focusAreaLabel}
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}
