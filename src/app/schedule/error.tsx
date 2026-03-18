@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePageTransition } from "@/components/PageTransition";
 
 export default function ScheduleError({
   error,
@@ -9,9 +10,12 @@ export default function ScheduleError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { setPageReady } = usePageTransition();
+
   useEffect(() => {
     console.error("Schedule page error:", error);
-  }, [error]);
+    setPageReady();
+  }, [error, setPageReady]);
 
   return (
     <div
