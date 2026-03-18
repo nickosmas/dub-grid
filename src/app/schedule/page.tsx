@@ -1300,7 +1300,7 @@ function SchedulerContent() {
               indicatorTypes={indicatorTypes}
               certifications={certifications}
               orgRoles={orgRoles}
-              isCellInteractive={canEditNotes}
+              isCellInteractive={canEditShifts || canEditNotes}
               activeIndicatorIdsForKey={activeIndicatorIdsForKey}
               activeFocusArea={activeFocusArea}
               getCustomShiftTimes={getCustomShiftTimes}
