@@ -896,18 +896,17 @@ function SchedulerContent() {
       );
 
       if (generated.length > 0) {
-        setShifts(prev => {
-          const next = { ...prev };
-          for (const { empId, date, label, shiftCodeId } of generated) {
-            next[`${empId}_${date}`] = {
-              label, shiftCodeIds: [shiftCodeId], isDraft: true, fromRecurring: true,
-              draftKind: 'new', publishedShiftCodeIds: [], publishedLabel: '',
-            };
-          }
-          return next;
-        });
+        const shiftUpdates: Record<string, ShiftMap[string]> = {};
+        for (const { empId, date, label, shiftCodeId } of generated) {
+          const key = `${empId}_${date}`;
+          shiftUpdates[key] = {
+            label, shiftCodeIds: [shiftCodeId], isDraft: true, fromRecurring: true,
+            draftKind: 'new', publishedShiftCodeIds: [], publishedLabel: '',
+          };
+        }
+        setShifts(prev => ({ ...prev, ...shiftUpdates }));
         toast.success(`Recurring schedule applied (${generated.length} shifts)`);
-        broadcastDraftChanged();
+        broadcastDraftChanged({ shifts: shiftUpdates });
       } else {
         toast.info("No empty slots to fill");
       }
