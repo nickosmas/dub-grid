@@ -419,7 +419,14 @@ function GridmasterLogin() {
         setMessage("Navigation timed out. Please try refreshing the page.");
       }, 8000);
     } catch (err: any) {
-      setMessage(err.message || "An error occurred");
+      const msg = err.message?.toLowerCase() ?? "";
+      if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
+        setMessage("Invalid email or password.");
+      } else if (msg.includes("fetch") || msg.includes("network")) {
+        setMessage("Network error — please check your connection.");
+      } else {
+        setMessage(err.message || "An error occurred");
+      }
       setLoading(false);
     }
   }
@@ -699,7 +706,16 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         setIsError(true);
       }, 8000);
     } catch (err: any) {
-      setMessage(err.message || "An error occurred");
+      const msg = err.message?.toLowerCase() ?? "";
+      if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
+        setMessage("Invalid email or password. Please try again.");
+      } else if (msg.includes("email not confirmed")) {
+        setMessage("Your email has not been confirmed. Check your inbox for a confirmation link.");
+      } else if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
+        setMessage("Network error — please check your connection and try again.");
+      } else {
+        setMessage(err.message || "An unexpected error occurred. Please try again.");
+      }
       setIsError(true);
       setLoading(false);
     }

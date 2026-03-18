@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getInitials, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
 import { borderColor } from "@/lib/colors";
+import { BOX_SHADOW_CARD } from "@/lib/constants";
 import { Employee, FocusArea, ShiftCode, NamedItem } from "@/types";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
 import * as db from "@/lib/db";
@@ -31,7 +32,6 @@ interface StaffViewProps {
   onBench: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onAdd: () => void;
-  onRecurringSchedule?: (emp: Employee) => void;
   orgId?: string;
   shiftCodes?: ShiftCode[];
   /** Full code map (including archived) for resolving historical labels. */
@@ -217,10 +217,15 @@ function MembersSection({
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  // Search and Filter state
+  // Search, Filter, and Pagination state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
   const [filterRole, setFilterRole] = useState<number | null>(null);
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+
+  // Reset to page 1 when filters/sort/tab change
+  useEffect(() => { setPage(1); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy]);
 
   const rawList = useMemo(() => {
     const list = activeTab === "active" ? employees : activeTab === "benched" ? benchedEmployees : terminatedEmployees;
@@ -264,6 +269,12 @@ function MembersSection({
     list.splice(dragOverIdx, 0, item);
     return list;
   }, [baseList, draggedIdx, dragOverIdx, isReordering]);
+
+  const totalPages = Math.ceil(displayList.length / PAGE_SIZE);
+  const paginatedList = useMemo(
+    () => displayList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [displayList, page],
+  );
 
   const handleEnterReorder = useCallback(() => {
     setIsReordering(true);
@@ -523,6 +534,7 @@ function MembersSection({
 
       {/* Table & Empty States */}
       {rawList.length > 0 ? (
+        <>
         <div
           style={{
             background: "#fff",
@@ -558,7 +570,7 @@ function MembersSection({
         </div>
 
         {/* Employee rows */}
-        {displayList.map((emp, i) => {
+        {paginatedList.map((emp, i) => {
           const isExpanded = !isReordering && emp.id === expandedEmpId;
           const isDragging = isReordering && draggedIdx !== null && baseList[draggedIdx]?.id === emp.id;
           const isDropTarget = isReordering && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
@@ -615,7 +627,7 @@ function MembersSection({
                       <rect x="9" y="10" width="2" height="2" rx="1"/>
                     </svg>
                   )}
-                  <span style={{ fontSize: 13, fontWeight: 700 }}>{i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{(page - 1) * PAGE_SIZE + i + 1}</span>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -748,6 +760,41 @@ function MembersSection({
           );
         })}
         </div>
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 24px",
+            fontSize: 13,
+            color: "var(--color-text-muted)",
+          }}>
+            <span style={{ fontSize: 12 }}>
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, displayList.length)} of {displayList.length}
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="dg-btn"
+                style={{ padding: "5px 12px", fontSize: 12, opacity: page === 1 ? 0.4 : 1 }}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="dg-btn"
+                style={{ padding: "5px 12px", fontSize: 12, opacity: page === totalPages ? 0.4 : 1 }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+        </>
       ) : (
         /* Empty state with dashed borders */
         <div style={{
@@ -1518,7 +1565,7 @@ function FocusAreasSection({
             borderRadius: 12,
             border: "1px solid var(--color-border)",
             overflow: "hidden",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            boxShadow: BOX_SHADOW_CARD,
           }}
         >
           <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -1637,7 +1684,7 @@ function NamedItemsSection({
             borderRadius: 12,
             border: "1px solid var(--color-border)",
             overflow: "hidden",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            boxShadow: BOX_SHADOW_CARD,
           }}
         >
           <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -1665,7 +1712,6 @@ export default function StaffView({
   onBench,
   onActivate,
   onAdd,
-  onRecurringSchedule,
   orgId,
   shiftCodes,
   shiftCodeMap,

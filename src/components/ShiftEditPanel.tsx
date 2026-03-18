@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { formatDate, getCertName } from "@/lib/utils";
+import { formatDate, getCertName, formatRelativeTime } from "@/lib/utils";
 import { EditModalState, ShiftCode, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind } from "@/types";
 import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
@@ -45,6 +45,13 @@ interface ShiftEditPanelProps {
   focusAreas?: FocusArea[];
   /** All certifications — used to resolve certificationId to names */
   certifications?: NamedItem[];
+  /** Audit metadata — only populated for admin+ users. */
+  auditInfo?: {
+    createdByName: string | null;
+    updatedByName: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+  } | null;
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
@@ -339,6 +346,7 @@ export default function ShiftEditPanel({
   draftKind = null,
   focusAreas = [],
   certifications = [],
+  auditInfo,
 }: ShiftEditPanelProps) {
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
@@ -1003,6 +1011,41 @@ export default function ShiftEditPanel({
 
               {/* Notes / Indicators — single shift only; multi-shift shows inline per pill */}
               {currentLabels.length <= 1 && renderNotesSection()}
+
+              {/* Audit metadata footer — admin+ only */}
+              {auditInfo && (auditInfo.createdByName || auditInfo.updatedByName) && (
+                <div
+                  style={{
+                    marginTop: 20,
+                    paddingTop: 12,
+                    borderTop: "1px solid var(--color-border)",
+                    fontSize: 11,
+                    color: "var(--color-text-subtle)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}
+                >
+                  {auditInfo.createdByName && auditInfo.createdAt && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontWeight: 600 }}>Created by</span>
+                      <span>{auditInfo.createdByName}</span>
+                      <span style={{ color: "var(--color-text-muted)" }}>
+                        {formatRelativeTime(auditInfo.createdAt)}
+                      </span>
+                    </div>
+                  )}
+                  {auditInfo.updatedByName && auditInfo.updatedAt && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontWeight: 600 }}>Updated by</span>
+                      <span>{auditInfo.updatedByName}</span>
+                      <span style={{ color: "var(--color-text-muted)" }}>
+                        {formatRelativeTime(auditInfo.updatedAt)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Remove shift */}
               {allowShiftEdits && hasActiveShift && (

@@ -20,7 +20,7 @@ export default function SuperAdminLoginPage() {
     setMessage("");
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });

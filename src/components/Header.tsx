@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useLogout, usePermissions } from "@/hooks";
 import { usePageTransition } from "@/components/PageTransition";
+import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
@@ -66,32 +67,32 @@ export default function Header({ orgName }: HeaderProps) {
     return false;
   });
 
+  const { user: authUser } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [userName, setUserName] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(
+    () => (typeof window !== "undefined" ? sessionStorage.getItem("dg_user_name") : null),
+  );
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const cached = sessionStorage.getItem("dg_user_name");
-    if (cached) setUserName(cached);
-
+    if (!authUser) return;
+    let cancelled = false;
     void (async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("first_name, last_name")
-          .eq("id", user.id)
-          .single();
-        const first = profile?.first_name?.trim() || "";
-        const last = profile?.last_name?.trim() || "";
-        const full = [first, last].filter(Boolean).join(" ");
-        const name = full || user.email?.split("@")[0] || null;
-        setUserName(name);
-        if (name) sessionStorage.setItem("dg_user_name", name);
-      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", authUser.id)
+        .single();
+      if (cancelled) return;
+      const first = profile?.first_name?.trim() || "";
+      const last = profile?.last_name?.trim() || "";
+      const full = [first, last].filter(Boolean).join(" ");
+      const name = full || authUser.email?.split("@")[0] || null;
+      setUserName(name);
+      if (name) sessionStorage.setItem("dg_user_name", name);
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [authUser]);
 
   useEffect(() => {
     if (!menuOpen) return;

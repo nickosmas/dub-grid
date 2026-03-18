@@ -8,6 +8,7 @@ import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, Organ
 import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
+import { BOX_SHADOW_CARD } from "@/lib/constants";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -81,7 +82,7 @@ function Section({
         borderRadius: 12,
         border: "1px solid var(--color-border)",
         overflow: "hidden",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        boxShadow: BOX_SHADOW_CARD,
         width: "100%",
         maxWidth,
         flexShrink: 0,
@@ -803,7 +804,7 @@ function FocusAreasSettings({
           borderRadius: 12,
           border: isEditing ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
           overflow: "hidden",
-          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : BOX_SHADOW_CARD,
           transition: "border-color 0.15s, box-shadow 0.15s",
           marginBottom: 4,
         }}
@@ -1624,7 +1625,7 @@ function StringListSettings({
           borderRadius: 12,
           border: isEditing ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
           overflow: "hidden",
-          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : BOX_SHADOW_CARD,
           transition: "border-color 0.15s, box-shadow 0.15s",
         }}
       >

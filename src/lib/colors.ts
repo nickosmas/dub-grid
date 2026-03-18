@@ -43,3 +43,21 @@ export function getPresetByBg(bgHex: string): PredefinedColor {
 
 /** Legacy mapping for off-days and default transparent assignments */
 export const TRANSPARENT_BORDER = "transparent";
+
+// ── Shared grid constants ────────────────────────────────────────────────────
+
+/** Certification badge colors by abbreviation. */
+export const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
+  JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },
+  "CSN III": { bg: "#DBEAFE", text: "#1D4ED8" },
+  "CSN II": { bg: "#CCFBF1", text: "#0E7490" },
+  STAFF: { bg: "#F1F5F9", text: "#475569" },
+};
+export const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
+
+/** Draft-mode cell border colors by change kind. */
+export const DRAFT_BORDER_COLORS: Record<string, string> = {
+  new: '#16A34A',
+  modified: '#D97706',
+  deleted: '#DC2626',
+};

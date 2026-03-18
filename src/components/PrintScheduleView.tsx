@@ -3,24 +3,16 @@
 import { useMemo, useRef } from "react";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem } from "@/types";
 import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
-import { DAY_LABELS } from "@/lib/constants";
+import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { borderColor } from "@/lib/colors";
+import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-const DESIGNATION_COLORS: Record<string, { bg: string; text: string }> = {
-  JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },
-  "CSN III": { bg: "#DBEAFE", text: "#1D4ED8" },
-  "CSN II": { bg: "#CCFBF1", text: "#0E7490" },
-  STAFF: { bg: "#F1F5F9", text: "#475569" },
-};
-const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
 
 function getFocusAreaInitials(name: string): string {
   return name
@@ -162,7 +154,7 @@ function PrintSection({
           border: "1px solid #CBD5E1",
           borderRadius: 12,
           overflow: "hidden",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: BOX_SHADOW_CARD,
         }}
       >
         {/* Header row */}
@@ -364,7 +356,7 @@ function PrintSection({
                               bottom: "0.25em",
                               left: "0.5em",
                               display: "flex",
-                              flexDirection: "column",
+                              flexDirection: "row",
                               gap: "0.15em",
                               alignItems: "stretch",
                             }}
@@ -388,13 +380,13 @@ function PrintSection({
                                     flex: 1,
                                     background: isCross ? "#ffffff" : style.color,
                                     border: `1px solid ${borderColor(style.text)}`,
-                                    borderRadius: 3,
+                                    borderRadius: 4,
                                     color: style.text,
                                     display: "flex",
-                                    flexDirection: hasTime ? "row" : "column",
+                                    flexDirection: "column",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    gap: hasTime ? "0.25em" : 0,
+                                    gap: 0,
                                     fontWeight: 800,
                                     position: "relative",
                                     lineHeight: 1,

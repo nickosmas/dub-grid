@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { fetchAuditLog } from "@/lib/db";
 import type { AuditLogEntry } from "@/types";
+import { BOX_SHADOW_CARD } from "@/lib/constants";
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
   borderRadius: 12,
   border: "1px solid var(--color-border)",
   overflow: "hidden",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+  boxShadow: BOX_SHADOW_CARD,
 };
 
 const thStyle: React.CSSProperties = {

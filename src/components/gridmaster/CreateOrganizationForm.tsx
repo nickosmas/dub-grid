@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createOrganization, assignOrgRoleByEmail } from "@/lib/db";
 import type { Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import { BOX_SHADOW_CARD } from "@/lib/constants";
 
 const TIMEZONES = [
   "America/New_York",
@@ -47,7 +48,7 @@ const sectionStyle: React.CSSProperties = {
   borderRadius: 12,
   border: "1px solid var(--color-border)",
   overflow: "hidden",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+  boxShadow: BOX_SHADOW_CARD,
 };
 
 const sectionHeaderStyle: React.CSSProperties = {

@@ -32,7 +32,7 @@ vi.mock("@/hooks", () => ({
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
-  useAuth: vi.fn(),
+  useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
 }));
 
 vi.mock("next/navigation", () => ({

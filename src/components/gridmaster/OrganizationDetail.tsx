@@ -18,6 +18,7 @@ import type {
 } from "@/types";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
+import { BOX_SHADOW_CARD } from "@/lib/constants";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 
 type Tab = "overview" | "users" | "employees" | "config" | "activity";
@@ -37,7 +38,7 @@ const sectionStyle: React.CSSProperties = {
   borderRadius: 12,
   border: "1px solid var(--color-border)",
   overflow: "hidden",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+  boxShadow: BOX_SHADOW_CARD,
 };
 
 const sectionHeaderStyle: React.CSSProperties = {

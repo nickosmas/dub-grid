@@ -1,16 +1,11 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, DraftKind } from "@/types";
-import { borderColor } from "@/lib/colors";
-
-const DRAFT_BORDER_COLORS: Record<string, string> = {
-  new: '#16A34A',
-  modified: '#D97706',
-  deleted: '#DC2626',
-};
+import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
 
 interface MonthViewProps {
   monthStart: Date;
@@ -25,6 +20,16 @@ interface MonthViewProps {
   activeFocusArea?: number | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
 }
+
+type DayCellData = {
+  date: Date;
+  dateKey: string;
+  isToday: boolean;
+  categoryCounts: Map<number, number>;
+  byFocusArea: Map<string, { name: string; shift: string; style: ShiftCode; draftKind: DraftKind }[]>;
+  activeCats: ShiftCategory[];
+  focusAreaSections: string[];
+};
 
 function buildMonthCells(monthStart: Date): (Date | null)[] {
   const year = monthStart.getFullYear();
@@ -46,6 +51,148 @@ function fmtCount(n: number): string {
 function shortName(name: string): string {
   const parts = name.trim().split(" ");
   return parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
+}
+
+/* ── Day Popover (portal-based) ── */
+function DayPopover({
+  anchorEl,
+  data,
+  focusAreaColorMap,
+  onClose,
+}: {
+  anchorEl: HTMLElement;
+  data: DayCellData;
+  focusAreaColorMap: Record<string, { bg: string; text: string }>;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useLayoutEffect(() => {
+    const rect = anchorEl.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const flipUp = spaceBelow < 260;
+    setMenuStyle({
+      position: "absolute",
+      top: flipUp ? undefined : rect.bottom + window.scrollY + 4,
+      bottom: flipUp ? window.innerHeight - rect.top - window.scrollY + 4 : undefined,
+      left: Math.max(8, rect.left + window.scrollX),
+      width: 300,
+      maxHeight: Math.min(flipUp ? rect.top - 12 : spaceBelow, 500),
+      zIndex: 9999,
+    });
+  }, [anchorEl]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target) && !anchorEl.contains(target)) {
+        onClose();
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose, anchorEl]);
+
+  if (!mounted) return null;
+
+  const { date, activeCats, categoryCounts, focusAreaSections, byFocusArea } = data;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={{
+        ...menuStyle,
+        background: "#fff",
+        border: "1px solid var(--color-border)",
+        borderRadius: 12,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Header */}
+      <div style={{
+        padding: "10px 14px",
+        borderBottom: "1px solid var(--color-border-light)",
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)" }}>
+          {date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+        </span>
+      </div>
+
+      {/* Employee breakdown */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}>
+        {focusAreaSections.length === 0 ? (
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", padding: "8px 0" }}>
+            No shifts scheduled
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {focusAreaSections.map((focusArea) => {
+              const workers = byFocusArea.get(focusArea)!;
+              const wc = focusAreaColorMap[focusArea] ?? { bg: "#F1F5F9", text: "#475569" };
+              return (
+                <div key={focusArea}>
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: wc.text,
+                    background: wc.bg,
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                    marginBottom: 5,
+                  }}>
+                    {focusArea}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {workers.map(({ name, shift, style: s, draftKind: dk }, ni) => (
+                      <div key={ni} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{
+                          background: s.color,
+                          border: dk ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}` : `1px solid ${borderColor(s.text)}`,
+                          borderRadius: 4,
+                          padding: dk ? "1px 5px" : "2px 6px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: s.text,
+                          opacity: dk === 'deleted' ? 0.5 : 1,
+                          textDecoration: dk === 'deleted' ? 'line-through' : 'none',
+                        }}>
+                          {shift}
+                        </div>
+                        <span style={{
+                          fontSize: 11,
+                          color: "var(--color-text-secondary)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}>
+                          {shortName(name)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 export default function MonthView({
@@ -93,6 +240,98 @@ export default function MonthView({
     return 99;
   };
 
+  // Popover state
+  const [popoverDateKey, setPopoverDateKey] = useState<string | null>(null);
+  const popoverAnchorRef = useRef<HTMLElement | null>(null);
+
+  const handleCellClick = useCallback((dateKey: string, el: HTMLElement) => {
+    if (popoverDateKey === dateKey) {
+      setPopoverDateKey(null);
+      popoverAnchorRef.current = null;
+    } else {
+      setPopoverDateKey(dateKey);
+      popoverAnchorRef.current = el;
+    }
+  }, [popoverDateKey]);
+
+  const closePopover = useCallback(() => {
+    setPopoverDateKey(null);
+    popoverAnchorRef.current = null;
+  }, []);
+
+  // Pre-compute all day data so the popover can access it
+  const dayDataMap = useMemo(() => {
+    const map = new Map<string, DayCellData>();
+    for (const date of cells) {
+      if (!date) continue;
+      const dateKey = formatDateKey(date);
+      const isToday = dateKey === todayKey;
+
+      const categoryCounts = new Map<number, number>();
+      const byFocusArea = new Map<
+        string,
+        { name: string; shift: string; style: ShiftCode; draftKind: DraftKind }[]
+      >();
+
+      filteredEmployees.forEach((emp) => {
+        const combinedLabel = shiftForKey(emp.id, date);
+        if (!combinedLabel || combinedLabel === "X" || combinedLabel === "OFF") return;
+
+        const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+        const empHomeFas = focusAreas.filter(fa => emp.focusAreaIds.includes(fa.id));
+        const shiftLabels = combinedLabel.split("/");
+        shiftLabels.forEach((label, li) => {
+          const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+          const style = codeEntry ?? getShiftStyle(label, empHomeFas[0]?.name);
+
+          // Skip off-day codes entirely
+          if (style.isOffDay) return;
+
+          if (style.categoryId != null) {
+            categoryCounts.set(style.categoryId, (categoryCounts.get(style.categoryId) ?? 0) + 1);
+          }
+
+          const dk = draftKindForKey?.(emp.id, date) ?? null;
+
+          if (style.focusAreaId != null) {
+            // Focus-area-specific code: count under that focus area
+            const fa = focusAreas.find(f => f.id === style.focusAreaId);
+            if (!fa) return;
+            const list = byFocusArea.get(fa.name) ?? [];
+            list.push({ name: emp.name, shift: label, style, draftKind: dk });
+            byFocusArea.set(fa.name, list);
+          } else {
+            // General/shared code: count under the employee's home focus area(s)
+            for (const fa of empHomeFas) {
+              const list = byFocusArea.get(fa.name) ?? [];
+              list.push({ name: emp.name, shift: label, style, draftKind: dk });
+              byFocusArea.set(fa.name, list);
+            }
+          }
+        });
+      });
+
+      byFocusArea.forEach((list) =>
+        list.sort((a, b) => shiftSortOrder(a.style) - shiftSortOrder(b.style)),
+      );
+
+      const activeCats = shiftCategories
+        .filter((cat) => (categoryCounts.get(cat.id) ?? 0) > 0)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+      const focusAreaSections = focusAreaNames.filter(
+        (w) =>
+          byFocusArea.has(w) &&
+          (activeFocusArea === null || w === focusAreas.find(fa => fa.id === activeFocusArea)?.name),
+      );
+
+      map.set(dateKey, { date, dateKey, isToday, categoryCounts, byFocusArea, activeCats, focusAreaSections });
+    }
+    return map;
+  }, [cells, todayKey, filteredEmployees, shiftForKey, shiftCodeIdsForKey, getShiftStyle, focusAreas, shiftCodeById, shiftCategories, focusAreaNames, activeFocusArea, draftKindForKey, categoryMap]);
+
+  const popoverData = popoverDateKey ? dayDataMap.get(popoverDateKey) : null;
+
   return (
     <div>
       {/* Day-of-week column headers */}
@@ -138,85 +377,42 @@ export default function MonthView({
                 style={{
                   background: "transparent",
                   borderRadius: 10,
-                  minHeight: 80,
+                  minHeight: 64,
                 }}
               />
             );
           }
 
           const dateKey = formatDateKey(date);
-          const isToday = dateKey === todayKey;
-
-          // Per-category counts (keyed by categoryId)
-          const categoryCounts = new Map<number, number>();
-          const byFocusArea = new Map<
-            string,
-            { name: string; shift: string; style: ShiftCode; draftKind: DraftKind }[]
-          >();
-
-          filteredEmployees.forEach((emp) => {
-            const combinedLabel = shiftForKey(emp.id, date);
-            if (!combinedLabel || combinedLabel === "X" || combinedLabel === "OFF")
-              return;
-
-            const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
-            const primaryFa = focusAreas.find(fa => emp.focusAreaIds.includes(fa.id));
-            const primaryFaName = primaryFa?.name;
-            const shiftLabels = combinedLabel.split("/");
-            shiftLabels.forEach((label, li) => {
-              // Resolve by shift code ID first, then by label + focus area context
-              const byId = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
-              const style = byId ?? getShiftStyle(label, primaryFaName);
-              if (style.categoryId != null) {
-                categoryCounts.set(
-                  style.categoryId,
-                  (categoryCounts.get(style.categoryId) ?? 0) + 1,
-                );
-              }
-              if (!primaryFaName) return;
-              const list = byFocusArea.get(primaryFaName) ?? [];
-              const dk = draftKindForKey?.(emp.id, date) ?? null;
-              list.push({ name: emp.name, shift: label, style, draftKind: dk });
-              byFocusArea.set(primaryFaName, list);
-            });
-          });
-
-          byFocusArea.forEach((list) =>
-            list.sort((a, b) => shiftSortOrder(a.style) - shiftSortOrder(b.style)),
-          );
-
-          // Categories present on this day, in sort order
-          const activeCats = shiftCategories
-            .filter((cat) => (categoryCounts.get(cat.id) ?? 0) > 0)
-            .sort((a, b) => a.sortOrder - b.sortOrder);
-
-          const focusAreaSections = focusAreaNames.filter(
-            (w) =>
-              byFocusArea.has(w) &&
-              (activeFocusArea === null || w === focusAreas.find(fa => fa.id === activeFocusArea)?.name),
-          );
+          const data = dayDataMap.get(dateKey)!;
+          const { isToday, activeCats, categoryCounts, focusAreaSections, byFocusArea } = data;
+          const isOpen = popoverDateKey === dateKey;
 
           return (
             <div
               key={dateKey}
+              onClick={(e) => handleCellClick(dateKey, e.currentTarget)}
               style={{
                 background: isToday ? "#EFF6FF" : "#fff",
-                border: isToday
-                  ? "2px solid var(--color-today-text)"
-                  : "1px solid var(--color-border)",
+                border: isOpen
+                  ? "2px solid var(--color-primary, #6366F1)"
+                  : isToday
+                    ? "2px solid var(--color-today-text)"
+                    : "1px solid var(--color-border)",
                 borderRadius: 10,
-                padding: "9px 10px 8px",
-                minHeight: 90,
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
+                minHeight: 64,
+                boxShadow: isOpen
+                  ? "0 0 0 2px rgba(99, 102, 241, 0.15)"
+                  : "0 1px 3px rgba(0,0,0,0.04)",
+                cursor: "pointer",
+                transition: "border-color 0.1s, box-shadow 0.1s",
               }}
             >
-              {/* Date number + per-category coverage badges */}
+              {/* Date number */}
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 6,
+                  marginBottom: focusAreaSections.length > 0 ? 5 : 0,
                 }}
               >
                 <div
@@ -231,132 +427,72 @@ export default function MonthView({
                     fontSize: 13,
                     fontWeight: 700,
                     color: isToday ? "#fff" : "var(--color-text-secondary)",
-                    flexShrink: 0,
                   }}
                 >
                   {date.getDate()}
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 3,
-                    flexWrap: "wrap",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  {activeCats.map((cat) => (
-                    <span
-                      key={cat.id}
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        background: cat.color,
-                        color: "var(--color-text-secondary)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 4,
-                        padding: "1px 5px",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {cat.name} {fmtCount(categoryCounts.get(cat.id) ?? 0)}
-                    </span>
-                  ))}
-                </div>
               </div>
 
+              {/* Focus areas + total shift count */}
               {focusAreaSections.length > 0 && (
-                <div
-                  style={{
-                    height: 1,
-                    background: "var(--color-border-light)",
-                    marginBottom: 5,
-                  }}
-                />
-              )}
-
-              {/* Workers grouped by focus area */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {focusAreaSections.map((focusArea) => {
-                  const workers = byFocusArea.get(focusArea)!;
-                  const wc = focusAreaColorMap[focusArea] ?? {
-                    bg: "#F1F5F9",
-                    text: "#475569",
-                  };
-                  const abbr = focusArea
-                    .split(" ")
-                    .map((p) => p[0])
-                    .join("")
-                    .toUpperCase();
-                  return (
-                    <div key={focusArea}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {focusAreaSections.map((focusArea) => {
+                    const workers = byFocusArea.get(focusArea)!;
+                    const wc = focusAreaColorMap[focusArea] ?? { bg: "#F1F5F9", text: "#475569" };
+                    return (
                       <div
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: "0.06em",
-                          background: wc.bg,
-                          color: wc.text,
-                          borderRadius: 3,
-                          padding: "1px 5px",
-                          marginBottom: 3,
-                          display: "inline-block",
-                        }}
-                      >
-                        {abbr}
-                      </div>
-                      <div
+                        key={focusArea}
                         style={{
                           display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 4,
                         }}
                       >
-                        {workers.map(({ name, shift, style: s, draftKind: dk }, ni) => (
-                          <div
-                            key={ni}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                            }}
-                          >
-                            <div
-                                key={ni}
-                                style={{
-                                  background: s.color,
-                                  border: dk ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}` : `1px solid ${borderColor(s.text)}`,
-                                  borderRadius: 4,
-                                  padding: dk ? "1px 5px" : "2px 6px",
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: s.text,
-                                  opacity: dk === 'deleted' ? 0.5 : 1,
-                                  textDecoration: dk === 'deleted' ? 'line-through' : 'none',
-                                }}
-                              >{shift}
-                            </div>
-                            <span
-                              style={{
-                                fontSize: 10.5,
-                                color: "var(--color-text-secondary)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {shortName(name)}
-                            </span>
-                          </div>
-                        ))}
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: wc.text,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {focusArea}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            background: wc.bg,
+                            color: wc.text,
+                            borderRadius: 4,
+                            padding: "1px 5px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {workers.length}
+                        </span>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+
+      {/* Day popover */}
+      {popoverData && popoverAnchorRef.current && (
+        <DayPopover
+          anchorEl={popoverAnchorRef.current}
+          data={popoverData}
+          focusAreaColorMap={focusAreaColorMap}
+          onClose={closePopover}
+        />
+      )}
     </div>
   );
 }

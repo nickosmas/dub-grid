@@ -72,7 +72,7 @@ describe("Login page submit states", () => {
     submitForm(container);
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid login credentials")).toBeInTheDocument();
+      expect(screen.getByText("Invalid email or password. Please try again.")).toBeInTheDocument();
     });
 
     // Button must be re-enabled — loading=false on error

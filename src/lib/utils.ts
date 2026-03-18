@@ -1,3 +1,12 @@
+/** Shallow equality check for sorted number arrays (avoids JSON.stringify). */
+export function arraysEqual(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export function getWeekStart(date: Date): Date {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -53,7 +62,7 @@ export function fmt12h(time24: string | null | undefined): string {
 
 // ── ID → display resolution helpers ─────────────────────────────────────────
 
-import type { NamedItem, FocusArea } from "@/types";
+import type { NamedItem } from "@/types";
 
 export function getCertName(id: number | null, certs: NamedItem[]): string {
   if (id == null) return "";
@@ -65,19 +74,9 @@ export function getCertAbbr(id: number | null, certs: NamedItem[]): string {
   return certs.find((c) => c.id === id)?.abbr ?? "";
 }
 
-export function getRoleNames(ids: number[], roles: NamedItem[]): string[] {
-  const map = new Map(roles.map((r) => [r.id, r.name]));
-  return ids.map((id) => map.get(id)).filter((n): n is string => !!n);
-}
-
 export function getRoleAbbrs(ids: number[], roles: NamedItem[]): string[] {
   const map = new Map(roles.map((r) => [r.id, r.abbr]));
   return ids.map((id) => map.get(id)).filter((a): a is string => !!a);
-}
-
-export function getFocusAreaNames(ids: number[], areas: FocusArea[]): string[] {
-  const map = new Map(areas.map((a) => [a.id, a.name]));
-  return ids.map((id) => map.get(id)).filter((n): n is string => !!n);
 }
 
 export function getInitials(name: string): string {
@@ -90,4 +89,21 @@ export function getInitials(name: string): string {
   const firstLetter = parts[0].replace(/[^a-zA-Z]/g, "")[0] ?? "";
   const lastLetter = parts[parts.length - 1].replace(/[^a-zA-Z]/g, "")[0] ?? "";
   return (firstLetter + lastLetter).toUpperCase();
+}
+
+/** Format a timestamp as a relative string: "just now", "5 min ago", "2 hr ago", "3 days ago", or "Mar 15". */
+export function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMs = Math.max(0, now - then);
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  if (hours < 24) return `${hours} hr ago`;
+  if (days < 7) return `${days} day${days !== 1 ? "s" : ""} ago`;
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

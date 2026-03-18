@@ -75,16 +75,19 @@ describe("Toolbar — schedule mode rendering", () => {
   });
 });
 
-describe("Toolbar — Print button", () => {
-  it("renders a Print button in schedule mode", () => {
-    render(<Toolbar {...defaultProps} />);
+describe("Toolbar — Tools dropdown", () => {
+  it("renders Print inside Tools dropdown", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
     expect(screen.getByRole("button", { name: /Print/i })).toBeInTheDocument();
   });
 
-  it("Print button calls onPrintOpen when clicked", async () => {
+  it("Print calls onPrintOpen when clicked from Tools dropdown", async () => {
     const user = userEvent.setup();
     const onPrintOpen = vi.fn();
     render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} />);
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
     await user.click(screen.getByRole("button", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
   });

@@ -93,7 +93,7 @@ export default function CustomSelect<T extends string | number>({
           fontFamily: "inherit",
           whiteSpace: "nowrap",
           textAlign: "left",
-          transition: "border-color 150ms ease, box-shadow 150ms ease",
+          transition: "box-shadow 150ms ease",
           boxShadow: open ? "0 0 0 3px rgba(56,189,248,0.15)" : undefined,
           borderColor: open ? "var(--color-border-focus)" : "var(--color-border)",
           opacity: disabled ? 0.7 : 1,

@@ -36,17 +36,6 @@ const defaultCertifications = [
   { id: 4, orgId: "org-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
   { id: 5, orgId: "org-1", name: "—", abbr: "—", sortOrder: 4 },
 ];
-const defaultRoles = [
-  { id: 1, orgId: "org-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },
-  { id: 2, orgId: "org-1", name: "DVCSN", abbr: "DVCSN", sortOrder: 1 },
-  { id: 3, orgId: "org-1", name: "Supv", abbr: "Supv", sortOrder: 2 },
-  { id: 4, orgId: "org-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
-  { id: 5, orgId: "org-1", name: "CN", abbr: "CN", sortOrder: 4 },
-  { id: 6, orgId: "org-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
-  { id: 7, orgId: "org-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
-  { id: 8, orgId: "org-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
-];
-
 function renderModal(
   overrides: {
     onAdd?: ReturnType<typeof vi.fn>;
@@ -55,7 +44,7 @@ function renderModal(
 ) {
   const onAdd = overrides.onAdd ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
-  render(<AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={onClose} />);
+  render(<AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />);
   return { onAdd, onClose };
 }
 
@@ -69,7 +58,7 @@ describe("AddEmployeeModal", () => {
   describe("Rendering", () => {
     it("renders name inputs with 'Full name' placeholder (one per default row)", () => {
       const { container } = render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={vi.fn()} onClose={vi.fn()} />,
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
       );
       const inputs = getRowInputs(container);
       // 3 rows by default
@@ -86,7 +75,7 @@ describe("AddEmployeeModal", () => {
 
     it("renders focus area toggle buttons for each focus area (in at least the first row)", () => {
       const { container } = render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={vi.fn()} onClose={vi.fn()} />,
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
       );
       // At minimum one "North" and one "South" button should be present (per-row)
       const northBtns = Array.from(container.querySelectorAll("button")).filter(
@@ -120,7 +109,7 @@ describe("AddEmployeeModal", () => {
         const onAdd = vi.fn();
         const onClose = vi.fn();
         const { container } = render(
-          <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={onClose} />,
+          <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />,
         );
         return { onAdd, container };
       })();
@@ -146,7 +135,7 @@ describe("AddEmployeeModal", () => {
     it("valid submission calls onAdd with correct shape (array of employees, no id or seniority)", async () => {
       const onAdd = vi.fn();
       const { container } = render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={vi.fn()} />,
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
       const inputs = getRowInputs(container);
       await userEvent.type(inputs[0], "Alice Smith");
@@ -180,7 +169,7 @@ describe("AddEmployeeModal", () => {
     it("clicking a focus area button selects it; resulting submission includes that focus area", async () => {
       const onAdd = vi.fn();
       const { container } = render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={vi.fn()} />,
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
       const inputs = getRowInputs(container);
       await userEvent.type(inputs[0], "Test");
@@ -201,7 +190,7 @@ describe("AddEmployeeModal", () => {
     it("clicking a focus area button twice returns to original state", async () => {
       const onAdd = vi.fn();
       const { container } = render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} roles={defaultRoles} onAdd={onAdd} onClose={vi.fn()} />,
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
       const inputs = getRowInputs(container);
       await userEvent.type(inputs[0], "Test");
@@ -269,8 +258,7 @@ describe("AddEmployeeModal", () => {
               <AddEmployeeModal
                 focusAreas={testFocusAreas}
                 certifications={defaultCertifications}
-                roles={defaultRoles}
-                onAdd={onAdd}
+                               onAdd={onAdd}
                 onClose={onClose}
               />,
             );
