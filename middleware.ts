@@ -140,36 +140,49 @@ export async function middleware(req: NextRequest) {
   // from the caller's profile so route guards still work.
   // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
   const isGridmaster = claims.platform_role === "gridmaster";
+  const subdomainMismatch = !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
+
   if (
     !claims.platform_role ||
     !claims.org_role ||
-    (!isGridmaster && (!claims.org_id || !claims.org_slug))
+    (!isGridmaster && (!claims.org_id || !claims.org_slug)) ||
+    subdomainMismatch
   ) {
-    let query = supabase
+    const userId = session.user.id;
+
+    // 1. Fetch platform role from profile
+    const { data: profile } = await supabase
       .from("profiles")
-      .select("org_id, platform_role, organization_memberships(org_role), organizations(slug)")
-      .eq("id", session.user.id);
+      .select("platform_role, org_id")
+      .eq("id", userId)
+      .maybeSingle();
 
-    // If we have a subdomain, prioritize fetching the role for THAT organization.
-    // This prevents multi-org users from being stuck with the wrong role.
+    // 2. Fetch org-specific role for the current subdomain
+    let resolvedOrgRole = "user";
+    let resolvedOrgId = profile?.org_id;
+    let resolvedOrgSlug = undefined;
+
     if (subdomain && subdomain !== "gridmaster") {
-      query = query
+      const { data: membership } = await supabase
+        .from("organization_memberships")
+        .select("org_role, org_id, organizations!inner(slug)")
+        .eq("user_id", userId)
         .eq("organizations.slug", subdomain)
-        .eq("organization_memberships.organizations.slug", subdomain);
+        .maybeSingle<any>();
+
+      if (membership) {
+        resolvedOrgRole = membership.org_role;
+        resolvedOrgId = membership.org_id;
+        resolvedOrgSlug = membership.organizations?.slug;
+      }
     }
 
-    const { data: profile } = await query.maybeSingle<any>();
-
-    if (profile) {
-      const memberships = profile.organization_memberships as any;
-      const orgs = profile.organizations as any;
-      claims = {
-        platform_role: claims.platform_role ?? profile.platform_role ?? "none",
-        org_role: claims.org_role ?? (Array.isArray(memberships) ? memberships[0]?.org_role : memberships?.org_role) ?? "user",
-        org_id: claims.org_id ?? (Array.isArray(orgs) ? orgs[0]?.org_id : profile.org_id) ?? undefined,
-        org_slug: claims.org_slug ?? (Array.isArray(orgs) ? orgs[0]?.slug : orgs?.slug) ?? undefined,
-      };
-    }
+    claims = {
+      platform_role: claims.platform_role ?? profile?.platform_role ?? "none",
+      org_role: claims.org_role ?? resolvedOrgRole,
+      org_id: claims.org_id ?? resolvedOrgId ?? undefined,
+      org_slug: claims.org_slug ?? resolvedOrgSlug ?? undefined,
+    };
   }
 
   // Calculate effective role - Requirement 11.1
