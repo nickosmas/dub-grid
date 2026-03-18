@@ -80,7 +80,10 @@ export function getRoleAbbrs(ids: number[], roles: NamedItem[]): string[] {
 }
 
 export function getInitials(name: string): string {
-  const parts = name.split(" ").filter(Boolean);
+  const parts = name
+    .split(" ")
+    .filter(Boolean)
+    .filter((p) => /[a-zA-Z]/.test(p));
   if (parts.length === 0) return "";
   if (parts.length === 1) {
     const letters = parts[0].replace(/[^a-zA-Z]/g, "");
