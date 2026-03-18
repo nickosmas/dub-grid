@@ -2760,10 +2760,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                 <div
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    background: "#EFF6FF",
-                    borderLeft: "3px solid #2563EB",
-                    borderRadius: "0 0 8px 0",
-                    padding: "12px 16px 12px 41px",
+                    padding: "12px 16px 12px 44px",
                     marginBottom: 6,
                     display: "flex", flexDirection: "column", gap: 12,
                   }}
@@ -2852,27 +2849,27 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
 
                       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
                         <button
-                          onClick={() => handlePermsSave(user.id)}
-                          disabled={savingPerms === user.id}
-                          className="dg-btn dg-btn-primary"
-                          style={{ padding: "7px 14px" }}
-                        >
-                          {savingPerms === user.id ? "Saving…" : "Save"}
-                        </button>
-                        <button
                           onClick={() => {
-                            const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
-                            setResetPermsConfirm({ userId: user.id, userName: name });
+                            if (hasUnsavedChanges) {
+                              setEditingPerms((prev) => ({ ...prev, [user.id]: { ...savedPerms } }));
+                            } else {
+                              setExpandedUserId(null);
+                            }
                           }}
                           disabled={savingPerms === user.id}
                           className="dg-btn"
                           style={{ padding: "7px 14px" }}
                         >
-                          Reset All
+                          {hasUnsavedChanges ? "Undo" : "Cancel"}
                         </button>
-                        {hasUnsavedChanges && (
-                          <span style={{ fontSize: 11, color: "#D97706" }}>Unsaved changes</span>
-                        )}
+                        <button
+                          onClick={() => handlePermsSave(user.id)}
+                          disabled={savingPerms === user.id || !hasUnsavedChanges}
+                          className="dg-btn dg-btn-primary"
+                          style={{ padding: "7px 14px" }}
+                        >
+                          {savingPerms === user.id ? "Saving…" : "Save"}
+                        </button>
                       </div>
                     </>
                   )}

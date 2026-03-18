@@ -1076,14 +1076,7 @@ function SchedulerContent() {
   }, [isLoading, loadError, org, setPageReady]);
 
   if (orgLoading || permsLoading || (scheduleLoading && !org)) {
-    return (
-      <div className="dg-page" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100vh - 64px)" }}>
-        <ProgressBar loading={true} />
-        <div style={{ color: "var(--color-text-muted)", fontSize: 14, fontWeight: 500 }}>
-          Loading Organization & Permissions…
-        </div>
-      </div>
-    );
+    return null;
   }
   if (loadError && !org) {
     return (
