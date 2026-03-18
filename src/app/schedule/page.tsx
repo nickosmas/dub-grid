@@ -746,9 +746,18 @@ function SchedulerContent() {
         // Bulk-update all shifts in the series
         try {
           await db.updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
+          const prevShifts = shifts;
           const shiftData = await db.fetchShifts(org!.id, canEditShifts, shiftCodeMap);
           setShifts(shiftData);
-          broadcastDraftChanged();
+          const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
+          for (const [k, v] of Object.entries(shiftData)) {
+            if (!prevShifts[k] || JSON.stringify(prevShifts[k]) !== JSON.stringify(v)) {
+              shiftUpdates[k] = v;
+            }
+          }
+          if (Object.keys(shiftUpdates).length > 0) {
+            broadcastDraftChanged({ shifts: shiftUpdates });
+          }
           toast.success("Series updated");
         } catch (err) {
           toast.error("Failed to update series");
@@ -764,10 +773,24 @@ function SchedulerContent() {
   const handleConfirmSeriesDelete = useCallback(async () => {
     if (!pendingSeriesDelete || !org) return;
     try {
+      const prevShifts = shifts;
       const deletedCount = await db.deleteShiftSeries(pendingSeriesDelete.seriesId);
       const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap);
       setShifts(shiftData);
-      broadcastDraftChanged();
+      const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
+      // Detect removed shifts
+      for (const k of Object.keys(prevShifts)) {
+        if (!shiftData[k]) shiftUpdates[k] = null;
+      }
+      // Detect changed shifts
+      for (const [k, v] of Object.entries(shiftData)) {
+        if (!prevShifts[k] || JSON.stringify(prevShifts[k]) !== JSON.stringify(v)) {
+          shiftUpdates[k] = v;
+        }
+      }
+      if (Object.keys(shiftUpdates).length > 0) {
+        broadcastDraftChanged({ shifts: shiftUpdates });
+      }
       toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
     } catch (err) {
       toast.error("Failed to delete series");
@@ -777,7 +800,7 @@ function SchedulerContent() {
       unlockCell();
       setEditPanel(null);
     }
-  }, [pendingSeriesDelete, org, canEditShifts, shiftCodeMap, broadcastDraftChanged, unlockCell]);
+  }, [pendingSeriesDelete, org, canEditShifts, shiftCodeMap, shifts, broadcastDraftChanged, unlockCell]);
 
   const handleRepeatConfirm = useCallback(
     async (
@@ -804,8 +827,19 @@ function SchedulerContent() {
           endDate,
           maxOccurrences,
         );
+        const prevShifts = shifts;
         const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap);
         setShifts(shiftData);
+        // Broadcast new/changed shifts to other editors
+        const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
+        for (const [key, value] of Object.entries(shiftData)) {
+          if (!prevShifts[key] || JSON.stringify(prevShifts[key]) !== JSON.stringify(value)) {
+            shiftUpdates[key] = value;
+          }
+        }
+        if (Object.keys(shiftUpdates).length > 0) {
+          broadcastDraftChanged({ shifts: shiftUpdates });
+        }
         toast.success("Repeating shift created");
       } catch (err) {
         toast.error("Failed to create repeating shift");
@@ -815,7 +849,7 @@ function SchedulerContent() {
         setEditPanel(null);
       }
     },
-    [editPanel, org, canEditShifts, shiftCodeMap, shiftForKey, shiftCodeIdsForKey, unlockCell],
+    [editPanel, org, canEditShifts, shiftCodeMap, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged],
   );
 
   // Compute the auto-fill date range (reused by preview + apply)
