@@ -2451,7 +2451,7 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
 };
 
 /** Permissions that are always on and cannot be toggled off. */
-const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule", "canViewStaff"]);
+const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule"]);
 
 /** Permissions that only super_admin can hold — hidden from admin permissions editor. */
 const SUPER_ADMIN_ONLY = new Set<keyof AdminPermissions>(["canManageOrgSettings"]);

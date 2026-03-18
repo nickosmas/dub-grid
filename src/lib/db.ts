@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { arraysEqual } from "@/lib/utils";
 import { MAX_SERIES_OCCURRENCES, MS_PER_DAY } from "@/lib/constants";
+import { parseHost } from "@/lib/subdomain";
 
 import {
   Employee,
@@ -269,11 +270,17 @@ export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<Db
 // ── Organization ──────────────────────────────────────────────────────────────
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .limit(1)
-    .single();
+  let query = supabase.from("organizations").select("*");
+
+  // Client-side: scope by subdomain slug if present
+  if (typeof window !== "undefined") {
+    const { subdomain } = parseHost(window.location.host);
+    if (subdomain && subdomain !== "gridmaster") {
+      query = query.eq("slug", subdomain);
+    }
+  }
+
+  const { data, error } = await query.limit(1).single();
 
   if (error) {
     if (error.code === 'PGRST116') {

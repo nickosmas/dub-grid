@@ -51,7 +51,7 @@ export default function Header({ orgName }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOutLocal } = useLogout();
-  const { isGridmaster, role, canEditShifts, canManageOrg, isSuperAdmin } = usePermissions();
+  const { isGridmaster, role, canEditShifts, canViewStaff, canManageOrg, isSuperAdmin } = usePermissions();
   const { startNavigation } = usePageTransition();
 
   const activeTab = pathname.startsWith("/staff")
@@ -62,7 +62,7 @@ export default function Header({ orgName }: HeaderProps) {
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === "schedule") return true;
-    if (item.id === "staff") return canEditShifts;
+    if (item.id === "staff") return canViewStaff;
     if (item.id === "settings") return canManageOrg || isSuperAdmin || isGridmaster;
     return false;
   });

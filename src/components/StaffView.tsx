@@ -1479,11 +1479,11 @@ function RecurringScheduleSection({
 function FocusAreasSection({
   employees,
   focusAreas,
-  focusAreaLabel,
+  focusAreaLabel = "Focus Areas",
 }: {
   employees: Employee[];
   focusAreas: FocusArea[];
-  focusAreaLabel: string;
+  focusAreaLabel?: string;
 }) {
   const grouped = useMemo(() => {
     return focusAreas.map((focusArea) => ({
@@ -1587,15 +1587,15 @@ function FocusAreasSection({
 function NamedItemsSection({
   employees,
   items,
-  label,
-  singularLabel,
+  label = "Items",
+  singularLabel = "Item",
   getEmployeeValues,
   pillStyle,
 }: {
   employees: Employee[];
   items: NamedItem[];
-  label: string;
-  singularLabel: string;
+  label?: string;
+  singularLabel?: string;
   getEmployeeValues: (emp: Employee) => number[];
   pillStyle?: { bg: string; text: string };
 }) {
@@ -1719,6 +1719,7 @@ export default function StaffView({
   shiftCodes,
   shiftCodeMap,
   canEditShifts,
+  canManageEmployees,
   focusAreaLabel = "Focus Areas",
   certificationLabel = "Certifications",
   roleLabel = "Roles",
