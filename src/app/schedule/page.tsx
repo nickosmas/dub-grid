@@ -330,7 +330,7 @@ function SchedulerContent() {
     [shifts, auditNames, publishChangesMap],
   );
 
-  const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser);
+  const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser, canEditShifts);
 
   // Subscribe to real-time schedule broadcasts so other tabs/users see
   // published and draft changes immediately without a manual refresh.
@@ -395,9 +395,11 @@ function SchedulerContent() {
         if (msg.payload) handleUnlockBroadcast(msg.payload);
       })
       .on('presence', { event: 'sync' }, syncPresence)
+      .on('presence', { event: 'join' }, syncPresence)
+      .on('presence', { event: 'leave' }, syncPresence)
       .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED' && currentUser) {
-          await channel.track({ editingCell: null, userId: currentUser.id, userName: currentUser.name });
+        if (status === 'SUBSCRIBED' && currentUser && canEditShifts) {
+          await channel.track({ editingCell: null, userId: currentUser.id, userName: currentUser.name, canEdit: true });
         }
       });
 
@@ -1066,7 +1068,14 @@ function SchedulerContent() {
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
-  if (loadError) {
+  const { setPageReady } = usePageTransition();
+  const isLoading = orgLoading || empLoading || scheduleLoading || !draftCheckComplete;
+
+  useEffect(() => {
+    if (!isLoading || (loadError && !org)) setPageReady();
+  }, [isLoading, loadError, org, setPageReady]);
+
+  if (loadError && !org) {
     return (
       <div
         style={{
@@ -1152,13 +1161,6 @@ function SchedulerContent() {
       </div>
     );
   }
-
-  const { setPageReady } = usePageTransition();
-  const isLoading = orgLoading || empLoading || scheduleLoading || !draftCheckComplete;
-
-  useEffect(() => {
-    if (!isLoading) setPageReady();
-  }, [isLoading, setPageReady]);
 
   // ── Main UI ──────────────────────────────────────────────────────────────────
 
@@ -1259,7 +1261,7 @@ function SchedulerContent() {
                 onApplyRecurring={handleAutoFillPreview}
                 isApplyingRecurring={isApplyingRecurring}
                 onPrintOpen={() => setShowPrintOptions(true)}
-                presenceSlot={<PresenceAvatars onlineUsers={onlineUsers} />}
+                presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
                 showAudit={showAudit}
                 onAuditToggle={canEditShifts ? () => setShowAudit(prev => !prev) : undefined}
               />

@@ -16,21 +16,20 @@ function SettingsPageContent() {
     setOrg, setFocusAreas, handleShiftCodesChange, setShiftCategories,
     setIndicatorTypes, handleCertificationsChange, setOrgRoles,
   } = useOrganizationData();
+  const { setPageReady } = usePageTransition();
+  const isLoading = loading || !org;
 
-  if (loadError) {
+  useEffect(() => {
+    if (!isLoading || (loadError && !org)) setPageReady();
+  }, [isLoading, loadError, org, setPageReady]);
+
+  if (loadError && !org) {
     return (
       <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
         <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
       </div>
     );
   }
-
-  const { setPageReady } = usePageTransition();
-  const isLoading = loading || !org;
-
-  useEffect(() => {
-    if (!isLoading) setPageReady();
-  }, [isLoading, setPageReady]);
 
   return (
     <div

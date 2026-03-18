@@ -19,6 +19,7 @@ interface PresencePayload {
   editingCell: string | null;
   userId: string;
   userName: string;
+  canEdit?: boolean;
 }
 
 interface UseCellLocksReturn {
@@ -35,6 +36,7 @@ interface UseCellLocksReturn {
 export function useCellLocks(
   channelRef: MutableRefObject<RealtimeChannel | null>,
   currentUser: { id: string; name: string } | null,
+  canEdit = true,
 ): UseCellLocksReturn {
   const [lockedCells, setLockedCells] = useState<Map<string, CellLock>>(
     () => new Map(),
@@ -42,6 +44,8 @@ export function useCellLocks(
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
 
   // Rebuild lockedCells map + onlineUsers list from presence state.
   // Returned so the parent can register it directly on the channel —
@@ -60,9 +64,10 @@ export function useCellLocks(
       for (const p of presences as PresencePayload[]) {
         if (!p.userId) continue;
 
-        // Build online users list (deduplicated, excluding current user)
+        // Build online users list (deduplicated, excluding current user and non-editors)
         if (
           !seenUserIds.has(p.userId) &&
+          p.canEdit !== false &&
           currentUserRef.current &&
           p.userId !== currentUserRef.current.id
         ) {
@@ -103,6 +108,7 @@ export function useCellLocks(
         editingCell: cellKey,
         userId: user.id,
         userName: user.name,
+        canEdit: canEditRef.current,
       });
       // Broadcast for instant delivery to other clients
       void channel.send({
@@ -122,6 +128,7 @@ export function useCellLocks(
       editingCell: null,
       userId: user.id,
       userName: user.name,
+      canEdit: canEditRef.current,
     });
     void channel.send({
       type: 'broadcast',

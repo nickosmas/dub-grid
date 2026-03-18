@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePageTransition } from "@/components/PageTransition";
 
 export default function SettingsError({
   error,
@@ -9,9 +10,12 @@ export default function SettingsError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { setPageReady } = usePageTransition();
+
   useEffect(() => {
     console.error("Settings page error:", error);
-  }, [error]);
+    setPageReady();
+  }, [error, setPageReady]);
 
   return (
     <div

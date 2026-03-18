@@ -147,7 +147,11 @@ export function useOrganizationData(): OrganizationData {
         if (cancelled) return;
         console.error(err);
         handleApiError(err);
-        setLoadError(err instanceof Error ? err.message : "Failed to load data");
+        // Only set error if no cached data exists — a background re-fetch failure
+        // shouldn't wipe out valid cached state or trigger hooks-order violations.
+        if (!orgDataCache) {
+          setLoadError(err instanceof Error ? err.message : "Failed to load data");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import type { OnlineUser } from "@/hooks/useCellLocks";
 
 const MAX_VISIBLE = 4;
@@ -141,7 +142,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
         </div>
       )}
 
-      {hoveredUser && tooltipPos && hoveredUserData && (
+      {hoveredUser && tooltipPos && hoveredUserData && createPortal(
         <div
           style={{
             position: "fixed",
@@ -173,7 +174,8 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               editing
             </span>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
