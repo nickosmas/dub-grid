@@ -13,8 +13,8 @@ import DraftBanner from "@/components/DraftBanner";
 
 import ProgressBar from "@/components/ProgressBar";
 import { usePageTransition } from "@/components/PageTransition";
-import { addDays, formatDate, formatDateKey, getWeekStart } from "@/lib/utils";
-import { filterAndSortEmployees } from "@/lib/schedule-logic";
+import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName } from "@/lib/utils";
+import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
 import { OptimisticLockError } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
@@ -24,6 +24,11 @@ import { useAuth } from "@/components/AuthProvider";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { toast } from "sonner";
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
+import type { ShiftDragData } from "@/components/DraggableShift";
+import type { CellDropData } from "@/components/DroppableCell";
+import ShiftContextMenu from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   Employee,
@@ -77,6 +82,9 @@ function SchedulerContent() {
   const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{ seriesId: string; shiftCount: number } | null>(null);
   const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry | null>(null);
   const [showPublishDiff, setShowPublishDiff] = useState(false);
+  const [isImportingPrevious, setIsImportingPrevious] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ count: number; sourceRange: string; targetRange: string } | null>(null);
 
   const draftBreakdown = useMemo(
     () => computeDraftBreakdown(shifts, notes),
@@ -95,6 +103,28 @@ function SchedulerContent() {
     updatedByName: string | null;
     createdAt: string | null;
     updatedAt: string | null;
+  } | null>(null);
+
+  // ── Drag & Drop state ──────────────────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+  const [activeDrag, setActiveDrag] = useState<ShiftDragData | null>(null);
+
+  // ── Clipboard state (copy-paste shifts) ───────────────────────────────────
+  const [clipboard, setClipboard] = useState<{
+    label: string;
+    shiftCodeIds: number[];
+  } | null>(null);
+  const hoveredCellRef = useRef<{ empId: string; date: Date; focusAreaName: string } | null>(null);
+
+  // ── Context menu state ────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    empId: string;
+    date: Date;
+    focusAreaName: string;
   } | null>(null);
 
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -486,7 +516,7 @@ function SchedulerContent() {
     const q = staffSearch.toLowerCase();
     return new Set(
       filteredEmployees
-        .filter((e) => e.name.toLowerCase().includes(q))
+        .filter((e) => getEmployeeDisplayName(e).toLowerCase().includes(q))
         .map((e) => e.id),
     );
   }, [staffSearch, filteredEmployees]);
@@ -714,7 +744,7 @@ function SchedulerContent() {
         : null;
       setEditPanel({
         empId: emp.id,
-        empName: emp.name,
+        empName: getEmployeeDisplayName(emp),
         date,
         empFocusAreaIds: emp.focusAreaIds,
         empCertificationId: emp.certificationId,
@@ -852,6 +882,151 @@ function SchedulerContent() {
     [editPanel, org, canEditShifts, shiftCodeMap, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged],
   );
 
+  // ── Qualification check for drag/paste ──────────────────────────────────
+  const focusAreaNameMap = useMemo(
+    () => new Map(focusAreas.map(fa => [fa.id, fa.name])),
+    [focusAreas],
+  );
+  const certificationNameMap = useMemo(
+    () => new Map(certifications.map(c => [c.id, c.name])),
+    [certifications],
+  );
+
+  /** Returns null if qualified, or an error message string if not. */
+  const checkQualification = useCallback(
+    (empId: string, shiftCodeIds: number[]): string | null => {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return null; // shouldn't happen, but don't block
+
+      for (const codeId of shiftCodeIds) {
+        const code = shiftCodes.find(sc => sc.id === codeId);
+        if (!code) continue;
+        if (!isEmployeeQualified(emp, code)) {
+          const reasons = getDisqualificationReasons(emp, code, focusAreaNameMap, certificationNameMap);
+          return `${getEmployeeDisplayName(emp)} cannot be assigned ${code.label}: ${reasons.join(", ")}`;
+        }
+      }
+      return null;
+    },
+    [employees, shiftCodes, focusAreaNameMap, certificationNameMap],
+  );
+
+  // ── Drag & Drop handlers ──────────────────────────────────────────────────
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current as ShiftDragData | undefined;
+    if (data) setActiveDrag(data);
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDrag(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const dragData = active.data.current as ShiftDragData | undefined;
+    const dropData = over.data.current as CellDropData | undefined;
+    if (!dragData || !dropData) return;
+
+    // No-op if dropped on same cell
+    const sourceKey = `${dragData.empId}_${dragData.dateKey}`;
+    const targetKey = `${dropData.empId}_${dropData.dateKey}`;
+    if (sourceKey === targetKey) return;
+
+    // Check target lock
+    const targetLock = getCellLock(targetKey);
+    if (targetLock) {
+      toast.info(`Cell is being edited by ${targetLock.userName}`);
+      return;
+    }
+
+    // Check if target employee qualifies for the shift
+    const disqualified = checkQualification(dropData.empId, dragData.shiftCodeIds);
+    if (disqualified) {
+      toast.error(disqualified);
+      return;
+    }
+
+    // Move shift: create at target, delete at source
+    setShift(dropData.empId, dropData.date, dragData.label, dragData.shiftCodeIds);
+    setShift(dragData.empId, dragData.date, "OFF", []);
+    toast.success("Shift moved");
+  }, [setShift, getCellLock, checkQualification]);
+
+  // ── Copy-paste handlers ──────────────────────────────────────────────────
+  const handleCopyShift = useCallback((empId: string, date: Date) => {
+    const key = `${empId}_${formatDateKey(date)}`;
+    const shift = shifts[key];
+    if (!shift || shift.shiftCodeIds.length === 0) return;
+    setClipboard({ label: shift.label, shiftCodeIds: shift.shiftCodeIds });
+    toast.success("Shift copied");
+  }, [shifts]);
+
+  const handlePasteShift = useCallback((empId: string, date: Date) => {
+    if (!clipboard) return;
+    const cellKey = `${empId}_${formatDateKey(date)}`;
+    const lock = getCellLock(cellKey);
+    if (lock) {
+      toast.info(`Cell is being edited by ${lock.userName}`);
+      return;
+    }
+
+    // Check if target employee qualifies for the pasted shift
+    const disqualified = checkQualification(empId, clipboard.shiftCodeIds);
+    if (disqualified) {
+      toast.error(disqualified);
+      return;
+    }
+
+    setShift(empId, date, clipboard.label, clipboard.shiftCodeIds);
+    toast.success("Shift pasted");
+  }, [clipboard, setShift, getCellLock, checkQualification]);
+
+  const handleClearShift = useCallback((empId: string, date: Date) => {
+    const cellKey = `${empId}_${formatDateKey(date)}`;
+    const lock = getCellLock(cellKey);
+    if (lock) {
+      toast.info(`Cell is being edited by ${lock.userName}`);
+      return;
+    }
+    setShift(empId, date, "OFF", []);
+  }, [setShift, getCellLock]);
+
+  // Context menu handlers
+  const handleCellContextMenu = useCallback((e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, empId, date, focusAreaName });
+  }, []);
+
+  const handleCellHover = useCallback((empId: string, date: Date, focusAreaName: string) => {
+    hoveredCellRef.current = { empId, date, focusAreaName };
+  }, []);
+
+  // Keyboard shortcuts for copy-paste (Cmd/Ctrl+C and Cmd/Ctrl+V)
+  useEffect(() => {
+    if (!canEditShifts) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      const hovered = hoveredCellRef.current;
+      if (!hovered) return;
+
+      if (e.key === "c") {
+        // Don't intercept if user has text selected
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        e.preventDefault();
+        handleCopyShift(hovered.empId, hovered.date);
+      } else if (e.key === "v") {
+        e.preventDefault();
+        handlePasteShift(hovered.empId, hovered.date);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canEditShifts, handleCopyShift, handlePasteShift]);
+
   // Compute the auto-fill date range (reused by preview + apply)
   const getAutoFillRange = useCallback((): { startDate: Date; endDate: Date } => {
     if (spanWeeks === "month") {
@@ -952,6 +1127,123 @@ function SchedulerContent() {
       setAutoFillPreview(null);
     }
   }, [org, getAutoFillRange, recurringShifts, shifts, broadcastDraftChanged]);
+
+  // ── Import Previous Schedule ────────────────────────────────────────────────
+
+  // Preview: count how many shifts would be imported, then show confirmation
+  const handleImportPreviousPreview = useCallback(() => {
+    if (!org || spanWeeks === "month") return;
+
+    const days = spanWeeks * 7;
+    const sourceStart = addDays(weekStart, -days);
+
+    // Count source shifts that have data AND whose target cell is empty
+    let count = 0;
+    for (let i = 0; i < days; i++) {
+      const sourceDate = addDays(sourceStart, i);
+      const targetDate = addDays(weekStart, i);
+      const sourceDateKey = formatDateKey(sourceDate);
+      const targetDateKey = formatDateKey(targetDate);
+
+      for (const emp of employees) {
+        const sourceKey = `${emp.id}_${sourceDateKey}`;
+        const targetKey = `${emp.id}_${targetDateKey}`;
+        const sourceShift = shifts[sourceKey];
+        if (
+          sourceShift &&
+          sourceShift.shiftCodeIds.length > 0 &&
+          !sourceShift.isDelete &&
+          !shifts[targetKey]
+        ) {
+          count++;
+        }
+      }
+    }
+
+    if (count === 0) {
+      toast.info("No shifts to import — either the previous period is empty or all slots are already filled");
+      return;
+    }
+
+    const sourceRange = `${formatDate(sourceStart)} – ${formatDate(addDays(sourceStart, days - 1))}`;
+    const targetRange = `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, days - 1))}`;
+    setImportPreview({ count, sourceRange, targetRange });
+    setShowImportConfirm(true);
+  }, [org, spanWeeks, weekStart, employees, shifts]);
+
+  // Actually apply the import (called after confirmation)
+  const handleImportPrevious = useCallback(async () => {
+    if (!org || spanWeeks === "month") return;
+    setShowImportConfirm(false);
+    setIsImportingPrevious(true);
+
+    try {
+      const days = spanWeeks * 7;
+      const sourceStart = addDays(weekStart, -days);
+      const shiftUpdates: Record<string, ShiftMap[string]> = {};
+      const upsertPromises: Promise<void>[] = [];
+
+      for (let i = 0; i < days; i++) {
+        const sourceDate = addDays(sourceStart, i);
+        const targetDate = addDays(weekStart, i);
+        const sourceDateKey = formatDateKey(sourceDate);
+        const targetDateKey = formatDateKey(targetDate);
+
+        for (const emp of employees) {
+          const sourceKey = `${emp.id}_${sourceDateKey}`;
+          const targetKey = `${emp.id}_${targetDateKey}`;
+          const sourceShift = shifts[sourceKey];
+
+          if (
+            sourceShift &&
+            sourceShift.shiftCodeIds.length > 0 &&
+            !sourceShift.isDelete &&
+            !shifts[targetKey]
+          ) {
+            // Build optimistic state entry
+            shiftUpdates[targetKey] = {
+              label: sourceShift.label,
+              shiftCodeIds: sourceShift.shiftCodeIds,
+              isDraft: true,
+              draftKind: 'new',
+              publishedShiftCodeIds: [],
+              publishedLabel: '',
+            };
+
+            // Queue DB upsert
+            upsertPromises.push(
+              db.upsertShift(
+                emp.id,
+                targetDateKey,
+                sourceShift.shiftCodeIds,
+                org.id,
+                sourceShift.customStartTime,
+                sourceShift.customEndTime,
+              )
+            );
+          }
+        }
+      }
+
+      // Batch all upserts
+      await Promise.all(upsertPromises);
+
+      // Apply optimistic state update
+      setShifts(prev => ({ ...prev, ...shiftUpdates }));
+      broadcastDraftChanged({ shifts: shiftUpdates });
+
+      const count = Object.keys(shiftUpdates).length;
+      toast.success(`Imported ${count} shift${count !== 1 ? 's' : ''} from previous ${spanWeeks === 1 ? 'week' : '2 weeks'}`);
+    } catch (err) {
+      toast.error("Failed to import schedule");
+      console.error(err);
+      // Refetch to ensure consistency
+      await refetchScheduleData();
+    } finally {
+      setIsImportingPrevious(false);
+      setImportPreview(null);
+    }
+  }, [org, spanWeeks, weekStart, employees, shifts, broadcastDraftChanged, refetchScheduleData]);
 
   const handleNoteToggle = useCallback(
     async (indicatorTypeId: number, active: boolean, focusAreaId: number) => {
@@ -1296,6 +1588,8 @@ function SchedulerContent() {
                 canEditShifts={canEditShifts && canApplyRecurringSchedule}
                 onApplyRecurring={handleAutoFillPreview}
                 isApplyingRecurring={isApplyingRecurring}
+                onImportPrevious={spanWeeks !== "month" ? handleImportPreviousPreview : undefined}
+                isImportingPrevious={isImportingPrevious}
                 onPrintOpen={() => setShowPrintOptions(true)}
                 presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
                 showAudit={showAudit}
@@ -1307,7 +1601,7 @@ function SchedulerContent() {
           <div style={{ padding: "16px 16px" }}>
 
             {spanWeeks !== "month" && (
-          <div>
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <ScheduleGrid
               filteredEmployees={visibleScheduleEmployees}
               allEmployees={employees}
@@ -1338,8 +1632,49 @@ function SchedulerContent() {
               cellLocks={lockedCells}
               showAudit={showAudit}
               createdByNameForKey={createdByNameForKey}
+              isDragging={!!activeDrag}
+              onCellHover={handleCellHover}
+              onCellContextMenu={handleCellContextMenu}
             />
-          </div>
+            <DragOverlay dropAnimation={null}>
+              {activeDrag && (
+                <div
+                  style={{
+                    background: activeDrag.pillColor,
+                    color: activeDrag.pillText,
+                    border: `1px solid ${activeDrag.pillText}20`,
+                    borderRadius: 6,
+                    padding: "6px 16px",
+                    fontSize: 16,
+                    fontWeight: 800,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.1)",
+                    cursor: "grabbing",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {activeDrag.label}
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        )}
+
+        {/* Context menu for copy/paste */}
+        {contextMenu && canEditShifts && (
+          <ShiftContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            hasShift={(() => {
+              const key = `${contextMenu.empId}_${formatDateKey(contextMenu.date)}`;
+              const s = shifts[key];
+              return !!(s && s.shiftCodeIds.length > 0 && !s.isDelete);
+            })()}
+            hasClipboard={!!clipboard}
+            onCopy={() => handleCopyShift(contextMenu.empId, contextMenu.date)}
+            onPaste={() => handlePasteShift(contextMenu.empId, contextMenu.date)}
+            onClear={() => handleClearShift(contextMenu.empId, contextMenu.date)}
+            onClose={() => setContextMenu(null)}
+          />
         )}
 
         {spanWeeks === "month" && (
@@ -1479,6 +1814,18 @@ function SchedulerContent() {
           variant="danger"
           onConfirm={handleConfirmSeriesDelete}
           onCancel={() => { setPendingSeriesDelete(null); unlockCell(); setEditPanel(null); }}
+        />
+      )}
+
+      {showImportConfirm && importPreview && (
+        <ConfirmDialog
+          title="Import Previous Schedule?"
+          message={`This will copy ${importPreview.count} shift${importPreview.count !== 1 ? 's' : ''} from ${importPreview.sourceRange} into ${importPreview.targetRange}. Only empty slots will be filled — existing shifts will not be overwritten.`}
+          confirmLabel="Import Shifts"
+          variant="info"
+          isLoading={isImportingPrevious}
+          onConfirm={handleImportPrevious}
+          onCancel={() => { setShowImportConfirm(false); setImportPreview(null); }}
         />
       )}
         </>

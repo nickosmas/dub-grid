@@ -1,5 +1,6 @@
 "use client";
 import CustomSelect from "@/components/CustomSelect";
+import { getEmployeeDisplayName } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -932,7 +933,7 @@ function EmployeesTab({
               ) : (
                 list.map((emp) => (
                   <tr key={emp.id}>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{emp.name}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>{getEmployeeDisplayName(emp)}</td>
                     <td style={tdStyle}><StatusDot status={emp.status} /></td>
                     <td style={{ ...tdStyle, textAlign: "center" }}>{emp.seniority}</td>
                     <td style={{ ...tdStyle, fontSize: 12, color: "var(--color-text-muted)" }}>{emp.phone || "—"}</td>

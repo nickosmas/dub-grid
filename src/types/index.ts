@@ -93,7 +93,8 @@ export type EmployeeStatus = 'active' | 'benched' | 'terminated';
 
 export interface Employee {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   /** Current employment status: active (working), benched (temporarily away), terminated (left). */
   status: EmployeeStatus;
   /** When the status was last changed. */
@@ -108,6 +109,8 @@ export interface Employee {
   email: string;
   contactNotes: string;
   archivedAt?: string | null;
+  /** Linked Supabase auth user ID. Null if no account linked. */
+  userId: string | null;
 }
 
 export type DraftKind = 'new' | 'modified' | 'deleted' | null;
@@ -336,6 +339,8 @@ export interface Invitation {
   acceptedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  /** Employee record this invitation is for. Null if not linked to an employee. */
+  employeeId: string | null;
 }
 
 export interface UserClaims {

@@ -13,6 +13,7 @@ import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { useAuth } from "@/components/AuthProvider";
 
 function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: string; onChange: (c: PredefinedColor) => void; disabled?: boolean }) {
   const active = getPresetByBg(valueBg);
@@ -1702,7 +1703,7 @@ function StringListSettings({
           const isDropTarget = isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
           return (
             <div
-              key={i}
+              key={item.id}
               draggable={isEditing}
               onDragStart={isEditing ? () => handleDragStart(i) : undefined}
               onDragOver={isEditing ? (e) => handleDragOver(e, i) : undefined}
@@ -2477,6 +2478,7 @@ function emptyAdminPerms(): AdminPermissions {
 
 // ── User Management Settings ──────────────────────────────────────────────────
 function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean }) {
+  const { user: currentUser } = useAuth();
   const myRole = isSuperAdmin ? "super_admin" : "user";
   const [users, setUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2605,6 +2607,11 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
       return true;
     })
     .sort((a, b) => {
+      // Pin logged-in user to the top
+      const aIsYou = !!(currentUser && a.id === currentUser.id);
+      const bIsYou = !!(currentUser && b.id === currentUser.id);
+      if (aIsYou !== bIsYou) return aIsYou ? -1 : 1;
+
       const ra = ROLE_ORDER[a.orgRole] ?? 3;
       const rb = ROLE_ORDER[b.orgRole] ?? 3;
       if (ra !== rb) return ra - rb;
@@ -2699,7 +2706,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
       </div>
 
       <div style={{ display: "flex", flexDirection: "column" }}>
-        {sortedUsers.map((user) => {
+        {sortedUsers.map((user, idx) => {
           const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
           const roleColor = ROLE_COLORS[user.orgRole] ?? ROLE_COLORS.user;
           const isSuperAdminUser = user.orgRole === "super_admin";
@@ -2707,11 +2714,12 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
           const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
           const perms = editingPerms[user.id] ?? savedPerms;
           const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
+          const isLast = idx === sortedUsers.length - 1;
           const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
             allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
 
           return (
-            <div key={user.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+            <div key={user.id} style={{ borderBottom: isLast ? "none" : "1px solid var(--color-border-light)" }}>
               {/* Collapsed row */}
               <div
                 style={{
@@ -2729,8 +2737,16 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                   {(displayName !== "—" ? displayName : "?")[0].toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
                     {displayName}
+                    {currentUser && user.id === currentUser.id && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10,
+                        background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap",
+                      }}>
+                        You
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                     {user.email ?? "—"}

@@ -21,6 +21,11 @@ vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+const mockToastError = vi.fn();
+vi.mock("sonner", () => ({
+  toast: { error: (...args: unknown[]) => mockToastError(...args), success: vi.fn() },
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
@@ -47,6 +52,7 @@ describe("Login page submit states", () => {
       configurable: true,
     });
     mockSignInWithPassword.mockReset();
+    mockToastError.mockReset();
   });
 
   it("successful sign-in: button stays disabled and shows 'Signing in…'", async () => {
@@ -72,7 +78,7 @@ describe("Login page submit states", () => {
     submitForm(container);
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid email or password. Please try again.")).toBeInTheDocument();
+      expect(mockToastError).toHaveBeenCalledWith("Invalid email or password. Please try again.");
     });
 
     // Button must be re-enabled — loading=false on error

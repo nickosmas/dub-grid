@@ -15,6 +15,7 @@ const mockPermissions = {
   canManageOrg: true,
   canEditShifts: true,
   canEditNotes: true,
+  canViewStaff: true,
   atLeast: (r: string) => {
     const levels: Record<string, number> = {
       gridmaster: 4,
@@ -69,6 +70,7 @@ beforeEach(() => {
   mockPermissions.isGridmaster = false;
   mockPermissions.isSuperAdmin = false;
   mockPermissions.canEditShifts = true;
+  mockPermissions.canViewStaff = true;
   mockPermissions.canManageOrg = true;
 });
 
@@ -142,8 +144,8 @@ describe("Header nav link hrefs", () => {
 });
 
 describe("Header permission-based tab visibility", () => {
-  it("hides Staff tab when user cannot edit shifts", () => {
-    mockPermissions.canEditShifts = false;
+  it("hides Staff tab when user cannot view staff", () => {
+    mockPermissions.canViewStaff = false;
     render(<Header />);
     expect(screen.queryByRole("link", { name: /Staff/i })).not.toBeInTheDocument();
   });

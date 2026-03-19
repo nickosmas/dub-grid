@@ -30,17 +30,18 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const checkSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error && /refresh.token/i.test(error.message)) {
-          // Refresh token was revoked (e.g. another browser signed out globally).
-          // Clear the stale local session so ProtectedRoute can redirect to /login.
-          console.warn("Refresh token invalid, clearing local session:", error.message);
+        if (error) {
+          // Stale or revoked refresh token (e.g. after DB reset, server restart,
+          // or another browser signed out globally). Clear the dead session
+          // silently so the user just sees the login page.
           await supabase.auth.signOut({ scope: "local" });
           setUser(null);
           return;
         }
         setUser(session?.user ?? null);
-      } catch (error) {
-        console.error("Error checking session:", error);
+      } catch {
+        // Network errors etc. — treat as no session
+        setUser(null);
       } finally {
         setIsLoading(false);
       }

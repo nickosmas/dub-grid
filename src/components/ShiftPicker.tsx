@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ShiftCode, FocusArea } from "@/types";
+import { isEmployeeQualified } from "@/lib/schedule-logic";
 
 interface ShiftPickerProps {
   shiftCodes: ShiftCode[];
@@ -54,10 +55,10 @@ export default function ShiftPicker({
   });
 
   function isQualified(s: ShiftCode) {
-    const certOk = !s.requiredCertificationIds?.length ||
-      (empCertificationId != null && s.requiredCertificationIds.includes(empCertificationId));
-    const areaOk = !s.focusAreaId || empFocusAreaIds.includes(s.focusAreaId);
-    return certOk && areaOk;
+    return isEmployeeQualified(
+      { certificationId: empCertificationId, focusAreaIds: empFocusAreaIds },
+      s,
+    );
   }
 
   function getShiftsForFocusArea(faId: number): ShiftCode[] {

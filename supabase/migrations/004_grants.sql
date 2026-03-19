@@ -14,8 +14,12 @@
 -- the tables it needs.
 -- ══════════════════════════════════════════════════════════════════════════════
 
--- Hook needs to read profiles + organizations for JWT claims
+-- supabase_auth_admin needs USAGE on public schema to locate and call the hook
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+
+-- Hook needs to read profiles + org memberships + organizations for JWT claims
 GRANT SELECT ON TABLE public.profiles TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.organization_memberships TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organizations TO supabase_auth_admin;
 
 -- Hook needs to read/delete jwt_refresh_locks to check/clean locks

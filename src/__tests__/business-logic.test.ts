@@ -9,7 +9,8 @@ import { Employee, ShiftCode } from "@/types";
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: "emp-1",
-    name: "Test Employee",
+    firstName: "Test",
+    lastName: "Employee",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -20,6 +21,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     phone: "",
     email: "",
     contactNotes: "",
+    userId: null,
     ...overrides,
   };
 }

@@ -94,6 +94,11 @@ export function getInitials(name: string): string {
   return (firstLetter + lastLetter).toUpperCase();
 }
 
+/** Returns "First Last" display name for an employee. */
+export function getEmployeeDisplayName(emp: { firstName: string; lastName: string }): string {
+  return `${emp.firstName} ${emp.lastName}`.trim();
+}
+
 /** Format a timestamp as a relative string: "just now", "5 min ago", "2 hr ago", "3 days ago", or "Mar 15". */
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();

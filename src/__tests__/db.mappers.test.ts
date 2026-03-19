@@ -209,7 +209,8 @@ import type { DbEmployee } from "@/lib/db";
 const baseEmployeeRow: DbEmployee = {
   id: "emp-1",
   org_id: "org-1",
-  name: "Alice Smith",
+  first_name: "Alice",
+  last_name: "Smith",
   status: "active",
   status_changed_at: null,
   status_note: "",
@@ -220,6 +221,7 @@ const baseEmployeeRow: DbEmployee = {
   phone: "555-9999",
   email: "alice@example.com",
   contact_notes: "Call after 9am",
+  user_id: null,
   archived_at: null,
 };
 
@@ -228,7 +230,8 @@ describe("rowToEmployee", () => {
     const result = rowToEmployee(baseEmployeeRow);
 
     expect(result.id).toBe("emp-1");
-    expect(result.name).toBe("Alice Smith");
+    expect(result.firstName).toBe("Alice");
+    expect(result.lastName).toBe("Smith");
     expect(result.certificationId).toBe(1);
     expect(result.roleIds).toEqual([2, 3]);
     expect(result.seniority).toBe(3);
@@ -264,7 +267,8 @@ import type { Employee } from "@/types";
 
 describe("employeeToRow", () => {
   const baseEmployee: Omit<Employee, "id"> = {
-    name: "Bob Jones",
+    firstName: "Bob",
+    lastName: "Jones",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -275,13 +279,15 @@ describe("employeeToRow", () => {
     phone: "555-1111",
     email: "bob@example.com",
     contactNotes: "Prefers text",
+    userId: null,
   };
 
   it("maps all fields correctly to snake_case", () => {
     const result = employeeToRow(baseEmployee, "org-99");
 
     expect(result.org_id).toBe("org-99");
-    expect(result.name).toBe("Bob Jones");
+    expect(result.first_name).toBe("Bob");
+    expect(result.last_name).toBe("Jones");
     expect(result.certification_id).toBe(2);
     expect(result.role_ids).toEqual([1]);
     expect(result.seniority).toBe(2);
@@ -309,7 +315,8 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
   const arbDbEmployee = fc.record({
     id: fc.uuid(),
     org_id: fc.string({ minLength: 1 }),
-    name: fc.string({ minLength: 1 }),
+    first_name: fc.string({ minLength: 1 }),
+    last_name: fc.string({ minLength: 1 }),
     status: fc.constantFrom("active" as const, "benched" as const, "terminated" as const),
     status_changed_at: fc.oneof(fc.constant(null as string | null), fc.constant("2026-01-01T00:00:00Z")),
     status_note: fc.string(),
@@ -320,6 +327,7 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     phone: fc.string(),
     email: fc.string(),
     contact_notes: fc.string(),
+    user_id: fc.constant(null as string | null),
     archived_at: fc.constant(null as string | null),
   });
 

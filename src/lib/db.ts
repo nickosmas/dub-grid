@@ -19,6 +19,8 @@ import {
   OrganizationUser,
   NamedItem,
   DraftKind,
+  Invitation,
+  AssignableOrganizationRole,
 } from "@/types";
 
 // ── Optimistic Locking Error ──────────────────────────────────────────────────
@@ -104,7 +106,8 @@ export interface DbShiftCode {
 export interface DbEmployee {
   id: string;
   org_id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   status: EmployeeStatus;
   status_changed_at: string | null;
   status_note: string;
@@ -116,6 +119,7 @@ export interface DbEmployee {
   email: string;
   contact_notes: string;
   archived_at: string | null;
+  user_id: string | null;
 }
 
 interface DbShift {
@@ -238,7 +242,8 @@ export function rowToShiftCode(row: DbShiftCode): ShiftCode {
 export function rowToEmployee(row: DbEmployee): Employee {
   return {
     id: row.id,
-    name: row.name,
+    firstName: row.first_name,
+    lastName: row.last_name,
     status: row.status ?? 'active',
     statusChangedAt: row.status_changed_at ?? null,
     statusNote: row.status_note ?? '',
@@ -250,13 +255,15 @@ export function rowToEmployee(row: DbEmployee): Employee {
     email: row.email ?? "",
     contactNotes: row.contact_notes ?? "",
     archivedAt: row.archived_at ?? null,
+    userId: row.user_id ?? null,
   };
 }
 
-export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<DbEmployee, "id" | "status" | "status_changed_at" | "status_note" | "archived_at"> {
+export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<DbEmployee, "id" | "status" | "status_changed_at" | "status_note" | "archived_at" | "user_id"> {
   return {
     org_id: orgId,
-    name: emp.name,
+    first_name: emp.firstName,
+    last_name: emp.lastName,
     certification_id: emp.certificationId,
     role_ids: emp.roleIds ?? [],
     seniority: emp.seniority,
@@ -1225,7 +1232,7 @@ export async function endImpersonation(sessionId: string): Promise<void> {
 
 export async function acceptInvitation(
   token: string,
-): Promise<{ status: string; orgId: string; role: string }> {
+): Promise<{ status: string; orgId: string; role: string; orgSlug: string | null }> {
   const { data, error } = await supabase.rpc("accept_invitation", {
     p_token: token,
   });
@@ -1234,7 +1241,72 @@ export async function acceptInvitation(
     status: data.status,
     orgId: data.org_id,
     role: data.role,
+    orgSlug: data.org_slug ?? null,
   };
+}
+
+export async function sendInvitation(
+  email: string,
+  role: AssignableOrganizationRole,
+  orgId: string,
+  employeeId?: string,
+): Promise<{ invitationId: string; token: string; expiresAt: string }> {
+  const { data, error } = await supabase.rpc("send_invitation", {
+    p_email: email,
+    p_role: role,
+    p_org_id: orgId,
+    p_employee_id: employeeId ?? null,
+  });
+  if (error) throw error;
+  return {
+    invitationId: data.invitation_id,
+    token: data.token,
+    expiresAt: data.expires_at,
+  };
+}
+
+export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    orgId: row.org_id as string,
+    invitedBy: (row.invited_by as string) ?? null,
+    email: row.email as string,
+    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
+    token: row.token as string,
+    expiresAt: row.expires_at as string,
+    acceptedAt: (row.accepted_at as string) ?? null,
+    revokedAt: (row.revoked_at as string) ?? null,
+    createdAt: row.created_at as string,
+    employeeId: (row.employee_id as string) ?? null,
+  }));
+}
+
+export async function revokeInvitation(invitationId: string): Promise<void> {
+  const { error } = await supabase
+    .from("invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", invitationId);
+  if (error) throw error;
+}
+
+export async function linkEmployeeToUser(
+  employeeId: string,
+  userId: string,
+  orgId: string,
+): Promise<{ status: string }> {
+  const { data, error } = await supabase.rpc("link_employee_to_user", {
+    p_employee_id: employeeId,
+    p_user_id: userId,
+    p_org_id: orgId,
+  });
+  if (error) throw error;
+  return { status: data.status };
 }
 
 // ── Recurring Shifts ──────────────────────────────────────────────────────────

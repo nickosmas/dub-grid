@@ -1,5 +1,44 @@
 import { Employee, ShiftCode } from "@/types";
 
+/**
+ * Checks whether an employee is qualified for a given shift code based on
+ * focus area assignment and certification requirements.
+ */
+export function isEmployeeQualified(
+  emp: { certificationId: number | null; focusAreaIds: number[] },
+  shiftCode: ShiftCode,
+): boolean {
+  const certOk = !shiftCode.requiredCertificationIds?.length ||
+    (emp.certificationId != null && shiftCode.requiredCertificationIds.includes(emp.certificationId));
+  const areaOk = !shiftCode.focusAreaId || emp.focusAreaIds.includes(shiftCode.focusAreaId);
+  return certOk && areaOk;
+}
+
+/**
+ * Returns human-readable reasons why an employee is not qualified for a shift code.
+ */
+export function getDisqualificationReasons(
+  emp: { certificationId: number | null; focusAreaIds: number[] },
+  shiftCode: ShiftCode,
+  focusAreaNames?: Map<number, string>,
+  certificationNames?: Map<number, string>,
+): string[] {
+  const reasons: string[] = [];
+  if (shiftCode.focusAreaId && !emp.focusAreaIds.includes(shiftCode.focusAreaId)) {
+    const name = focusAreaNames?.get(shiftCode.focusAreaId) ?? `focus area #${shiftCode.focusAreaId}`;
+    reasons.push(`not assigned to ${name}`);
+  }
+  if (shiftCode.requiredCertificationIds?.length) {
+    if (emp.certificationId == null || !shiftCode.requiredCertificationIds.includes(emp.certificationId)) {
+      const names = shiftCode.requiredCertificationIds
+        .map(id => certificationNames?.get(id) ?? `cert #${id}`)
+        .join(" or ");
+      reasons.push(`requires ${names}`);
+    }
+  }
+  return reasons;
+}
+
 export interface Tally {
   [label: string]: number;
 }

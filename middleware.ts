@@ -128,7 +128,7 @@ export async function middleware(req: NextRequest) {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
   } catch (err) {
-    console.warn("JWT verification failed, falling back to unverified decode:", err);
+    console.warn("JWT verification failed, falling back to unverified decode");
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
     } catch {

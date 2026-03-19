@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DAY_LABELS } from "@/lib/constants";
-import { formatDateKey } from "@/lib/utils";
+import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, DraftKind } from "@/types";
 import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
 
@@ -68,7 +68,6 @@ function DayPopover({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const [mounted, setMounted] = useState(false);
-
   useEffect(() => { setMounted(true); }, []);
 
   useLayoutEffect(() => {
@@ -158,7 +157,7 @@ function DayPopover({
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     {workers.map(({ name, shift, style: s, draftKind: dk }, ni) => (
-                      <div key={ni} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div key={`${name}-${shift}-${ni}`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                         <div style={{
                           background: s.color,
                           border: dk ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}` : `1px solid ${borderColor(s.text)}`,
@@ -298,13 +297,13 @@ export default function MonthView({
             const fa = focusAreas.find(f => f.id === style.focusAreaId);
             if (!fa) return;
             const list = byFocusArea.get(fa.name) ?? [];
-            list.push({ name: emp.name, shift: label, style, draftKind: dk });
+            list.push({ name: getEmployeeDisplayName(emp), shift: label, style, draftKind: dk });
             byFocusArea.set(fa.name, list);
           } else {
             // General/shared code: count under the employee's home focus area(s)
             for (const fa of empHomeFas) {
               const list = byFocusArea.get(fa.name) ?? [];
-              list.push({ name: emp.name, shift: label, style, draftKind: dk });
+              list.push({ name: getEmployeeDisplayName(emp), shift: label, style, draftKind: dk });
               byFocusArea.set(fa.name, list);
             }
           }
