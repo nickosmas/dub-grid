@@ -1,5 +1,3 @@
-"use client";
-
 import { ShiftCode } from "@/types";
 
 // Excluded from legend — internal/meta entries with no printed meaning

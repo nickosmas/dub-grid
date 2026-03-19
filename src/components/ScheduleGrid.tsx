@@ -5,8 +5,11 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, Tally } from "@/lib/schedule-logic";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange } from "@/types";
-import { getCertAbbr, getRoleAbbrs } from "@/lib/utils";
+import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
+import DroppableCell from "./DroppableCell";
+import DraggableShift from "./DraggableShift";
+import { useAuth } from "@/components/AuthProvider";
 
 function getFocusAreaInitials(name: string): string {
   return name
@@ -72,6 +75,12 @@ interface ScheduleGridProps {
   showAudit?: boolean;
   /** Returns the creator's first name for compact grid display */
   createdByNameForKey?: (empId: string, date: Date) => string | null;
+  /** Suppress hover effects during drag */
+  isDragging?: boolean;
+  /** Called when mouse enters a cell (for copy-paste hover tracking) */
+  onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
+  /** Called on right-click of a cell */
+  onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
 }
 
 
@@ -107,6 +116,9 @@ interface SectionBlockProps {
   cellLocks?: Map<string, { userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
+  isDragging?: boolean;
+  onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
+  onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -140,7 +152,11 @@ const SectionBlock = memo(function SectionBlock({
   cellLocks,
   showAudit,
   createdByNameForKey,
+  isDragging: isDraggingGlobal,
+  onCellHover,
+  onCellContextMenu,
 }: SectionBlockProps) {
+  const { user: currentUser } = useAuth();
   if (employees.length === 0) return null;
 
   // Bind focus-area context so all label lookups within this section
@@ -366,7 +382,8 @@ const SectionBlock = memo(function SectionBlock({
               highlightEmpIds && highlightEmpIds.size > 0
                 ? highlightEmpIds.has(emp.id)
                 : true;
-            const rowBg = "#fff";
+            const isCurrentUser = !!(emp.userId && currentUser && emp.userId === currentUser.id);
+            const rowBg = isCurrentUser ? "var(--color-today-bg)" : "#fff";
             const certAbbr = getCertAbbr(emp.certificationId, certifications);
             const dc =
               DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
@@ -400,32 +417,36 @@ const SectionBlock = memo(function SectionBlock({
                     boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 5 }}
+                  <div style={{
+                    minWidth: 0, position: "relative", overflow: "hidden",
+                    display: "flex", flexDirection: "column", justifyContent: "center",
+                  }}>
+                    <span
+                      style={{
+                        fontSize: getEmployeeDisplayName(emp).length > 22 ? 11 : getEmployeeDisplayName(emp).length > 16 ? 12 : 14,
+                        fontWeight: 600,
+                        color: "var(--color-text-secondary)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        lineHeight: 1.2,
+                      }}
                     >
+                      {getEmployeeDisplayName(emp)}
+                    </span>
+                    {emp.roleIds.length > 0 && (
                       <span
                         style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: "var(--color-text-secondary)",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {emp.name}
-                      </span>
-                    </div>
-                    {emp.roleIds.length > 0 && (
-                      <div
-                        style={{
-                          fontSize: 12,
+                          fontSize: getEmployeeDisplayName(emp).length > 18 ? 9 : 11,
                           color: "var(--color-text-subtle)",
-                          marginTop: 1,
                           whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          lineHeight: 1.2,
                         }}
                       >
                         {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
-                      </div>
+                      </span>
                     )}
                   </div>
                   {emp.certificationId != null && (
@@ -465,11 +486,23 @@ const SectionBlock = memo(function SectionBlock({
                   const isLocked = !!cellLock;
                   const auditName = showAudit ? createdByNameForKey?.(emp.id, date) ?? null : null;
 
+                  const hasDraggableShift = isCellInteractive && !isLocked && shiftCode && shiftCode !== "OFF" && draftKind !== 'deleted';
+                  const firstStyle = hasDraggableShift ? getStyleByIdOrLabel(shiftCode.split("/")[0], cellCodeIds[0]) : null;
+
                   return (
-                    <div
+                    <DroppableCell
                       key={dateKey}
+                      id={`drop_${emp.id}_${dateKey}_${sectionName}`}
+                      data={{ empId: emp.id, date, dateKey, focusAreaName: sectionName }}
+                      disabled={!isCellInteractive || isLocked}
                       onClick={() => {
                         if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
+                      }}
+                      onContextMenu={(e) => {
+                        if (isCellInteractive && onCellContextMenu) {
+                          e.preventDefault();
+                          onCellContextMenu(e, emp.id, date, sectionName);
+                        }
                       }}
                       style={{
                         height: showAudit ? 62 : 48,
@@ -491,9 +524,10 @@ const SectionBlock = memo(function SectionBlock({
                         transition: "background 0.1s",
                       }}
                       onMouseEnter={(e) => {
-                        if (isCellInteractive) {
+                        if (isCellInteractive && !isDraggingGlobal) {
                           e.currentTarget.style.background = "var(--color-today-bg)";
                         }
+                        onCellHover?.(emp.id, date, sectionName);
                         if (shiftCode && shiftCode !== "OFF") {
                           const rect = e.currentTarget.getBoundingClientRect();
                           const content = shiftCode.split("/").map((l, li) => {
@@ -516,7 +550,7 @@ const SectionBlock = memo(function SectionBlock({
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (isCellInteractive) {
+                        if (isCellInteractive && !isDraggingGlobal) {
                           e.currentTarget.style.background = isToday
                             ? "var(--color-today-bg)"
                             : rowBg;
@@ -525,7 +559,21 @@ const SectionBlock = memo(function SectionBlock({
                       }}
                     >
                       {shiftCode && shiftCode !== "OFF" ? (
-                        (() => {
+                        <DraggableShift
+                          id={`drag_${emp.id}_${dateKey}_${sectionName}`}
+                          data={{
+                            empId: emp.id,
+                            date,
+                            dateKey,
+                            label: shiftCode,
+                            shiftCodeIds: cellCodeIds,
+                            focusAreaName: sectionName,
+                            pillColor: firstStyle?.color ?? "#F8FAFC",
+                            pillText: firstStyle?.text ?? "#475569",
+                          }}
+                          disabled={!hasDraggableShift}
+                        >
+                        {(() => {
                           const labels = shiftCode.split("/");
 
                           // Per-pill publish diff: compare from[i] vs to[i] positionally
@@ -953,7 +1001,8 @@ const SectionBlock = memo(function SectionBlock({
                             )}
                             </>
                           );
-                        })()
+                        })()}
+                        </DraggableShift>
                       ) : (showDiffOverlay && draftKind === 'deleted' && publishedLabel) || (publishDiff?.kind === 'deleted' && publishDiff.from.length > 0) ? (
                         (() => {
                           const isDraftDelete = draftKind === 'deleted';
@@ -1098,7 +1147,7 @@ const SectionBlock = memo(function SectionBlock({
                           {cellLock.userName.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 2)}
                         </span>
                       )}
-                    </div>
+                    </DroppableCell>
                   );
                 })}
               </div>
@@ -1204,7 +1253,11 @@ export default function ScheduleGrid({
   cellLocks,
   showAudit,
   createdByNameForKey,
+  isDragging,
+  onCellHover,
+  onCellContextMenu,
 }: ScheduleGridProps) {
+  const { user: currentUser } = useAuth();
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
 
@@ -1431,6 +1484,9 @@ export default function ScheduleGrid({
             cellLocks={cellLocks}
             showAudit={showAudit}
             createdByNameForKey={createdByNameForKey}
+            isDragging={isDragging}
+            onCellHover={onCellHover}
+            onCellContextMenu={onCellContextMenu}
           />
         );
       })}

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem } from "@/types";
-import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
+import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
@@ -223,12 +223,12 @@ function PrintSection({
                         whiteSpace: "normal",
                         overflowWrap: "break-word",
                         lineHeight: 1.05,
-                        fontSize: emp.name.length > 25 ? "0.85em" : emp.name.length > 18 ? "0.95em" : "1em",
+                        fontSize: getEmployeeDisplayName(emp).length > 25 ? "0.85em" : getEmployeeDisplayName(emp).length > 18 ? "0.95em" : "1em",
                         display: "block",
                         maxWidth: `${nameColEm - 4}em`,
                       }}
                     >
-                      {emp.name}
+                      {getEmployeeDisplayName(emp)}
                     </span>
                   </div>
                   {emp.roleIds.length > 0 && (

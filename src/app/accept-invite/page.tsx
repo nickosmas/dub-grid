@@ -2,90 +2,129 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/components/AuthProvider";
-import { DubGridLogo } from "@/components/Logo";
+import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { acceptInvitation } from "@/lib/db";
 
-type PageState =
-  | "loading"
-  | "no-token"
-  | "needs-auth"
-  | "accepting"
-  | "success"
-  | "error";
+type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
 
 export default function AcceptInvitePage() {
-  const { user, isLoading: isAuthLoading } = useAuth();
   const [state, setState] = useState<PageState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [orgSlug, setOrgSlug] = useState<string | null>(null);
 
-  // Login form state (shown when user is not authenticated)
+  // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginLoading, setLoginLoading] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Extract token from URL on mount
+  // Extract token and email from URL on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("token");
+    const emailParam = params.get("email");
     if (!t) {
       setState("no-token");
     } else {
       setToken(t);
+      if (emailParam) setEmail(emailParam);
+      setState("form");
     }
   }, []);
 
-  // Once auth state is resolved and we have a token, determine next step
-  useEffect(() => {
-    if (!token || isAuthLoading) return;
-
-    if (!user) {
-      setState("needs-auth");
-    } else {
-      // User is authenticated — attempt to accept
-      handleAccept(token);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, isAuthLoading]);
-
-  async function handleAccept(inviteToken: string) {
-    setState("accepting");
-    try {
-      await acceptInvitation(inviteToken);
-
-      // Sign out so the user re-authenticates with fresh JWT claims
-      // containing their new org context
-      await supabase.auth.signOut({ scope: "local" });
-
-      setState("success");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to accept invitation";
-      setError(message);
-      setState("error");
-    }
+  function getLoginUrl(slug: string | null) {
+    if (!slug) return "/login";
+    const host = window.location.host;
+    const protocol = window.location.protocol;
+    if (host.startsWith(`${slug}.`)) return "/login";
+    const parts = host.split(".");
+    const baseDomain = parts.length >= 2 ? parts.slice(-2).join(".") : host;
+    return `${protocol}//${slug}.${baseDomain}/login`;
   }
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoginLoading(true);
-    setLoginError(null);
+    setFormError(null);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      setLoginError(authError.message);
-      setLoginLoading(false);
+    if (password !== confirmPassword) {
+      setFormError("Passwords do not match");
+      return;
+    }
+    if (password.length < 6) {
+      setFormError("Password must be at least 6 characters");
       return;
     }
 
-    // Auth state change will trigger the useEffect above to call handleAccept
-    setLoginLoading(false);
+    setLoading(true);
+    setState("processing");
+
+    try {
+      // 1. Sign up — create the Supabase auth account
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (signUpError) {
+        throw new Error(signUpError.message);
+      }
+
+      // If no session (email confirmation required or user already exists),
+      // try signing in directly
+      if (data.user && !data.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          throw new Error(
+            signInError.message.toLowerCase().includes("email not confirmed")
+              ? "Please check your email to confirm your account, then try again."
+              : signInError.message
+          );
+        }
+      }
+
+      // 2. Accept the invitation (now authenticated)
+      let slug: string | null = null;
+      try {
+        const result = await acceptInvitation(token!);
+        slug = result.orgSlug;
+      } catch (acceptErr: any) {
+        const msg: string = acceptErr?.message ?? "";
+        // "Already accepted" is fine — just proceed to success
+        if (!msg.toLowerCase().includes("already been accepted")) {
+          throw new Error(msg || "Failed to accept invitation");
+        }
+        // Try to look up the org slug for redirect
+        try {
+          const { data: inv } = await supabase
+            .from("invitations")
+            .select("org_id, organizations(slug)")
+            .eq("token", token!)
+            .maybeSingle();
+          slug = (inv?.organizations as any)?.slug ?? null;
+        } catch {
+          // Best-effort
+        }
+      }
+
+      // 3. Sign out so user re-authenticates with fresh JWT claims.
+      // Use global scope to revoke the server-side refresh token too,
+      // otherwise the login page will find a stale token in cookies.
+      await supabase.auth.signOut();
+
+      setOrgSlug(slug);
+      setState("success");
+    } catch (err: any) {
+      console.error("[accept-invite] Error:", err);
+      setFormError(err?.message ?? "Something went wrong. Please try again.");
+      setState("form");
+      setLoading(false);
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -119,48 +158,87 @@ export default function AcceptInvitePage() {
         <div
           style={{
             display: "flex",
-            justifyContent: "center",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "10px",
             marginBottom: "32px",
           }}
         >
-          <div
-            style={{
-              padding: "16px",
-              background:
-                "linear-gradient(135deg, #1B3A2D 0%, #2D5A47 100%)",
-              borderRadius: "20px",
-              boxShadow: "0 8px 16px rgba(27, 58, 45, 0.2)",
-            }}
-          >
-            <DubGridLogo size={40} color="#fff" />
-          </div>
+          <DubGridLogo size={52} />
+          <DubGridWordmark />
         </div>
 
-        {state === "loading" || state === "accepting" ? (
+        {state === "loading" || state === "processing" ? (
           <LoadingState
-            message={
-              state === "accepting"
-                ? "Accepting invitation..."
-                : "Loading..."
-            }
+            message={state === "processing" ? "Setting up your account..." : "Loading..."}
           />
         ) : state === "no-token" ? (
           <ErrorState
             title="Invalid Link"
             message="This invitation link is missing a token. Please check the link you received and try again."
           />
-        ) : state === "needs-auth" ? (
-          <LoginForm
-            email={email}
-            password={password}
-            error={loginError}
-            loading={loginLoading}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            onSubmit={handleLogin}
-          />
+        ) : state === "form" ? (
+          <>
+            <h1 style={headingStyle}>Accept Invitation</h1>
+            <p style={subtextStyle}>
+              Set your password to join your organization.
+            </p>
+
+            <form
+              onSubmit={handleSubmit}
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                readOnly={!!new URLSearchParams(window.location.search).get("email")}
+                style={{
+                  ...inputStyle,
+                  ...(new URLSearchParams(window.location.search).get("email")
+                    ? { background: "#F1F5F9", color: "#64748B" }
+                    : {}),
+                }}
+              />
+
+              <PasswordInput
+                placeholder="Password"
+                value={password}
+                onChange={setPassword}
+                showPassword={showPassword}
+                onToggle={() => setShowPassword(!showPassword)}
+              />
+              <PasswordInput
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                showPassword={showPassword}
+                onToggle={() => setShowPassword(!showPassword)}
+              />
+
+              {formError && (
+                <p style={{ color: "#DC2626", fontSize: "14px", margin: 0, textAlign: "left" }}>
+                  {formError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  ...primaryButtonStyle,
+                  opacity: loading ? 0.6 : 1,
+                  cursor: loading ? "not-allowed" : "pointer",
+                }}
+              >
+                {loading ? "Setting up..." : "Set Password & Accept"}
+              </button>
+            </form>
+          </>
         ) : state === "success" ? (
-          <SuccessState />
+          <SuccessState orgSlug={orgSlug} getLoginUrl={getLoginUrl} />
         ) : state === "error" ? (
           <ErrorState
             title="Invitation Failed"
@@ -174,6 +252,66 @@ export default function AcceptInvitePage() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+function PasswordInput({
+  placeholder,
+  value,
+  onChange,
+  showPassword,
+  onToggle,
+}: {
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  showPassword: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        type={showPassword ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required
+        minLength={6}
+        style={{ ...inputStyle, paddingRight: 48 }}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        tabIndex={-1}
+        style={{
+          position: "absolute",
+          right: 12,
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 4,
+          color: "#94A3B8",
+          display: "flex",
+          alignItems: "center",
+        }}
+        aria-label={showPassword ? "Hide password" : "Show password"}
+      >
+        {showPassword ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 function LoadingState({ message }: { message: string }) {
   return (
     <>
@@ -183,31 +321,48 @@ function LoadingState({ message }: { message: string }) {
   );
 }
 
-function SuccessState() {
+function SuccessState({
+  orgSlug,
+  getLoginUrl,
+}: {
+  orgSlug: string | null;
+  getLoginUrl: (slug: string | null) => string;
+}) {
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(id);
+          window.location.href = getLoginUrl(orgSlug);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
-      <h1 style={headingStyle}>Invitation Accepted</h1>
+      <h1 style={headingStyle}>You&apos;re All Set</h1>
       <p style={subtextStyle}>
-        You have been added to the organization. Please sign in to access your
-        new workspace.
+        Your account has been created and invitation accepted.
+        Redirecting to sign in{countdown > 0 ? ` in ${countdown}...` : "..."}
       </p>
       <button
-        onClick={() => (window.location.href = "/login")}
+        onClick={() => (window.location.href = getLoginUrl(orgSlug))}
         style={primaryButtonStyle}
       >
-        Sign In
+        Sign In Now
       </button>
     </>
   );
 }
 
-function ErrorState({
-  title,
-  message,
-}: {
-  title: string;
-  message: string;
-}) {
+function ErrorState({ title, message }: { title: string; message: string }) {
   return (
     <>
       <h1 style={headingStyle}>{title}</h1>
@@ -218,80 +373,6 @@ function ErrorState({
       >
         Go to Login
       </button>
-    </>
-  );
-}
-
-function LoginForm({
-  email,
-  password,
-  error,
-  loading,
-  onEmailChange,
-  onPasswordChange,
-  onSubmit,
-}: {
-  email: string;
-  password: string;
-  error: string | null;
-  loading: boolean;
-  onEmailChange: (v: string) => void;
-  onPasswordChange: (v: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-}) {
-  return (
-    <>
-      <h1 style={headingStyle}>Accept Invitation</h1>
-      <p style={subtextStyle}>
-        Sign in to accept your organization invitation.
-      </p>
-
-      <form
-        onSubmit={onSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 24 }}
-      >
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => onEmailChange(e.target.value)}
-          required
-          style={inputStyle}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => onPasswordChange(e.target.value)}
-          required
-          style={inputStyle}
-        />
-
-        {error && (
-          <p
-            style={{
-              color: "#DC2626",
-              fontSize: "14px",
-              margin: 0,
-              textAlign: "left",
-            }}
-          >
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            ...primaryButtonStyle,
-            opacity: loading ? 0.6 : 1,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Signing in..." : "Sign In & Accept"}
-        </button>
-      </form>
     </>
   );
 }
@@ -308,7 +389,7 @@ const headingStyle: React.CSSProperties = {
 
 const subtextStyle: React.CSSProperties = {
   fontSize: "16px",
-  color:"#475569",
+  color: "#475569",
   lineHeight: 1.6,
   marginBottom: "24px",
 };

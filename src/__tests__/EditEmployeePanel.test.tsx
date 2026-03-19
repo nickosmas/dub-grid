@@ -47,7 +47,8 @@ const focusAreas: FocusArea[] = [
 
 const employee: Employee = {
   id: "emp-42",
-  name: "Alice Smith",
+  firstName: "Alice",
+  lastName: "Smith",
   status: "active",
   statusChangedAt: null,
   statusNote: "",
@@ -58,6 +59,7 @@ const employee: Employee = {
   phone: "555-1234",
   email: "alice@example.com",
   contactNotes: "",
+  userId: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -103,10 +105,10 @@ describe("EditEmployeePanel", () => {
   // Pre-population
   // -------------------------------------------------------------------------
   describe("Pre-population", () => {
-    it("name input is pre-populated with employee.name", () => {
+    it("name inputs are pre-populated with employee firstName and lastName", () => {
       renderPanel();
-      const nameInput = screen.getByDisplayValue("Alice Smith");
-      expect(nameInput).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Smith")).toBeInTheDocument();
     });
 
     it("phone input is pre-populated with employee.phone", () => {
@@ -133,12 +135,12 @@ describe("EditEmployeePanel", () => {
       ).toBeDisabled();
     });
 
-    it("Save Changes becomes enabled after changing the name field", async () => {
+    it("Save Changes becomes enabled after changing the first name field", async () => {
       const user = userEvent.setup();
       renderPanel();
-      const nameInput = screen.getByDisplayValue("Alice Smith");
+      const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
-      await user.type(nameInput, "Bob Jones");
+      await user.type(nameInput, "Bob");
       expect(
         screen.getByRole("button", { name: "Save Changes" }),
       ).not.toBeDisabled();
@@ -155,14 +157,14 @@ describe("EditEmployeePanel", () => {
       ).not.toBeDisabled();
     });
 
-    it("Save Changes is disabled when name is cleared even if other fields are modified", async () => {
+    it("Save Changes is disabled when first name is cleared even if other fields are modified", async () => {
       const user = userEvent.setup();
       renderPanel();
       // First modify designation so isModified would be true
       await user.click(screen.getByRole("button", { name: /STAFF/ }));
       await user.click(screen.getByRole("button", { name: "CSN II" }));
-      // Then clear the name
-      const nameInput = screen.getByDisplayValue("Alice Smith");
+      // Then clear the first name
+      const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
       expect(
         screen.getByRole("button", { name: "Save Changes" }),
@@ -173,9 +175,9 @@ describe("EditEmployeePanel", () => {
       const user = userEvent.setup();
       renderPanel();
       // Modify name so isModified is true
-      const nameInput = screen.getByDisplayValue("Alice Smith");
+      const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
-      await user.type(nameInput, "Bob Jones");
+      await user.type(nameInput, "Bob");
       // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(
@@ -193,9 +195,9 @@ describe("EditEmployeePanel", () => {
       const onSave = vi.fn();
       renderPanel({ onSave });
 
-      const nameInput = screen.getByDisplayValue("Alice Smith");
-      await user.clear(nameInput);
-      await user.type(nameInput, "Bob Jones");
+      const firstNameInput = screen.getByDisplayValue("Alice");
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, "Bob");
 
       await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
@@ -203,7 +205,8 @@ describe("EditEmployeePanel", () => {
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "emp-42",
-          name: "Bob Jones",
+          firstName: "Bob",
+          lastName: "Smith",
           certificationId: 4,
           focusAreaIds: [1],
           phone: "555-1234",
@@ -273,7 +276,8 @@ describe("EditEmployeePanel", () => {
       // Arbitrary Employee generator
       const arbEmployee = fc.record({
         id: fc.uuid(),
-        name: fc.string({ minLength: 1, maxLength: 40 }),
+        firstName: fc.string({ minLength: 1, maxLength: 20 }),
+        lastName: fc.string({ minLength: 1, maxLength: 20 }),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),
@@ -284,6 +288,7 @@ describe("EditEmployeePanel", () => {
         phone: fc.string({ maxLength: 20 }),
         email: fc.string({ maxLength: 30 }),
         contactNotes: fc.string({ maxLength: 50 }),
+        userId: fc.constant(null as string | null),
       });
 
       fc.assert(
@@ -326,7 +331,7 @@ describe("EditEmployeePanel", () => {
               'input:not([type="number"])',
             )!;
             fireEvent.change(nameInput, {
-              target: { value: emp.name + "X" },
+              target: { value: emp.firstName + "X" },
             });
 
             // Assert Save is enabled after mutation

@@ -398,12 +398,10 @@ function GridmasterLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const showLoadingText = useDelayedFlag(loading);
-  const [message, setMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setMessage("");
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -416,20 +414,25 @@ function GridmasterLogin() {
 
       setTimeout(() => {
         setLoading(false);
-        setMessage("Navigation timed out. Please try refreshing the page.");
+        toast.error("Navigation timed out. Please try refreshing the page.");
       }, 8000);
     } catch (err: any) {
       const msg = err.message?.toLowerCase() ?? "";
       if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
-        setMessage("Invalid email or password.");
+        toast.error("Invalid email or password.");
+      } else if (msg.includes("hook") || msg.includes("unexpected") || msg.includes("hook_payload")) {
+        toast.error("Something went wrong during sign in. Please try again.");
       } else if (msg.includes("fetch") || msg.includes("network")) {
-        setMessage("Network error — please check your connection.");
+        toast.error("Network error — please check your connection.");
       } else {
-        setMessage(err.message || "An error occurred");
+        toast.error("Unable to sign in. Please try again.");
       }
       setLoading(false);
     }
   }
+
+  // Gridmaster login has no Toaster of its own — it's rendered inside PublicRoute
+  // which is inside AuthProvider (which has the Toaster).
 
   return (
     <div
@@ -489,22 +492,6 @@ function GridmasterLogin() {
         >
           Platform Admin Sign In
         </h1>
-
-        {message && (
-          <div
-            style={{
-              padding: "12px",
-              background: "#7F1D1D",
-              color: "#FECACA",
-              borderRadius: "8px",
-              fontSize: "14px",
-              marginBottom: "16px",
-              border: "1px solid #991B1B",
-            }}
-          >
-            {message}
-          </div>
-        )}
 
         <form
           onSubmit={handleSubmit}
@@ -605,9 +592,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const showLoadingText = useDelayedFlag(loading);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
-
   // Validate subdomain in the background — never block form render.
   // DomainSelector already validates before redirecting here (?verified=1),
   // and the post-login JWT check catches org mismatches regardless.
@@ -638,8 +622,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setMessage("");
-    setIsError(false);
 
     try {
       // Sign in — the response already includes the session (no extra getSession() needed)
@@ -664,8 +646,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
             if (rpcError || !orgs) {
               await supabase.auth.signOut({ scope: "local" });
-              setMessage("Unable to verify workspace access.");
-              setIsError(true);
+              toast.error("Unable to verify workspace access. Please try again.");
               setLoading(false);
               return;
             }
@@ -680,8 +661,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
               if (switchError) {
                 await supabase.auth.signOut({ scope: "local" });
-                setMessage("Failed to switch workspace context.");
-                setIsError(true);
+                toast.error("Failed to switch workspace. Please try again.");
                 setLoading(false);
                 return;
               }
@@ -689,8 +669,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               await supabase.auth.refreshSession();
             } else {
               await supabase.auth.signOut({ scope: "local" });
-              setMessage("Your account is not associated with this workspace.");
-              setIsError(true);
+              toast.error("Your account is not associated with this workspace.");
               setLoading(false);
               return;
             }
@@ -702,21 +681,21 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
       setTimeout(() => {
         setLoading(false);
-        setMessage("Navigation timed out. Please try refreshing the page.");
-        setIsError(true);
+        toast.error("Navigation timed out. Please try refreshing the page.");
       }, 8000);
     } catch (err: any) {
       const msg = err.message?.toLowerCase() ?? "";
       if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
-        setMessage("Invalid email or password. Please try again.");
+        toast.error("Invalid email or password. Please try again.");
       } else if (msg.includes("email not confirmed")) {
-        setMessage("Your email has not been confirmed. Check your inbox for a confirmation link.");
+        toast.error("Your email has not been confirmed. Check your inbox for a confirmation link.");
+      } else if (msg.includes("hook") || msg.includes("unexpected")) {
+        toast.error("Something went wrong during sign in. Please try again.");
       } else if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
-        setMessage("Network error — please check your connection and try again.");
+        toast.error("Network error — please check your connection and try again.");
       } else {
-        setMessage(err.message || "An unexpected error occurred. Please try again.");
+        toast.error("Unable to sign in. Please try again.");
       }
-      setIsError(true);
       setLoading(false);
     }
   }
@@ -771,49 +750,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         >
           Sign in to your workspace
         </h1>
-
-        {message && (
-          <div
-            style={{
-              padding: "12px 14px",
-              background: isError ? "#FEF2F2" : "#F0FDF4",
-              color: isError ? "#B91C1C" : "#166534",
-              borderRadius: "8px",
-              fontSize: "14px",
-              marginBottom: "20px",
-              lineHeight: 1.5,
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        {message && isError && (
-          <div style={{ marginBottom: 20 }}>
-            <button
-              type="button"
-              onClick={async () => {
-                await supabase.auth.signOut({ scope: "local" });
-                setMessage("");
-                setIsError(false);
-                window.location.reload();
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 16px",
-                background: "#fff",
-                border: "2px solid #B91C1C",
-                borderRadius: "8px",
-                color: "#B91C1C",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Sign out and try again
-            </button>
-          </div>
-        )}
 
         <form
           onSubmit={handleSubmit}

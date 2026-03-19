@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { Employee, FocusArea, NamedItem } from "@/types";
+import { getEmployeeDisplayName } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
 
 export interface EditEmployeePanelProps {
@@ -17,10 +18,12 @@ export interface EditEmployeePanelProps {
   onBench: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onCancel: () => void;
+  onInvite?: (emp: Employee) => void;
 }
 
 type EditForm = {
-  name: string;
+  firstName: string;
+  lastName: string;
   certificationId: number | null;
   focusAreaIds: number[];
   roleIds: number[];
@@ -42,9 +45,11 @@ export default function EditEmployeePanel({
   onBench,
   onActivate,
   onCancel,
+  onInvite,
 }: EditEmployeePanelProps) {
   const [form, setForm] = useState<EditForm>({
-    name: employee.name,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
     certificationId: employee.certificationId,
     focusAreaIds: employee.focusAreaIds,
     roleIds: employee.roleIds,
@@ -59,7 +64,8 @@ export default function EditEmployeePanel({
 
   const isModified = useMemo(() => {
     return (
-      form.name !== employee.name ||
+      form.firstName !== employee.firstName ||
+      form.lastName !== employee.lastName ||
       form.certificationId !== employee.certificationId ||
       form.phone !== employee.phone ||
       form.email !== employee.email ||
@@ -72,11 +78,12 @@ export default function EditEmployeePanel({
   }, [form, employee]);
 
   const handleSave = useCallback(() => {
-    if (!form.name.trim()) return;
+    if (!form.firstName.trim()) return;
     if (form.focusAreaIds.length === 0) return;
     onSave({
       ...employee,
-      name: form.name.trim(),
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
       certificationId: form.certificationId,
       focusAreaIds: form.focusAreaIds,
       roleIds: form.roleIds,
@@ -134,17 +141,31 @@ export default function EditEmployeePanel({
         {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Name */}
-          <div>
-            <label style={labelStyle}>FULL NAME</label>
-            <input
-              className="dg-input"
-              value={form.name}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, name: e.target.value }))
-              }
-              placeholder="e.g. Maria S."
-              readOnly={readOnly}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>FIRST NAME</label>
+              <input
+                className="dg-input"
+                value={form.firstName}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, firstName: e.target.value }))
+                }
+                placeholder="e.g. Maria"
+                readOnly={readOnly}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>LAST NAME</label>
+              <input
+                className="dg-input"
+                value={form.lastName}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, lastName: e.target.value }))
+                }
+                placeholder="e.g. Garcia"
+                readOnly={readOnly}
+              />
+            </div>
           </div>
 
           {/* Contact details */}
@@ -173,6 +194,11 @@ export default function EditEmployeePanel({
                 placeholder="name@example.com"
                 readOnly={readOnly}
               />
+              {employee.userId && form.email !== employee.email && (
+                <p style={{ fontSize: 11, color: "#D97706", margin: "4px 0 0", lineHeight: 1.3 }}>
+                  This employee has a linked account. Changing the contact email does not change their login email.
+                </p>
+              )}
             </div>
           </div>
 
@@ -296,7 +322,7 @@ export default function EditEmployeePanel({
         {isActive && showBenchConfirm ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEF3C7", padding: "12px 16px", borderRadius: 8, width: "100%" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
-              Bench {form.name}? They will be removed from the schedule but their data will be preserved.
+              Bench {getEmployeeDisplayName(form)}? They will be removed from the schedule but their data will be preserved.
             </span>
             <input
               className="dg-input"
@@ -324,7 +350,7 @@ export default function EditEmployeePanel({
         ) : employee.status !== "terminated" && showDeleteConfirm ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEE2E2", padding: "12px 16px", borderRadius: 8, width: "100%" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#991B1B" }}>
-              Terminate {form.name}? They will be permanently removed from the schedule and staff list. Historical shift data will be preserved.
+              Terminate {getEmployeeDisplayName(form)}? They will be permanently removed from the schedule and staff list. Historical shift data will be preserved.
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -349,7 +375,7 @@ export default function EditEmployeePanel({
                 <button
                   onClick={handleSave}
                   disabled={
-                    !isModified || !form.name.trim() || form.focusAreaIds.length === 0
+                    !isModified || !form.firstName.trim() || form.focusAreaIds.length === 0
                   }
                   className="dg-btn dg-btn-primary"
                   style={{ minWidth: 120 }}
@@ -383,6 +409,18 @@ export default function EditEmployeePanel({
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
                 Activate
+              </button>
+            )}
+            {onInvite && employee.email && !employee.userId && (
+              <button
+                onClick={() => onInvite(employee)}
+                className="dg-btn dg-btn-ghost"
+                style={{ color: "#2563EB", border: "1px solid #BFDBFE" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+                </svg>
+                Invite
               </button>
             )}
             {isActive && (

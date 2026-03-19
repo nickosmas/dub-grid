@@ -34,6 +34,10 @@ vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: any) => <a href={href} {...rest}>{children}</a>,
 }));
 
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
+}));
+
 const focusAreas: FocusArea[] = [
   {
     id: 1,
@@ -48,7 +52,8 @@ const focusAreas: FocusArea[] = [
 const employees: Employee[] = [
   {
     id: "emp-1",
-    name: "Alice Smith",
+    firstName: "Alice",
+    lastName: "Smith",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -59,10 +64,12 @@ const employees: Employee[] = [
     phone: "",
     email: "",
     contactNotes: "",
+    userId: null,
   },
   {
     id: "emp-2",
-    name: "Bob Jones",
+    firstName: "Bob",
+    lastName: "Jones",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -73,6 +80,7 @@ const employees: Employee[] = [
     phone: "",
     email: "",
     contactNotes: "",
+    userId: null,
   },
 ];
 
@@ -89,6 +97,7 @@ const defaultProps = {
   onBench: vi.fn(),
   onActivate: vi.fn(),
   onAdd: vi.fn(),
+  canManageEmployees: true,
 };
 
 describe("StaffView", () => {
@@ -157,7 +166,8 @@ describe("Property-based tests", () => {
   const arbUniqueEmployees = fc
     .array(
       fc.record({
-        name: fc.string({ minLength: 1, maxLength: 40 }),
+        firstName: fc.string({ minLength: 1, maxLength: 20 }),
+        lastName: fc.string({ minLength: 1, maxLength: 20 }),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),
@@ -170,6 +180,7 @@ describe("Property-based tests", () => {
         phone: fc.string(),
         email: fc.string(),
         contactNotes: fc.string(),
+        userId: fc.constant(null as string | null),
       }),
       { minLength: 1, maxLength: 20 },
     )
@@ -245,6 +256,12 @@ describe("Property-based tests", () => {
 
       await fc.assert(
         fc.asyncProperty(arbUniqueEmployees, async (emps) => {
+          // The component sorts by lastName then firstName (not by full display name).
+          // Verify the rendered order matches that sort.
+          const expected = [...emps].sort(
+            (a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
+          );
+
           const { unmount, container } = render(
             <StaffView
               employees={emps}
@@ -290,15 +307,13 @@ describe("Property-based tests", () => {
             return nameDiv.childNodes[0]?.textContent ?? "";
           });
 
-          // Assert non-decreasing alphabetical order
-          for (let i = 0; i < names.length - 1; i++) {
-            if (names[i].localeCompare(names[i + 1]) > 0) {
-              unmount();
-              return false;
-            }
-          }
-
           unmount();
+
+          // Compare rendered order against expected order (lastName then firstName)
+          const expectedNames = expected.map((e) => `${e.firstName} ${e.lastName}`.trim());
+          for (let i = 0; i < expectedNames.length; i++) {
+            if (names[i] !== expectedNames[i]) return false;
+          }
           return true;
         }),
         { numRuns: 100 },
@@ -360,7 +375,7 @@ describe("Property-based tests", () => {
           unmount();
 
           // Compare rendered order against expected order by name
-          const expectedNames = expected.map((e) => e.name);
+          const expectedNames = expected.map((e) => `${e.firstName} ${e.lastName}`.trim());
           for (let i = 0; i < expectedNames.length; i++) {
             if (renderedNames[i] !== expectedNames[i]) return false;
           }

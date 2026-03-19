@@ -348,40 +348,40 @@ BEGIN
   DELETE FROM public.employees WHERE org_id = org;
 
   INSERT INTO public.employees
-    (org_id, name, certification_id, role_ids, seniority, focus_area_ids)
+    (org_id, first_name, last_name, certification_id, role_ids, seniority, focus_area_ids)
   VALUES
     -- Skilled Nursing ────────────────────────────────────────────────────
-    (org, 'Connie Wahl',           cert_jlcsn, ARRAY[role_dcsn],                      1, ARRAY[fa_snw]),
-    (org, 'Robert Miruka',         cert_jlcsn, ARRAY[role_mentor],                    2, ARRAY[fa_snw, fa_sc]),
-    (org, 'Rose Keyaer',           cert_jlcsn, ARRAY[role_supv],                      3, ARRAY[fa_snw, fa_sc]),
-    (org, 'Shirley Bihag',         cert_jlcsn, ARRAY[role_supv],                      4, ARRAY[fa_snw, fa_sc]),
-    (org, 'Queen Nwosu',           cert_jlcsn, ARRAY[role_mentor, role_supv],          5, ARRAY[fa_snw, fa_sc]),
-    (org, 'Ben Egwuenu',           cert_jlcsn, ARRAY[role_supv],                      6, ARRAY[fa_snw, fa_sc]),
-    (org, 'Linda Luciani',         cert_jlcsn, ARRAY[role_supv, role_cn],              7, ARRAY[fa_snw, fa_vcsn, fa_sc]),
-    (org, 'Paul Otieno',           cert_jlcsn, ARRAY[role_supv],                      8, ARRAY[fa_snw]),
-    (org, 'Julius Miruka',         cert_jlcsn, ARRAY[role_supv],                      9, ARRAY[fa_snw, fa_ns]),
-    (org, 'Becky Hoskyn',          cert_jlcsn, ARRAY[]::bigint[],                    10, ARRAY[fa_snw]),
-    (org, 'Jared Onsabwa',         cert_staff, ARRAY[]::bigint[],                    11, ARRAY[fa_snw]),
-    (org, 'Emmanuel Odenyi',       cert_staff, ARRAY[]::bigint[],                    12, ARRAY[fa_snw, fa_sc]),
-    (org, 'Nicodamus Kosmas',      cert_staff, ARRAY[]::bigint[],                    13, ARRAY[fa_snw, fa_sc]),
-    (org, 'Josiah "Joey" Onyechi', cert_staff, ARRAY[]::bigint[],                    14, ARRAY[fa_snw, fa_sc]),
-    (org, 'Alice Mburu',           cert_staff, ARRAY[]::bigint[],                    15, ARRAY[fa_snw, fa_sc]),
-    (org, 'Alayne Reed',           cert_staff, ARRAY[]::bigint[],                    16, ARRAY[fa_snw]),
-    (org, 'Chris Michael Mawere',  cert_csn3,  ARRAY[]::bigint[],                    17, ARRAY[fa_snw, fa_vcsn, fa_sc]),
-    (org, 'Daniel Ogbonna',        cert_csn3,  ARRAY[]::bigint[],                    18, ARRAY[fa_snw, fa_sc]),
-    (org, 'Alphince Baraza',       cert_csn3,  ARRAY[]::bigint[],                    19, ARRAY[fa_snw, fa_sc]),
-    (org, 'Arphaxard Ouma',        cert_csn2,  ARRAY[]::bigint[],                    20, ARRAY[fa_snw, fa_sc]),
-    (org, 'Mercy Kigera',          cert_csn2,  ARRAY[]::bigint[],                    21, ARRAY[fa_snw, fa_sc]),
-    (org, 'Vicky Kiende',          cert_csn2,  ARRAY[]::bigint[],                    22, ARRAY[fa_snw, fa_sc]),
-    (org, 'Deborah Lee',           cert_jlcsn, ARRAY[role_scmgr],                    23, ARRAY[fa_snw, fa_sc]),
-    (org, 'Sherry Otieno',         cert_other, ARRAY[role_actcor],                   24, ARRAY[fa_snw, fa_sc]),
-    (org, 'Deborah Gray',          cert_other, ARRAY[role_scasst],                   25, ARRAY[fa_snw, fa_sc]),
+    (org, 'Connie',          'Wahl',     cert_jlcsn, ARRAY[role_dcsn],                      1, ARRAY[fa_snw]),
+    (org, 'Robert',          'Miruka',   cert_jlcsn, ARRAY[role_mentor],                    2, ARRAY[fa_snw, fa_sc]),
+    (org, 'Rose',            'Keyaer',   cert_jlcsn, ARRAY[role_supv],                      3, ARRAY[fa_snw, fa_sc]),
+    (org, 'Shirley',         'Bihag',    cert_jlcsn, ARRAY[role_supv],                      4, ARRAY[fa_snw, fa_sc]),
+    (org, 'Queen',           'Nwosu',    cert_jlcsn, ARRAY[role_mentor, role_supv],          5, ARRAY[fa_snw, fa_sc]),
+    (org, 'Ben',             'Egwuenu',  cert_jlcsn, ARRAY[role_supv],                      6, ARRAY[fa_snw, fa_sc]),
+    (org, 'Linda',           'Luciani',  cert_jlcsn, ARRAY[role_supv, role_cn],              7, ARRAY[fa_snw, fa_vcsn, fa_sc]),
+    (org, 'Paul',            'Otieno',   cert_jlcsn, ARRAY[role_supv],                      8, ARRAY[fa_snw]),
+    (org, 'Julius',          'Miruka',   cert_jlcsn, ARRAY[role_supv],                      9, ARRAY[fa_snw, fa_ns]),
+    (org, 'Becky',           'Hoskyn',   cert_jlcsn, ARRAY[]::bigint[],                    10, ARRAY[fa_snw]),
+    (org, 'Jared',           'Onsabwa',  cert_staff, ARRAY[]::bigint[],                    11, ARRAY[fa_snw]),
+    (org, 'Emmanuel',        'Odenyi',   cert_staff, ARRAY[]::bigint[],                    12, ARRAY[fa_snw, fa_sc]),
+    (org, 'Nicodamus',       'Kosmas',   cert_staff, ARRAY[]::bigint[],                    13, ARRAY[fa_snw, fa_sc]),
+    (org, 'Josiah "Joey"',   'Onyechi',  cert_staff, ARRAY[]::bigint[],                    14, ARRAY[fa_snw, fa_sc]),
+    (org, 'Alice',           'Mburu',    cert_staff, ARRAY[]::bigint[],                    15, ARRAY[fa_snw, fa_sc]),
+    (org, 'Alayne',          'Reed',     cert_staff, ARRAY[]::bigint[],                    16, ARRAY[fa_snw]),
+    (org, 'Chris Michael',   'Mawere',   cert_csn3,  ARRAY[]::bigint[],                    17, ARRAY[fa_snw, fa_vcsn, fa_sc]),
+    (org, 'Daniel',          'Ogbonna',  cert_csn3,  ARRAY[]::bigint[],                    18, ARRAY[fa_snw, fa_sc]),
+    (org, 'Alphince',        'Baraza',   cert_csn3,  ARRAY[]::bigint[],                    19, ARRAY[fa_snw, fa_sc]),
+    (org, 'Arphaxard',       'Ouma',     cert_csn2,  ARRAY[]::bigint[],                    20, ARRAY[fa_snw, fa_sc]),
+    (org, 'Mercy',           'Kigera',   cert_csn2,  ARRAY[]::bigint[],                    21, ARRAY[fa_snw, fa_sc]),
+    (org, 'Vicky',           'Kiende',   cert_csn2,  ARRAY[]::bigint[],                    22, ARRAY[fa_snw, fa_sc]),
+    (org, 'Deborah',         'Lee',      cert_jlcsn, ARRAY[role_scmgr],                    23, ARRAY[fa_snw, fa_sc]),
+    (org, 'Sherry',          'Otieno',   cert_other, ARRAY[role_actcor],                   24, ARRAY[fa_snw, fa_sc]),
+    (org, 'Deborah',         'Gray',     cert_other, ARRAY[role_scasst],                   25, ARRAY[fa_snw, fa_sc]),
     -- Night Shift ─────────────────────────────────────────────────────────────
-    (org, 'Grace Kamiti',          cert_jlcsn, ARRAY[role_supv],                     26, ARRAY[fa_ns]),
-    (org, 'Stephen Onsabwa',       cert_jlcsn, ARRAY[role_supv],                     27, ARRAY[fa_ns]),
+    (org, 'Grace',           'Kamiti',   cert_jlcsn, ARRAY[role_supv],                     26, ARRAY[fa_ns]),
+    (org, 'Stephen',         'Onsabwa',  cert_jlcsn, ARRAY[role_supv],                     27, ARRAY[fa_ns]),
     -- Visiting CSNS ───────────────────────────────────────────────────────────
-    (org, 'Aicha Langel',          cert_jlcsn, ARRAY[role_dvcsn],                    28, ARRAY[fa_vcsn])
-  ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
+    (org, 'Aicha',           'Langel',   cert_jlcsn, ARRAY[role_dvcsn],                    28, ARRAY[fa_vcsn])
+  ON CONFLICT (org_id, first_name, last_name) WHERE archived_at IS NULL DO NOTHING;
 
 END $$;
 -- =============================================================================
@@ -905,7 +905,7 @@ BEGIN
     ('Aicha Langel', '2026-04-04', ARRAY[c_x],  NULL, NULL, NULL)
 
   ) AS v(emp_name, dt, codes, fa_id, cstart, cend)
-  JOIN public.employees e ON e.name = v.emp_name AND e.org_id = org
+  JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
   ON CONFLICT (emp_id, date) DO UPDATE SET
     published_shift_code_ids = EXCLUDED.published_shift_code_ids,
     focus_area_id = EXCLUDED.focus_area_id,

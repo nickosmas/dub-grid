@@ -7,7 +7,8 @@ import CustomSelect from "@/components/CustomSelect";
 
 type RowEntry = {
   _id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   certificationId: number | null;
   focusAreaIds: number[];
 };
@@ -15,7 +16,8 @@ type RowEntry = {
 function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEntry {
   return {
     _id: Math.random().toString(36).slice(2),
-    name: "",
+    firstName: "",
+    lastName: "",
     certificationId,
     focusAreaIds,
   };
@@ -42,7 +44,7 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
 
   const lastNameRef = useRef<HTMLInputElement | null>(null);
 
-  const validRows = rows.filter((r) => r.name.trim() && r.focusAreaIds.length > 0);
+  const validRows = rows.filter((r) => r.firstName.trim() && r.focusAreaIds.length > 0);
 
   const updateRow = useCallback((id: string, patch: Partial<Omit<RowEntry, "_id">>) => {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
@@ -77,7 +79,8 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
     if (validRows.length === 0) return;
     onAdd(
       validRows.map((r) => ({
-        name: r.name.trim(),
+        firstName: r.firstName.trim(),
+        lastName: r.lastName.trim(),
         certificationId: r.certificationId,
         focusAreaIds: r.focusAreaIds,
         roleIds: [],
@@ -87,6 +90,7 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
         status: "active" as const,
         statusChangedAt: null,
         statusNote: "",
+        userId: null,
       })),
     );
   }, [validRows, onAdd]);
@@ -106,14 +110,14 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 140px 1fr 28px",
+            gridTemplateColumns: "1fr 1fr 140px 1fr 28px",
             gap: 8,
             paddingBottom: 6,
             borderBottom: "1px solid var(--color-border-light)",
             marginBottom: 4,
           }}
         >
-          {["NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h) => (
+          {["FIRST NAME", "LAST NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h) => (
             <div key={h} style={labelStyle}>{h}</div>
           ))}
         </div>
@@ -127,25 +131,40 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                 key={row._id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 140px 1fr 28px",
+                  gridTemplateColumns: "1fr 1fr 140px 1fr 28px",
                   gap: 8,
                   alignItems: "center",
                 }}
               >
-                {/* Name */}
+                {/* First Name */}
                 <input
-                  ref={isLast ? lastNameRef : undefined}
                   className="dg-input"
-                  value={row.name}
-                  onChange={(e) => updateRow(row._id, { name: e.target.value })}
+                  value={row.firstName}
+                  onChange={(e) => updateRow(row._id, { firstName: e.target.value })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       if (isLast) addRow();
                     }
                   }}
-                  placeholder="Full name"
+                  placeholder="First name"
                   autoFocus={idx === 0}
+                  style={{ fontSize: 13 }}
+                />
+
+                {/* Last Name */}
+                <input
+                  ref={isLast ? lastNameRef : undefined}
+                  className="dg-input"
+                  value={row.lastName}
+                  onChange={(e) => updateRow(row._id, { lastName: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (isLast) addRow();
+                    }
+                  }}
+                  placeholder="Last name"
                   style={{ fontSize: 13 }}
                 />
 

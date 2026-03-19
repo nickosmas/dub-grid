@@ -97,6 +97,7 @@ function StaffPageContent() {
             focusAreaLabel={org?.focusAreaLabel}
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}
+            orgName={org?.name}
           />
 
           {showAddModal && (

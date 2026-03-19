@@ -137,7 +137,8 @@ CREATE TABLE public.certifications (
 CREATE TABLE public.employees (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id            UUID NOT NULL,
-  name              TEXT NOT NULL,
+  first_name        TEXT NOT NULL,
+  last_name         TEXT NOT NULL,
   seniority         INTEGER NOT NULL,
   phone             TEXT NOT NULL DEFAULT '',
   email             TEXT NOT NULL DEFAULT '',
@@ -152,7 +153,9 @@ CREATE TABLE public.employees (
   created_by        UUID,
   updated_by        UUID,
   created_at        TIMESTAMPTZ DEFAULT now(),
-  updated_at        TIMESTAMPTZ DEFAULT now()
+  updated_at        TIMESTAMPTZ DEFAULT now(),
+  /** Linked Supabase auth user. Set when invitation is accepted. */
+  user_id           UUID
 );
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
@@ -331,9 +334,15 @@ CREATE TABLE public.invitations (
   accepted_at    TIMESTAMPTZ,
   revoked_at     TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-  CONSTRAINT one_pending_invite_per_email UNIQUE (org_id, email)
+  /** Employee record this invitation is for. Set when inviting from staff page. */
+  employee_id    UUID
 );
+
+-- Only one pending (non-accepted, non-revoked) invitation per email per org.
+-- Allows multiple historical rows (accepted/revoked) for the same email.
+CREATE UNIQUE INDEX one_pending_invite_per_email
+  ON public.invitations (org_id, email)
+  WHERE accepted_at IS NULL AND revoked_at IS NULL;
 
 COMMENT ON TABLE public.invitations IS 'Organization invitations for invite-only registration. 72-hour expiry, atomic acceptance.';
 
@@ -495,7 +504,8 @@ ALTER TABLE public.employees
   ADD CONSTRAINT employees_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT employees_certification_id_fkey FOREIGN KEY (certification_id) REFERENCES public.certifications(id) ON DELETE SET NULL,
   ADD CONSTRAINT employees_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT employees_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  ADD CONSTRAINT employees_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT employees_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- shift_categories
 ALTER TABLE public.shift_categories
@@ -551,7 +561,8 @@ ALTER TABLE public.shift_series
 -- invitations
 ALTER TABLE public.invitations
   ADD CONSTRAINT invitations_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT invitations_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  ADD CONSTRAINT invitations_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT invitations_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id) ON DELETE SET NULL;
 
 -- role_change_log
 ALTER TABLE public.role_change_log
@@ -623,9 +634,11 @@ CREATE INDEX idx_employees_org_id ON public.employees(org_id);
 CREATE INDEX idx_employees_certification_id ON public.employees(certification_id);
 CREATE INDEX idx_employees_role_ids ON public.employees USING gin(role_ids);
 CREATE INDEX idx_employees_focus_area_ids ON public.employees USING gin(focus_area_ids);
-CREATE UNIQUE INDEX employees_org_name_active_unique ON public.employees(org_id, name) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX employees_org_name_active_unique ON public.employees(org_id, first_name, last_name) WHERE archived_at IS NULL;
 CREATE INDEX idx_employees_active ON public.employees(org_id) WHERE archived_at IS NULL;
 CREATE INDEX idx_employees_status ON public.employees(org_id, status) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX idx_employees_user_id_per_org ON public.employees(org_id, user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_employees_user_id ON public.employees(user_id) WHERE user_id IS NOT NULL;
 
 -- shift_categories
 CREATE UNIQUE INDEX shift_categories_global_name_unique ON public.shift_categories(org_id, name) WHERE focus_area_id IS NULL AND archived_at IS NULL;
@@ -672,6 +685,7 @@ CREATE INDEX idx_shift_series_active ON public.shift_series(org_id) WHERE archiv
 CREATE UNIQUE INDEX idx_invitations_token ON public.invitations(token);
 CREATE INDEX idx_invitations_org_id ON public.invitations(org_id);
 CREATE INDEX idx_invitations_expires_at ON public.invitations(expires_at);
+CREATE INDEX idx_invitations_employee_id ON public.invitations(employee_id) WHERE employee_id IS NOT NULL;
 
 -- role_change_log
 CREATE INDEX idx_role_change_log_idempotency_key ON public.role_change_log(idempotency_key);

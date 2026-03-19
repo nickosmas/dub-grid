@@ -4,11 +4,14 @@ import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } fr
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { getInitials, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
+import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor } from "@/lib/colors";
 import { BOX_SHADOW_CARD } from "@/lib/constants";
-import { Employee, FocusArea, ShiftCode, NamedItem } from "@/types";
+import { Employee, FocusArea, ShiftCode, NamedItem, Invitation } from "@/types";
+import { useAuth } from "@/components/AuthProvider";
+import { isEmployeeQualified } from "@/lib/schedule-logic";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
+import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import * as db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -41,6 +44,7 @@ interface StaffViewProps {
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
+  orgName?: string;
 }
 
 function hashCode(s: string): number {
@@ -129,6 +133,8 @@ function SidebarLink({
 
 // ── Employee avatar chip (used in Focus Areas & Roles sections) ───────────────
 function EmpChip({ emp }: { emp: Employee }) {
+  const { user: currentUser } = useAuth();
+  const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
   const hue = hashCode(emp.id) % 360;
   return (
     <div
@@ -159,7 +165,7 @@ function EmpChip({ emp }: { emp: Employee }) {
           border: `1px solid hsl(${hue}, 70%, 85%)`,
         }}
       >
-        {getInitials(emp.name)}
+        {getInitials(getEmployeeDisplayName(emp))}
       </div>
       <span
         style={{
@@ -170,8 +176,16 @@ function EmpChip({ emp }: { emp: Employee }) {
           letterSpacing: "-0.01em",
         }}
       >
-        {emp.name}
+        {getEmployeeDisplayName(emp)}
       </span>
+      {isYou && (
+        <span style={{
+          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10,
+          background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap",
+        }}>
+          You
+        </span>
+      )}
     </div>
   );
 }
@@ -195,6 +209,8 @@ function MembersSection({
   focusAreaLabel,
   certificationLabel,
   roleLabel,
+  orgId,
+  orgName,
 }: {
   employees: Employee[];
   benchedEmployees: Employee[];
@@ -211,7 +227,10 @@ function MembersSection({
   focusAreaLabel: string;
   certificationLabel: string;
   roleLabel: string;
+  orgId?: string;
+  orgName?: string;
 }) {
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"name" | "seniority" | "focusArea">("seniority");
@@ -220,6 +239,37 @@ function MembersSection({
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
+  // Invitation state
+  const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
+  const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+
+  // Fetch pending invitations for badge display
+  useEffect(() => {
+    if (!orgId) return;
+    db.fetchInvitations(orgId).then((invites) => {
+      setPendingInvitations(
+        invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
+      );
+    }).catch(() => { /* silently ignore — badges just won't show */ });
+  }, [orgId]);
+
+  const pendingInviteByEmployeeId = useMemo(() => {
+    const map = new Map<string, Invitation>();
+    for (const inv of pendingInvitations) {
+      if (inv.employeeId) map.set(inv.employeeId, inv);
+    }
+    return map;
+  }, [pendingInvitations]);
+
+  function refreshInvitations() {
+    if (!orgId) return;
+    db.fetchInvitations(orgId).then((invites) => {
+      setPendingInvitations(
+        invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
+      );
+    }).catch(() => {});
+  }
+
   // Search, Filter, and Pagination state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
@@ -227,14 +277,36 @@ function MembersSection({
   const PAGE_SIZE = 15;
   const [page, setPage] = useState(1);
 
-  // Reset to page 1 when filters/sort/tab change
-  useEffect(() => { setPage(1); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy]);
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(empId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(empId)) next.delete(empId); else next.add(empId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(list: Employee[]) {
+    const allSelected = list.every((e) => selectedIds.has(e.id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(list.map((e) => e.id)));
+    }
+  }
+
+  function clearSelection() { setSelectedIds(new Set()); }
+
+  // Reset to page 1 and clear selection when filters/sort/tab change
+  useEffect(() => { setPage(1); clearSelection(); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy]);
 
   const rawList = useMemo(() => {
     const list = activeTab === "active" ? employees : activeTab === "benched" ? benchedEmployees : terminatedEmployees;
     return list.filter(emp => {
       const matchesSearch = !searchQuery || 
-        emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        getEmployeeDisplayName(emp).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (emp.email && emp.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (emp.phone && emp.phone.includes(searchQuery));
       
@@ -250,7 +322,7 @@ function MembersSection({
       [...rawList].sort((a, b) => {
         switch (sortBy) {
           case "name":
-            return a.name.localeCompare(b.name);
+            return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
           case "focusArea": {
             const faA = focusAreas.find(f => f.id === a.focusAreaIds[0])?.name ?? "";
             const faB = focusAreas.find(f => f.id === b.focusAreaIds[0])?.name ?? "";
@@ -349,7 +421,7 @@ function MembersSection({
     return pendingOrder.some((emp, i) => emp.id !== sorted[i]?.id);
   }, [isReordering, pendingOrder, sorted]);
 
-  const gridCols = "48px 1fr 220px 120px 160px 28px";
+  const gridCols = "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px";
 
   const tabItems: { key: EmployeeTab; label: string; count: number; color: string }[] = [
     { key: "active", label: "Active", count: employees.length, color: "var(--color-today-text)" },
@@ -357,8 +429,37 @@ function MembersSection({
     { key: "terminated", label: "Terminated", count: terminatedEmployees.length, color: "var(--color-danger)" },
   ];
 
+  const unlinkedActive = employees.filter((e) => !e.userId);
+  const unlinkedCount = unlinkedActive.length;
+  const unlinkedNoEmail = unlinkedActive.filter((e) => !e.email).length;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+      {/* Unlinked accounts banner */}
+      {canManageEmployees && unlinkedCount > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 20px",
+            background: "#FFFBEB",
+            border: "1px solid #FDE68A",
+            borderRadius: 10,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span style={{ fontSize: 13, color: "#92400E" }}>
+            <strong>{unlinkedCount} staff member{unlinkedCount !== 1 ? "s" : ""}</strong>{" "}
+            {unlinkedCount !== 1 ? "don't" : "doesn't"} have a linked account.
+            {unlinkedNoEmail > 0 && <>{" "}<strong>{unlinkedNoEmail}</strong> still need{unlinkedNoEmail === 1 ? "s" : ""} an email address added before they can be invited.</>}
+            {" "}Expand a row and click <strong>Invite</strong> to send an invitation or link an existing account.
+          </span>
+        </div>
+      )}
+
       {/* Status tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
         {tabItems.map((tab) => {
@@ -535,6 +636,88 @@ function MembersSection({
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && canManageEmployees && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 20px",
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            borderRadius: 10,
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1E40AF" }}>
+            {selectedIds.size} selected
+          </span>
+          <div style={{ flex: 1 }} />
+          {activeTab === "active" && (() => {
+            const invitable = displayList.filter(
+              (e) => selectedIds.has(e.id) && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id)
+            );
+            return invitable.length > 0 ? (
+              <button
+                className="dg-btn dg-btn-ghost"
+                style={{ fontSize: 12, fontWeight: 600, color: "#2563EB", border: "1px solid #BFDBFE", padding: "5px 12px" }}
+                onClick={() => {
+                  invitable.forEach((emp) => setInviteEmployee(emp));
+                  // For bulk, open the first one; user can process one by one
+                  setInviteEmployee(invitable[0]);
+                }}
+              >
+                Invite ({invitable.length})
+              </button>
+            ) : null;
+          })()}
+          {activeTab === "active" && (
+            <button
+              className="dg-btn dg-btn-ghost"
+              style={{ fontSize: 12, fontWeight: 600, color: "#D97706", border: "1px solid #FDE68A", padding: "5px 12px" }}
+              onClick={async () => {
+                const ids = [...selectedIds];
+                for (const id of ids) { onBench(id); }
+                clearSelection();
+              }}
+            >
+              Bench ({selectedIds.size})
+            </button>
+          )}
+          {activeTab === "benched" && (
+            <button
+              className="dg-btn dg-btn-ghost"
+              style={{ fontSize: 12, fontWeight: 600, color: "#059669", border: "1px solid #D1FAE5", padding: "5px 12px" }}
+              onClick={async () => {
+                const ids = [...selectedIds];
+                for (const id of ids) { onActivate(id); }
+                clearSelection();
+              }}
+            >
+              Activate ({selectedIds.size})
+            </button>
+          )}
+          <button
+            className="dg-btn dg-btn-ghost"
+            style={{ fontSize: 12, fontWeight: 600, color: "var(--color-error)", border: "1px solid #FEE2E2", padding: "5px 12px" }}
+            onClick={async () => {
+              const ids = [...selectedIds];
+              for (const id of ids) { onDelete(id); }
+              clearSelection();
+            }}
+          >
+            Terminate ({selectedIds.size})
+          </button>
+          <button
+            className="dg-btn dg-btn-ghost"
+            style={{ fontSize: 12, color: "var(--color-text-muted)", padding: "5px 12px" }}
+            onClick={clearSelection}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* Table & Empty States */}
       {rawList.length > 0 ? (
         <>
@@ -557,7 +740,7 @@ function MembersSection({
               background: "var(--color-row-alt)",
             }}
           >
-          {["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", ""].map((h, i) => (
+          {["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", "Account", ""].map((h, i) => (
             <div
               key={i}
               style={{
@@ -565,8 +748,20 @@ function MembersSection({
                 fontWeight: 700,
                 color: "var(--color-text-subtle)",
                 letterSpacing: "0.06em",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
+              {i === 0 && canManageEmployees && !isReordering && (
+                <input
+                  type="checkbox"
+                  checked={displayList.length > 0 && displayList.every((e) => selectedIds.has(e.id))}
+                  onChange={() => toggleSelectAll(displayList)}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ accentColor: "var(--color-today-text)", cursor: "pointer", width: 14, height: 14 }}
+                />
+              )}
               {h}
             </div>
           ))}
@@ -630,6 +825,15 @@ function MembersSection({
                       <rect x="9" y="10" width="2" height="2" rx="1"/>
                     </svg>
                   )}
+                  {canManageEmployees && !isReordering && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(emp.id)}
+                      onChange={() => toggleSelect(emp.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ accentColor: "var(--color-today-text)", cursor: "pointer", width: 14, height: 14 }}
+                    />
+                  )}
                   <span style={{ fontSize: 13, fontWeight: 700 }}>{(page - 1) * PAGE_SIZE + i + 1}</span>
                 </div>
 
@@ -651,7 +855,7 @@ function MembersSection({
                         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
                       }}
                     >
-                      {getInitials(emp.name)}
+                      {getInitials(getEmployeeDisplayName(emp))}
                     </div>
                   <div>
                     <div
@@ -664,7 +868,20 @@ function MembersSection({
                         gap: 6,
                       }}
                     >
-                      {emp.name}
+                      {getEmployeeDisplayName(emp)}
+                      {emp.userId && currentUser && emp.userId === currentUser.id && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: 10,
+                          background: "#EFF6FF",
+                          color: "#2563EB",
+                          whiteSpace: "nowrap",
+                        }}>
+                          You
+                        </span>
+                      )}
                     </div>
                     {(emp.email || emp.phone) && (
                       <div style={{ fontSize: 11, color: "var(--color-text-faint)", marginTop: 1 }}>
@@ -717,6 +934,59 @@ function MembersSection({
                   {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "—"}
                 </div>
 
+                {/* Account status column */}
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  {emp.userId ? (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      background: "#DCFCE7",
+                      color: "#166534",
+                      whiteSpace: "nowrap",
+                    }}>
+                      Linked
+                    </span>
+                  ) : pendingInviteByEmployeeId.has(emp.id) ? (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      background: "#FEF3C7",
+                      color: "#92400E",
+                      whiteSpace: "nowrap",
+                    }}>
+                      Invited
+                    </span>
+                  ) : emp.email ? (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      background: "#FEE2E2",
+                      color: "#991B1B",
+                      whiteSpace: "nowrap",
+                    }}>
+                      Not invited
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      background: "var(--color-border-light)",
+                      color: "var(--color-text-muted)",
+                      whiteSpace: "nowrap",
+                    }}>
+                      No email
+                    </span>
+                  )}
+                </div>
+
                 <div
                   style={{
                     display: "flex",
@@ -756,6 +1026,7 @@ function MembersSection({
                     onBench={(empId, note) => { onBench(empId, note); setExpandedEmpId(null); }}
                     onActivate={(empId) => { onActivate(empId); setExpandedEmpId(null); }}
                     onCancel={() => setExpandedEmpId(null)}
+                    onInvite={canManageEmployees && orgId && !pendingInviteByEmployeeId.has(emp.id) ? (e) => { setExpandedEmpId(null); setInviteEmployee(e); } : undefined}
                   />
                 </div>
               )}
@@ -845,6 +1116,20 @@ function MembersSection({
             </button>
           )}
         </div>
+      )}
+
+      {/* Invite Employee Modal */}
+      {inviteEmployee && orgId && (
+        <InviteEmployeeModal
+          employee={inviteEmployee}
+          orgId={orgId}
+          orgName={orgName || "your organization"}
+          onClose={() => setInviteEmployee(null)}
+          onInvited={() => {
+            setInviteEmployee(null);
+            refreshInvitations();
+          }}
+        />
       )}
     </div>
   );
@@ -972,6 +1257,7 @@ function RecurringScheduleSection({
 
   // ── Edit state ──
   const [dirtySchedules, setDirtySchedules] = useState<Record<string, Record<number, string>>>({});
+  const { user: currentUser } = useAuth();
   const [activeCell, setActiveCell] = useState<{ empId: string; dayIndex: number } | null>(null);
   const [activeCellEl, setActiveCellEl] = useState<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1137,7 +1423,7 @@ function RecurringScheduleSection({
   // ── Filtering ──
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      const matchesSearch = !searchQuery || emp.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !searchQuery || getEmployeeDisplayName(emp).toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFocusArea = !filterFocusArea || emp.focusAreaIds.includes(filterFocusArea);
       return matchesSearch && matchesFocusArea;
     });
@@ -1154,12 +1440,7 @@ function RecurringScheduleSection({
 
   // ── Get qualified shift codes per employee ──
   function getQualifiedCodes(emp: Employee) {
-    return shiftCodes.filter((st) => {
-      const certOk = !st.requiredCertificationIds?.length ||
-        (emp.certificationId != null && st.requiredCertificationIds.includes(emp.certificationId));
-      const areaOk = !st.focusAreaId || emp.focusAreaIds.includes(st.focusAreaId);
-      return certOk && areaOk;
-    });
+    return shiftCodes.filter((st) => isEmployeeQualified(emp, st));
   }
 
   // ── Find the employee for the active cell popover ──
@@ -1377,14 +1658,23 @@ function RecurringScheduleSection({
                     color: `hsl(${hashCode(emp.id) % 360}, 70%, 35%)`,
                     border: `1px solid hsl(${hashCode(emp.id) % 360}, 70%, 85%)`,
                   }}>
-                    {getInitials(emp.name)}
+                    {getInitials(getEmployeeDisplayName(emp))}
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{
                       fontWeight: 600, fontSize: 13, color: "var(--color-text-secondary)",
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      display: "flex", alignItems: "center", gap: 5,
                     }}>
-                      {emp.name}
+                      {getEmployeeDisplayName(emp)}
+                      {emp.userId && currentUser && emp.userId === currentUser.id && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10,
+                          background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap", flexShrink: 0,
+                        }}>
+                          You
+                        </span>
+                      )}
                     </div>
                     {emp.certificationId != null && (
                       <div style={{ fontSize: 10, color: "var(--color-text-faint)", marginTop: 1 }}>
@@ -1723,6 +2013,7 @@ export default function StaffView({
   focusAreaLabel = "Focus Areas",
   certificationLabel = "Certifications",
   roleLabel = "Roles",
+  orgName,
 }: StaffViewProps) {
   const pathname = usePathname();
   const VALID_SECTIONS: StaffSection[] = ["members", "recurring-schedule", "focus-areas", "certifications", "roles"];
@@ -1793,6 +2084,8 @@ export default function StaffView({
             focusAreaLabel={focusAreaLabel}
             certificationLabel={certificationLabel}
             roleLabel={roleLabel}
+            orgId={orgId}
+            orgName={orgName}
           />
         )}
 

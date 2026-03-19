@@ -48,19 +48,22 @@ function renderModal(
   return { onAdd, onClose };
 }
 
-// The component renders 3 rows by default. Each row has a "Full name" input.
+// The component renders 3 rows by default. Each row has first/last name inputs.
 // Focus area buttons appear per-row. We scope row interactions by index.
-function getRowInputs(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLInputElement>('input[placeholder="Full name"]'));
+function getFirstNameInputs(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLInputElement>('input[placeholder="First name"]'));
+}
+function getLastNameInputs(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLInputElement>('input[placeholder="Last name"]'));
 }
 
 describe("AddEmployeeModal", () => {
   describe("Rendering", () => {
-    it("renders name inputs with 'Full name' placeholder (one per default row)", () => {
+    it("renders first name inputs with 'First name' placeholder (one per default row)", () => {
       const { container } = render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
       );
-      const inputs = getRowInputs(container);
+      const inputs = getFirstNameInputs(container);
       // 3 rows by default
       expect(inputs.length).toBeGreaterThanOrEqual(1);
       expect(inputs[0]).toBeInTheDocument();
@@ -114,7 +117,7 @@ describe("AddEmployeeModal", () => {
         return { onAdd, container };
       })();
 
-      const inputs = getRowInputs(container);
+      const inputs = getFirstNameInputs(container);
       // Type a name in the first row
       await userEvent.type(inputs[0], "Alice");
 
@@ -137,8 +140,10 @@ describe("AddEmployeeModal", () => {
       const { container } = render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getRowInputs(container);
-      await userEvent.type(inputs[0], "Alice Smith");
+      const firstNameInputs = getFirstNameInputs(container);
+      const lastNameInputs = getLastNameInputs(container);
+      await userEvent.type(firstNameInputs[0], "Alice");
+      await userEvent.type(lastNameInputs[0], "Smith");
 
       const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
       await userEvent.click(submitBtn);
@@ -151,7 +156,8 @@ describe("AddEmployeeModal", () => {
       const firstEmployee = calledWithArg[0];
       expect(firstEmployee).toEqual(
         expect.objectContaining({
-          name: "Alice Smith",
+          firstName: "Alice",
+          lastName: "Smith",
           focusAreaIds: expect.any(Array),
           roleIds: expect.any(Array),
           phone: expect.any(String),
@@ -171,7 +177,7 @@ describe("AddEmployeeModal", () => {
       const { container } = render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getRowInputs(container);
+      const inputs = getFirstNameInputs(container);
       await userEvent.type(inputs[0], "Test");
 
       // Click South in the first row to add it
@@ -192,7 +198,7 @@ describe("AddEmployeeModal", () => {
       const { container } = render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getRowInputs(container);
+      const inputs = getFirstNameInputs(container);
       await userEvent.type(inputs[0], "Test");
 
       // North is selected by default in first row; click twice

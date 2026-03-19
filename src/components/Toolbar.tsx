@@ -33,6 +33,8 @@ interface ToolbarProps {
   canEditShifts?: boolean;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
+  onImportPrevious?: () => void;
+  isImportingPrevious?: boolean;
   onPrintOpen?: () => void;
   presenceSlot?: React.ReactNode;
   showAudit?: boolean;
@@ -80,6 +82,8 @@ function ToolsMenu({
   canEditShifts,
   onApplyRecurring,
   isApplyingRecurring,
+  onImportPrevious,
+  isImportingPrevious,
 }: {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -89,6 +93,8 @@ function ToolsMenu({
   canEditShifts?: boolean;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
+  onImportPrevious?: () => void;
+  isImportingPrevious?: boolean;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -205,6 +211,26 @@ function ToolsMenu({
           {isApplyingRecurring ? "Filling..." : "Auto Fill Shifts"}
         </button>
       )}
+
+      {/* Import Previous Schedule */}
+      {canEditShifts && onImportPrevious && (
+        <button
+          style={{
+            ...itemStyle,
+            opacity: isImportingPrevious ? 0.6 : 1,
+          }}
+          disabled={isImportingPrevious}
+          onClick={() => { onImportPrevious(); onClose(); }}
+          onMouseEnter={(e) => { if (!isImportingPrevious) e.currentTarget.style.background = "var(--color-surface-overlay)"; }}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          </svg>
+          {isImportingPrevious ? "Importing..." : "Import Previous Schedule"}
+        </button>
+      )}
     </div>,
     document.body,
   );
@@ -225,6 +251,8 @@ export default function Toolbar({
   canEditShifts,
   onApplyRecurring,
   isApplyingRecurring,
+  onImportPrevious,
+  isImportingPrevious,
   onPrintOpen,
   presenceSlot,
   showAudit,
@@ -407,6 +435,8 @@ export default function Toolbar({
             canEditShifts={canEditShifts}
             onApplyRecurring={onApplyRecurring}
             isApplyingRecurring={isApplyingRecurring}
+            onImportPrevious={onImportPrevious}
+            isImportingPrevious={isImportingPrevious}
           />
         )}
       </div>

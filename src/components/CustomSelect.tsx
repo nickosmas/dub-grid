@@ -29,15 +29,12 @@ export default function CustomSelect<T extends string | number>({
 }: CustomSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value) ?? options[0];
 
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useLayoutEffect(() => {
     if (open && ref.current) {

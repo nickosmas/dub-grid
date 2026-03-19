@@ -747,9 +747,10 @@ $$;
 -- ── send_invitation ───────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.send_invitation(
-  p_email  TEXT,
-  p_role   TEXT,
-  p_org_id UUID
+  p_email        TEXT,
+  p_role         TEXT,
+  p_org_id       UUID,
+  p_employee_id  UUID DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -783,12 +784,37 @@ BEGIN
     RAISE EXCEPTION 'User is already a member of this organization';
   END IF;
 
+  -- Validate employee if provided
+  IF p_employee_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.employees
+      WHERE id = p_employee_id AND org_id = p_org_id AND archived_at IS NULL
+    ) THEN
+      RAISE EXCEPTION 'Employee not found in this organization';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.employees
+      WHERE id = p_employee_id AND user_id IS NOT NULL
+    ) THEN
+      RAISE EXCEPTION 'Employee already has a linked user account';
+    END IF;
+  END IF;
+
   DELETE FROM public.invitations
    WHERE org_id = p_org_id AND lower(email) = lower(p_email)
      AND (expires_at < NOW() OR revoked_at IS NOT NULL OR accepted_at IS NOT NULL);
 
-  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign)
-    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role)
+  -- Block duplicate: an active (pending) invitation already exists for this email
+  IF EXISTS (
+    SELECT 1 FROM public.invitations
+     WHERE org_id = p_org_id AND lower(email) = lower(p_email)
+       AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at >= NOW()
+  ) THEN
+    RAISE EXCEPTION 'An active invitation already exists for this email';
+  END IF;
+
+  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id)
+    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id)
   RETURNING * INTO v_invite;
 
   RETURN jsonb_build_object(
@@ -799,7 +825,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID) TO authenticated;
 
 
 -- ── accept_invitation ─────────────────────────────────────────────────────────
@@ -810,9 +836,11 @@ LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
-  v_invite     public.invitations;
-  v_uid        UUID;
-  v_user_email TEXT;
+  v_invite          public.invitations;
+  v_uid             UUID;
+  v_user_email      TEXT;
+  v_emp_first_name  TEXT;
+  v_emp_last_name   TEXT;
 BEGIN
   v_uid := auth.uid();
   IF v_uid IS NULL THEN
@@ -840,10 +868,26 @@ BEGIN
 
   UPDATE public.invitations SET accepted_at = NOW() WHERE id = v_invite.id;
 
-  INSERT INTO public.profiles (id, org_id, platform_role)
-  VALUES (v_uid, v_invite.org_id, 'none')
+  -- Link employee record to auth user and copy names if employee_id is present
+  IF v_invite.employee_id IS NOT NULL THEN
+    UPDATE public.employees
+    SET user_id = v_uid, updated_at = NOW()
+    WHERE id = v_invite.employee_id
+      AND org_id = v_invite.org_id
+      AND user_id IS NULL;
+
+    SELECT first_name, last_name INTO v_emp_first_name, v_emp_last_name
+    FROM public.employees
+    WHERE id = v_invite.employee_id AND org_id = v_invite.org_id;
+  END IF;
+
+  INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name)
+  VALUES (v_uid, v_invite.org_id, 'none', v_emp_first_name, v_emp_last_name)
   ON CONFLICT (id) DO UPDATE
-    SET org_id = COALESCE(profiles.org_id, EXCLUDED.org_id), updated_at = NOW();
+    SET org_id     = COALESCE(profiles.org_id, EXCLUDED.org_id),
+        first_name = COALESCE(EXCLUDED.first_name, profiles.first_name),
+        last_name  = COALESCE(EXCLUDED.last_name, profiles.last_name),
+        updated_at = NOW();
 
   INSERT INTO public.organization_memberships (user_id, org_id, org_role)
   VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign)
@@ -860,12 +904,115 @@ BEGIN
     SET locked_until = NOW() + INTERVAL '2 seconds', reason = 'invitation_accepted';
 
   RETURN jsonb_build_object(
-    'status', 'accepted', 'org_id', v_invite.org_id, 'role', v_invite.role_to_assign::TEXT
+    'status', 'accepted',
+    'org_id', v_invite.org_id,
+    'role', v_invite.role_to_assign::TEXT,
+    'org_slug', (SELECT slug FROM public.organizations WHERE id = v_invite.org_id)
   );
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.accept_invitation(UUID) TO authenticated;
+
+
+-- ── revoke_invitation_on_email_change ────────────────────────────────────────
+-- Auto-revoke pending invitations when an employee's email is changed.
+-- Prevents stale invitations from blocking re-invites with the new email.
+
+CREATE OR REPLACE FUNCTION public.revoke_invitation_on_email_change()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF OLD.email IS DISTINCT FROM NEW.email THEN
+    UPDATE public.invitations
+    SET revoked_at = NOW()
+    WHERE employee_id = OLD.id
+      AND accepted_at IS NULL
+      AND revoked_at IS NULL
+      AND expires_at >= NOW();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_revoke_invitation_on_email_change
+  BEFORE UPDATE ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.revoke_invitation_on_email_change();
+
+
+-- ── link_employee_to_user ────────────────────────────────────────────────────
+-- Directly link an existing org user to an employee record (no invitation needed).
+-- Use case: user already has an account and is already a member of this org.
+
+CREATE OR REPLACE FUNCTION public.link_employee_to_user(
+  p_employee_id  UUID,
+  p_user_id      UUID,
+  p_org_id       UUID
+) RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_caller_role TEXT;
+BEGIN
+  -- Authorization: gridmaster or super_admin in this org
+  IF NOT public.is_gridmaster() THEN
+    v_caller_role := public.caller_org_role()::TEXT;
+    IF public.caller_org_id() <> p_org_id OR v_caller_role <> 'super_admin' THEN
+      RAISE EXCEPTION 'Unauthorized: only super_admin can link employees';
+    END IF;
+  END IF;
+
+  -- Validate org exists
+  IF NOT EXISTS (
+    SELECT 1 FROM public.organizations WHERE id = p_org_id AND archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Organization not found or archived';
+  END IF;
+
+  -- Validate employee belongs to org and is not already linked
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE id = p_employee_id AND org_id = p_org_id AND archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Employee not found in this organization';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE id = p_employee_id AND user_id IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'Employee already has a linked user account';
+  END IF;
+
+  -- Validate user is a member of this org
+  IF NOT EXISTS (
+    SELECT 1 FROM public.organization_memberships
+    WHERE user_id = p_user_id AND org_id = p_org_id
+  ) THEN
+    RAISE EXCEPTION 'User is not a member of this organization';
+  END IF;
+
+  -- Validate user is not already linked to another employee in this org
+  IF EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE org_id = p_org_id AND user_id = p_user_id AND archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'User is already linked to another employee in this organization';
+  END IF;
+
+  -- Link them
+  UPDATE public.employees
+  SET user_id = p_user_id, updated_at = NOW()
+  WHERE id = p_employee_id AND org_id = p_org_id;
+
+  RETURN jsonb_build_object('status', 'linked', 'employee_id', p_employee_id, 'user_id', p_user_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.link_employee_to_user(UUID, UUID, UUID) TO authenticated;
 
 
 -- ── start_impersonation ───────────────────────────────────────────────────────

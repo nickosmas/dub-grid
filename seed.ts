@@ -509,7 +509,10 @@ async function main() {
     interface EmpRow { id: string; focus_area_ids: number[]; status: string }
     const employees: EmpRow[] = [];
     for (let i = 0; i < empNames.length; i++) {
-      const name = empNames[i];
+      const fullName = empNames[i];
+      const nameParts = fullName.split(" ");
+      const lastName = nameParts.pop()!;
+      const firstName = nameParts.join(" ") || lastName;
       const certId = certIds[i % certIds.length];
       // Spread employees across focus areas evenly
       const primaryFaIdx = i % focusAreaIds.length;
@@ -523,12 +526,12 @@ async function main() {
 
       const { rows: [row] } = await db.query(
         `INSERT INTO public.employees
-           (org_id, name, seniority, phone, email, contact_notes, certification_id, role_ids, focus_area_ids, status, status_note)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::bigint[],$9::integer[],$10::employee_status,$11)
+           (org_id, first_name, last_name, seniority, phone, email, contact_notes, certification_id, role_ids, focus_area_ids, status, status_note)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::bigint[],$10::integer[],$11::employee_status,$12)
          RETURNING id, focus_area_ids, status`,
-        [orgId, name, empNames.length - i,
-         copycat.phoneNumber(`${tenant.slug}-${name}-${i}`),
-         copycat.email(`${tenant.slug}-${name}-${i}`),
+        [orgId, firstName, lastName, empNames.length - i,
+         copycat.phoneNumber(`${tenant.slug}-${fullName}-${i}`),
+         copycat.email(`${tenant.slug}-${fullName}-${i}`),
          "", certId, empRoleIds, empFaIds, status, ""]
       );
       employees.push({
@@ -629,7 +632,6 @@ async function main() {
   const TEST_USERS = [
     { email: "nicokosmas.dev@gmail.com",     platform_role: "gridmaster", org_role: "user",        label: "gridmaster",  first_name: "Nicodamus", last_name: "Kosmas", preferred_org: "sunrise-senior" },
     { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "ardenwood" },
-    { email: "nicodamus.kosmas@icloud.com",   platform_role: "none",       org_role: "admin",       label: "admin",       first_name: "Nico",      last_name: "Kosmas", preferred_org: "sunrise-senior" },
     { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "ardenwood" },
   ];
 
