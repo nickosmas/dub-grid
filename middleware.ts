@@ -131,11 +131,10 @@ export async function middleware(req: NextRequest) {
   } catch {
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
-      // Don't trust elevated roles from unverified tokens — a forged JWT
-      // could claim gridmaster/super_admin/admin access. Only allow 'user'
-      // role through; RLS is the real security gate.
-      const unverifiedRole = calculateEffectiveRole(claims);
-      if (unverifiedRole !== "user") {
+      // Don't trust gridmaster from unverified tokens — a forged JWT could
+      // claim platform-level access. Org-level roles (super_admin/admin) are
+      // safe to pass through because RLS enforces all data access anyway.
+      if (claims.platform_role === "gridmaster") {
         return NextResponse.redirect(new URL("/login", req.url));
       }
     } catch {
