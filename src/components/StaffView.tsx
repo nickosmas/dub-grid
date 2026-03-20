@@ -17,6 +17,8 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
+import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const EMPTY_CODE_MAP = new Map<number, string>();
@@ -158,7 +160,7 @@ function EmpChip({ emp }: { emp: Employee }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 9,
+          fontSize: "var(--dg-fs-micro)",
           fontWeight: 800,
           color: `hsl(${hue}, 70%, 35%)`,
           flexShrink: 0,
@@ -180,7 +182,7 @@ function EmpChip({ emp }: { emp: Employee }) {
       </span>
       {isYou && (
         <span style={{
-          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10,
+          fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
           background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap",
         }}>
           You
@@ -230,6 +232,8 @@ function MembersSection({
   orgId?: string;
   orgName?: string;
 }) {
+  const isMobile = useMediaQuery(MOBILE);
+  const isTablet = useMediaQuery(TABLET);
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
@@ -242,6 +246,7 @@ function MembersSection({
   // Invitation state
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   // Fetch pending invitations for badge display
   useEffect(() => {
@@ -268,6 +273,19 @@ function MembersSection({
         invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
       );
     }).catch(() => {});
+  }
+
+  async function handleRevokeInvitation(invitationId: string) {
+    setRevokingId(invitationId);
+    try {
+      await db.revokeInvitation(invitationId);
+      refreshInvitations();
+      toast.success("Invitation revoked");
+    } catch {
+      toast.error("Failed to revoke invitation");
+    } finally {
+      setRevokingId(null);
+    }
   }
 
   // Search, Filter, and Pagination state
@@ -421,7 +439,11 @@ function MembersSection({
     return pendingOrder.some((emp, i) => emp.id !== sorted[i]?.id);
   }, [isReordering, pendingOrder, sorted]);
 
-  const gridCols = "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px";
+  const gridCols = isMobile
+    ? "36px 1fr 28px"
+    : isTablet
+      ? "36px 1.2fr 1fr 0.6fr 28px"
+      : "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px";
 
   const tabItems: { key: EmployeeTab; label: string; count: number; color: string }[] = [
     { key: "active", label: "Active", count: employees.length, color: "var(--color-today-text)" },
@@ -440,9 +462,9 @@ function MembersSection({
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 20px",
+            alignItems: isMobile ? "flex-start" : "center",
+            gap: isMobile ? 8 : 12,
+            padding: isMobile ? "10px 12px" : "12px 20px",
             background: "#FFFBEB",
             border: "1px solid #FDE68A",
             borderRadius: 10,
@@ -505,7 +527,7 @@ function MembersSection({
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", padding: "4px 0", position: "relative" }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 8 : 0, alignItems: isMobile ? "stretch" : "center", padding: "4px 0", position: "relative" }}>
         {/* Reorder hint — stretches to fill all space left of the right-group buttons */}
         {isReordering && (
           <div style={{
@@ -520,6 +542,7 @@ function MembersSection({
             borderRadius: 10,
             padding: "10px 20px",
             marginRight: isDirty ? 160 : 90,
+            zIndex: 2,
           }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
@@ -530,7 +553,7 @@ function MembersSection({
           </div>
         )}
         {/* Left group: dropdowns (hidden but in DOM during reorder to preserve height) */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", visibility: isReordering ? "hidden" : "visible" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", visibility: isReordering ? "hidden" : "visible", flexWrap: isMobile ? "wrap" : undefined, flexShrink: 0 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", whiteSpace: "nowrap" }}>Sort</span>
           <CustomSelect
             value={filterFocusArea ?? ""}
@@ -539,7 +562,7 @@ function MembersSection({
               ...focusAreas.map(fa => ({ value: fa.id, label: fa.name }))
             ]}
             onChange={(val: string | number) => setFilterFocusArea(val ? Number(val) : null)}
-            style={{ width: "auto", minWidth: 140 }}
+            style={{ width: "auto", minWidth: isMobile ? 100 : 140, flex: isMobile ? "1 1 100px" : undefined }}
             fontSize={12}
           />
           <CustomSelect
@@ -549,7 +572,7 @@ function MembersSection({
               ...roles.map(r => ({ value: r.id, label: r.name }))
             ]}
             onChange={(val: string | number) => setFilterRole(val ? Number(val) : null)}
-            style={{ width: "auto", minWidth: 140 }}
+            style={{ width: "auto", minWidth: isMobile ? 100 : 140, flex: isMobile ? "1 1 100px" : undefined }}
             fontSize={12}
           />
           <CustomSelect
@@ -560,7 +583,7 @@ function MembersSection({
               { value: "focusArea" as const, label: focusAreaLabel },
             ]}
             onChange={(val) => { setSortBy(val as "seniority" | "name" | "focusArea"); }}
-            style={{ width: "auto", minWidth: 120 }}
+            style={{ width: "auto", minWidth: isMobile ? 80 : 120, flex: isMobile ? "1 1 80px" : undefined }}
             fontSize={12}
           />
           {(searchQuery || filterFocusArea || filterRole) && (
@@ -568,7 +591,7 @@ function MembersSection({
               onClick={() => { setSearchQuery(""); setFilterFocusArea(null); setFilterRole(null); }}
               style={{
                 background: "none", border: "none", color: "var(--color-today-text)", fontSize: 12,
-                fontWeight: 600, cursor: "pointer", padding: "4px 8px",
+                fontWeight: 600, cursor: "pointer", padding: "4px 8px", whiteSpace: "nowrap",
               }}
             >
               Clear
@@ -576,7 +599,7 @@ function MembersSection({
           )}
         </div>
 
-        <div style={{ flex: 1 }} />
+        {!isMobile && <div style={{ flex: 1 }} />}
 
         {/* Right group: search, reorder, add */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative", zIndex: 1 }}>
@@ -642,11 +665,12 @@ function MembersSection({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            padding: "10px 20px",
+            gap: isMobile ? 8 : 12,
+            padding: isMobile ? "10px 12px" : "10px 20px",
             background: "#EFF6FF",
             border: "1px solid #BFDBFE",
             borderRadius: 10,
+            flexWrap: "wrap",
           }}
         >
           <span style={{ fontSize: 13, fontWeight: 700, color: "#1E40AF" }}>
@@ -735,12 +759,17 @@ function MembersSection({
             style={{
               display: "grid",
               gridTemplateColumns: gridCols,
-              padding: "12px 24px",
+              padding: isMobile ? "10px 12px" : "12px 24px",
               borderBottom: "1px solid var(--color-border-light)",
               background: "var(--color-row-alt)",
             }}
           >
-          {["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", "Account", ""].map((h, i) => (
+          {(isMobile
+            ? ["", "Name", ""]
+            : isTablet
+              ? ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, ""]
+              : ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", "Account", ""]
+          ).map((h, i) => (
             <div
               key={i}
               style={{
@@ -784,7 +813,7 @@ function MembersSection({
                 style={{
                   display: "grid",
                   gridTemplateColumns: gridCols,
-                  padding: "14px 24px",
+                  padding: isMobile ? "10px 12px" : "14px 24px",
                   borderTop: isDropTarget
                     ? "2px solid #3B82F6"
                     : i === 0
@@ -798,7 +827,7 @@ function MembersSection({
                   transition: "all 0.15s ease",
                   opacity: isDragging ? 0.4 : 1,
                   borderLeft: isExpanded ? "4px solid var(--color-today-text)" : "4px solid transparent",
-                  paddingLeft: "calc(24px - 4px)",
+                  paddingLeft: isMobile ? "calc(12px - 4px)" : "calc(24px - 4px)",
                   position: "relative",
                   zIndex: isExpanded ? 1 : 0,
                 }}
@@ -871,7 +900,7 @@ function MembersSection({
                       {getEmployeeDisplayName(emp)}
                       {emp.userId && currentUser && emp.userId === currentUser.id && (
                         <span style={{
-                          fontSize: 10,
+                          fontSize: "var(--dg-fs-badge)",
                           fontWeight: 700,
                           padding: "1px 6px",
                           borderRadius: 10,
@@ -891,101 +920,134 @@ function MembersSection({
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {emp.focusAreaIds.map((faId) => {
-                    const fa = focusAreas.find(f => f.id === faId);
-                    if (!fa) return null;
-                    const fc = { bg: fa.colorBg, text: fa.colorText };
-                    return (
-                      <span
-                        key={faId}
-                        style={{
-                          background: fc.bg,
-                          color: fc.text,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          borderRadius: 20,
-                          padding: "2px 8px",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {fa.name}
-                      </span>
-                    );
-                  })}
-                </div>
+                {!isMobile && (
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {emp.focusAreaIds.map((faId) => {
+                      const fa = focusAreas.find(f => f.id === faId);
+                      if (!fa) return null;
+                      const fc = { bg: fa.colorBg, text: fa.colorText };
+                      return (
+                        <span
+                          key={faId}
+                          style={{
+                            background: fc.bg,
+                            color: fc.text,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            borderRadius: 20,
+                            padding: "2px 8px",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {fa.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
 
-                <div>
-                  <span
-                    style={{
-                      background: "var(--color-border-light)",
-                      color: "var(--color-text-muted)",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      borderRadius: 20,
-                      padding: "3px 9px",
-                    }}
-                  >
-                    {getCertAbbr(emp.certificationId, certifications)}
-                  </span>
-                </div>
+                {!isMobile && (
+                  <div>
+                    <span
+                      style={{
+                        background: "var(--color-border-light)",
+                        color: "var(--color-text-muted)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        borderRadius: 20,
+                        padding: "3px 9px",
+                      }}
+                    >
+                      {getCertAbbr(emp.certificationId, certifications)}
+                    </span>
+                  </div>
+                )}
 
-                <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                  {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "—"}
-                </div>
+                {!isMobile && !isTablet && (
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "—"}
+                  </div>
+                )}
 
                 {/* Account status column */}
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  {emp.userId ? (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 10,
-                      background: "#DCFCE7",
-                      color: "#166534",
-                      whiteSpace: "nowrap",
-                    }}>
-                      Linked
-                    </span>
-                  ) : pendingInviteByEmployeeId.has(emp.id) ? (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 10,
-                      background: "#FEF3C7",
-                      color: "#92400E",
-                      whiteSpace: "nowrap",
-                    }}>
-                      Invited
-                    </span>
-                  ) : emp.email ? (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 10,
-                      background: "#FEE2E2",
-                      color: "#991B1B",
-                      whiteSpace: "nowrap",
-                    }}>
-                      Not invited
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 10,
-                      background: "var(--color-border-light)",
-                      color: "var(--color-text-muted)",
-                      whiteSpace: "nowrap",
-                    }}>
-                      No email
-                    </span>
-                  )}
-                </div>
+                {!isMobile && !isTablet && (
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    {emp.userId ? (
+                      <span style={{
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "#DCFCE7",
+                        color: "#166534",
+                        whiteSpace: "nowrap",
+                      }}>
+                        Linked
+                      </span>
+                    ) : pendingInviteByEmployeeId.has(emp.id) ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{
+                          fontSize: "var(--dg-fs-badge)",
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 10,
+                          background: "#FEF3C7",
+                          color: "#92400E",
+                          whiteSpace: "nowrap",
+                        }}>
+                          Invited
+                        </span>
+                        {canManageEmployees && (() => {
+                          const inv = pendingInviteByEmployeeId.get(emp.id)!;
+                          return (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRevokeInvitation(inv.id); }}
+                              disabled={revokingId === inv.id}
+                              style={{
+                                fontSize: "var(--dg-fs-badge)",
+                                fontWeight: 600,
+                                padding: "2px 6px",
+                                borderRadius: 10,
+                                background: "none",
+                                color: "#92400E",
+                                border: "1px solid #92400E",
+                                cursor: revokingId === inv.id ? "not-allowed" : "pointer",
+                                opacity: revokingId === inv.id ? 0.5 : 1,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {revokingId === inv.id ? "..." : "Revoke"}
+                            </button>
+                          );
+                        })()}
+                      </span>
+                    ) : emp.email ? (
+                      <span style={{
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "#FEE2E2",
+                        color: "#991B1B",
+                        whiteSpace: "nowrap",
+                      }}>
+                        Not invited
+                      </span>
+                    ) : (
+                      <span style={{
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "var(--color-border-light)",
+                        color: "var(--color-text-muted)",
+                        whiteSpace: "nowrap",
+                      }}>
+                        No email
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 <div
                   style={{
@@ -1099,7 +1161,7 @@ function MembersSection({
             </svg>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+            <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
               {searchQuery || filterFocusArea || filterRole ? "No results found" : (activeTab === "active" ? "No active employees" : activeTab === "benched" ? "No benched employees" : "No terminated employees")}
             </div>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -1251,6 +1313,7 @@ function RecurringScheduleSection({
   focusAreas: FocusArea[];
   certifications: NamedItem[];
 }) {
+  const isMobile = useMediaQuery(MOBILE);
   // ── Data state ──
   const [allSchedules, setAllSchedules] = useState<Record<string, Record<number, string>>>({});
   const [loading, setLoading] = useState(true);
@@ -1453,8 +1516,8 @@ function RecurringScheduleSection({
         <div style={{
           position: "sticky", top: 0, zIndex: 20,
           background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10,
-          padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          padding: isMobile ? "10px 12px" : "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)", flexWrap: "wrap", gap: 8,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1500,7 +1563,7 @@ function RecurringScheduleSection({
 
       {/* Header */}
       <div>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           Recurring Shifts
         </h2>
         <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -1509,18 +1572,18 @@ function RecurringScheduleSection({
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: isMobile ? 8 : 12 }}>
         {focusAreas.length > 0 && (
           <CustomSelect
             value={filterFocusArea}
             options={focusAreaOptions}
             onChange={setFilterFocusArea}
             fontSize={12}
-            style={{ minWidth: 160 }}
+            style={{ minWidth: isMobile ? 120 : 160 }}
           />
         )}
-        <div style={{ flex: 1 }} />
-        <div style={{ position: "relative" }}>
+        <div style={{ flex: 1, minWidth: isMobile ? "100%" : 0 }} />
+        <div style={{ position: "relative", width: isMobile ? "100%" : undefined }}>
           <svg
             width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-faint)"
             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -1539,7 +1602,7 @@ function RecurringScheduleSection({
               borderRadius: 10,
               fontSize: 12,
               outline: "none",
-              width: 180,
+              width: isMobile ? "100%" : 180,
               background: "#fff",
               fontFamily: "inherit",
               transition: "border-color 150ms ease",
@@ -1598,17 +1661,20 @@ function RecurringScheduleSection({
       ) : (
         <div style={{
           background: "#fff", borderRadius: 14, border: "1px solid var(--color-border)",
-          overflow: "hidden", boxShadow: "var(--shadow-raised)", position: "relative",
+          overflowX: isMobile ? "auto" : "hidden", overflowY: "hidden",
+          boxShadow: "var(--shadow-raised)", position: "relative",
+          WebkitOverflowScrolling: "touch",
         }}>
           {/* Header row */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "200px repeat(7, 1fr)",
+            minWidth: isMobile ? 448 : undefined,
+            gridTemplateColumns: `${isMobile ? 140 : 200}px repeat(7, minmax(${isMobile ? 44 : 0}px, 1fr))`,
             background: "var(--color-row-alt)",
             borderBottom: "1px solid var(--color-border-light)",
           }}>
             <div style={{
-              padding: "10px 16px", fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)",
+              padding: "10px 16px", fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)",
               textTransform: "uppercase", letterSpacing: "0.08em",
             }}>
               Staff
@@ -1617,7 +1683,7 @@ function RecurringScheduleSection({
               <div
                 key={day}
                 style={{
-                  padding: "10px 4px", fontSize: 10, fontWeight: 700, color: "var(--color-text-faint)",
+                  padding: "10px 4px", fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-faint)",
                   textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center",
                 }}
               >
@@ -1634,7 +1700,8 @@ function RecurringScheduleSection({
                 key={emp.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "200px repeat(7, 1fr)",
+                  gridTemplateColumns: `${isMobile ? 140 : 200}px repeat(7, minmax(${isMobile ? 44 : 0}px, 1fr))`,
+                  minWidth: isMobile ? 448 : undefined,
                   borderTop: i === 0 ? "none" : "1px solid var(--color-border-light)",
                   transition: "background 0.12s",
                 }}
@@ -1669,7 +1736,7 @@ function RecurringScheduleSection({
                       {getEmployeeDisplayName(emp)}
                       {emp.userId && currentUser && emp.userId === currentUser.id && (
                         <span style={{
-                          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10,
+                          fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
                           background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap", flexShrink: 0,
                         }}>
                           You
@@ -1677,7 +1744,7 @@ function RecurringScheduleSection({
                       )}
                     </div>
                     {emp.certificationId != null && (
-                      <div style={{ fontSize: 10, color: "var(--color-text-faint)", marginTop: 1 }}>
+                      <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-faint)", marginTop: 1 }}>
                         {getCertAbbr(emp.certificationId, certifications)}
                       </div>
                     )}
@@ -1791,7 +1858,7 @@ function FocusAreasSection({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
       <div>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {focusAreaLabel}
         </h2>
         <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -1907,7 +1974,7 @@ function NamedItemsSection({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
       <div>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {label}
         </h2>
         <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -2016,6 +2083,8 @@ export default function StaffView({
   orgName,
 }: StaffViewProps) {
   const pathname = usePathname();
+  const isMobile = useMediaQuery(MOBILE);
+  const isTablet = useMediaQuery(TABLET);
   const VALID_SECTIONS: StaffSection[] = ["members", "recurring-schedule", "focus-areas", "certifications", "roles"];
   const sectionFromPath = pathname.split("/")[2] as StaffSection | undefined;
   const activeSection: StaffSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : "members";
@@ -2037,36 +2106,53 @@ export default function StaffView({
   const getCertValues = useCallback((emp: Employee) => emp.certificationId != null ? [emp.certificationId] : [], []);
   const getRoleValues = useCallback((emp: Employee) => emp.roleIds, []);
 
+  // Register sub-nav items for the mobile bottom sheet
+  const subNavItems: SubNavItem[] = useMemo(
+    () =>
+      links.map((link) => ({
+        id: link.id,
+        label: link.label,
+        icon: link.icon,
+        href: link.id === "members" ? "/staff" : `/staff/${link.id}`,
+        active: activeSection === link.id,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeSection, orgId, focusAreaLabel, certificationLabel, roleLabel],
+  );
+  useSetMobileSubNav(subNavItems);
+
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          width: 240,
-          flexShrink: 0,
-          height: "100%",
-          borderRight: "1px solid var(--color-border)",
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          padding: "24px 12px",
-          gap: 4,
-          overflowY: "auto",
-        }}
-      >
-        {links.map((link) => (
-          <SidebarLink
-            key={link.id}
-            label={link.label}
-            icon={link.icon}
-            active={activeSection === link.id}
-            href={link.id === "members" ? "/staff" : `/staff/${link.id}`}
-          />
-        ))}
-      </aside>
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden" }}>
+      {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
+      {isMobile ? null : (
+        <aside
+          style={{
+            width: isTablet ? 180 : 240,
+            flexShrink: 0,
+            height: "100%",
+            borderRight: "1px solid var(--color-border)",
+            background: "#fff",
+            display: "flex",
+            flexDirection: "column",
+            padding: isTablet ? "20px 8px" : "24px 12px",
+            gap: 4,
+            overflowY: "auto",
+          }}
+        >
+          {links.map((link) => (
+            <SidebarLink
+              key={link.id}
+              label={link.label}
+              icon={link.icon}
+              active={activeSection === link.id}
+              href={link.id === "members" ? "/staff" : `/staff/${link.id}`}
+            />
+          ))}
+        </aside>
+      )}
 
       {/* Content */}
-      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "40px 48px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
+      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "40px 48px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
         {activeSection === "members" && (
           <MembersSection
             employees={employees}

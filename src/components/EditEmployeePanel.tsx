@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
+import { useMediaQuery, MOBILE } from "@/hooks";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
@@ -47,6 +48,7 @@ export default function EditEmployeePanel({
   onCancel,
   onInvite,
 }: EditEmployeePanelProps) {
+  const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState<EditForm>({
     firstName: employee.firstName,
     lastName: employee.lastName,
@@ -129,11 +131,11 @@ export default function EditEmployeePanel({
   const readOnly = !canEdit;
 
   return (
-    <div style={{ padding: "20px 24px" }}>
+    <div style={{ padding: isMobile ? "16px 16px" : "20px 24px" }}>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
           gap: 24,
           ...(readOnly ? { opacity: 0.6, pointerEvents: "none" } : {}),
         }}
@@ -141,7 +143,7 @@ export default function EditEmployeePanel({
         {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Name */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>FIRST NAME</label>
               <input
@@ -169,7 +171,7 @@ export default function EditEmployeePanel({
           </div>
 
           {/* Contact details */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>PHONE</label>
               <input
@@ -369,7 +371,7 @@ export default function EditEmployeePanel({
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: isMobile ? 8 : 12, alignItems: "center", flexWrap: "wrap" }}>
             {canEdit && (
               <>
                 <button

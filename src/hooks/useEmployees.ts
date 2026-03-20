@@ -11,6 +11,7 @@ interface EmployeeCache {
   active: Employee[];
   benched: Employee[];
   terminated: Employee[];
+  lastFetchedAt: number;
 }
 
 let employeeCache: EmployeeCache | null = null;
@@ -59,12 +60,20 @@ export function useEmployees(orgId: string | null): EmployeesData {
         active: employees,
         benched: benchedEmployees,
         terminated: terminatedEmployees,
+        lastFetchedAt: employeeCache?.lastFetchedAt ?? Date.now(),
       };
     }
   }, [orgId, loading, employees, benchedEmployees, terminatedEmployees]);
 
   useEffect(() => {
     if (!orgId) return;
+
+    // Skip re-fetch if cache is fresh (< 30s old) and matches this org
+    if (employeeCache?.orgId === orgId && Date.now() - employeeCache.lastFetchedAt < 30_000) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     async function load() {
       try {
@@ -77,6 +86,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           setEmployees(active);
           setBenchedEmployees(benched);
           setTerminatedEmployees(terminated);
+          employeeCache = { orgId: orgId!, active, benched, terminated, lastFetchedAt: Date.now() };
         }
       } catch (err) {
         console.error("Failed to load employees:", err);

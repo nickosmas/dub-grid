@@ -291,7 +291,7 @@ function OrgSearchCombobox({
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 10 }}>
                       {isArchived && (
-                        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-surface-overlay)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>
+                        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-surface-overlay)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>
                           Archived
                         </span>
                       )}
@@ -361,7 +361,7 @@ export default function GridmasterPage() {
     return (
       <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center", padding: 24 }}>
         <div style={{ textAlign: "center", maxWidth: 520 }}>
-          <h1 style={{ marginBottom: 8, fontSize: 24, color: "var(--color-danger)" }}>Access denied</h1>
+          <h1 style={{ marginBottom: 8, fontSize: "var(--dg-fs-section-title)", color: "var(--color-danger)" }}>Access denied</h1>
           <p style={{ margin: 0, color: "var(--color-text-muted)" }}>
             The gridmaster command center is restricted to gridmaster accounts.
           </p>
@@ -421,7 +421,7 @@ export default function GridmasterPage() {
           </span>
           <span
             style={{
-              fontSize: 10,
+              fontSize: "var(--dg-fs-badge)",
               fontWeight: 600,
               textTransform: "uppercase",
               letterSpacing: "0.08em",

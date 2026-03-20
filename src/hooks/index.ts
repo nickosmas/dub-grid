@@ -19,3 +19,8 @@ export type { EmployeesData } from "./useEmployees";
 
 export { useCellLocks } from "./useCellLocks";
 export type { CellLock, OnlineUser } from "./useCellLocks";
+
+export { useMediaQuery, MOBILE, TABLET, DESKTOP } from "./useMediaQuery";
+
+export { useShiftRequests } from "./useShiftRequests";
+export type { ShiftRequestsData } from "./useShiftRequests";

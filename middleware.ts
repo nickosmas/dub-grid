@@ -118,7 +118,8 @@ export async function middleware(req: NextRequest) {
   // Verify JWT and read top-level custom claims - Requirement 11.4
   // If jwtVerify fails (expired token, wrong secret, etc.), fall back to
   // unverified decode so the user isn't blocked. Real data security is
-  // enforced by Supabase RLS, not edge middleware.
+  // enforced by Supabase RLS, not edge middleware. However, we never trust
+  // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
   try {
     if (process.env.SUPABASE_JWT_SECRET) {
@@ -131,6 +132,11 @@ export async function middleware(req: NextRequest) {
     console.warn("JWT verification failed, falling back to unverified decode");
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
+      // Don't trust elevated roles from unverified tokens — a forged JWT
+      // could claim gridmaster access. Force re-auth instead.
+      if (claims.platform_role === "gridmaster") {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
     } catch {
       return NextResponse.redirect(new URL("/login", req.url));
     }
@@ -174,6 +180,10 @@ export async function middleware(req: NextRequest) {
         resolvedOrgRole = membership.org_role;
         resolvedOrgId = membership.org_id;
         resolvedOrgSlug = membership.organizations?.slug;
+      } else if (subdomainMismatch) {
+        // User is on a subdomain they don't belong to — redirect to login
+        // instead of silently proceeding with stale/missing org context.
+        return NextResponse.redirect(new URL("/login", req.url));
       }
     }
 

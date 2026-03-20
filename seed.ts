@@ -392,7 +392,7 @@ async function main() {
         public.focus_areas
       CASCADE;
       DELETE FROM public.organizations
-      WHERE slug IN ('sunrise-senior', 'harbor-health', 'evergreen-care', 'pacific-wellness', 'mountain-view', 'ardenwood');
+      WHERE slug IN ('sunrise-senior', 'harbor-health', 'evergreen-care', 'pacific-wellness', 'mountain-view', 'calmhaven');
     EXCEPTION WHEN undefined_table THEN
       NULL; -- Tables don't exist yet on first run
     END $$;
@@ -604,11 +604,11 @@ async function main() {
     console.log(`    ✓ ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.shiftCodes.length} codes, ${employees.length} employees, ${shiftCount} shifts`);
   }
 
-  // ── Arden Wood (6th tenant) — from existing SQL seed files ──────────
-  console.log(`\n  [6/6] Arden Wood...`);
+  // ── Calm Haven (6th tenant) — from SQL seed file ────────────────────
+  console.log(`\n  [6/6] Calm Haven...`);
 
-  const ardenWoodSql = readFileSync('supabase/seed_arden_wood.sql', 'utf8');
-  await db.query(ardenWoodSql);
+  const calmHavenSql = readFileSync('supabase/seed_calm_haven.sql', 'utf8');
+  await db.query(calmHavenSql);
 
   const gridmasterSql = readFileSync('supabase/seed_gridmaster.sql', 'utf8');
   await db.query(gridmasterSql);
@@ -617,28 +617,28 @@ async function main() {
 
   // ── Auth Users & Profiles ──────────────────────────────────────────────
   // Create 4 test users, all assigned to the first seeded organization.
-  // Uses a DO $$ block (same pattern as seed_arden_wood.sql) to avoid
+  // Uses a DO $$ block (same pattern as seed_calm_haven.sql) to avoid
   // pg driver prepared-statement type inference issues.
 
   console.log("\n  Creating test users...");
 
-  // Get default and Arden Wood organization IDs
+  // Get default and Calm Haven organization IDs
   const { rows: orgs } = await db.query(
-    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'ardenwood')`
+    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven')`
   );
   const defaultOrgId = orgs.find((o: any) => o.slug === 'sunrise-senior')?.id;
-  const ardenwoodOrgId = orgs.find((o: any) => o.slug === 'ardenwood')?.id;
+  const calmhavenOrgId = orgs.find((o: any) => o.slug === 'calmhaven')?.id;
 
   const TEST_USERS = [
     { email: "nicokosmas.dev@gmail.com",     platform_role: "gridmaster", org_role: "user",        label: "gridmaster",  first_name: "Nicodamus", last_name: "Kosmas", preferred_org: "sunrise-senior" },
-    { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "ardenwood" },
-    { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "ardenwood" },
+    { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "calmhaven" },
+    { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "calmhaven" },
   ];
 
   const allAdminPerms = `'{"canEditShifts":true,"canPublishSchedule":true,"canApplyRecurringSchedule":true,"canEditNotes":true,"canManageRecurringShifts":true,"canManageShiftSeries":true,"canManageEmployees":true,"canManageFocusAreas":true,"canManageShiftCodes":true,"canManageIndicatorTypes":true,"canManageOrgSettings":true}'::jsonb`;
 
   for (const user of TEST_USERS) {
-    const orgIdStr = user.preferred_org === 'ardenwood' ? ardenwoodOrgId : defaultOrgId;
+    const orgIdStr = user.preferred_org === 'calmhaven' ? calmhavenOrgId : defaultOrgId;
     const orgIdSql = user.platform_role === "gridmaster" ? "NULL" : `'${orgIdStr}'`;
 
     await db.query(`
@@ -724,7 +724,7 @@ async function main() {
     console.log(`    ✓ ${user.label}: ${allOrgs.length} organizations`);
   }
 
-  console.log("\n✅ All 6 tenants + 4 test users + memberships seeded successfully!");
+  console.log("\n✅ All 6 tenants + 3 test users + memberships seeded successfully!");
   await db.end();
   process.exit(0);
 }

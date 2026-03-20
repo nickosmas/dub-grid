@@ -28,6 +28,8 @@ const ALL_PERMS: AdminPermissions = {
   canManageIndicatorTypes: true,
   canManageOrgSettings: true,
   canManageOrgLabels: true,
+  canManageCoverageRequirements: true,
+  canApproveShiftRequests: true,
 };
 
 /** Read-only baseline — used for user role (and admin with no configured perms). */
@@ -46,6 +48,8 @@ const READ_ONLY_PERMS: AdminPermissions = {
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,
   canManageOrgLabels: false,
+  canManageCoverageRequirements: false,
+  canApproveShiftRequests: false,
 };
 
 export interface Permissions extends AdminPermissions {
@@ -92,7 +96,8 @@ function buildPerms(
     p.canManageShiftCodes ||
     p.canManageIndicatorTypes ||
     p.canManageOrgSettings ||
-    p.canManageOrgLabels;
+    p.canManageOrgLabels ||
+    p.canManageCoverageRequirements;
 
   return {
     ...p,
@@ -120,10 +125,12 @@ const NO_PERMS: Permissions = buildPerms("user", null, false);
 // instantly while a background re-resolve happens.
 
 let permsCache: Permissions | null = null;
+let permsCacheTimestamp = 0;
 
 /** Clear the cache (call on logout). */
 export function clearPermsCache(): void {
   permsCache = null;
+  permsCacheTimestamp = 0;
 }
 
 /**
@@ -166,6 +173,7 @@ export function usePermissions(): Permissions {
     /** Set both React state and module-level cache. */
     function setPermsAndCache(p: Permissions) {
       permsCache = p;
+      permsCacheTimestamp = Date.now();
       if (mounted) setPerms(p);
     }
 
@@ -241,6 +249,8 @@ export function usePermissions(): Permissions {
     supabase.auth
       .getSession()
       .then(({ data: { session } }: { data: { session: Session | null } }) => {
+        // Skip re-resolve if cache is fresh (< 30s old)
+        if (permsCache && Date.now() - permsCacheTimestamp < 30_000) return;
         loadSession(session);
       });
 

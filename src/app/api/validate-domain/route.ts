@@ -1,10 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("slug")?.trim().toLowerCase();
 
-  if (!slug || slug === "gridmaster" || !/^[a-z0-9-]+$/.test(slug)) {
+  if (!slug || RESERVED_SUBDOMAINS.has(slug) || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug)) {
     return NextResponse.json({ valid: false }, {
       headers: { "Cache-Control": "public, max-age=60" },
     });

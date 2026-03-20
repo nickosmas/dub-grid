@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = process.env.PORT || 3000;
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
-const baseURL = `http://ardenwood.${baseDomain}:${port}`;
+const baseURL = `http://calmhaven.${baseDomain}:${port}`;
 
 export default defineConfig({
   testDir: "./e2e",

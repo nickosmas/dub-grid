@@ -1,16 +1,23 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { Copy, ClipboardPaste, Trash2 } from "lucide-react";
+import { Copy, ClipboardPaste, Trash2, UserPlus, ArrowLeftRight } from "lucide-react";
 
 interface ShiftContextMenuProps {
   x: number;
   y: number;
   hasShift: boolean;
   hasClipboard: boolean;
+  canEdit: boolean;
+  /** Show pickup/swap actions (employee viewing own published shift). */
+  canRequest: boolean;
+  /** An active request already exists for this shift. */
+  hasActiveRequest: boolean;
   onCopy: () => void;
   onPaste: () => void;
   onClear: () => void;
+  onMakeAvailable?: () => void;
+  onProposeSwap?: () => void;
   onClose: () => void;
 }
 
@@ -19,9 +26,14 @@ export default function ShiftContextMenu({
   y,
   hasShift,
   hasClipboard,
+  canEdit,
+  canRequest,
+  hasActiveRequest,
   onCopy,
   onPaste,
   onClear,
+  onMakeAvailable,
+  onProposeSwap,
   onClose,
 }: ShiftContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -90,63 +102,139 @@ export default function ShiftContextMenu({
         }
       `}</style>
       <div ref={menuRef} style={menuStyle}>
-        <button
-          style={hasShift ? itemStyle : disabledStyle}
-          onMouseEnter={(e) => {
-            if (hasShift) e.currentTarget.style.background = "#F1F5F9";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "none";
-          }}
-          onClick={() => {
-            onCopy();
-            onClose();
-          }}
-        >
-          <Copy size={14} />
-          Copy Shift
-        </button>
-        <button
-          style={hasClipboard ? itemStyle : disabledStyle}
-          onMouseEnter={(e) => {
-            if (hasClipboard) e.currentTarget.style.background = "#F1F5F9";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "none";
-          }}
-          onClick={() => {
-            onPaste();
-            onClose();
-          }}
-        >
-          <ClipboardPaste size={14} />
-          Paste Shift
-        </button>
-        {hasShift && (
+        {canEdit && (
           <>
-            <div
-              style={{
-                height: 1,
-                background: "var(--color-border-light)",
-                margin: "4px 0",
-              }}
-            />
             <button
-              style={{ ...itemStyle, color: "#DC2626" }}
+              style={hasShift ? itemStyle : disabledStyle}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#FEF2F2";
+                if (hasShift) e.currentTarget.style.background = "#F1F5F9";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "none";
               }}
               onClick={() => {
-                onClear();
+                onCopy();
                 onClose();
               }}
             >
-              <Trash2 size={14} />
-              Clear Shift
+              <Copy size={14} />
+              Copy Shift
             </button>
+            <button
+              style={hasClipboard ? itemStyle : disabledStyle}
+              onMouseEnter={(e) => {
+                if (hasClipboard) e.currentTarget.style.background = "#F1F5F9";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "none";
+              }}
+              onClick={() => {
+                onPaste();
+                onClose();
+              }}
+            >
+              <ClipboardPaste size={14} />
+              Paste Shift
+            </button>
+            {hasShift && (
+              <>
+                <div
+                  style={{
+                    height: 1,
+                    background: "var(--color-border-light)",
+                    margin: "4px 0",
+                  }}
+                />
+                <button
+                  style={{ ...itemStyle, color: "#DC2626" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#FEF2F2";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "none";
+                  }}
+                  onClick={() => {
+                    onClear();
+                    onClose();
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Clear Shift
+                </button>
+              </>
+            )}
+          </>
+        )}
+        {canRequest && hasShift && !hasActiveRequest && (
+          <>
+            {canEdit && (
+              <div
+                style={{
+                  height: 1,
+                  background: "var(--color-border-light)",
+                  margin: "4px 0",
+                }}
+              />
+            )}
+            {onMakeAvailable && (
+              <button
+                style={{ ...itemStyle, color: "#2563EB" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#EFF6FF";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "none";
+                }}
+                onClick={() => {
+                  onMakeAvailable();
+                  onClose();
+                }}
+              >
+                <UserPlus size={14} />
+                Make available for pickup
+              </button>
+            )}
+            {onProposeSwap && (
+              <button
+                style={{ ...itemStyle, color: "#4F46E5" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#EEF2FF";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "none";
+                }}
+                onClick={() => {
+                  onProposeSwap();
+                  onClose();
+                }}
+              >
+                <ArrowLeftRight size={14} />
+                Propose a swap
+              </button>
+            )}
+          </>
+        )}
+        {canRequest && hasShift && hasActiveRequest && (
+          <>
+            {canEdit && (
+              <div
+                style={{
+                  height: 1,
+                  background: "var(--color-border-light)",
+                  margin: "4px 0",
+                }}
+              />
+            )}
+            <div
+              style={{
+                padding: "8px 14px",
+                fontSize: 12,
+                color: "#92400E",
+                fontStyle: "italic",
+              }}
+            >
+              Request already active
+            </div>
           </>
         )}
       </div>

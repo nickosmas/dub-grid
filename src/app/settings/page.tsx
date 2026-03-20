@@ -1,36 +1,29 @@
 "use client";
 
-import { useEffect } from "react";
-import Header from "@/components/Header";
 import SettingsPage from "@/components/SettingsPage";
 import ProgressBar from "@/components/ProgressBar";
-import { usePageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, usePermissions } from "@/hooks";
 
 function SettingsPageContent() {
-  const { 
-    canManageOrg, 
-    isSuperAdmin, 
-    isGridmaster, 
+  const {
+    canManageOrg,
+    isSuperAdmin,
+    isGridmaster,
     canManageOrgLabels,
     canManageFocusAreas,
     canManageShiftCodes,
     canManageIndicatorTypes,
     canManageOrgSettings,
+    canManageCoverageRequirements,
   } = usePermissions();
   const {
     org, focusAreas, shiftCodes, shiftCategories, indicatorTypes,
-    certifications, orgRoles, loading, loadError,
+    certifications, orgRoles, coverageRequirements, loading, loadError,
     setOrg, setFocusAreas, handleShiftCodesChange, setShiftCategories,
-    setIndicatorTypes, handleCertificationsChange, setOrgRoles,
+    setIndicatorTypes, handleCertificationsChange, setOrgRoles, setCoverageRequirements,
   } = useOrganizationData();
-  const { setPageReady } = usePageTransition();
   const isLoading = loading || !org;
-
-  useEffect(() => {
-    if (!isLoading || (loadError && !org)) setPageReady();
-  }, [isLoading, loadError, org, setPageReady]);
 
   if (loadError && !org) {
     return (
@@ -50,18 +43,6 @@ function SettingsPageContent() {
       }}
     >
       <ProgressBar loading={isLoading} />
-      <div
-        className="no-print"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          background: "var(--color-bg)",
-          boxShadow: "var(--shadow-raised)",
-        }}
-      >
-        <Header orgName={org?.name} />
-      </div>
 
       {!isLoading && (
         <SettingsPage
@@ -87,6 +68,9 @@ function SettingsPageContent() {
           canManageShiftCodes={canManageShiftCodes}
           canManageIndicatorTypes={canManageIndicatorTypes}
           canManageOrgSettings={canManageOrgSettings}
+          coverageRequirements={coverageRequirements}
+          onCoverageRequirementsChange={setCoverageRequirements}
+          canManageCoverageRequirements={canManageCoverageRequirements}
         />
       )}
     </div>

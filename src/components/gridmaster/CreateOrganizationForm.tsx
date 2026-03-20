@@ -151,7 +151,7 @@ export default function CreateOrganizationForm({
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: 680 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           Create Organization
         </h2>
         <button type="button" className="dg-btn dg-btn-ghost" onClick={onCancel}>

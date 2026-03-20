@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
             display: "inline-block",
             marginBottom: "32px",
             color: "#6B7280",
-            fontSize: "14px",
+            fontSize: "var(--dg-fs-body-sm)",
             textDecoration: "none",
           }}
         >
@@ -32,21 +32,21 @@ export default function PrivacyPolicyPage() {
 
         <h1
           style={{
-            fontSize: "28px",
+            fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
             marginBottom: "8px",
           }}
         >
           Privacy Policy
         </h1>
-        <p style={{ fontSize: "14px", color: "#6B7280", marginBottom: "40px" }}>
+        <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "#6B7280", marginBottom: "40px" }}>
           Last updated: March 2025
         </p>
 
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -54,7 +54,7 @@ export default function PrivacyPolicyPage() {
           >
             1. Introduction
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
             DubGrid (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;)
             operates a multi-tenant staff scheduling platform for care
             facilities. This Privacy Policy explains how we collect, use,
@@ -67,7 +67,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -75,13 +75,13 @@ export default function PrivacyPolicyPage() {
           >
             2. Information We Collect
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151", marginBottom: "16px" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151", marginBottom: "16px" }}>
             We collect information necessary to provide the Service and to
             manage your organization&apos;s schedules and staff.
           </p>
           <ul
             style={{
-              fontSize: "15px",
+              fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
               color: "#374151",
               paddingLeft: "24px",
@@ -143,7 +143,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -151,12 +151,12 @@ export default function PrivacyPolicyPage() {
           >
             3. How We Use Your Information
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151", marginBottom: "16px" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151", marginBottom: "16px" }}>
             We use the information we collect to:
           </p>
           <ul
             style={{
-              fontSize: "15px",
+              fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
               color: "#374151",
               paddingLeft: "24px",
@@ -188,7 +188,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -196,7 +196,7 @@ export default function PrivacyPolicyPage() {
           >
             4. Data Storage, Security, and PHI Prohibition
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
             Your data is stored on secure servers provided by our
             infrastructure and database provider. We use row-level security
             and role-based access control so that access to data is restricted
@@ -215,7 +215,7 @@ export default function PrivacyPolicyPage() {
           >
             <p
               style={{
-                fontSize: "14px",
+                fontSize: "var(--dg-fs-body-sm)",
                 fontWeight: 600,
                 color: "#92400E",
                 marginBottom: "8px",
@@ -223,7 +223,7 @@ export default function PrivacyPolicyPage() {
             >
               PROHIBITION OF PROTECTED HEALTH INFORMATION (PHI)
             </p>
-            <p style={{ fontSize: "14px", lineHeight: 1.5, color: "#92400E" }}>
+            <p style={{ fontSize: "var(--dg-fs-body-sm)", lineHeight: 1.5, color: "#92400E" }}>
               DubGrid is designed for operational staff scheduling and is
               <strong>not</strong> a HIPAA-compliant platform. The Service is not
               intended for the storage, transmission, or processing of Protected
@@ -240,7 +240,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -248,7 +248,7 @@ export default function PrivacyPolicyPage() {
           >
             5. Data Retention
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
             We retain your account and profile data for as long as your
             account is active and as needed to provide the Service. Organization
             data, employee rosters, shifts, and notes are retained for as long
@@ -263,7 +263,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -271,7 +271,7 @@ export default function PrivacyPolicyPage() {
           >
             6. Your Rights and Choices
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
             Depending on your jurisdiction, you may have the right to access,
             correct, or delete your personal information, or to restrict or
             object to certain processing. You can update your profile
@@ -284,7 +284,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -292,7 +292,7 @@ export default function PrivacyPolicyPage() {
           >
             7. Changes to This Policy
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
             We may update this Privacy Policy from time to time. We will
             post the updated policy on this page and update the &ldquo;Last
             updated&rdquo; date. Continued use of the Service after changes
@@ -303,7 +303,7 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2
             style={{
-              fontSize: "18px",
+              fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
               color: "#1F2937",
@@ -311,7 +311,7 @@ export default function PrivacyPolicyPage() {
           >
             8. Contact Us
           </h2>
-          <p style={{ fontSize: "15px", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
             If you have questions about this Privacy Policy or our data
             practices, please contact us at the email or address provided on
             the DubGrid website or in your organization&apos;s account

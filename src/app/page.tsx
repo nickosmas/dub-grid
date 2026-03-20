@@ -1,74 +1,175 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
+import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
+import StaffViewMockup from "@/components/landing/StaffViewMockup";
+import SettingsMockup from "@/components/landing/SettingsMockup";
+import PermissionsMockup from "@/components/landing/PermissionsMockup";
+import RecurringShiftsMockup from "@/components/landing/RecurringShiftsMockup";
+import {
+  CalendarDays,
+  Users,
+  Shield,
+  Repeat,
+  Settings,
+  Radio,
+  BarChart3,
+  Mail,
+  FileText,
+  Building2,
+  Lock,
+  Menu,
+  X,
+  ArrowRight,
+  type LucideIcon,
+} from "lucide-react";
 
-/* ─── Features data ─── */
-const FEATURES = [
+/* ─── Data ────────────────────────────────────────────── */
+
+type Feature = {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+};
+
+const FEATURES: Feature[] = [
   {
-    icon: "📋",
-    title: "One-Click Scheduling",
-    desc: "Build shift schedules in minutes, not hours. Click, assign, done — no formulas required.",
+    icon: CalendarDays,
+    title: "Schedule Management",
+    description:
+      "Drag-and-drop shift grid with a draft-to-publish workflow. Week and month views with print-ready exports.",
   },
   {
-    icon: "👥",
+    icon: Users,
+    title: "Staff Management",
+    description:
+      "Employee records, certifications, focus areas, and status tracking — all in one place.",
+  },
+  {
+    icon: Shield,
     title: "Role-Based Access",
-    desc: "Admins, schedulers, and staff each see exactly what they need. No oversharing, no confusion.",
+    description:
+      "Super admin, admin with configurable permissions, and user roles. Everyone sees exactly what they need.",
   },
   {
-    icon: "🔔",
-    title: "Instant Visibility",
-    desc: "Everyone sees the latest schedule the moment it's published. No more emailing spreadsheets.",
+    icon: Radio,
+    title: "Real-Time Collaboration",
+    description:
+      "Live schedule updates and presence indicators. Changes are visible the moment they happen.",
   },
   {
-    icon: "🏥",
-    title: "Built for Care Facilities",
-    desc: "Focus areas, certifications, shift types — DubGrid understands your world out of the box.",
+    icon: BarChart3,
+    title: "Coverage Intelligence",
+    description:
+      "Shift counts, gap detection, focus area filtering, and color-coded shift types at a glance.",
   },
   {
-    icon: "📊",
-    title: "Coverage at a Glance",
-    desc: "Real-time shift counts, gap detection, and print-ready views keep your floor covered.",
+    icon: Repeat,
+    title: "Recurring Shifts",
+    description:
+      "Daily, weekly, and biweekly templates with full series management.",
   },
   {
-    icon: "🔒",
-    title: "Draft → Publish Workflow",
-    desc: "Tweak schedules privately before publishing. Staff only see what's final.",
+    icon: Settings,
+    title: "Customizable Terminology",
+    description:
+      "Rename focus areas, certifications, roles, and shift codes to match your facility.",
+  },
+  {
+    icon: Mail,
+    title: "Invite-Only Onboarding",
+    description:
+      "Secure invitation flow with 72-hour expiry. No open registration, no unauthorized access.",
   },
 ];
 
-const PAIN_POINTS = [
+const TRUST_SIGNALS = [
   {
-    before: "Emailing spreadsheets back and forth",
-    after: "Single source of truth, always live",
+    icon: Shield,
+    title: "Role-Based Access Control",
+    description:
+      "Granular permissions at every level. Admins, schedulers, and staff each see only what they need.",
   },
   {
-    before: "Manual cell coloring in Google Sheets",
-    after: "Shift types with built-in color coding",
+    icon: FileText,
+    title: "Immutable Audit Trail",
+    description:
+      "Every role change and schedule version is logged. Full accountability, zero ambiguity.",
   },
   {
-    before: '"Who\'s covering Focus Area B tonight?"',
-    after: "Filtered views by focus area, role & date",
+    icon: Lock,
+    title: "Invite-Only Access",
+    description:
+      "No open registration. Every user enters through a secure, time-limited invitation.",
   },
   {
-    before: "Version confusion across copies",
-    after: "One schedule, versioned & auditable",
-  },
-  {
-    before: "No access control on sensitive data",
-    after: "Role-based permissions at every level",
+    icon: Building2,
+    title: "Multi-Organization",
+    description:
+      "Built from the ground up to scale. Each facility gets its own isolated workspace with dedicated subdomain routing.",
   },
 ];
 
-/* ─── Main Page ─── */
+/* ─── Scroll Reveal Hook ──────────────────────────────── */
+
+function useScrollReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -60px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, isVisible };
+}
+
+/* ─── Section Wrapper ─────────────────────────────────── */
+
+function RevealSection({
+  children,
+  className = "",
+  id,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  const { ref, isVisible } = useScrollReveal();
+  return (
+    <section
+      ref={ref}
+      id={id}
+      className={`transition-all duration-700 ease-out ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      } ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
+
+/* ─── Main Page ───────────────────────────────────────── */
+
 export default function RootPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  /* Session redirect — preserved exactly */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const wantsSignIn = params.get("signin") === "1";
@@ -104,7 +205,6 @@ export default function RootPage() {
               return;
             }
           }
-          // Use full page navigation so the middleware sees refreshed cookies
           window.location.replace("/schedule");
         } else {
           setReady(true);
@@ -116,432 +216,384 @@ export default function RootPage() {
     checkSession();
   }, [router]);
 
+  /* Loading state */
   if (!ready) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#F8FAFC",
-      }}>
-        <div style={{
-          width: 32,
-          height: 32,
-          border: "3px solid #E2E8F0",
-          borderTopColor: "#1B3A2D",
-          borderRadius: "50%",
-          animation: "spin 0.7s linear infinite",
-        }} />
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#F8FAFC",
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            border: "3px solid #E2E8F0",
+            borderTopColor: "#1B3A2D",
+            borderRadius: "50%",
+            animation: "spin 0.7s linear infinite",
+          }}
+        />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
-    <div className="landing">
+    <div className="min-h-screen bg-white text-slate-950 font-sans overflow-x-hidden">
       {/* ── Navbar ── */}
-      <nav className="nav">
-        <div className="nav-inner">
-          <div className="nav-brand">
-            <DubGridLogo size={32} color="#1B3A2D" />
-            <DubGridWordmark fontSize={20} color="#1B3A2D" />
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <DubGridLogo size={28} color="#1B3A2D" />
+            <DubGridWordmark fontSize={18} color="#1B3A2D" />
           </div>
-          <Link href="/login" className="btn-signin">
-            Sign In
-          </Link>
+
+          {/* Desktop nav links */}
+          <div className="hidden md:flex items-center gap-8">
+            <a
+              href="#features"
+              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Features
+            </a>
+            <a
+              href="#security"
+              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Security
+            </a>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Link
+              href="/login"
+              className="hidden sm:inline-flex px-5 py-2 rounded-full bg-[#1B3A2D] text-white text-sm font-semibold hover:bg-[#2D5A45] transition-colors"
+            >
+              Sign In
+            </Link>
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 -mr-2 text-slate-600 hover:text-slate-900 transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu size={22} />
+            </button>
+          </div>
         </div>
       </nav>
 
-      {/* ── Hero ── */}
-      <section className="hero">
-        <div className="hero-inner">
-          <div className="hero-badge">Staff Scheduling, Reimagined</div>
-          <h1 className="hero-title">
-            Stop scheduling with
-            <br />
-            <span className="hero-strike">spreadsheets</span>
-          </h1>
-          <p className="hero-subtitle">
-            DubGrid replaces Google Sheets and Excel with a purpose-built
-            platform for care facility scheduling — faster to use, easier to
-            manage, and impossible to accidentally break.
-          </p>
-          <div className="hero-actions">
-            <Link href="/login" className="btn-hero-primary">
-              Get Started
+      {/* ── Mobile Menu Overlay ── */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[60] bg-white/95 backdrop-blur-xl flex flex-col">
+          <div className="flex items-center justify-between px-6 h-16">
+            <div className="flex items-center gap-2.5">
+              <DubGridLogo size={28} color="#1B3A2D" />
+              <DubGridWordmark fontSize={18} color="#1B3A2D" />
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-2 -mr-2 text-slate-600 hover:text-slate-900 transition-colors"
+              aria-label="Close menu"
+            >
+              <X size={22} />
+            </button>
+          </div>
+          <div className="flex flex-col items-center justify-center flex-1 gap-8">
+            <a
+              href="#features"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-2xl font-semibold text-slate-900 hover:text-[#1B3A2D] transition-colors"
+            >
+              Features
+            </a>
+            <a
+              href="#security"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-2xl font-semibold text-slate-900 hover:text-[#1B3A2D] transition-colors"
+            >
+              Security
+            </a>
+            <Link
+              href="/login"
+              className="mt-4 px-8 py-3 rounded-full bg-[#1B3A2D] text-white text-lg font-semibold hover:bg-[#2D5A45] transition-colors"
+            >
+              Sign In
             </Link>
-            <a href="#features" className="btn-hero-secondary">
-              See How It Works ↓
+          </div>
+        </div>
+      )}
+
+      {/* ── Hero ── */}
+      <section className="relative flex items-center justify-center overflow-hidden">
+        {/* Mesh gradient background */}
+        <div className="absolute inset-0 -z-10">
+          <div
+            className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full opacity-[0.04]"
+            style={{
+              background:
+                "radial-gradient(circle, #1B3A2D 0%, transparent 70%)",
+            }}
+          />
+          <div
+            className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03]"
+            style={{
+              background:
+                "radial-gradient(circle, #3B82F6 0%, transparent 70%)",
+            }}
+          />
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.02]"
+            style={{
+              background:
+                "radial-gradient(circle, #1B3A2D 0%, transparent 60%)",
+            }}
+          />
+        </div>
+
+        <div className="max-w-4xl mx-auto px-6 text-center pt-28 pb-14">
+          {/* Headline */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-slate-950 leading-[1.05]">
+            Purpose built for
+            <br />
+            <span className="text-[#1B3A2D]">CS Care Facilities</span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="mt-6 text-lg md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
+            DubGrid replaces spreadsheets with a purpose-built scheduling
+            platform. Faster to use, easier to manage, impossible to break.
+          </p>
+
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[#1B3A2D] text-white font-semibold text-base hover:-translate-y-0.5 hover:shadow-xl transition-all duration-200"
+            >
+              Get Started
+              <ArrowRight size={18} className="ml-2" />
+            </Link>
+            <a
+              href="#features"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full border border-slate-200 text-slate-700 font-semibold text-base hover:border-slate-400 transition-colors duration-200"
+            >
+              See Features
             </a>
           </div>
         </div>
       </section>
 
-      {/* ── Pain Points ── */}
-      <section className="comparison" id="why">
-        <div className="section-inner">
-          <h2 className="section-title">Why you should switch</h2>
-          <p className="section-subtitle">
-            Spreadsheets were built for numbers, not shift schedules. Here's
-            what changes when you move to DubGrid.
-          </p>
-          <div className="comparison-grid">
-            <div className="comparison-col comparison-col--before">
-              <div className="comparison-header">❌&ensp;Spreadsheets</div>
-              {PAIN_POINTS.map((p, i) => (
-                <div key={i} className="comparison-item">
-                  {p.before}
-                </div>
-              ))}
-            </div>
-            <div className="comparison-col comparison-col--after">
-              <div className="comparison-header">✅&ensp;DubGrid</div>
-              {PAIN_POINTS.map((p, i) => (
-                <div key={i} className="comparison-item">
-                  {p.after}
-                </div>
-              ))}
+      {/* ── Schedule Grid Mockup ── */}
+      <RevealSection className="-mt-10 pb-12 sm:pb-16">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="[perspective:1200px]">
+            <div className="[transform:rotateX(2deg)] origin-bottom">
+              <ScheduleGridMockup />
             </div>
           </div>
         </div>
-      </section>
+      </RevealSection>
 
-      {/* ── Features ── */}
-      <section className="features" id="features">
-        <div className="section-inner">
-          <h2 className="section-title">
-            Everything you need, nothing you don't
-          </h2>
-          <p className="section-subtitle">
-            Built specifically for care facilities that need reliable,
-            role-aware scheduling — without the overhead of a bloated enterprise
-            tool.
-          </p>
-          <div className="features-grid">
-            {FEATURES.map((f, i) => (
-              <div key={i} className="feature-card">
-                <span className="feature-icon">{f.icon}</span>
-                <h3 className="feature-title">{f.title}</h3>
-                <p className="feature-desc">{f.desc}</p>
-              </div>
-            ))}
+      {/* ── Bento Feature Grid ── */}
+      <RevealSection id="features" className="py-16 sm:py-20 lg:py-24 bg-slate-50">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+              Everything you need
+            </h2>
+            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+              Built specifically for care facilities that need reliable,
+              role-aware scheduling.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {FEATURES.map((feature, i) => {
+              const Icon = feature.icon;
+              return (
+                <div
+                  key={feature.title}
+                  className="group rounded-2xl border border-slate-100 bg-white p-6 lg:p-8 hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                  style={{ transitionDelay: `${i * 75}ms` }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-[#1B3A2D]/10 transition-colors duration-300">
+                    <Icon
+                      size={20}
+                      className="text-slate-600 group-hover:text-[#1B3A2D] transition-colors duration-300"
+                    />
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-900 mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              );
+            })}
+
           </div>
         </div>
-      </section>
+      </RevealSection>
+
+      {/* ── Settings Mockup ── */}
+      <RevealSection className="py-12 sm:py-16 lg:py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+              Make it yours
+            </h2>
+            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+              Rename focus areas, certifications, and roles to match how your facility actually works.
+            </p>
+          </div>
+          <SettingsMockup />
+        </div>
+      </RevealSection>
+
+      {/* ── Recurring Shifts Mockup ── */}
+      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-slate-50">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+              Automate the routine
+            </h2>
+            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+              Set recurring shift templates and apply them in one click. Daily, weekly, or biweekly.
+            </p>
+          </div>
+          <RecurringShiftsMockup />
+        </div>
+      </RevealSection>
+
+      {/* ── Staff View Mockup ── */}
+      <RevealSection className="py-12 sm:py-16 lg:py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+              Your team, at a glance
+            </h2>
+            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+              Certifications, focus areas, and account status — all in one unified view.
+            </p>
+          </div>
+          <div className="max-w-4xl mx-auto">
+            <StaffViewMockup />
+          </div>
+        </div>
+      </RevealSection>
+
+      {/* ── Security & Trust ── */}
+      <RevealSection
+        id="security"
+        className="py-16 sm:py-20 lg:py-24"
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+              Built for trust
+            </h2>
+            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+              Enterprise-grade security without the enterprise complexity.
+            </p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-10 items-start">
+            {/* Trust signal cards */}
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {TRUST_SIGNALS.map((signal) => {
+                const Icon = signal.icon;
+                return (
+                  <div
+                    key={signal.title}
+                    className="p-6 rounded-2xl bg-white border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
+                        <Icon size={18} className="text-slate-600" />
+                      </div>
+                      <h3 className="text-base font-semibold text-slate-900">
+                        {signal.title}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      {signal.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Permissions mockup */}
+            <div className="w-full lg:w-auto lg:shrink-0">
+              <PermissionsMockup />
+            </div>
+          </div>
+        </div>
+      </RevealSection>
 
       {/* ── CTA ── */}
-      <section className="cta">
-        <div className="section-inner cta-inner">
-          <h2 className="cta-title">Ready to leave the spreadsheet behind?</h2>
-          <p className="cta-subtitle">
+      <RevealSection className="py-16 sm:py-20 lg:py-24 bg-[#1B3A2D] relative overflow-hidden">
+        {/* Subtle grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+
+        <div className="relative max-w-3xl mx-auto px-6 text-center">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
+            Ready to leave
+            <br />
+            spreadsheets behind?
+          </h2>
+          <p className="text-lg text-white/60 mt-4 max-w-xl mx-auto">
             Your team deserves a scheduling tool that just works.
           </p>
-          <Link href="/login" className="btn-hero-primary">
-            Sign In to Your Workspace
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 rounded-full bg-white text-[#1B3A2D] font-semibold text-base hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
+          >
+            Get Started
+            <ArrowRight size={18} />
           </Link>
         </div>
-      </section>
+      </RevealSection>
 
       {/* ── Footer ── */}
-      <footer className="footer">
-        <div className="nav-inner footer-inner">
-          <div className="nav-brand" style={{ opacity: 0.6 }}>
-            <DubGridLogo size={24} color="#475569" />
-            <DubGridWordmark fontSize={16} color="#475569" />
+      <footer className="border-t border-slate-100">
+        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <DubGridLogo size={20} color="#94A3B8" />
+            <span className="text-xs text-slate-400">
+              &copy; {new Date().getFullYear()} DubGrid
+            </span>
           </div>
-          <span className="footer-copy">
-            © {new Date().getFullYear()} DubGrid. All rights reserved.
-          </span>
+          <div className="flex gap-6">
+            <Link
+              href="/privacy"
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Terms of Service
+            </Link>
+          </div>
         </div>
       </footer>
-
-      {/* ─── Scoped styles ─── */}
-      <style>{`
-        /* ── Reset & base ── */
-        .landing {
-          min-height: 100vh;
-          background: #FFFFFF;
-          color: #0F172A;
-          font-family: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
-          overflow-x: hidden;
-        }
-
-        /* ── Loading ── */
-        .loading-screen {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #F8FAFC;
-        }
-        .spinner {
-          width: 32px; height: 32px;
-          border: 3px solid #E2E8F0;
-          border-top-color: #1B3A2D;
-          border-radius: 50%;
-          animation: spin 0.7s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ── Nav ── */
-        .nav {
-          position: fixed;
-          top: 0; left: 0; right: 0;
-          z-index: 100;
-          background: rgba(255,255,255,0.85);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid #F1F5F9;
-        }
-        .nav-inner {
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 0 24px;
-          height: 64px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .nav-brand {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .btn-signin {
-          display: inline-block;
-          padding: 8px 20px;
-          border-radius: 8px;
-          background: #1B3A2D;
-          color: #fff;
-          font-size: 14px;
-          font-weight: 600;
-          border: none;
-          cursor: pointer;
-          transition: opacity 0.2s;
-          text-decoration: none;
-        }
-        .btn-signin:hover { opacity: 0.88; }
-
-        /* ── Hero ── */
-        .hero {
-          padding: 160px 24px 100px;
-          text-align: center;
-          background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%);
-        }
-        .hero-inner { max-width: 720px; margin: 0 auto; }
-        .hero-badge {
-          display: inline-block;
-          font-size: 13px;
-          font-weight: 700;
-          color: #2563EB;
-          background: #EFF6FF;
-          padding: 6px 16px;
-          border-radius: 100px;
-          margin-bottom: 24px;
-          letter-spacing: 0.02em;
-        }
-        .hero-title {
-          font-size: clamp(36px, 5vw, 56px);
-          font-weight: 800;
-          line-height: 1.1;
-          margin: 0 0 24px;
-          color: #0F172A;
-          letter-spacing: -0.03em;
-        }
-        .hero-strike {
-          text-decoration: line-through;
-          text-decoration-color: #EF4444;
-          text-decoration-thickness: 3px;
-          color: #94A3B8;
-        }
-        .hero-subtitle {
-          font-size: 18px;
-          line-height: 1.7;
-          color: #475569;
-          margin: 0 0 40px;
-          max-width: 580px;
-          margin-left: auto;
-          margin-right: auto;
-        }
-        .hero-actions {
-          display: flex;
-          gap: 16px;
-          justify-content: center;
-          flex-wrap: wrap;
-        }
-        .btn-hero-primary {
-          display: inline-block;
-          padding: 14px 32px;
-          border-radius: 10px;
-          background: #1B3A2D;
-          color: #fff;
-          font-size: 16px;
-          font-weight: 700;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.15s, box-shadow 0.15s;
-          text-decoration: none;
-        }
-        .btn-hero-primary:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 20px rgba(27,58,45,0.25);
-        }
-        .btn-hero-secondary {
-          padding: 14px 32px;
-          border-radius: 10px;
-          background: transparent;
-          color: #1B3A2D;
-          font-size: 16px;
-          font-weight: 600;
-          border: 2px solid #E2E8F0;
-          cursor: pointer;
-          text-decoration: none;
-          transition: border-color 0.2s;
-        }
-        .btn-hero-secondary:hover { border-color: #94A3B8; }
-
-        /* ── Section shared ── */
-        .section-inner {
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 0 24px;
-        }
-        .section-title {
-          font-size: clamp(26px, 3.5vw, 36px);
-          font-weight: 800;
-          text-align: center;
-          margin: 0 0 12px;
-          letter-spacing: -0.02em;
-        }
-        .section-subtitle {
-          font-size: 17px;
-          color: #64748B;
-          text-align: center;
-          max-width: 560px;
-          margin: 0 auto 48px;
-          line-height: 1.6;
-        }
-
-        /* ── Comparison ── */
-        .comparison {
-          padding: 100px 24px;
-          background: #F8FAFC;
-        }
-        .comparison-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-          max-width: 800px;
-          margin: 0 auto;
-        }
-        .comparison-col {
-          border-radius: 14px;
-          overflow: hidden;
-        }
-        .comparison-col--before { background: #FEF2F2; }
-        .comparison-col--after  { background: #F0FDF4; }
-        .comparison-header {
-          padding: 16px 20px;
-          font-size: 15px;
-          font-weight: 700;
-        }
-        .comparison-col--before .comparison-header { color: #991B1B; background: #FEE2E2; }
-        .comparison-col--after  .comparison-header { color: #166534; background: #DCFCE7; }
-        .comparison-item {
-          padding: 14px 20px;
-          font-size: 14px;
-          line-height: 1.5;
-          color: #334155;
-          border-top: 1px solid rgba(0,0,0,0.06);
-        }
-
-        /* ── Features ── */
-        .features {
-          padding: 100px 24px;
-        }
-        .features-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-        }
-        .feature-card {
-          padding: 32px 28px;
-          border-radius: 14px;
-          border: 1px solid #F1F5F9;
-          background: #FAFBFC;
-          transition: box-shadow 0.2s, transform 0.2s;
-        }
-        .feature-card:hover {
-          box-shadow: 0 8px 30px rgba(0,0,0,0.06);
-          transform: translateY(-2px);
-        }
-        .feature-icon { font-size: 28px; display: block; margin-bottom: 16px; }
-        .feature-title {
-          font-size: 17px;
-          font-weight: 700;
-          margin: 0 0 8px;
-          color: #0F172A;
-        }
-        .feature-desc {
-          font-size: 14px;
-          line-height: 1.6;
-          color: #64748B;
-          margin: 0;
-        }
-
-        /* ── CTA ── */
-        .cta {
-          padding: 100px 24px;
-          background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-          text-align: center;
-        }
-        .cta-inner { display: flex; flex-direction: column; align-items: center; }
-        .cta-title {
-          font-size: clamp(26px, 3.5vw, 36px);
-          font-weight: 800;
-          color: #fff;
-          margin: 0 0 12px;
-          letter-spacing: -0.02em;
-        }
-        .cta-subtitle {
-          font-size: 17px;
-          color: #94A3B8;
-          margin: 0 0 32px;
-        }
-        .cta .btn-hero-primary {
-          background: #fff;
-          color: #0F172A;
-          text-decoration: none;
-        }
-        .cta .btn-hero-primary:hover {
-          box-shadow: 0 6px 24px rgba(255,255,255,0.2);
-        }
-
-        /* ── Footer ── */
-        .footer {
-          border-top: 1px solid #F1F5F9;
-          padding: 24px 0;
-        }
-        .footer-inner {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .footer-copy {
-          font-size: 13px;
-          color: #94A3B8;
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 768px) {
-          .features-grid { grid-template-columns: 1fr; }
-          .comparison-grid { grid-template-columns: 1fr; }
-          .hero { padding: 130px 20px 72px; }
-        }
-        @media (max-width: 480px) {
-          .hero-actions { flex-direction: column; align-items: center; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -13,6 +13,7 @@ const PERMISSION_GROUPS = [
       { key: "canEditShifts", label: "Edit Shifts" },
       { key: "canPublishSchedule", label: "Publish Schedule" },
       { key: "canApplyRecurringSchedule", label: "Apply Recurring Schedule" },
+      { key: "canApproveShiftRequests", label: "Approve Shift Requests" },
     ],
   },
   {
@@ -42,6 +43,7 @@ const PERMISSION_GROUPS = [
       { key: "canManageShiftCodes", label: "Manage Shift Codes" },
       { key: "canManageIndicatorTypes", label: "Manage Indicator Types" },
       { key: "canManageOrgLabels", label: "Manage Custom Labels" },
+      { key: "canManageCoverageRequirements", label: "Manage Coverage Requirements" },
     ],
   },
 ] as const;
@@ -61,6 +63,8 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,
   canManageOrgLabels: false,
+  canManageCoverageRequirements: false,
+  canApproveShiftRequests: false,
 };
 
 export default function AdminPermissionsEditor({

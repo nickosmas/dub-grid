@@ -3,8 +3,8 @@
 import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
-import { computeDailyTallies, Tally } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange } from "@/types";
+import { resolveRequirement, computeCoverageStatus } from "@/lib/schedule-logic";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus } from "@/types";
 import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
 import DroppableCell from "./DroppableCell";
@@ -81,6 +81,8 @@ interface ScheduleGridProps {
   onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
   /** Called on right-click of a cell */
   onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
+  /** Coverage requirements for inline tally status display */
+  coverageRequirements?: CoverageRequirement[];
 }
 
 
@@ -119,6 +121,7 @@ interface SectionBlockProps {
   isDragging?: boolean;
   onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
   onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
+  coverageRequirements?: CoverageRequirement[];
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -155,6 +158,7 @@ const SectionBlock = memo(function SectionBlock({
   isDragging: isDraggingGlobal,
   onCellHover,
   onCellContextMenu,
+  coverageRequirements,
 }: SectionBlockProps) {
   const { user: currentUser } = useAuth();
   if (employees.length === 0) return null;
@@ -203,27 +207,47 @@ const SectionBlock = memo(function SectionBlock({
 
   const shiftCodeIdsForKeyFn = shiftCodeIdsForKey ?? (() => []);
 
-  const dailyTallies = useMemo(() => {
-    return weekDates.map((date) =>
-      computeDailyTallies(
-        homeEmployees,
-        date,
-        shiftCodeIdsForKeyFn,
-        shiftCodeById,
-        sectionCodeIds,
-      ),
-    );
-  }, [weekDates, homeEmployees, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds]);
+  // Coverage status per (date, category, shiftCode)
+  // Shape: Record<categoryId, Record<shiftCodeLabel, CoverageStatus>>[]
+  const dailyCoverageStatus = useMemo(() => {
+    if (!coverageRequirements?.length || !sectionFocusArea) return null;
+    return weekDates.map((date) => {
+      const dow = date.getDay();
+      const statusByCategory: Record<number, Record<string, CoverageStatus>> = {};
+      for (const req of coverageRequirements) {
+        if (req.focusAreaId !== sectionFocusArea.id) continue;
+        const code = shiftCodeById.get(req.shiftCodeId);
+        if (!code || code.categoryId == null || !sectionCodeIds.has(code.id)) continue;
+        const resolved = resolveRequirement(coverageRequirements, sectionFocusArea.id, code.id, dow);
+        if (!resolved) continue;
+        statusByCategory[code.categoryId] ??= {};
+        // Only compute once per code (skip if already computed for this label)
+        if (statusByCategory[code.categoryId][code.label]) continue;
+        statusByCategory[code.categoryId][code.label] = computeCoverageStatus(
+          homeEmployees,
+          date,
+          shiftCodeIdsForKeyFn,
+          sectionCodeIds,
+          code.id,
+          resolved,
+        );
+      }
+      return statusByCategory;
+    });
+  }, [weekDates, coverageRequirements, sectionFocusArea, homeEmployees, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds]);
 
-  const renderTally = (tally: Tally) => {
-    const entries = Object.entries(tally);
+  const renderCoverage = (coverageByLabel?: Record<string, CoverageStatus>) => {
+    if (!coverageByLabel) return "-";
+    const entries = Object.entries(coverageByLabel).filter(([, c]) => c.hasRequirement);
     if (entries.length === 0) return "-";
     return (
-      <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-        {entries.map(([label, count], ei) => (
+      <div style={{ display: "flex", flexDirection: "row", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+        {entries.map(([label, cov], ei) => (
           <span key={label} style={{ whiteSpace: "nowrap" }}>
             {ei > 0 && <span style={{ color: "var(--color-text-faint)", margin: "0 0.3em" }}>|</span>}
-            {label}: {count}
+            <span style={{ color: cov.isMet ? "#16A34A" : "#DC2626", fontWeight: 700 }}>
+              {label}: {cov.actual}/{cov.required}
+            </span>
           </span>
         ))}
       </div>
@@ -251,22 +275,21 @@ const SectionBlock = memo(function SectionBlock({
     return map;
   }, [shiftCodes, sectionName, focusAreas]);
 
-  // Determine which tally rows to render from the actual dailyTallies data.
-  // This ensures tallies always show when categorized shifts exist.
-  const tallyRows = useMemo(() => {
+  // Coverage rows — only show categories that have coverage requirements configured
+  const coverageRows = useMemo(() => {
+    if (!dailyCoverageStatus) return [];
     const allCatIds = new Set<number>();
-    for (const dayTally of dailyTallies) {
-      for (const catId of Object.keys(dayTally).map(Number)) {
+    for (const dayCov of dailyCoverageStatus) {
+      for (const catId of Object.keys(dayCov).map(Number)) {
         allCatIds.add(catId);
       }
     }
     if (allCatIds.size === 0) return [];
-
     return shiftCategories
       .filter((cat) => allCatIds.has(cat.id))
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((cat) => ({ id: cat.id, name: cat.name }));
-  }, [dailyTallies, shiftCategories]);
+  }, [dailyCoverageStatus, shiftCategories]);
 
   const gridTemplate = `220px repeat(${weekDates.length}, minmax(${colWidth}px, 1fr))`;
 
@@ -281,7 +304,7 @@ const SectionBlock = memo(function SectionBlock({
       {/* Section label */}
       <div
         style={{
-          fontSize: 16,
+          fontSize: "var(--dg-fs-title)",
           fontWeight: 700,
           color: "var(--color-text-secondary)",
           marginBottom: 10,
@@ -360,7 +383,7 @@ const SectionBlock = memo(function SectionBlock({
                   </div>
                   <div
                     style={{
-                      fontSize: 17,
+                      fontSize: "var(--dg-fs-title)",
                       fontWeight: 700,
                       color: isToday
                         ? "var(--color-today-text)"
@@ -437,7 +460,7 @@ const SectionBlock = memo(function SectionBlock({
                     {emp.roleIds.length > 0 && (
                       <span
                         style={{
-                          fontSize: getEmployeeDisplayName(emp).length > 18 ? 9 : 11,
+                          fontSize: getEmployeeDisplayName(emp).length > 18 ? "var(--dg-fs-micro)" : 11,
                           color: "var(--color-text-subtle)",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -665,7 +688,7 @@ const SectionBlock = memo(function SectionBlock({
                                      {getFocusAreaInitials(crossHomeFa.name)}
                                    </span>
                                  )}
-                                 <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                                 <span style={{ fontSize: "var(--dg-fs-title)", fontWeight: 800, lineHeight: 1 }}>{label}</span>
                                  {customTimes && (
                                    <span style={{
                                      fontSize: 11,
@@ -744,7 +767,7 @@ const SectionBlock = memo(function SectionBlock({
                                      left: "50%",
                                      transform: "translateX(-50%)",
                                      maxWidth: "calc(100% - 12px)",
-                                     fontSize: 9,
+                                     fontSize: "var(--dg-fs-micro)",
                                      fontWeight: 600,
                                      lineHeight: 1,
                                      textAlign: "center",
@@ -868,7 +891,7 @@ const SectionBlock = memo(function SectionBlock({
                                           left: 0,
                                           display: "flex",
                                           alignItems: "center",
-                                          fontSize: 9,
+                                          fontSize: "var(--dg-fs-micro)",
                                           fontWeight: 800,
                                           lineHeight: 1,
                                           background: crossHomeFaLi.colorBg,
@@ -884,7 +907,7 @@ const SectionBlock = memo(function SectionBlock({
                                     )}
                                     <span>{label}</span>
                                     {hasTime && (
-                                      <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                      <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
                                         {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
                                       </span>
                                     )}
@@ -928,7 +951,7 @@ const SectionBlock = memo(function SectionBlock({
                                   left: "50%",
                                   transform: "translateX(-50%)",
                                   maxWidth: "calc(100% - 12px)",
-                                  fontSize: 9,
+                                  fontSize: "var(--dg-fs-micro)",
                                   fontWeight: 600,
                                   lineHeight: 1,
                                   textAlign: "center",
@@ -1031,14 +1054,14 @@ const SectionBlock = memo(function SectionBlock({
                               }}
                             >
                               <span style={{
-                                fontSize: 16,
+                                fontSize: "var(--dg-fs-title)",
                                 fontWeight: 800,
                                 lineHeight: 1,
                               }}>
                                 {deletedLabel}
                               </span>
                               <span style={{
-                                fontSize: 10,
+                                fontSize: "var(--dg-fs-badge)",
                                 fontWeight: 700,
                                 lineHeight: 1,
                                 color: "#DC2626",
@@ -1057,7 +1080,7 @@ const SectionBlock = memo(function SectionBlock({
                                   left: "50%",
                                   transform: "translateX(-50%)",
                                   maxWidth: "calc(100% - 12px)",
-                                  fontSize: 9,
+                                  fontSize: "var(--dg-fs-micro)",
                                   fontWeight: 600,
                                   lineHeight: 1,
                                   textAlign: "center",
@@ -1154,9 +1177,9 @@ const SectionBlock = memo(function SectionBlock({
             );
           })}
 
-          {/* Count rows — one per active tally category for this section */}
-          {tallyRows.map((row, ci) => {
-            const isLastRow = ci === tallyRows.length - 1;
+          {/* Coverage rows — one per category with configured requirements */}
+          {coverageRows.map((row, ci) => {
+            const isLastRow = ci === coverageRows.length - 1;
             return (
             <div
               key={row.id}
@@ -1173,7 +1196,7 @@ const SectionBlock = memo(function SectionBlock({
                   zIndex: 1,
                   background: "#fff",
                   padding: "6px 14px",
-                  fontSize: 10,
+                  fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
                   color: "var(--color-text-secondary)",
                   letterSpacing: "0.05em",
@@ -1186,9 +1209,11 @@ const SectionBlock = memo(function SectionBlock({
               >
                 {row.name}
               </div>
-              {dailyTallies.map((tallies, i) => {
-                const tally = tallies[row.id] ?? {};
-                const hasCount = Object.keys(tally).length > 0;
+              {weekDates.map((_, i) => {
+                const coverageByLabel = dailyCoverageStatus?.[i]?.[row.id];
+                const coverageValues = coverageByLabel ? Object.values(coverageByLabel) : [];
+                const allMet = coverageValues.every((c) => !c.hasRequirement || c.isMet);
+                const cellBg = allMet ? "rgba(22, 163, 74, 0.06)" : "rgba(220, 38, 38, 0.06)";
                 return (
                   <div
                     key={i}
@@ -1201,17 +1226,17 @@ const SectionBlock = memo(function SectionBlock({
                           : "1px solid var(--color-border)",
                       borderBottom: isLastRow ? undefined : (splitAtIndex !== undefined && i === splitAtIndex ? undefined : "1px solid var(--color-border)"),
                       boxShadow: isLastRow ? undefined : (splitAtIndex !== undefined && i === splitAtIndex ? "inset 0 -1px 0 var(--color-border)" : undefined),
-                      fontSize: 10,
+                      fontSize: "var(--dg-fs-badge)",
                       lineHeight: 1.3,
                       fontWeight: 700,
-                      color: hasCount ? "var(--color-text-secondary)" : "var(--color-text-subtle)",
+                      background: cellBg,
                       display: "flex",
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    {renderTally(tally)}
+                    {renderCoverage(coverageByLabel)}
                   </div>
                 );
               })}
@@ -1256,6 +1281,7 @@ export default function ScheduleGrid({
   isDragging,
   onCellHover,
   onCellContextMenu,
+  coverageRequirements,
 }: ScheduleGridProps) {
   const { user: currentUser } = useAuth();
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
@@ -1370,7 +1396,7 @@ export default function ScheduleGrid({
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+            <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600, marginBottom: 4 }}>
               No shifts found for this period
             </div>
             <div style={{ fontSize: 13 }}>
@@ -1487,6 +1513,7 @@ export default function ScheduleGrid({
             isDragging={isDragging}
             onCellHover={onCellHover}
             onCellContextMenu={onCellContextMenu}
+            coverageRequirements={coverageRequirements}
           />
         );
       })}

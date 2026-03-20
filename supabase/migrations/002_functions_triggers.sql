@@ -327,6 +327,10 @@ CREATE TRIGGER trigger_shift_series_audit
   BEFORE INSERT OR UPDATE ON public.shift_series
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
+CREATE TRIGGER trigger_coverage_requirements_audit
+  BEFORE INSERT OR UPDATE ON public.coverage_requirements
+  FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
+
 -- Shifts updated_at (fires in addition to audit trigger)
 CREATE TRIGGER trigger_shifts_updated_at
   BEFORE UPDATE ON public.shifts
@@ -371,6 +375,10 @@ BEGIN
   IF p_changed_by_id <> auth.uid() THEN
     RAISE EXCEPTION 'Caller identity mismatch';
   END IF;
+
+  -- Advisory lock prevents two callers from changing the same user's role
+  -- simultaneously (last-write-wins race). Released at end of transaction.
+  PERFORM pg_advisory_xact_lock(hashtext('change_role_' || p_target_user_id::TEXT));
 
   IF EXISTS (
     SELECT 1 FROM role_change_log WHERE idempotency_key = p_idempotency_key
@@ -943,6 +951,31 @@ CREATE OR REPLACE TRIGGER trg_revoke_invitation_on_email_change
   EXECUTE FUNCTION public.revoke_invitation_on_email_change();
 
 
+-- Auto-revoke pending invitations when an employee is archived (soft-deleted).
+CREATE OR REPLACE FUNCTION public.revoke_invitation_on_employee_archive()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF OLD.archived_at IS NULL AND NEW.archived_at IS NOT NULL THEN
+    UPDATE public.invitations
+    SET revoked_at = NOW()
+    WHERE employee_id = OLD.id
+      AND accepted_at IS NULL
+      AND revoked_at IS NULL
+      AND expires_at >= NOW();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_revoke_invitation_on_employee_archive
+  BEFORE UPDATE ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.revoke_invitation_on_employee_archive();
+
+
 -- ── link_employee_to_user ────────────────────────────────────────────────────
 -- Directly link an existing org user to an employee record (no invitation needed).
 -- Use case: user already has an account and is already a member of this org.
@@ -1226,3 +1259,657 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_audit_log(UUID, INTEGER, INTEGER) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- SHIFT REQUESTS: Pickup & Swap Functions
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Helper: check if two time ranges overlap. NULL times = full day (always overlaps).
+CREATE OR REPLACE FUNCTION public.shift_times_overlap(
+  p_start1 TIME, p_end1 TIME,
+  p_start2 TIME, p_end2 TIME
+) RETURNS BOOLEAN
+LANGUAGE SQL IMMUTABLE
+AS $$
+  SELECT CASE
+    -- If either shift has no times defined, treat as full-day → always overlaps
+    WHEN p_start1 IS NULL OR p_end1 IS NULL OR p_start2 IS NULL OR p_end2 IS NULL THEN TRUE
+    -- Standard overlap check: start1 < end2 AND start2 < end1
+    ELSE p_start1 < p_end2 AND p_start2 < p_end1
+  END;
+$$;
+
+
+-- ── create_shift_request ────────────────────────────────────────────────────
+-- Creates a pickup or swap request. Validates shift ownership and snapshots data.
+
+CREATE OR REPLACE FUNCTION public.create_shift_request(
+  p_org_id              UUID,
+  p_type                public.shift_request_type,
+  p_requester_emp_id    UUID,
+  p_requester_shift_date DATE,
+  p_target_emp_id       UUID DEFAULT NULL,
+  p_target_shift_date   DATE DEFAULT NULL,
+  p_idempotency_key     UUID DEFAULT gen_random_uuid()
+) RETURNS UUID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_request_id UUID;
+  v_requester_shift RECORD;
+  v_target_shift RECORD;
+  v_requester_employee RECORD;
+BEGIN
+  -- Idempotency: return existing if already created
+  SELECT id INTO v_request_id FROM public.shift_requests WHERE idempotency_key = p_idempotency_key;
+  IF FOUND THEN RETURN v_request_id; END IF;
+
+  -- Validate requester is an active employee in this org
+  SELECT id, user_id, status INTO v_requester_employee
+  FROM public.employees
+  WHERE id = p_requester_emp_id AND org_id = p_org_id AND archived_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Employee not found or archived';
+  END IF;
+
+  -- Validate caller is the requester (employee's linked user) or admin+
+  IF v_requester_employee.user_id IS DISTINCT FROM auth.uid()
+     AND NOT public.is_gridmaster()
+     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'Unauthorized: you can only create requests for your own shifts';
+  END IF;
+
+  -- Validate requester owns a published shift on this date
+  SELECT emp_id, date, published_shift_code_ids, focus_area_id,
+         custom_start_time, custom_end_time
+  INTO v_requester_shift
+  FROM public.shifts
+  WHERE emp_id = p_requester_emp_id AND date = p_requester_shift_date AND org_id = p_org_id;
+
+  IF NOT FOUND OR array_length(v_requester_shift.published_shift_code_ids, 1) IS NULL THEN
+    RAISE EXCEPTION 'No published shift found for this employee on this date';
+  END IF;
+
+  -- Check no off-day codes (can't avail an off day)
+  IF EXISTS (
+    SELECT 1 FROM public.shift_codes
+    WHERE id = ANY(v_requester_shift.published_shift_code_ids)
+      AND is_off_day = TRUE
+  ) THEN
+    RAISE EXCEPTION 'Cannot create a request for an off-day shift';
+  END IF;
+
+  -- Check no active request already exists for this shift
+  IF EXISTS (
+    SELECT 1 FROM public.shift_requests
+    WHERE requester_emp_id = p_requester_emp_id
+      AND requester_shift_date = p_requester_shift_date
+      AND org_id = p_org_id
+      AND status IN ('open', 'pending_approval')
+  ) THEN
+    RAISE EXCEPTION 'An active request already exists for this shift';
+  END IF;
+
+  -- For swaps: validate target
+  IF p_type = 'swap' THEN
+    IF p_target_emp_id IS NULL OR p_target_shift_date IS NULL THEN
+      RAISE EXCEPTION 'Swap requests require a target employee and shift date';
+    END IF;
+
+    IF p_requester_emp_id = p_target_emp_id THEN
+      RAISE EXCEPTION 'Cannot swap with yourself';
+    END IF;
+
+    -- Validate target employee exists and is active
+    IF NOT EXISTS (
+      SELECT 1 FROM public.employees
+      WHERE id = p_target_emp_id AND org_id = p_org_id AND archived_at IS NULL AND status = 'active'
+    ) THEN
+      RAISE EXCEPTION 'Target employee not found, archived, or inactive';
+    END IF;
+
+    -- Validate target owns a published shift on the target date
+    SELECT emp_id, date, published_shift_code_ids, focus_area_id,
+           custom_start_time, custom_end_time
+    INTO v_target_shift
+    FROM public.shifts
+    WHERE emp_id = p_target_emp_id AND date = p_target_shift_date AND org_id = p_org_id;
+
+    IF NOT FOUND OR array_length(v_target_shift.published_shift_code_ids, 1) IS NULL THEN
+      RAISE EXCEPTION 'Target employee has no published shift on the specified date';
+    END IF;
+
+    -- Check target shift has no off-day codes
+    IF EXISTS (
+      SELECT 1 FROM public.shift_codes
+      WHERE id = ANY(v_target_shift.published_shift_code_ids)
+        AND is_off_day = TRUE
+    ) THEN
+      RAISE EXCEPTION 'Cannot swap with an off-day shift';
+    END IF;
+  END IF;
+
+  -- Create the request
+  IF p_type = 'swap' THEN
+    INSERT INTO public.shift_requests (
+      org_id, type, status,
+      requester_emp_id, requester_shift_date, requester_shift_code_ids,
+      requester_focus_area_id, requester_custom_start_time, requester_custom_end_time,
+      target_emp_id, target_shift_date, target_shift_code_ids,
+      target_focus_area_id, target_custom_start_time, target_custom_end_time,
+      idempotency_key
+    ) VALUES (
+      p_org_id, p_type, 'open',
+      p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
+      v_requester_shift.focus_area_id, v_requester_shift.custom_start_time, v_requester_shift.custom_end_time,
+      p_target_emp_id, p_target_shift_date,
+      v_target_shift.published_shift_code_ids,
+      v_target_shift.focus_area_id,
+      v_target_shift.custom_start_time,
+      v_target_shift.custom_end_time,
+      p_idempotency_key
+    ) RETURNING id INTO v_request_id;
+  ELSE
+    INSERT INTO public.shift_requests (
+      org_id, type, status,
+      requester_emp_id, requester_shift_date, requester_shift_code_ids,
+      requester_focus_area_id, requester_custom_start_time, requester_custom_end_time,
+      target_emp_id, target_shift_date,
+      idempotency_key
+    ) VALUES (
+      p_org_id, p_type, 'open',
+      p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
+      v_requester_shift.focus_area_id, v_requester_shift.custom_start_time, v_requester_shift.custom_end_time,
+      NULL, NULL,
+      p_idempotency_key
+    ) RETURNING id INTO v_request_id;
+  END IF;
+
+  RETURN v_request_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID) TO authenticated;
+
+
+-- ── claim_shift_request ─────────────────────────────────────────────────────
+-- An employee claims an open pickup request. Time-based conflict check.
+
+CREATE OR REPLACE FUNCTION public.claim_shift_request(
+  p_request_id   UUID,
+  p_claimer_emp_id UUID
+) RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_request RECORD;
+  v_claimer RECORD;
+  v_req_start TIME;
+  v_req_end TIME;
+  v_existing RECORD;
+  v_ex_start TIME;
+  v_ex_end TIME;
+  v_has_conflict BOOLEAN := FALSE;
+BEGIN
+  -- Lock and fetch the request
+  SELECT * INTO v_request
+  FROM public.shift_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Request not found';
+  END IF;
+
+  IF v_request.type != 'pickup' THEN
+    RAISE EXCEPTION 'Only pickup requests can be claimed';
+  END IF;
+
+  IF v_request.status != 'open' THEN
+    RAISE EXCEPTION 'Request is no longer open (status: %)', v_request.status;
+  END IF;
+
+  IF v_request.expires_at < now() THEN
+    UPDATE public.shift_requests SET status = 'expired', resolved_at = now(), updated_at = now()
+    WHERE id = p_request_id;
+    RAISE EXCEPTION 'Request has expired';
+  END IF;
+
+  IF v_request.requester_emp_id = p_claimer_emp_id THEN
+    RAISE EXCEPTION 'Cannot claim your own request';
+  END IF;
+
+  -- Validate claimer is active employee in same org
+  SELECT id, user_id, certification_id, status INTO v_claimer
+  FROM public.employees
+  WHERE id = p_claimer_emp_id AND org_id = v_request.org_id AND archived_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Claimer employee not found or archived';
+  END IF;
+
+  IF v_claimer.status != 'active' THEN
+    RAISE EXCEPTION 'Claimer employee is not active';
+  END IF;
+
+  -- Validate caller is the claimer
+  IF v_claimer.user_id IS DISTINCT FROM auth.uid()
+     AND NOT public.is_gridmaster()
+     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'Unauthorized: you can only claim requests for yourself';
+  END IF;
+
+  -- Check certification requirements
+  IF EXISTS (
+    SELECT 1 FROM public.shift_codes sc
+    WHERE sc.id = ANY(v_request.requester_shift_code_ids)
+      AND array_length(sc.required_certification_ids, 1) IS NOT NULL
+      AND NOT (v_claimer.certification_id = ANY(sc.required_certification_ids))
+  ) THEN
+    RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
+  END IF;
+
+  -- Time-based conflict check: resolve the requested shift's effective times
+  -- MIN for start (earliest begin), MAX for end (latest finish) across multi-code shifts
+  SELECT
+    COALESCE(v_request.requester_custom_start_time, MIN(sc.default_start_time)),
+    COALESCE(v_request.requester_custom_end_time, MAX(sc.default_end_time))
+  INTO v_req_start, v_req_end
+  FROM public.shift_codes sc
+  WHERE sc.id = ANY(v_request.requester_shift_code_ids);
+
+  -- Check each existing shift the claimer has on that date
+  FOR v_existing IN
+    SELECT s.published_shift_code_ids, s.custom_start_time, s.custom_end_time
+    FROM public.shifts s
+    WHERE s.emp_id = p_claimer_emp_id
+      AND s.date = v_request.requester_shift_date
+      AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+  LOOP
+    -- Resolve the existing shift's effective times
+    SELECT
+      COALESCE(v_existing.custom_start_time, MIN(sc.default_start_time)),
+      COALESCE(v_existing.custom_end_time, MAX(sc.default_end_time))
+    INTO v_ex_start, v_ex_end
+    FROM public.shift_codes sc
+    WHERE sc.id = ANY(v_existing.published_shift_code_ids);
+
+    IF public.shift_times_overlap(v_req_start, v_req_end, v_ex_start, v_ex_end) THEN
+      v_has_conflict := TRUE;
+      EXIT;
+    END IF;
+  END LOOP;
+
+  IF v_has_conflict THEN
+    RAISE EXCEPTION 'You have a conflicting shift at this time';
+  END IF;
+
+  -- Claim the request
+  UPDATE public.shift_requests
+  SET target_emp_id = p_claimer_emp_id,
+      status = 'pending_approval',
+      updated_at = now()
+  WHERE id = p_request_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.claim_shift_request(UUID, UUID) TO authenticated;
+
+
+-- ── respond_to_shift_request ────────────────────────────────────────────────
+-- Target employee accepts or declines a swap request.
+
+CREATE OR REPLACE FUNCTION public.respond_to_shift_request(
+  p_request_id UUID,
+  p_emp_id     UUID,
+  p_accept     BOOLEAN
+) RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_request RECORD;
+  v_emp RECORD;
+BEGIN
+  -- Lock and fetch
+  SELECT * INTO v_request
+  FROM public.shift_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Request not found'; END IF;
+
+  IF v_request.type != 'swap' THEN
+    RAISE EXCEPTION 'Only swap requests can be responded to';
+  END IF;
+
+  IF v_request.status != 'open' THEN
+    RAISE EXCEPTION 'Request is no longer open (status: %)', v_request.status;
+  END IF;
+
+  IF v_request.expires_at < now() THEN
+    UPDATE public.shift_requests SET status = 'expired', resolved_at = now(), updated_at = now()
+    WHERE id = p_request_id;
+    RAISE EXCEPTION 'Request has expired';
+  END IF;
+
+  -- Validate caller is the target employee
+  SELECT id, user_id INTO v_emp FROM public.employees WHERE id = p_emp_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Employee not found';
+  END IF;
+  IF v_emp.user_id IS DISTINCT FROM auth.uid() AND NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'Unauthorized: only the target employee can respond';
+  END IF;
+
+  IF v_request.target_emp_id != p_emp_id THEN
+    RAISE EXCEPTION 'You are not the target of this swap request';
+  END IF;
+
+  IF p_accept THEN
+    UPDATE public.shift_requests
+    SET status = 'pending_approval', updated_at = now()
+    WHERE id = p_request_id;
+  ELSE
+    UPDATE public.shift_requests
+    SET status = 'rejected', resolved_at = now(), updated_at = now()
+    WHERE id = p_request_id;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.respond_to_shift_request(UUID, UUID, BOOLEAN) TO authenticated;
+
+
+-- ── resolve_shift_request ───────────────────────────────────────────────────
+-- Admin approves or rejects a pending request. On approval, executes the shift
+-- reassignment atomically.
+
+CREATE OR REPLACE FUNCTION public.resolve_shift_request(
+  p_request_id   UUID,
+  p_approved     BOOLEAN,
+  p_note         TEXT DEFAULT NULL
+) RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_request RECORD;
+  v_admin_user_id UUID := auth.uid();
+  v_req_shift RECORD;
+  v_tgt_shift RECORD;
+  v_req_start TIME;
+  v_req_end TIME;
+  v_existing RECORD;
+  v_ex_start TIME;
+  v_ex_end TIME;
+  v_has_conflict BOOLEAN := FALSE;
+  v_row_count INTEGER;
+BEGIN
+  -- Validate admin permissions
+  IF NOT (
+    public.is_gridmaster()
+    OR public.caller_org_role()::TEXT = 'super_admin'
+  ) THEN
+    -- Check canApproveShiftRequests for admins
+    IF public.caller_org_role()::TEXT = 'admin' THEN
+      IF NOT COALESCE(
+        (SELECT (cm.admin_permissions->>'canApproveShiftRequests')::BOOLEAN
+         FROM public.organization_memberships cm
+         WHERE cm.user_id = v_admin_user_id AND cm.org_id = public.caller_org_id()),
+        FALSE
+      ) THEN
+        RAISE EXCEPTION 'Unauthorized: you do not have permission to approve shift requests';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'Unauthorized: insufficient permissions';
+    END IF;
+  END IF;
+
+  -- Advisory lock prevents concurrent approvals per org
+  PERFORM pg_advisory_xact_lock(hashtext('resolve_shift_request_' || p_request_id::TEXT));
+
+  -- Lock and fetch the request
+  SELECT * INTO v_request
+  FROM public.shift_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Request not found'; END IF;
+
+  IF v_request.status != 'pending_approval' THEN
+    RAISE EXCEPTION 'Request is not pending approval (status: %)', v_request.status;
+  END IF;
+
+  IF v_request.expires_at < now() THEN
+    UPDATE public.shift_requests SET status = 'expired', resolved_at = now(), updated_at = now()
+    WHERE id = p_request_id;
+    RAISE EXCEPTION 'Request has expired';
+  END IF;
+
+  -- Validate org scoping
+  IF v_request.org_id != public.caller_org_id() AND NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'Unauthorized: request belongs to a different organization';
+  END IF;
+
+  IF NOT p_approved THEN
+    -- Reject
+    UPDATE public.shift_requests
+    SET status = 'rejected', admin_user_id = v_admin_user_id,
+        admin_note = p_note, resolved_at = now(), updated_at = now()
+    WHERE id = p_request_id;
+    RETURN;
+  END IF;
+
+  -- ── APPROVAL: execute the shift reassignment ──
+
+  -- Verify requester's shift still exists as snapshotted
+  SELECT * INTO v_req_shift
+  FROM public.shifts
+  WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+
+  IF NOT FOUND OR v_req_shift.published_shift_code_ids IS DISTINCT FROM v_request.requester_shift_code_ids THEN
+    RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. Please ask the employee to resubmit.';
+  END IF;
+
+  IF v_request.type = 'pickup' THEN
+    -- Time-based conflict re-check at approval time
+    -- MIN for start (earliest begin), MAX for end (latest finish) across multi-code shifts
+    SELECT
+      COALESCE(v_request.requester_custom_start_time, MIN(sc.default_start_time)),
+      COALESCE(v_request.requester_custom_end_time, MAX(sc.default_end_time))
+    INTO v_req_start, v_req_end
+    FROM public.shift_codes sc
+    WHERE sc.id = ANY(v_request.requester_shift_code_ids);
+
+    FOR v_existing IN
+      SELECT s.published_shift_code_ids, s.custom_start_time, s.custom_end_time
+      FROM public.shifts s
+      WHERE s.emp_id = v_request.target_emp_id
+        AND s.date = v_request.requester_shift_date
+        AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+    LOOP
+      SELECT
+        COALESCE(v_existing.custom_start_time, MIN(sc.default_start_time)),
+        COALESCE(v_existing.custom_end_time, MAX(sc.default_end_time))
+      INTO v_ex_start, v_ex_end
+      FROM public.shift_codes sc
+      WHERE sc.id = ANY(v_existing.published_shift_code_ids);
+
+      IF public.shift_times_overlap(v_req_start, v_req_end, v_ex_start, v_ex_end) THEN
+        v_has_conflict := TRUE;
+        EXIT;
+      END IF;
+    END LOOP;
+
+    IF v_has_conflict THEN
+      RAISE EXCEPTION 'The target employee now has a conflicting shift. Cannot approve.';
+    END IF;
+
+    -- Delete requester's shift
+    DELETE FROM public.shifts
+    WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+
+    -- Insert as target's shift (goes directly to published)
+    INSERT INTO public.shifts (
+      emp_id, date, org_id, user_id,
+      published_shift_code_ids, draft_shift_code_ids,
+      focus_area_id, custom_start_time, custom_end_time,
+      created_by, updated_by
+    )
+    SELECT
+      v_request.target_emp_id, v_request.requester_shift_date, v_request.org_id, e.user_id,
+      v_request.requester_shift_code_ids, '{}',
+      v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
+      v_admin_user_id, v_admin_user_id
+    FROM public.employees e
+    WHERE e.id = v_request.target_emp_id;
+
+    GET DIAGNOSTICS v_row_count = ROW_COUNT;
+    IF v_row_count = 0 THEN
+      RAISE EXCEPTION 'Failed to reassign shift: target employee not found';
+    END IF;
+
+  ELSIF v_request.type = 'swap' THEN
+    -- Verify target's shift still exists as snapshotted
+    SELECT * INTO v_tgt_shift
+    FROM public.shifts
+    WHERE emp_id = v_request.target_emp_id AND date = v_request.target_shift_date;
+
+    IF NOT FOUND OR v_tgt_shift.published_shift_code_ids IS DISTINCT FROM v_request.target_shift_code_ids THEN
+      RAISE EXCEPTION 'The target''s shift has been modified since the request was created. Please ask the employees to resubmit.';
+    END IF;
+
+    -- Delete both shifts
+    DELETE FROM public.shifts
+    WHERE (emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date)
+       OR (emp_id = v_request.target_emp_id AND date = v_request.target_shift_date);
+
+    -- Insert requester's old shift under target
+    INSERT INTO public.shifts (
+      emp_id, date, org_id, user_id,
+      published_shift_code_ids, draft_shift_code_ids,
+      focus_area_id, custom_start_time, custom_end_time,
+      created_by, updated_by
+    )
+    SELECT
+      v_request.target_emp_id, v_request.requester_shift_date, v_request.org_id, e.user_id,
+      v_request.requester_shift_code_ids, '{}',
+      v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
+      v_admin_user_id, v_admin_user_id
+    FROM public.employees e WHERE e.id = v_request.target_emp_id;
+
+    GET DIAGNOSTICS v_row_count = ROW_COUNT;
+    IF v_row_count = 0 THEN
+      RAISE EXCEPTION 'Failed to swap shift: target employee not found';
+    END IF;
+
+    -- Insert target's old shift under requester
+    INSERT INTO public.shifts (
+      emp_id, date, org_id, user_id,
+      published_shift_code_ids, draft_shift_code_ids,
+      focus_area_id, custom_start_time, custom_end_time,
+      created_by, updated_by
+    )
+    SELECT
+      v_request.requester_emp_id, v_request.target_shift_date, v_request.org_id, e.user_id,
+      v_request.target_shift_code_ids, '{}',
+      v_request.target_focus_area_id, v_request.target_custom_start_time, v_request.target_custom_end_time,
+      v_admin_user_id, v_admin_user_id
+    FROM public.employees e WHERE e.id = v_request.requester_emp_id;
+
+    GET DIAGNOSTICS v_row_count = ROW_COUNT;
+    IF v_row_count = 0 THEN
+      RAISE EXCEPTION 'Failed to swap shift: requester employee not found';
+    END IF;
+  END IF;
+
+  -- Mark approved
+  UPDATE public.shift_requests
+  SET status = 'approved', admin_user_id = v_admin_user_id,
+      admin_note = p_note, resolved_at = now(), updated_at = now()
+  WHERE id = p_request_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.resolve_shift_request(UUID, BOOLEAN, TEXT) TO authenticated;
+
+
+-- ── cancel_shift_request ────────────────────────────────────────────────────
+-- Requester cancels their own request.
+
+CREATE OR REPLACE FUNCTION public.cancel_shift_request(
+  p_request_id UUID,
+  p_emp_id     UUID
+) RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_request RECORD;
+  v_emp RECORD;
+BEGIN
+  SELECT * INTO v_request
+  FROM public.shift_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Request not found'; END IF;
+
+  IF v_request.status NOT IN ('open', 'pending_approval') THEN
+    RAISE EXCEPTION 'Request cannot be cancelled (status: %)', v_request.status;
+  END IF;
+
+  -- Validate caller is the requester
+  SELECT id, user_id INTO v_emp FROM public.employees WHERE id = p_emp_id;
+  IF v_request.requester_emp_id != p_emp_id THEN
+    RAISE EXCEPTION 'Only the requester can cancel this request';
+  END IF;
+
+  IF v_emp.user_id IS DISTINCT FROM auth.uid()
+     AND NOT public.is_gridmaster()
+     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  UPDATE public.shift_requests
+  SET status = 'cancelled', resolved_at = now(), updated_at = now()
+  WHERE id = p_request_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.cancel_shift_request(UUID, UUID) TO authenticated;
+
+
+-- ── expire_shift_requests ───────────────────────────────────────────────────
+-- Bulk-expire stale requests. Called by application cron or manually.
+-- Restricted to gridmaster only (cron calls via service_role bypass RLS).
+
+CREATE OR REPLACE FUNCTION public.expire_shift_requests()
+RETURNS INTEGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  -- Only gridmaster can call this directly; service_role bypasses RLS for cron
+  IF NOT public.is_gridmaster() AND current_setting('role', true) != 'service_role' THEN
+    RAISE EXCEPTION 'Unauthorized: only gridmaster or system cron can expire requests';
+  END IF;
+
+  UPDATE public.shift_requests
+  SET status = 'expired', resolved_at = now(), updated_at = now()
+  WHERE status IN ('open', 'pending_approval')
+    AND expires_at < now();
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.expire_shift_requests() TO authenticated;

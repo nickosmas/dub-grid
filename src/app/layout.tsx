@@ -17,13 +17,29 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "DubGrid",
   description: "Smart staff scheduling for care facilities",
+  icons: {
+    icon: [
+      {
+        url: "/icon/light",
+        type: "image/png",
+        sizes: "32x32",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/icon/dark",
+        type: "image/png",
+        sizes: "32x32",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+  },
   openGraph: {
     title: "DubGrid",
     description: "Smart staff scheduling for care facilities",
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "DubGrid",
     description: "Smart staff scheduling for care facilities",
   },
@@ -32,7 +48,8 @@ export const metadata: Metadata = {
 
 
 import AuthProvider from "@/components/AuthProvider";
-import { PageTransitionProvider } from "@/components/PageTransition";
+import AppShell from "@/components/AppShell";
+import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
 import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({
@@ -48,7 +65,9 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning>
         <AuthProvider>
-          <PageTransitionProvider>{children}</PageTransitionProvider>
+          <MobileSubNavProvider>
+            <AppShell>{children}</AppShell>
+          </MobileSubNavProvider>
         </AuthProvider>
         <Analytics />
       </body>
