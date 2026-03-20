@@ -13,7 +13,7 @@ import ShiftRequestBoard from "@/components/ShiftRequestBoard";
 import CoveragePanel from "@/components/CoveragePanel";
 import ShiftSwapModal from "@/components/ShiftSwapModal";
 
-import ProgressBar from "@/components/ProgressBar";
+import { AnimatedDubGridLogo } from "@/components/Logo";
 import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName } from "@/lib/utils";
 import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
@@ -215,13 +215,12 @@ function SchedulerContent() {
       try {
         const codeMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
 
-        // All 5 fetches are independent — run in parallel
-        const [shiftData, noteRows, recShifts, latestPublish, userInfo] = await Promise.all([
+        // Critical fetches in parallel — unblock grid render ASAP
+        const [shiftData, noteRows, recShifts, latestPublish] = await Promise.all([
           db.fetchShifts(orgId, canEditShifts, codeMap),
           db.fetchScheduleNotes(orgId),
           db.fetchRecurringShifts(orgId, undefined, codeMap),
           db.fetchLatestPublishHistory(orgId).catch(() => null),
-          fetchCurrentUser(),
         ]);
 
         const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
@@ -236,7 +235,9 @@ function SchedulerContent() {
         setNotes(noteMap);
         setRecurringShifts(recShifts);
         if (latestPublish) setPublishHistory(latestPublish);
-        if (userInfo) setCurrentUser(userInfo);
+
+        // Fetch current user in background — not needed for grid render
+        fetchCurrentUser().then(info => { if (info) setCurrentUser(info); });
       } catch (err) {
         console.error("loadSchedule error:", err);
       } finally {
@@ -1556,7 +1557,11 @@ function SchedulerContent() {
   const isLoading = orgLoading || empLoading || scheduleLoading;
 
   if (orgLoading || (scheduleLoading && !org)) {
-    return null;
+    return (
+      <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)", zIndex: 50 }}>
+        <AnimatedDubGridLogo size={160} />
+      </div>
+    );
   }
   if (loadError && !org) {
     return (
@@ -1656,7 +1661,11 @@ function SchedulerContent() {
         color: "var(--color-text-primary)",
       }}
     >
-      <ProgressBar loading={isLoading} />
+      {isLoading && (
+        <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)", zIndex: 50 }}>
+          <AnimatedDubGridLogo size={160} />
+        </div>
+      )}
 
       {!isLoading && (
         <>
