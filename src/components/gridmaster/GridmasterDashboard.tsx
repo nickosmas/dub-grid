@@ -21,7 +21,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
         minWidth: 140,
       }}
     >
-      <div style={{ fontSize: 28, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 4 }}>
+      <div style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 4 }}>
         {value}
       </div>
       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -105,7 +105,7 @@ export default function GridmasterDashboard({
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           Dashboard
         </h2>
         <button className="dg-btn dg-btn-primary" onClick={onCreateOrg}>

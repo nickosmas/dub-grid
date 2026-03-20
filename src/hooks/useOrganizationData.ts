@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { decodeJwt } from "jose";
 import * as db from "@/lib/db";
-import { validateConfig } from "@/lib/supabase";
+import { supabase, validateConfig } from "@/lib/supabase";
 import { handleApiError } from "@/lib/error-handling";
 import type {
   Organization,
@@ -9,6 +10,7 @@ import type {
   ShiftCategory,
   IndicatorType,
   NamedItem,
+  CoverageRequirement,
 } from "@/types";
 
 // ── Module-level cache ──────────────────────────────────────────────────────
@@ -24,6 +26,8 @@ interface OrgDataCache {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  coverageRequirements: CoverageRequirement[];
+  lastFetchedAt: number;
 }
 
 let orgDataCache: OrgDataCache | null = null;
@@ -54,6 +58,8 @@ export interface OrganizationData {
   setIndicatorTypes: (types: IndicatorType[]) => void;
   handleCertificationsChange: (items: NamedItem[]) => Promise<void>;
   setOrgRoles: (items: NamedItem[]) => void;
+  coverageRequirements: CoverageRequirement[];
+  setCoverageRequirements: (reqs: CoverageRequirement[]) => void;
 }
 
 export function useOrganizationData(): OrganizationData {
@@ -68,6 +74,7 @@ export function useOrganizationData(): OrganizationData {
   const [indicatorTypes, setIndicatorTypesState] = useState<IndicatorType[]>(orgDataCache?.indicatorTypes ?? []);
   const [certifications, setCertificationsState] = useState<NamedItem[]>(orgDataCache?.certifications ?? []);
   const [orgRoles, setOrgRolesState] = useState<NamedItem[]>(orgDataCache?.orgRoles ?? []);
+  const [coverageRequirements, setCoverageRequirementsState] = useState<CoverageRequirement[]>(orgDataCache?.coverageRequirements ?? []);
   const [loading, setLoading] = useState(!orgDataCache);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -97,6 +104,11 @@ export function useOrganizationData(): OrganizationData {
     if (orgDataCache) orgDataCache.orgRoles = items;
   }, []);
 
+  const setCoverageRequirements = useCallback((reqs: CoverageRequirement[]) => {
+    setCoverageRequirementsState(reqs);
+    if (orgDataCache) orgDataCache.coverageRequirements = reqs;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -104,20 +116,83 @@ export function useOrganizationData(): OrganizationData {
       try {
         validateConfig();
 
-        const fetchedOrg = await db.fetchUserOrganization();
-        if (!fetchedOrg) {
-          setLoadError("No organization found. Check your database setup.");
+        // Extract orgId from JWT to parallelize org + subsidiary fetches.
+        // getSession() reads from local storage (~5ms), decodeJwt is sync.
+        let earlyOrgId: string | null = null;
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            const payload = decodeJwt(session.access_token) as Record<string, unknown>;
+            earlyOrgId = (payload.org_id as string) || null;
+          }
+        } catch { /* proceed without hint */ }
+
+        // Skip re-fetch if cache is fresh (< 30s old) AND belongs to the
+        // same org. Without the orgId check, an org switch could serve stale
+        // data from the previous organization for up to 30 seconds.
+        if (
+          orgDataCache &&
+          Date.now() - orgDataCache.lastFetchedAt < 30_000 &&
+          (!earlyOrgId || orgDataCache.org.id === earlyOrgId)
+        ) {
+          setLoading(false);
           return;
         }
 
-        const [w, allCodes, cats, indicators, certs, roles] = await Promise.all([
-          db.fetchFocusAreas(fetchedOrg.id),
-          db.fetchShiftCodes(fetchedOrg.id, true),
-          db.fetchShiftCategories(fetchedOrg.id),
-          db.fetchIndicatorTypes(fetchedOrg.id),
-          db.fetchCertifications(fetchedOrg.id),
-          db.fetchOrganizationRoles(fetchedOrg.id),
-        ]);
+        let fetchedOrg: Organization | null;
+        let w: FocusArea[], allCodes: ShiftCode[], cats: ShiftCategory[];
+        let indicators: IndicatorType[], certs: NamedItem[], roles: NamedItem[];
+        let covReqs: CoverageRequirement[];
+
+        if (earlyOrgId) {
+          // Fast path: fetch org details AND subsidiary data in parallel
+          const [orgResult, ...parallelData] = await Promise.all([
+            db.fetchUserOrganization(),
+            db.fetchFocusAreas(earlyOrgId),
+            db.fetchShiftCodes(earlyOrgId, true),
+            db.fetchShiftCategories(earlyOrgId),
+            db.fetchIndicatorTypes(earlyOrgId),
+            db.fetchCertifications(earlyOrgId),
+            db.fetchOrganizationRoles(earlyOrgId),
+            db.fetchCoverageRequirements(earlyOrgId),
+          ]);
+          fetchedOrg = orgResult;
+
+          if (fetchedOrg && fetchedOrg.id === earlyOrgId) {
+            // JWT orgId matches — use parallel data
+            [w, allCodes, cats, indicators, certs, roles, covReqs] = parallelData;
+          } else if (fetchedOrg) {
+            // Rare: JWT orgId stale — refetch with correct id
+            [w, allCodes, cats, indicators, certs, roles, covReqs] = await Promise.all([
+              db.fetchFocusAreas(fetchedOrg.id),
+              db.fetchShiftCodes(fetchedOrg.id, true),
+              db.fetchShiftCategories(fetchedOrg.id),
+              db.fetchIndicatorTypes(fetchedOrg.id),
+              db.fetchCertifications(fetchedOrg.id),
+              db.fetchOrganizationRoles(fetchedOrg.id),
+              db.fetchCoverageRequirements(fetchedOrg.id),
+            ]);
+          } else {
+            setLoadError("No organization found. Check your database setup.");
+            return;
+          }
+        } else {
+          // Fallback: sequential (no JWT org_id available)
+          fetchedOrg = await db.fetchUserOrganization();
+          if (!fetchedOrg) {
+            setLoadError("No organization found. Check your database setup.");
+            return;
+          }
+          [w, allCodes, cats, indicators, certs, roles, covReqs] = await Promise.all([
+            db.fetchFocusAreas(fetchedOrg.id),
+            db.fetchShiftCodes(fetchedOrg.id, true),
+            db.fetchShiftCategories(fetchedOrg.id),
+            db.fetchIndicatorTypes(fetchedOrg.id),
+            db.fetchCertifications(fetchedOrg.id),
+            db.fetchOrganizationRoles(fetchedOrg.id),
+            db.fetchCoverageRequirements(fetchedOrg.id),
+          ]);
+        }
 
         if (cancelled) return;
 
@@ -133,6 +208,8 @@ export function useOrganizationData(): OrganizationData {
           indicatorTypes: indicators,
           certifications: certs,
           orgRoles: roles,
+          coverageRequirements: covReqs,
+          lastFetchedAt: Date.now(),
         };
 
         // Update React state
@@ -143,6 +220,7 @@ export function useOrganizationData(): OrganizationData {
         setIndicatorTypesState(indicators);
         setCertificationsState(certs);
         setOrgRolesState(roles);
+        setCoverageRequirementsState(covReqs);
       } catch (err) {
         if (cancelled) return;
         console.error(err);
@@ -209,5 +287,7 @@ export function useOrganizationData(): OrganizationData {
     setIndicatorTypes,
     handleCertificationsChange,
     setOrgRoles,
+    coverageRequirements,
+    setCoverageRequirements,
   };
 }

@@ -97,7 +97,10 @@ export default function AcceptInvitePage() {
         const msg: string = acceptErr?.message ?? "";
         // "Already accepted" is fine — just proceed to success
         if (!msg.toLowerCase().includes("already been accepted")) {
-          throw new Error(msg || "Failed to accept invitation");
+          throw new Error(
+            "Your account was created, but this invitation is no longer valid. " +
+            "Please contact your organization administrator for a new invitation."
+          );
         }
         // Try to look up the org slug for redirect
         try {
@@ -142,10 +145,9 @@ export default function AcceptInvitePage() {
       }}
     >
       <div
+        className="dg-auth-card"
         style={{
-          width: "100%",
           maxWidth: "480px",
-          padding: "48px 40px",
           background: "rgba(255, 255, 255, 0.95)",
           backdropFilter: "blur(16px)",
           borderRadius: "24px",
@@ -191,6 +193,7 @@ export default function AcceptInvitePage() {
               <input
                 type="email"
                 placeholder="Email"
+                className="dg-standalone-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -219,7 +222,7 @@ export default function AcceptInvitePage() {
               />
 
               {formError && (
-                <p style={{ color: "#DC2626", fontSize: "14px", margin: 0, textAlign: "left" }}>
+                <p style={{ color: "#DC2626", fontSize: "var(--dg-fs-body-sm)", margin: 0, textAlign: "left" }}>
                   {formError}
                 </p>
               )}
@@ -270,6 +273,7 @@ function PasswordInput({
       <input
         type={showPassword ? "text" : "password"}
         placeholder={placeholder}
+        className="dg-standalone-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required
@@ -380,7 +384,7 @@ function ErrorState({ title, message }: { title: string; message: string }) {
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
 const headingStyle: React.CSSProperties = {
-  fontSize: "28px",
+  fontSize: "var(--dg-fs-page-title)",
   fontWeight: 800,
   marginBottom: "16px",
   color: "#0F172A",
@@ -388,7 +392,7 @@ const headingStyle: React.CSSProperties = {
 };
 
 const subtextStyle: React.CSSProperties = {
-  fontSize: "16px",
+  fontSize: "var(--dg-fs-title)",
   color: "#475569",
   lineHeight: 1.6,
   marginBottom: "24px",
@@ -401,7 +405,7 @@ const primaryButtonStyle: React.CSSProperties = {
   color: "#fff",
   border: "none",
   borderRadius: "12px",
-  fontSize: "16px",
+  fontSize: "var(--dg-fs-title)",
   fontWeight: 700,
   cursor: "pointer",
   transition: "transform 0.15s, box-shadow 0.15s",
@@ -415,7 +419,7 @@ const secondaryButtonStyle: React.CSSProperties = {
   color: "#475569",
   border: "none",
   borderRadius: "12px",
-  fontSize: "15px",
+  fontSize: "var(--dg-fs-body)",
   fontWeight: 600,
   cursor: "pointer",
   transition: "background 0.2s",
@@ -427,7 +431,7 @@ const inputStyle: React.CSSProperties = {
   background: "#F8FAFC",
   border: "1px solid #E2E8F0",
   borderRadius: "12px",
-  fontSize: "15px",
+  fontSize: "var(--dg-fs-body)",
   color: "#0F172A",
   outline: "none",
   transition: "border-color 0.2s",

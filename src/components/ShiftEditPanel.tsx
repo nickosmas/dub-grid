@@ -6,6 +6,7 @@ import { EditModalState, ShiftCode, IndicatorType, SeriesScope, SeriesFrequency,
 import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm from "./RepeatForm";
+import { useMediaQuery, MOBILE } from "@/hooks";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
@@ -52,6 +53,14 @@ interface ShiftEditPanelProps {
     createdAt: string | null;
     updatedAt: string | null;
   } | null;
+  /** True if this shift belongs to the currently logged-in employee. */
+  isOwnShift?: boolean;
+  /** True if there's already an active request for this shift. */
+  hasActiveRequest?: boolean;
+  /** Callback to post this shift as available for pickup. */
+  onMakeAvailable?: () => void;
+  /** Callback to open the swap proposal modal. */
+  onProposeSwap?: () => void;
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
@@ -289,16 +298,16 @@ function PillTimeEditor({
   return (
     <div style={{ background: "#F8FAFC", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
+        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
         <button
           onClick={() => { setExpanded(false); onRemove(); }}
-          style={{ fontSize: 10, color: "var(--color-text-subtle)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+          style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-subtle)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
         >Remove</button>
       </div>
 
       {/* Start row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>START</span>
+        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>START</span>
         <TimeDropdown value={s.hour} options={hourOptions} onChange={(v) => updateStart(v, s.minute, s.period)} width={50} placeholder="--" />
         <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
         <TimeDropdown value={s.minute} options={minuteOptions} onChange={(v) => updateStart(s.hour, v, s.period)} width={50} />
@@ -307,7 +316,7 @@ function PillTimeEditor({
 
       {/* End row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>END</span>
+        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>END</span>
         <TimeDropdown value={e.hour} options={hourOptions} onChange={(v) => updateEnd(v, e.minute, e.period)} width={50} placeholder="--" />
         <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
         <TimeDropdown value={e.minute} options={minuteOptions} onChange={(v) => updateEnd(e.hour, v, e.period)} width={50} />
@@ -315,7 +324,7 @@ function PillTimeEditor({
       </div>
 
       {hasTimeError && (
-        <div style={{ color: "#DC2626", fontSize: 10, fontWeight: 600, marginTop: 6 }}>
+        <div style={{ color: "#DC2626", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
           Start time must be before end time
         </div>
       )}
@@ -347,7 +356,12 @@ export default function ShiftEditPanel({
   focusAreas = [],
   certifications = [],
   auditInfo,
+  isOwnShift = false,
+  hasActiveRequest = false,
+  onMakeAvailable,
+  onProposeSwap,
 }: ShiftEditPanelProps) {
+  const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
 
@@ -437,7 +451,7 @@ export default function ShiftEditPanel({
 
   const sectionLabel: React.CSSProperties = {
     marginBottom: 8,
-    fontSize: 10,
+    fontSize: "var(--dg-fs-badge)",
     fontWeight: 700,
     color: "var(--color-text-subtle)",
     textTransform: "uppercase",
@@ -514,7 +528,7 @@ export default function ShiftEditPanel({
                 position: "absolute",
                 top: -10,
                 left: 12,
-                fontSize: 10,
+                fontSize: "var(--dg-fs-badge)",
                 fontWeight: 800,
                 letterSpacing: "0.05em",
                 background: isCellNew ? "#16A34A" : "#D97706",
@@ -529,7 +543,7 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span style={{ fontWeight: 800, fontSize: 20, color: s.text, lineHeight: 1 }}>
+          <span style={{ fontWeight: 800, fontSize: "var(--dg-fs-card-title)", color: s.text, lineHeight: 1 }}>
             {label}
           </span>
           {(fullName || faName) && (
@@ -581,7 +595,7 @@ export default function ShiftEditPanel({
                     position: "absolute",
                     top: -10,
                     left: 12,
-                    fontSize: 10,
+                    fontSize: "var(--dg-fs-badge)",
                     fontWeight: 800,
                     letterSpacing: "0.05em",
                     background: isNewPill ? "#16A34A" : "#D97706",
@@ -612,11 +626,11 @@ export default function ShiftEditPanel({
                 }}
               >
                 <div style={{ textAlign: "center" }}>
-                  <span style={{ fontWeight: 800, fontSize: 18, color: s.text, lineHeight: 1 }}>
+                  <span style={{ fontWeight: 800, fontSize: "var(--dg-fs-heading)", color: s.text, lineHeight: 1 }}>
                     {label}
                   </span>
                   {(fullName || faName) && (
-                    <div style={{ fontSize: 10, color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 3 }}>
+                    <div style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 3 }}>
                       {fullName}{fullName && faName ? " · " : ""}{faName}
                     </div>
                   )}
@@ -793,12 +807,12 @@ export default function ShiftEditPanel({
                   <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? color : "var(--color-text-secondary)" }}>
                     {name}
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 1 }}>
+                  <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-subtle)", marginTop: 1 }}>
                     Appears as a colored dot
                   </div>
                 </div>
                 {isActive && (
-                  <div style={{ fontSize: 10, fontWeight: 700, color, flexShrink: 0 }}>ON</div>
+                  <div style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color, flexShrink: 0 }}>ON</div>
                 )}
               </button>
             );
@@ -824,16 +838,39 @@ export default function ShiftEditPanel({
         {/* Panel Header */}
         <div
           style={{
-            padding: "16px 20px",
+            padding: isMobile ? "12px 16px" : "16px 20px",
             borderBottom: "1px solid var(--color-border)",
             display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
             flexShrink: 0,
             background: "#fff",
           }}
         >
-          <div>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              aria-label="Back"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 36,
+                background: "transparent",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                padding: 0,
+                flexShrink: 0,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
                 fontSize: 15,
@@ -866,24 +903,26 @@ export default function ShiftEditPanel({
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="dg-btn dg-btn-ghost"
-            style={{
-              border: "1px solid var(--color-border)",
-              padding: "4px 8px",
-              fontSize: 16,
-              lineHeight: 1,
-            }}
-            title="Close"
-          >
-            ×
-          </button>
+          {!isMobile && (
+            <button
+              onClick={onClose}
+              className="dg-btn dg-btn-ghost"
+              style={{
+                border: "1px solid var(--color-border)",
+                padding: "4px 8px",
+                fontSize: 16,
+                lineHeight: 1,
+              }}
+              title="Close"
+            >
+              ×
+            </button>
+          )}
         </div>
 
 
         {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
           {showRepeatForm && onRepeatConfirm && empId ? (
             // ── Repeat form mode ─────────────────────────────────────────────
             <RepeatForm
@@ -1124,6 +1163,100 @@ export default function ShiftEditPanel({
                     </svg>
                     Add another shift
                   </button>
+                </div>
+              )}
+
+              {/* ── Shift Request Actions (employee self-service) ─────────── */}
+              {isOwnShift && hasActiveShift && !hasActiveRequest && !hasEdits && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    paddingTop: 16,
+                    borderTop: "1px solid var(--color-border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "var(--color-text-subtle)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Shift requests
+                  </div>
+                  {onMakeAvailable && (
+                    <button
+                      onClick={onMakeAvailable}
+                      className="dg-btn dg-btn-ghost"
+                      style={{
+                        width: "100%",
+                        fontSize: 12,
+                        padding: "9px 12px",
+                        border: "1px solid #93C5FD",
+                        borderRadius: 8,
+                        color: "#2563EB",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="8.5" cy="7" r="4" />
+                        <line x1="20" y1="8" x2="20" y2="14" />
+                        <line x1="23" y1="11" x2="17" y2="11" />
+                      </svg>
+                      Make available for pickup
+                    </button>
+                  )}
+                  {onProposeSwap && (
+                    <button
+                      onClick={onProposeSwap}
+                      className="dg-btn dg-btn-ghost"
+                      style={{
+                        width: "100%",
+                        fontSize: 12,
+                        padding: "9px 12px",
+                        border: "1px solid #A5B4FC",
+                        borderRadius: 8,
+                        color: "#4F46E5",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="17 1 21 5 17 9" />
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                        <polyline points="7 23 3 19 7 15" />
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                      </svg>
+                      Propose a swap
+                    </button>
+                  )}
+                </div>
+              )}
+              {isOwnShift && hasActiveRequest && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 12px",
+                    background: "#FEF3C7",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: "#92400E",
+                    textAlign: "center",
+                  }}
+                >
+                  A request is already active for this shift
                 </div>
               )}
             </>

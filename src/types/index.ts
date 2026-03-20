@@ -60,6 +60,49 @@ export interface ShiftCategory {
 }
 
 /**
+ * Minimum staffing requirement for a focus area + shift code + day of week.
+ * When dayOfWeek is null, the requirement applies to all 7 days ("every day" mode).
+ */
+export interface CoverageRequirement {
+  id: number;
+  orgId: string;
+  focusAreaId: number;
+  shiftCodeId: number;
+  /** 0=Sun..6=Sat. Null = applies to every day. */
+  dayOfWeek: number | null;
+  /** Minimum headcount required. */
+  minStaff: number;
+}
+
+/**
+ * Computed coverage status for a single (focus_area, shift_code, date) cell.
+ */
+export interface CoverageStatus {
+  /** Actual headcount assigned on this date in this section. */
+  actual: number;
+  /** Required headcount from coverage_requirements. */
+  required: number;
+  /** True when actual >= required. */
+  isMet: boolean;
+  /** True when there is a requirement defined (required > 0). */
+  hasRequirement: boolean;
+}
+
+/**
+ * A coverage gap: a (focus_area, shift_code, date) tuple where requirements are not met.
+ */
+export interface CoverageGap {
+  focusAreaId: number;
+  focusAreaName: string;
+  shiftCodeId: number;
+  shiftCodeLabel: string;
+  shiftCategoryId: number;
+  shiftCategoryName: string;
+  date: Date;
+  status: CoverageStatus;
+}
+
+/**
  * A shift code: the atomic grid-cell entry (e.g. "D", "EVE", "N", "OFF").
  * The `label` field is what is displayed in the schedule grid.
  */
@@ -283,6 +326,12 @@ export interface AdminPermissions {
   canManageOrgSettings: boolean;
   /** Edit custom terminology labels — focus areas, certifications, roles (delegatable to admin) */
   canManageOrgLabels: boolean;
+  // Coverage
+  /** Create / edit / delete coverage requirements for shift staffing minimums */
+  canManageCoverageRequirements: boolean;
+  // Shift Requests
+  /** Approve or reject employee shift pickup/swap requests */
+  canApproveShiftRequests: boolean;
 }
 
 export interface Profile {
@@ -391,4 +440,38 @@ export interface OrganizationMembership {
   email: string | null;
   firstName: string | null;
   lastName: string | null;
+}
+
+// ── Shift Requests ──────────────────────────────────────────────────────────
+
+export type ShiftRequestType = 'pickup' | 'swap';
+export type ShiftRequestStatus = 'open' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+
+export interface ShiftRequest {
+  id: string;
+  orgId: string;
+  type: ShiftRequestType;
+  status: ShiftRequestStatus;
+  requesterEmpId: string;
+  requesterName: string;
+  requesterShiftDate: string;
+  requesterShiftCodeIds: number[];
+  requesterShiftLabel: string;
+  requesterFocusAreaId: number | null;
+  requesterCustomStartTime: string | null;
+  requesterCustomEndTime: string | null;
+  targetEmpId: string | null;
+  targetName: string | null;
+  targetShiftDate: string | null;
+  targetShiftCodeIds: number[] | null;
+  targetShiftLabel: string | null;
+  targetFocusAreaId: number | null;
+  targetCustomStartTime: string | null;
+  targetCustomEndTime: string | null;
+  adminUserId: string | null;
+  adminNote: string | null;
+  expiresAt: string;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

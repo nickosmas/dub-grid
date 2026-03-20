@@ -156,7 +156,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
         minWidth: 80,
       }}
     >
-      <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-text-primary)" }}>{value}</div>
+      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{value}</div>
       <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>{label}</div>
     </div>
   );
@@ -260,7 +260,7 @@ export default function OrganizationDetail({
     <div>
       {/* Organization header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {organization.name}
         </h2>
         {organization.slug && (
@@ -1034,7 +1034,7 @@ function ConfigTab({
                       key={h}
                       style={{
                         padding: "8px 14px",
-                        fontSize: 10,
+                        fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
                         color: "var(--color-text-subtle)",
                         textTransform: "uppercase",

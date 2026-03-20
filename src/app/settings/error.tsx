@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePageTransition } from "@/components/PageTransition";
 
 export default function SettingsError({
   error,
@@ -10,12 +9,9 @@ export default function SettingsError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const { setPageReady } = usePageTransition();
-
   useEffect(() => {
     console.error("Settings page error:", error);
-    setPageReady();
-  }, [error, setPageReady]);
+  }, [error]);
 
   return (
     <div
@@ -30,7 +26,7 @@ export default function SettingsError({
         padding: 24,
       }}
     >
-      <p style={{ fontSize: 16, color: "#475569" }}>
+      <p style={{ fontSize: "var(--dg-fs-title)", color: "#475569" }}>
         Something went wrong loading this page.
       </p>
       <button
@@ -41,7 +37,7 @@ export default function SettingsError({
           color: "#fff",
           border: "none",
           borderRadius: 8,
-          fontSize: 14,
+          fontSize: "var(--dg-fs-body-sm)",
           fontWeight: 600,
           cursor: "pointer",
         }}

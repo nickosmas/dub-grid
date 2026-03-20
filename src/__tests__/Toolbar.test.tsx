@@ -57,9 +57,10 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
   });
 
-  it("renders span selector showing current span label", () => {
+  it("renders date label showing the current period", () => {
     render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    expect(screen.getByRole("button", { name: /1 Week/ })).toBeInTheDocument();
+    // Date range label is shown as text (e.g. "1/7 – 1/13"), not a button
+    expect(screen.getByText(/\d{1,2}\/\d{1,2}/)).toBeInTheDocument();
   });
 
   it("renders All focus area button plus one per focus area in focusAreas prop", () => {
@@ -94,13 +95,13 @@ describe("Toolbar — Tools dropdown", () => {
 });
 
 describe("Toolbar — active state styles", () => {
-  it("span selector trigger displays the label matching the current spanWeeks value", () => {
+  it("date label updates when spanWeeks changes", () => {
     const { rerender } = render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    expect(screen.getByRole("button", { name: /1 Week/ })).toBeInTheDocument();
-    rerender(<Toolbar {...defaultProps} spanWeeks={2} />);
-    expect(screen.getByRole("button", { name: /2 Weeks/ })).toBeInTheDocument();
+    // 1 week: shows M/D – M/D
+    expect(screen.getByText(/\d{1,2}\/\d{1,2} – \d{1,2}\/\d{1,2}/)).toBeInTheDocument();
     rerender(<Toolbar {...defaultProps} spanWeeks="month" />);
-    expect(screen.getByRole("button", { name: /Month/ })).toBeInTheDocument();
+    // Month: shows MonthName YYYY
+    expect(screen.getByText(/[A-Z][a-z]+ \d{4}/)).toBeInTheDocument();
   });
 
   it("active focus area button (matching activeFocusArea) has 'active' CSS class; others do not", () => {
@@ -134,23 +135,8 @@ describe("Toolbar — callbacks", () => {
     expect(defaultProps.onToday).toHaveBeenCalledTimes(1);
   });
 
-  it("selecting '2 Weeks' from span dropdown calls onSpanChange(2)", async () => {
-    const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    // Open the CustomSelect dropdown
-    await user.click(screen.getByRole("button", { name: /1 Week/ }));
-    // Click the "2 Weeks" option in the portaled dropdown
-    await user.click(screen.getByRole("button", { name: "2 Weeks" }));
-    expect(defaultProps.onSpanChange).toHaveBeenCalledWith(2);
-  });
-
-  it("selecting 'Month' from span dropdown calls onSpanChange('month')", async () => {
-    const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    await user.click(screen.getByRole("button", { name: /1 Week/ }));
-    await user.click(screen.getByRole("button", { name: "Month" }));
-    expect(defaultProps.onSpanChange).toHaveBeenCalledWith("month");
-  });
+  // Span selector was removed from Toolbar — span changes are now handled
+  // externally. Only nav callbacks (prev/next/today) remain.
 
   it("clicking a focus area button calls onFocusAreaChange with focus area id", async () => {
     const user = userEvent.setup();

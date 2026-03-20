@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useEffect } from "react";
 import React from "react";
+import { useMediaQuery, MOBILE } from "@/hooks";
 
 interface ModalProps {
   title: string;
@@ -12,6 +13,7 @@ interface ModalProps {
 
 export default function Modal({ title, onClose, children, style }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const isMobile = useMediaQuery(MOBILE);
 
   // Auto-focus the modal on open for keyboard accessibility
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function Modal({ title, onClose, children, style }: ModalProps) {
           <span
             style={{
               fontWeight: 700,
-              fontSize: 16,
+              fontSize: "var(--dg-fs-title)",
               color: "var(--color-text-primary)",
             }}
           >
@@ -64,7 +66,7 @@ export default function Modal({ title, onClose, children, style }: ModalProps) {
             onClick={onClose}
             aria-label="Close modal"
             className="dg-btn dg-btn-ghost"
-            style={{ fontSize: 20, lineHeight: 1, padding: "2px 6px" }}
+            style={{ fontSize: "var(--dg-fs-card-title)", lineHeight: 1, padding: isMobile ? "8px 10px" : "2px 6px", minWidth: isMobile ? 44 : undefined, minHeight: isMobile ? 44 : undefined }}
           >
             ×
           </button>

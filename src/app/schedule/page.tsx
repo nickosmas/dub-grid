@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import Header from "@/components/Header";
 import Toolbar from "@/components/Toolbar";
 import ScheduleGrid from "@/components/ScheduleGrid";
 import MonthView from "@/components/MonthView";
@@ -10,26 +9,31 @@ import PrintLegend from "@/components/PrintLegend";
 import PrintOptionsModal, { PrintConfig } from "@/components/PrintOptionsModal";
 import PrintScheduleView from "@/components/PrintScheduleView";
 import DraftBanner from "@/components/DraftBanner";
+import ShiftRequestBoard from "@/components/ShiftRequestBoard";
+import CoveragePanel from "@/components/CoveragePanel";
+import ShiftSwapModal from "@/components/ShiftSwapModal";
 
 import ProgressBar from "@/components/ProgressBar";
-import { usePageTransition } from "@/components/PageTransition";
 import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName } from "@/lib/utils";
-import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons } from "@/lib/schedule-logic";
+import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
 import { OptimisticLockError } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { supabase } from "@/lib/supabase";
-import { usePermissions, useOrganizationData, useEmployees, useCellLocks } from "@/hooks";
+import { usePermissions, useOrganizationData, useEmployees, useCellLocks, useShiftRequests } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { toast } from "sonner";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragOverlay, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
 import type { ShiftDragData } from "@/components/DraggableShift";
 import type { CellDropData } from "@/components/DroppableCell";
 import ShiftContextMenu from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import MobileDayView from "@/components/MobileDayView";
+import { useMediaQuery, MOBILE } from "@/hooks";
+import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import {
   Employee,
   EditModalState,
@@ -44,17 +48,21 @@ import {
 } from "@/types";
 
 function SchedulerContent() {
+  const isMobile = useMediaQuery(MOBILE);
   const { user: authUser } = useAuth();
-  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, isSuperAdmin, isLoading: permsLoading } = usePermissions();
+  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId } = usePermissions();
   const {
     org, focusAreas, shiftCodes, allShiftCodesRef, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,
+    coverageRequirements,
     loading: orgLoading, loadError,
   } = useOrganizationData();
+  // Use orgId from JWT (available immediately) so employee fetch starts
+  // in parallel with org data instead of waiting for it.
   const {
     employees,
     loading: empLoading,
-  } = useEmployees(org?.id ?? null);
+  } = useEmployees(orgId ?? org?.id ?? null);
 
   const today = useRef(new Date()).current;
 
@@ -86,6 +94,30 @@ function SchedulerContent() {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [importPreview, setImportPreview] = useState<{ count: number; sourceRange: string; targetRange: string } | null>(null);
 
+  // ── Coverage Panel ─────────────────────────────────────────────────────────
+  const [showCoveragePanel, setShowCoveragePanel] = useState(false);
+
+  // ── Shift Requests (pickup & swap) ────────────────────────────────────────
+  const [showRequestBoard, setShowRequestBoard] = useState(false);
+  const [swapModalState, setSwapModalState] = useState<{
+    empId: string;
+    empName: string;
+    shiftDate: string;
+    shiftLabel: string;
+  } | null>(null);
+
+  const currentEmpId = useMemo(
+    () => authUser ? employees.find(e => e.userId === authUser.id)?.id ?? null : null,
+    [employees, authUser],
+  );
+
+  const shiftRequests = useShiftRequests(
+    orgId ?? org?.id ?? null,
+    shiftCodeMap,
+    currentEmpId,
+    canApproveShiftRequests,
+  );
+
   const draftBreakdown = useMemo(
     () => computeDraftBreakdown(shifts, notes),
     [shifts, notes],
@@ -108,6 +140,8 @@ function SchedulerContent() {
   // ── Drag & Drop state ──────────────────────────────────────────────────────
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
   );
   const [activeDrag, setActiveDrag] = useState<ShiftDragData | null>(null);
 
@@ -154,7 +188,7 @@ function SchedulerContent() {
   const scheduleLoadStarted = useRef(false);
   const initialLoadUsedEditPerms = useRef(false);
   useEffect(() => {
-    if (orgLoading || permsLoading || !org || scheduleLoadStarted.current) return;
+    if (orgLoading || !org || scheduleLoadStarted.current) return;
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
@@ -507,6 +541,26 @@ function SchedulerContent() {
     [employees, activeFocusArea],
   );
 
+  // Register focus areas as sub-nav items for the mobile bottom sheet
+  const focusAreaSubNav: SubNavItem[] = useMemo(
+    () => [
+      {
+        id: "all",
+        label: "All " + (org?.focusAreaLabel || "Focus Areas"),
+        active: activeFocusArea === null,
+        onClick: () => setActiveFocusArea(null),
+      },
+      ...focusAreas.map((fa) => ({
+        id: String(fa.id),
+        label: fa.name,
+        active: activeFocusArea === fa.id,
+        onClick: () => setActiveFocusArea(fa.id),
+      })),
+    ],
+    [focusAreas, activeFocusArea, org?.focusAreaLabel],
+  );
+  useSetMobileSubNav(focusAreaSubNav);
+
   const visibleScheduleEmployees = useMemo(() => {
     return filteredEmployees;
   }, [filteredEmployees]);
@@ -534,6 +588,49 @@ function SchedulerContent() {
       shifts[`${empId}_${formatDateKey(date)}`]?.shiftCodeIds ?? [],
     [shifts],
   );
+
+  // ── Coverage gaps ──────────────────────────────────────────────────────────
+  const shiftCodeById = useMemo(() => {
+    const map = new Map<number, ShiftCode>();
+    for (const sc of shiftCodes) map.set(sc.id, sc);
+    // Include archived codes from allShiftCodesRef for shift lookup
+    for (const sc of allShiftCodesRef.current) {
+      if (!map.has(sc.id)) map.set(sc.id, sc);
+    }
+    return map;
+  }, [shiftCodes, allShiftCodesRef]);
+
+  const coverageGaps = useMemo(() => {
+    if (!coverageRequirements.length || !focusAreas.length) return [];
+
+    const employeesByFocusArea = new Map<number, Employee[]>();
+    for (const fa of focusAreas) {
+      employeesByFocusArea.set(
+        fa.id,
+        employees.filter((e) => e.focusAreaIds.includes(fa.id)),
+      );
+    }
+
+    const shiftCodeIdsByFocusArea = new Map<number, Set<number>>();
+    for (const fa of focusAreas) {
+      shiftCodeIdsByFocusArea.set(
+        fa.id,
+        new Set(shiftCodes.filter((sc) => sc.focusAreaId === fa.id).map((sc) => sc.id)),
+      );
+    }
+
+    return computeCoverageGaps(
+      focusAreas,
+      shiftCategories,
+      shiftCodes,
+      coverageRequirements,
+      dates,
+      employeesByFocusArea,
+      shiftCodeIdsForKey,
+      shiftCodeById,
+      shiftCodeIdsByFocusArea,
+    );
+  }, [coverageRequirements, focusAreas, employees, shiftCodes, shiftCategories, dates, shiftCodeIdsForKey, shiftCodeById]);
 
   const draftKindForKey = useCallback(
     (empId: string, date: Date): DraftKind => {
@@ -585,6 +682,53 @@ function SchedulerContent() {
       return { start, end, perPill };
     },
     [shifts],
+  );
+
+  /** True if the shift's date is in the past, or it's today and the shift has already started. */
+  const isShiftStarted = useCallback(
+    (empId: string, date: Date): boolean => {
+      const todayStr = formatDateKey(today);
+      const dateStr = formatDateKey(date);
+      if (dateStr < todayStr) return true;
+      if (dateStr > todayStr) return false;
+      // Today — check start time
+      const entry = shifts[`${empId}_${dateStr}`];
+      if (!entry || entry.shiftCodeIds.length === 0) return true;
+      // Resolve earliest start time from custom times or shift code defaults
+      let earliest: string | null = null;
+      if (entry.customStartTime) {
+        // customStartTime can be pipe-delimited for multi-pill shifts
+        for (const t of entry.customStartTime.split("|")) {
+          if (t && (!earliest || t < earliest)) earliest = t;
+        }
+      }
+      if (!earliest) {
+        for (const codeId of entry.shiftCodeIds) {
+          const sc = shiftCodes.find(c => c.id === codeId);
+          if (sc?.defaultStartTime && (!earliest || sc.defaultStartTime < earliest)) {
+            earliest = sc.defaultStartTime;
+          }
+        }
+      }
+      if (!earliest) return true; // no start time defined — treat as started (safe default)
+      const now = new Date();
+      const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      return nowTime >= earliest;
+    },
+    [shifts, shiftCodes, today],
+  );
+
+  /** True if the shift has at least one categorized, non-off-day shift code (i.e. a real work shift). */
+  const isRequestableShift = useCallback(
+    (empId: string, date: Date): boolean => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry || entry.shiftCodeIds.length === 0) return false;
+      return entry.shiftCodeIds.some(codeId => {
+        const sc = shiftCodes.find(c => c.id === codeId);
+        return sc != null && !sc.isOffDay && sc.categoryId != null;
+      });
+    },
+    [shifts, shiftCodes],
   );
 
   const handleCustomTimeChange = useCallback(
@@ -1303,9 +1447,10 @@ function SchedulerContent() {
         (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
       );
     } else {
-      setWeekStart((prev) => addDays(prev, -(spanWeeks * 7)));
+      const step = isMobile ? 7 : spanWeeks * 7;
+      setWeekStart((prev) => addDays(prev, -step));
     }
-  }, [spanWeeks]);
+  }, [spanWeeks, isMobile]);
 
   const handleNext = useCallback(() => {
     if (spanWeeks === "month") {
@@ -1313,9 +1458,10 @@ function SchedulerContent() {
         (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
       );
     } else {
-      setWeekStart((prev) => addDays(prev, spanWeeks * 7));
+      const step = isMobile ? 7 : spanWeeks * 7;
+      setWeekStart((prev) => addDays(prev, step));
     }
-  }, [spanWeeks]);
+  }, [spanWeeks, isMobile]);
 
   const handleToday = useCallback(
     () => setWeekStart(getWeekStart(today)),
@@ -1393,14 +1539,9 @@ function SchedulerContent() {
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
-  const { setPageReady } = usePageTransition();
-  const isLoading = orgLoading || empLoading || scheduleLoading || !draftCheckComplete;
+  const isLoading = orgLoading || empLoading || scheduleLoading;
 
-  useEffect(() => {
-    if (!isLoading || (loadError && !org)) setPageReady();
-  }, [isLoading, loadError, org, setPageReady]);
-
-  if (orgLoading || permsLoading || (scheduleLoading && !org)) {
+  if (orgLoading || (scheduleLoading && !org)) {
     return null;
   }
   if (loadError && !org) {
@@ -1439,10 +1580,10 @@ function SchedulerContent() {
         </div>
 
         <div style={{ maxWidth: 400 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0F172A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+          <h1 style={{ fontSize: "var(--dg-fs-section-title)", fontWeight: 800, color: "#0F172A", marginBottom: 12, letterSpacing: "-0.02em" }}>
             Workspace Setup Required
           </h1>
-          <p style={{ fontSize: 16, color: "#475569", lineHeight: 1.6, marginBottom: 32 }}>
+          <p style={{ fontSize: "var(--dg-fs-title)", color: "#475569", lineHeight: 1.6, marginBottom: 32 }}>
             Your account is active, but it looks like your workspace hasn't been initialized yet.
             Once your administrator completes the setup, you'll be able to access the schedule.
           </p>
@@ -1456,7 +1597,7 @@ function SchedulerContent() {
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
-                fontSize: 15,
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
                 cursor: "pointer",
                 transition: "opacity 0.2s"
@@ -1472,7 +1613,7 @@ function SchedulerContent() {
                 color: "#475569",
                 border: "none",
                 borderRadius: "8px",
-                fontSize: 15,
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
                 cursor: "pointer"
               }}
@@ -1502,18 +1643,6 @@ function SchedulerContent() {
       }}
     >
       <ProgressBar loading={isLoading} />
-      <div
-        className="no-print"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          background: "var(--color-bg)",
-          boxShadow: "var(--shadow-raised)",
-        }}
-      >
-        <Header orgName={org?.name} />
-      </div>
 
       {!isLoading && (
         <>
@@ -1557,18 +1686,24 @@ function SchedulerContent() {
                   {publishHistory.changeCount} change{publishHistory.changeCount !== 1 ? "s" : ""}
                 </span>
                 <div className="dg-draft-banner-actions">
-                  <button
-                    onClick={() => setShowPublishDiff(v => !v)}
-                    className="dg-btn dg-btn-secondary"
-                    style={{
-                      fontSize: 12,
-                      padding: "5px 12px",
-                      background: showPublishDiff ? "#E0E7FF" : undefined,
-                      color: showPublishDiff ? "#4338CA" : undefined,
-                    }}
-                  >
-                    {showPublishDiff ? "Hide Changes" : "Show What Changed"}
-                  </button>
+                  {isMobile ? (
+                    <span style={{ fontSize: 11, opacity: 0.6, fontStyle: "italic" }}>
+                      Use a larger screen to view details
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setShowPublishDiff(v => !v)}
+                      className="dg-btn dg-btn-secondary"
+                      style={{
+                        fontSize: 12,
+                        padding: "5px 12px",
+                        background: showPublishDiff ? "#E0E7FF" : undefined,
+                        color: showPublishDiff ? "#4338CA" : undefined,
+                      }}
+                    >
+                      {showPublishDiff ? "Hide Changes" : "Show What Changed"}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -1593,14 +1728,43 @@ function SchedulerContent() {
                 onPrintOpen={() => setShowPrintOptions(true)}
                 presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
                 showAudit={showAudit}
-                onAuditToggle={canEditShifts ? () => setShowAudit(prev => !prev) : undefined}
+                onAuditToggle={canEditShifts && !isMobile ? () => setShowAudit(prev => !prev) : undefined}
+                requestsBadgeCount={shiftRequests.badgeCount}
+                onRequestsToggle={() => setShowRequestBoard(prev => !prev)}
+                coverageGapCount={coverageGaps.length}
+                onCoverageToggle={() => setShowCoveragePanel(prev => !prev)}
               />
             </div>
           </div>
 
-          <div style={{ padding: "16px 16px" }}>
+          <div style={{ padding: isMobile ? "8px 0" : "16px 16px" }}>
 
-            {spanWeeks !== "month" && (
+            {/* Mobile Day View */}
+            {spanWeeks !== "month" && isMobile && (
+              <MobileDayView
+                filteredEmployees={visibleScheduleEmployees}
+                allEmployees={employees}
+                dates={dates.slice(0, 7)}
+                shiftForKey={shiftForKey}
+                shiftCodeIdsForKey={shiftCodeIdsForKey}
+                getShiftStyle={getShiftStyle}
+                handleCellClick={handleCellClick}
+                today={today}
+                focusAreas={focusAreas}
+                shiftCodes={shiftCodes}
+                shiftCategories={shiftCategories}
+                indicatorTypes={indicatorTypes}
+                certifications={certifications}
+                orgRoles={orgRoles}
+                isCellInteractive={canEditShifts || canEditNotes}
+                activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                activeFocusArea={activeFocusArea}
+                draftKindForKey={draftKindForKey}
+              />
+            )}
+
+            {/* Desktop/Tablet Grid */}
+            {spanWeeks !== "month" && !isMobile && (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <ScheduleGrid
               filteredEmployees={visibleScheduleEmployees}
@@ -1635,6 +1799,7 @@ function SchedulerContent() {
               isDragging={!!activeDrag}
               onCellHover={handleCellHover}
               onCellContextMenu={handleCellContextMenu}
+              coverageRequirements={coverageRequirements}
             />
             <DragOverlay dropAnimation={null}>
               {activeDrag && (
@@ -1645,7 +1810,7 @@ function SchedulerContent() {
                     border: `1px solid ${activeDrag.pillText}20`,
                     borderRadius: 6,
                     padding: "6px 16px",
-                    fontSize: 16,
+                    fontSize: "var(--dg-fs-title)",
                     fontWeight: 800,
                     boxShadow: "0 8px 24px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.1)",
                     cursor: "grabbing",
@@ -1659,8 +1824,8 @@ function SchedulerContent() {
           </DndContext>
         )}
 
-        {/* Context menu for copy/paste */}
-        {contextMenu && canEditShifts && (
+        {/* Context menu for copy/paste/requests */}
+        {contextMenu && (canEditShifts || (currentEmpId && contextMenu.empId === currentEmpId)) && (
           <ShiftContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
@@ -1670,9 +1835,30 @@ function SchedulerContent() {
               return !!(s && s.shiftCodeIds.length > 0 && !s.isDelete);
             })()}
             hasClipboard={!!clipboard}
+            canEdit={canEditShifts}
+            canRequest={!!currentEmpId && contextMenu.empId === currentEmpId && !isShiftStarted(contextMenu.empId, contextMenu.date) && isRequestableShift(contextMenu.empId, contextMenu.date)}
+            hasActiveRequest={shiftRequests.requests.some(
+              r => r.requesterEmpId === contextMenu.empId
+                && r.requesterShiftDate === formatDateKey(contextMenu.date)
+                && (r.status === 'open' || r.status === 'pending_approval')
+            )}
             onCopy={() => handleCopyShift(contextMenu.empId, contextMenu.date)}
             onPaste={() => handlePasteShift(contextMenu.empId, contextMenu.date)}
             onClear={() => handleClearShift(contextMenu.empId, contextMenu.date)}
+            onMakeAvailable={() => {
+              shiftRequests.create('pickup', contextMenu.empId, formatDateKey(contextMenu.date));
+            }}
+            onProposeSwap={() => {
+              const label = shiftForKey(contextMenu.empId, contextMenu.date) ?? '';
+              const emp = employees.find(e => e.id === contextMenu.empId);
+              const empName = emp ? `${emp.firstName} ${emp.lastName}` : '';
+              setSwapModalState({
+                empId: contextMenu.empId,
+                empName,
+                shiftDate: formatDateKey(contextMenu.date),
+                shiftLabel: label,
+              });
+            }}
             onClose={() => setContextMenu(null)}
           />
         )}
@@ -1719,6 +1905,75 @@ function SchedulerContent() {
           publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
           draftKind={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.draftKind}
           auditInfo={canEditShifts ? auditInfo : undefined}
+          isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
+          hasActiveRequest={shiftRequests.requests.some(
+            r => r.requesterEmpId === editPanel.empId
+              && r.requesterShiftDate === formatDateKey(editPanel.date)
+              && (r.status === 'open' || r.status === 'pending_approval')
+          )}
+          onMakeAvailable={currentEmpId && editPanel.empId === currentEmpId && !isShiftStarted(editPanel.empId, editPanel.date) && isRequestableShift(editPanel.empId, editPanel.date) ? () => {
+            shiftRequests.create('pickup', editPanel.empId, formatDateKey(editPanel.date));
+            setEditPanel(null);
+            unlockCell();
+          } : undefined}
+          onProposeSwap={currentEmpId && editPanel.empId === currentEmpId && !isShiftStarted(editPanel.empId, editPanel.date) && isRequestableShift(editPanel.empId, editPanel.date) ? () => {
+            const label = shiftForKey(editPanel.empId, editPanel.date) ?? '';
+            setSwapModalState({
+              empId: editPanel.empId,
+              empName: editPanel.empName,
+              shiftDate: formatDateKey(editPanel.date),
+              shiftLabel: label,
+            });
+            setEditPanel(null);
+            unlockCell();
+          } : undefined}
+        />
+      )}
+
+      {/* ── Shift Request Board (slide-out panel) ── */}
+      {showRequestBoard && (
+        <ShiftRequestBoard
+          requests={shiftRequests.requests}
+          openPickups={shiftRequests.openPickups}
+          myRequests={shiftRequests.myRequests}
+          pendingApproval={shiftRequests.pendingApproval}
+          loading={shiftRequests.loading}
+          currentEmpId={currentEmpId}
+          canApprove={canApproveShiftRequests}
+          onClaim={(id) => currentEmpId && shiftRequests.claim(id, currentEmpId)}
+          onRespond={(id, accept) => currentEmpId && shiftRequests.respond(id, currentEmpId, accept)}
+          onResolve={(id, approved, note) => shiftRequests.resolve(id, approved, note)}
+          onCancel={(id) => currentEmpId && shiftRequests.cancel(id, currentEmpId)}
+          onClose={() => setShowRequestBoard(false)}
+        />
+      )}
+
+      {/* ── Coverage Panel (slide-out) ── */}
+      {showCoveragePanel && (
+        <CoveragePanel
+          gaps={coverageGaps}
+          focusAreas={focusAreas}
+          shiftCategories={shiftCategories}
+          activeFocusArea={activeFocusArea}
+          onClose={() => setShowCoveragePanel(false)}
+        />
+      )}
+
+      {/* ── Shift Swap Modal ── */}
+      {swapModalState && (
+        <ShiftSwapModal
+          requesterEmpId={swapModalState.empId}
+          requesterName={swapModalState.empName}
+          shiftDate={swapModalState.shiftDate}
+          shiftLabel={swapModalState.shiftLabel}
+          employees={employees}
+          shiftForKey={shiftForKey}
+          isRequestableShift={isRequestableShift}
+          onSubmit={(targetEmpId, targetShiftDate) => {
+            shiftRequests.create('swap', swapModalState.empId, swapModalState.shiftDate, targetEmpId, targetShiftDate);
+            setSwapModalState(null);
+          }}
+          onClose={() => setSwapModalState(null)}
         />
       )}
 

@@ -1,3 +1,8 @@
+/** Subdomains that cannot be used as org slugs. */
+export const RESERVED_SUBDOMAINS = new Set([
+  "www", "login", "gridmaster", "api", "admin", "status", "app",
+]);
+
 export interface ParsedHost {
   subdomain: string | null;
   rootDomain: string;
@@ -20,7 +25,7 @@ export function parseHost(hostWithPort: string): ParsedHost {
   const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
   if (baseDomain && (hostname === baseDomain || hostname.endsWith("." + baseDomain))) {
     const subdomainPart = hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));
-    const isReserved = subdomainPart === "www" || subdomainPart === "login";
+    const isReserved = !!subdomainPart && RESERVED_SUBDOMAINS.has(subdomainPart);
 
     return {
       subdomain: isReserved ? null : subdomainPart,
@@ -35,9 +40,9 @@ export function parseHost(hostWithPort: string): ParsedHost {
     return { subdomain: null, rootDomain: "localhost", port, hostname };
   }
 
-  // Local development subdomains like ardenwood.localhost
+  // Local development subdomains like calmhaven.localhost
   if (labels.length === 2 && labels[1] === "localhost") {
-    const isReserved = labels[0] === "www" || labels[0] === "login";
+    const isReserved = RESERVED_SUBDOMAINS.has(labels[0]);
     return {
       subdomain: isReserved ? null : labels[0],
       rootDomain: "localhost",
@@ -69,7 +74,7 @@ export function parseHost(hostWithPort: string): ParsedHost {
   }
 
   // 4. General heuristic (last resort)
-  const isReserved = labels[0] === "www" || labels[0] === "login";
+  const isReserved = RESERVED_SUBDOMAINS.has(labels[0]);
   if (labels.length === 3 && isReserved) {
     return {
       subdomain: null,

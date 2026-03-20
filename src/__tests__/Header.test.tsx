@@ -30,6 +30,9 @@ const mockPermissions = {
 vi.mock("@/hooks", () => ({
   usePermissions: () => mockPermissions,
   useLogout: () => ({ signOutLocal: mockSignOut }),
+  useMediaQuery: () => false,
+  MOBILE: "(max-width: 767px)",
+  TABLET: "(min-width: 768px) and (max-width: 1024px)",
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
@@ -45,10 +48,6 @@ vi.mock("next/link", () => ({
   default: ({ href, children, className, ...rest }: any) => (
     <a href={href} className={className} {...rest}>{children}</a>
   ),
-}));
-
-vi.mock("@/components/PageTransition", () => ({
-  usePageTransition: () => ({ startNavigation: vi.fn(), setPageReady: vi.fn() }),
 }));
 
 vi.mock("@/lib/supabase", () => ({

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem } from "@/types";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement } from "@/types";
 import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { useAuth } from "@/components/AuthProvider";
+import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 
 function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: string; onChange: (c: PredefinedColor) => void; disabled?: boolean }) {
   const active = getPresetByBg(valueBg);
@@ -70,6 +72,9 @@ interface SettingsPageProps {
   canManageShiftCodes: boolean;
   canManageIndicatorTypes: boolean;
   canManageOrgSettings: boolean;
+  coverageRequirements: CoverageRequirement[];
+  onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
+  canManageCoverageRequirements: boolean;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -166,48 +171,40 @@ function TimeInput12h({ value, onChange, disabled }: { value: string | null | un
     setPeriod(p.period);
   }, [value]);
 
-  const selStyle: React.CSSProperties = {
-    ...inputStyle,
-    padding: "7px 4px",
-    textAlign: "center",
-    cursor: disabled ? "not-allowed" : "pointer",
-    background: disabled ? "var(--color-bg-subtle)" : "#fff",
-    color: disabled ? "var(--color-text-faint)" : "var(--color-text-primary)",
-  };
+  const hourOptions = [
+    { value: "", label: "--" },
+    ...[1,2,3,4,5,6,7,8,9,10,11,12].map((h) => ({ value: String(h), label: String(h) })),
+  ];
+  const minuteOptions = ["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => ({ value: m, label: m }));
+  const periodOptions = [{ value: "AM" as const, label: "AM" }, { value: "PM" as const, label: "PM" }];
 
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-      <select
+      <CustomSelect
         value={hour}
-        onChange={(e) => { setHour(e.target.value); onChange(to24h(e.target.value, minute, period)); }}
+        options={hourOptions}
+        onChange={(val) => { setHour(val); onChange(to24h(val, minute, period)); }}
         disabled={disabled}
-        style={{ ...selStyle, width: 52 }}
-      >
-        <option value="">--</option>
-        {[1,2,3,4,5,6,7,8,9,10,11,12].map((h) => (
-          <option key={h} value={String(h)}>{h}</option>
-        ))}
-      </select>
+        fontSize={13}
+        style={{ width: 56 }}
+      />
       <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
-      <select
+      <CustomSelect
         value={minute}
-        onChange={(e) => { setMinute(e.target.value); onChange(to24h(hour, e.target.value, period)); }}
+        options={minuteOptions}
+        onChange={(val) => { setMinute(val); onChange(to24h(hour, val, period)); }}
         disabled={disabled}
-        style={{ ...selStyle, width: 52 }}
-      >
-        {["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => (
-          <option key={m} value={m}>{m}</option>
-        ))}
-      </select>
-      <select
+        fontSize={13}
+        style={{ width: 56 }}
+      />
+      <CustomSelect
         value={period}
-        onChange={(e) => { const p = e.target.value as "AM" | "PM"; setPeriod(p); onChange(to24h(hour, minute, p)); }}
+        options={periodOptions}
+        onChange={(val) => { const p = val as "AM" | "PM"; setPeriod(p); onChange(to24h(hour, minute, p)); }}
         disabled={disabled}
-        style={{ ...selStyle, width: 58 }}
-      >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
-      </select>
+        fontSize={13}
+        style={{ width: 62 }}
+      />
     </div>
   );
 }
@@ -222,6 +219,7 @@ function OrganizationDetailsSettings({
   onSave: (o: Organization) => void;
   canManageOrgSettings: boolean;
 }) {
+  const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState({
     name: organization.name,
     address: organization.address,
@@ -266,7 +264,7 @@ function OrganizationDetailsSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <div>
           <label style={labelStyle}>ORGANIZATION NAME</label>
           <input
@@ -359,6 +357,7 @@ function OrganizationLabelsSettings({
   onSave: (o: Organization) => void;
   canManageOrgLabels: boolean;
 }) {
+  const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState({
     focusAreaLabel: organization.focusAreaLabel,
     certificationLabel: organization.certificationLabel,
@@ -399,7 +398,7 @@ function OrganizationLabelsSettings({
       <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
         Customize what your organization calls each feature. These labels appear throughout the app.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16 }}>
         <div>
           <label style={labelStyle}>FOCUS AREAS LABEL</label>
           <input
@@ -898,6 +897,7 @@ function ShiftCodeRow({
   onDeleted: (id: number) => void;
   canManageShiftCodes: boolean;
 }) {
+  const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState({
     label: st.label,
     name: st.name,
@@ -1089,7 +1089,7 @@ function ShiftCodeRow({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "120px 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "120px 1fr",
               gap: 10,
             }}
           >
@@ -1518,6 +1518,7 @@ function StringListSettings({
   placeholder: string;
   canEdit?: boolean;
 }) {
+  const isMobile = useMediaQuery(MOBILE);
   const [isEditing, setIsEditing] = useState(false);
   const [local, setLocal] = useState<NamedItem[]>(items);
   const [newName, setNewName] = useState("");
@@ -1620,7 +1621,9 @@ function StringListSettings({
     setDragOverIdx(null);
   };
 
-  const gridCols = isEditing ? "24px 32px 1fr 200px 28px" : "32px 1fr 200px";
+  const gridCols = isMobile
+    ? (isEditing ? "24px 32px 1fr 100px 28px" : "32px 1fr 100px")
+    : (isEditing ? "24px 32px 1fr 200px 28px" : "32px 1fr 200px");
 
   return (
     <div>
@@ -1833,7 +1836,7 @@ function StringListSettings({
                 border: "none",
                 cursor: newName.trim() ? "pointer" : "not-allowed",
                 color: newName.trim() ? "#2563EB" : "var(--color-text-faint)",
-                fontSize: 18,
+                fontSize: "var(--dg-fs-heading)",
                 fontWeight: 700,
                 lineHeight: 1,
                 padding: 0,
@@ -1881,6 +1884,7 @@ function IndicatorTypesSettings({
   onChange: (types: IndicatorType[]) => void;
   canManageIndicatorTypes: boolean;
 }) {
+  const isMobile = useMediaQuery(MOBILE);
   const [local, setLocal] = useState<(IndicatorType & { isNew?: boolean })[]>(indicatorTypes);
   const [saving, setSaving] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -1961,8 +1965,9 @@ function IndicatorTypesSettings({
           <div
             key={indicator.id}
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 80px auto auto",
+              display: isMobile ? "flex" : "grid",
+              flexWrap: isMobile ? "wrap" as const : undefined,
+              gridTemplateColumns: isMobile ? undefined : "1fr 80px auto auto",
               gap: 10,
               alignItems: "center",
               padding: "10px 0",
@@ -1973,7 +1978,7 @@ function IndicatorTypesSettings({
               value={indicator.name}
               onChange={(e) => handleChange(indicator.id, "name", e.target.value)}
               placeholder="Indicator name (e.g. Readings)"
-              style={{ ...inputStyle }}
+              style={{ ...inputStyle, ...(isMobile ? { width: "100%" } : {}) }}
             />
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input
@@ -2427,11 +2432,11 @@ function ShiftCategoriesSettings({
 // ── Admin permission metadata ──────────────────────────────────────────────────
 
 const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
-  { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRecurringSchedule"] },
+  { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRecurringSchedule", "canApproveShiftRequests"] },
   { label: "Notes", keys: ["canEditNotes"] },
   { label: "Recurring", keys: ["canManageRecurringShifts", "canManageShiftSeries"] },
   { label: "Staff", keys: ["canManageEmployees"] },
-  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings", "canManageOrgLabels"] },
+  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings", "canManageOrgLabels", "canManageCoverageRequirements"] },
 ];
 
 const PERM_LABELS: Record<keyof AdminPermissions, string> = {
@@ -2449,6 +2454,8 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canManageIndicatorTypes: "Manage Indicator Types",
   canManageOrgSettings: "Manage Organization Settings",
   canManageOrgLabels: "Manage Custom Labels",
+  canManageCoverageRequirements: "Manage Coverage Requirements",
+  canApproveShiftRequests: "Approve Shift Requests",
 };
 
 /** Permissions that are always on and cannot be toggled off. */
@@ -2473,12 +2480,434 @@ function emptyAdminPerms(): AdminPermissions {
     canManageIndicatorTypes: false,
     canManageOrgSettings: false,
     canManageOrgLabels: false,
+    canManageCoverageRequirements: false,
+    canApproveShiftRequests: false,
   };
+}
+
+// ── Coverage Requirements Settings ────────────────────────────────────────────
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function CoverageRequirementsSettings({
+  orgId,
+  focusAreas,
+  shiftCategories,
+  shiftCodes,
+  coverageRequirements,
+  onCoverageRequirementsChange,
+  canEdit,
+}: {
+  orgId: string;
+  focusAreas: FocusArea[];
+  shiftCategories: ShiftCategory[];
+  shiftCodes: ShiftCode[];
+  coverageRequirements: CoverageRequirement[];
+  onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
+  canEdit: boolean;
+}) {
+  // Expand key = "focusAreaId-categoryId"
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Draft edits keyed by "focusAreaId-categoryId"
+  type CodeReq = { shiftCodeId: number; minStaff: number };
+  type DraftRow = { dayOfWeek: number | null; codeRequirements: CodeReq[] };
+  type DraftEntry = { everyDay: boolean; rows: DraftRow[] };
+  const [drafts, setDrafts] = useState<Record<string, DraftEntry>>({});
+
+  // Get the shift codes belonging to a (focusArea, category) group
+  const getCodesForGroup = useCallback(
+    (focusAreaId: number, categoryId: number): ShiftCode[] => {
+      return shiftCodes.filter(
+        (sc) =>
+          !sc.archivedAt &&
+          !sc.isOffDay &&
+          sc.categoryId === categoryId &&
+          sc.focusAreaId === focusAreaId,
+      );
+    },
+    [shiftCodes],
+  );
+
+  const getDraft = useCallback(
+    (focusAreaId: number, categoryId: number): DraftEntry => {
+      const key = `${focusAreaId}-${categoryId}`;
+      if (drafts[key]) return drafts[key];
+
+      const codes = getCodesForGroup(focusAreaId, categoryId);
+      const makeEmptyCodeReqs = (): CodeReq[] =>
+        codes.map((sc) => ({ shiftCodeId: sc.id, minStaff: 0 }));
+
+      // Build from existing requirements for codes in this group
+      const codeIds = new Set(codes.map((sc) => sc.id));
+      const existing = coverageRequirements.filter(
+        (r) => r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId),
+      );
+
+      if (existing.length === 0) {
+        return { everyDay: true, rows: [{ dayOfWeek: null, codeRequirements: makeEmptyCodeReqs() }] };
+      }
+
+      const hasEveryDay = existing.some((r) => r.dayOfWeek === null);
+      if (hasEveryDay) {
+        const codeReqs = codes.map((sc) => {
+          const match = existing.find((r) => r.shiftCodeId === sc.id && r.dayOfWeek === null);
+          return { shiftCodeId: sc.id, minStaff: match?.minStaff ?? 0 };
+        });
+        return { everyDay: true, rows: [{ dayOfWeek: null, codeRequirements: codeReqs }] };
+      }
+
+      // Per-day mode: fill all 7 days
+      const rows: DraftRow[] = [];
+      for (let d = 0; d < 7; d++) {
+        const codeReqs = codes.map((sc) => {
+          const match = existing.find((r) => r.shiftCodeId === sc.id && r.dayOfWeek === d);
+          return { shiftCodeId: sc.id, minStaff: match?.minStaff ?? 0 };
+        });
+        rows.push({ dayOfWeek: d, codeRequirements: codeReqs });
+      }
+      return { everyDay: false, rows };
+    },
+    [coverageRequirements, drafts, getCodesForGroup],
+  );
+
+  const setDraft = useCallback((focusAreaId: number, categoryId: number, entry: DraftEntry) => {
+    setDrafts((prev) => ({ ...prev, [`${focusAreaId}-${categoryId}`]: entry }));
+  }, []);
+
+  const handleToggleEveryDay = useCallback(
+    (focusAreaId: number, categoryId: number) => {
+      const current = getDraft(focusAreaId, categoryId);
+      if (current.everyDay) {
+        // Switch to per-day: duplicate current every-day row to all 7 days
+        const val = current.rows[0]?.codeRequirements ?? [];
+        const rows: DraftRow[] = [];
+        for (let d = 0; d < 7; d++) {
+          rows.push({ dayOfWeek: d, codeRequirements: val.map((c) => ({ ...c })) });
+        }
+        setDraft(focusAreaId, categoryId, { everyDay: false, rows });
+      } else {
+        // Switch to every-day: use Monday's values (index 1)
+        const mon = current.rows.find((r) => r.dayOfWeek === 1) ?? current.rows[0];
+        const codeReqs = mon?.codeRequirements.map((c) => ({ ...c })) ?? [];
+        setDraft(focusAreaId, categoryId, {
+          everyDay: true,
+          rows: [{ dayOfWeek: null, codeRequirements: codeReqs }],
+        });
+      }
+    },
+    [getDraft, setDraft],
+  );
+
+  const handleCodeChange = useCallback(
+    (focusAreaId: number, categoryId: number, rowIndex: number, codeIndex: number, value: number) => {
+      const current = getDraft(focusAreaId, categoryId);
+      const rows = current.rows.map((r, ri) => {
+        if (ri !== rowIndex) return r;
+        const codeRequirements = r.codeRequirements.map((c, ci) => {
+          if (ci !== codeIndex) return c;
+          return { ...c, minStaff: Math.min(999, Math.max(0, value)) };
+        });
+        return { ...r, codeRequirements };
+      });
+      setDraft(focusAreaId, categoryId, { ...current, rows });
+    },
+    [getDraft, setDraft],
+  );
+
+  const handleSave = useCallback(
+    async (focusAreaId: number, categoryId: number) => {
+      const draft = getDraft(focusAreaId, categoryId);
+      const codes = getCodesForGroup(focusAreaId, categoryId);
+      const codeIds = new Set(codes.map((sc) => sc.id));
+      setSaving(true);
+      try {
+        // Save per code — collect all saved results
+        const allSaved: CoverageRequirement[] = [];
+        for (const code of codes) {
+          const rows = draft.rows.map((r) => {
+            const cr = r.codeRequirements.find((c) => c.shiftCodeId === code.id);
+            return { dayOfWeek: r.dayOfWeek, minStaff: cr?.minStaff ?? 0 };
+          });
+          const saved = await db.saveCoverageRequirements(orgId, focusAreaId, code.id, rows);
+          allSaved.push(...saved);
+        }
+        // Update parent state: remove old entries for codes in this group, add new ones
+        const remaining = coverageRequirements.filter(
+          (r) => !(r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId)),
+        );
+        onCoverageRequirementsChange([...remaining, ...allSaved]);
+        // Clear draft
+        setDrafts((prev) => {
+          const next = { ...prev };
+          delete next[`${focusAreaId}-${categoryId}`];
+          return next;
+        });
+        toast.success("Coverage requirements saved");
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to save coverage requirements");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [getDraft, getCodesForGroup, orgId, coverageRequirements, onCoverageRequirementsChange],
+  );
+
+  const activeCategories = shiftCategories.filter((c) => !c.archivedAt);
+  const activeFocusAreas = focusAreas.filter((fa) => !fa.archivedAt);
+
+  if (activeFocusAreas.length === 0 || activeCategories.length === 0) {
+    return (
+      <div style={{ padding: "24px 0", color: "var(--color-text-muted)", fontSize: 13, textAlign: "center" }}>
+        {activeFocusAreas.length === 0
+          ? "Create focus areas first to configure coverage requirements."
+          : "Create shift categories first to configure coverage requirements."}
+      </div>
+    );
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: 48,
+    padding: "4px 4px",
+    fontSize: 12,
+    borderRadius: 6,
+    border: "1px solid var(--color-border)",
+    textAlign: "center",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
+        Set minimum staffing requirements per focus area and shift code. These will be shown in the schedule grid tally rows and the coverage panel.
+      </p>
+
+      {activeFocusAreas.map((fa) => (
+        <div
+          key={fa.id}
+          style={{
+            border: "1px solid var(--color-border)",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
+          {/* Focus Area Header */}
+          <div
+            style={{
+              padding: "10px 16px",
+              background: fa.colorBg,
+              color: fa.colorText,
+              fontWeight: 700,
+              fontSize: 13,
+            }}
+          >
+            {fa.name}
+          </div>
+
+          {/* Categories */}
+          {activeCategories.map((cat) => {
+            if (cat.focusAreaId != null && cat.focusAreaId !== fa.id) return null;
+
+            const codes = getCodesForGroup(fa.id, cat.id);
+            if (codes.length === 0) return null;
+
+            const key = `${fa.id}-${cat.id}`;
+            const isExpanded = expanded === key;
+            const draft = getDraft(fa.id, cat.id);
+            const hasValues = draft.rows.some((r) =>
+              r.codeRequirements.some((c) => c.minStaff > 0),
+            );
+
+            return (
+              <div key={cat.id} style={{ borderTop: "1px solid var(--color-border)" }}>
+                {/* Category row */}
+                <button
+                  onClick={() => setExpanded(isExpanded ? null : key)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    padding: "10px 16px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {cat.name}
+                    {hasValues && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "#16A34A",
+                          background: "#F0FDF4",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        configured
+                      </span>
+                    )}
+                  </span>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    style={{
+                      transition: "transform 0.15s",
+                      transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {/* Expanded editor */}
+                {isExpanded && (
+                  <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {/* Every day toggle */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Same every day</span>
+                      <button
+                        disabled={!canEdit}
+                        onClick={() => handleToggleEveryDay(fa.id, cat.id)}
+                        style={{
+                          width: 34,
+                          height: 20,
+                          borderRadius: 10,
+                          background: draft.everyDay ? "#2563EB" : "#CBD5E1",
+                          border: "none",
+                          cursor: canEdit ? "pointer" : "default",
+                          position: "relative",
+                          padding: 0,
+                          transition: "background 0.15s",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: "#fff",
+                            position: "absolute",
+                            top: 2,
+                            left: draft.everyDay ? 16 : 2,
+                            transition: "left 0.15s",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                          }}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Per-code vertical list */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {codes.map((sc, ci) => (
+                        <div key={sc.id}>
+                          {/* Shift code badge */}
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "3px 10px",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: sc.text || "var(--color-text-secondary)",
+                              background: sc.color || "#F1F5F9",
+                              marginBottom: 6,
+                            }}
+                          >
+                            {sc.label} — {sc.name}
+                          </div>
+                          {/* Inputs */}
+                          {draft.everyDay ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
+                              <span style={{ fontSize: 12, color: "var(--color-text-muted)", width: 60 }}>Min staff</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={999}
+                                value={draft.rows[0]?.codeRequirements[ci]?.minStaff ?? 0}
+                                onChange={(e) => handleCodeChange(fa.id, cat.id, 0, ci, parseInt(e.target.value) || 0)}
+                                disabled={!canEdit}
+                                style={inputStyle}
+                              />
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 4 }}>
+                              {draft.rows.map((row, ri) => (
+                                <div key={ri} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", width: 28 }}>
+                                    {DAY_NAMES[row.dayOfWeek ?? 0]}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={999}
+                                    value={row.codeRequirements[ci]?.minStaff ?? 0}
+                                    onChange={(e) => handleCodeChange(fa.id, cat.id, ri, ci, parseInt(e.target.value) || 0)}
+                                    disabled={!canEdit}
+                                    style={{ ...inputStyle, width: 42 }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Save button */}
+                    {canEdit && (
+                      <button
+                        onClick={() => handleSave(fa.id, cat.id)}
+                        disabled={saving}
+                        style={{
+                          alignSelf: "flex-start",
+                          padding: "7px 16px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          borderRadius: 8,
+                          border: "none",
+                          background: "var(--color-accent-gradient)",
+                          color: "#fff",
+                          cursor: saving ? "not-allowed" : "pointer",
+                          opacity: saving ? 0.7 : 1,
+                        }}
+                      >
+                        {saving ? "Saving..." : "Save"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ── User Management Settings ──────────────────────────────────────────────────
 function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean }) {
   const { user: currentUser } = useAuth();
+  const isMobile = useMediaQuery(MOBILE);
   const myRole = isSuperAdmin ? "super_admin" : "user";
   const [users, setUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2776,7 +3205,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                 <div
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    padding: "12px 16px 12px 44px",
+                    padding: isMobile ? "12px 12px 12px 16px" : "12px 16px 12px 44px",
                     marginBottom: 6,
                     display: "flex", flexDirection: "column", gap: 12,
                   }}
@@ -3027,10 +3456,15 @@ export default function SettingsPage({
   canManageShiftCodes,
   canManageIndicatorTypes,
   canManageOrgSettings,
+  coverageRequirements,
+  onCoverageRequirementsChange,
+  canManageCoverageRequirements,
 }: SettingsPageProps) {
   const pathname = usePathname();
-  const VALID_SECTIONS = ["organization", "shift-categories", "shift-codes", "indicators", "staff-config", "users", "impersonation"];
+  const VALID_SECTIONS = ["organization", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "impersonation"];
   const sectionFromPath = pathname.split("/")[2];
+  const isMobile = useMediaQuery(MOBILE);
+  const isTablet = useMediaQuery(TABLET);
   const defaultSection = canManageOrg ? "organization" : "impersonation";
   const activeSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : defaultSection;
 
@@ -3046,11 +3480,13 @@ export default function SettingsPage({
 
   const iconIndicator = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>;
   const iconTag = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
+  const iconCoverage = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 
   const orgLinks = canManageOrg ? [
     { id: "organization", label: "Organization", icon: iconBuilding },
     { id: "shift-categories", label: "Shift Categories", icon: iconTag },
     { id: "shift-codes", label: "Shift Codes", icon: iconCalendar },
+    { id: "coverage", label: "Coverage", icon: iconCoverage },
     { id: "indicators", label: "Indicators", icon: iconIndicator },
     { id: "staff-config", label: "Designations", icon: iconDesignations },
     ...(isSuperAdmin ? [{ id: "users", label: "User Management", icon: iconUsers }] : []),
@@ -3062,35 +3498,52 @@ export default function SettingsPage({
 
   const allLinks = [...orgLinks, ...gridmasterLinks];
 
-  return (
-    <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+  // Register sub-nav items for the mobile bottom sheet
+  const subNavItems: SubNavItem[] = useMemo(
+    () =>
+      allLinks.map((link) => ({
+        id: link.id,
+        label: link.label,
+        icon: link.icon,
+        href: link.id === defaultSection ? "/settings" : `/settings/${link.id}`,
+        active: activeSection === link.id,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeSection, canManageOrg, isSuperAdmin, isGridmaster],
+  );
+  useSetMobileSubNav(subNavItems);
 
-      {/* Sidebar */}
-      <aside style={{
-        width: 220,
-        flexShrink: 0,
-        height: "100%",
-        borderRight: "1px solid var(--color-border)",
-        background: "#fff",
-        display: "flex",
-        flexDirection: "column",
-        padding: "32px 12px",
-        gap: 2,
-        overflowY: "auto",
-      }}>
-        {allLinks.map((link) => (
-          <SidebarLink
-            key={link.id}
-            label={link.label}
-            icon={link.icon}
-            active={activeSection === link.id}
-            href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`}
-          />
-        ))}
-      </aside>
+  return (
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden" }}>
+
+      {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
+      {isMobile ? null : (
+        <aside style={{
+          width: isTablet ? 180 : 220,
+          flexShrink: 0,
+          height: "100%",
+          borderRight: "1px solid var(--color-border)",
+          background: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          padding: isTablet ? "24px 8px" : "32px 12px",
+          gap: 2,
+          overflowY: "auto",
+        }}>
+          {allLinks.map((link) => (
+            <SidebarLink
+              key={link.id}
+              label={link.label}
+              icon={link.icon}
+              active={activeSection === link.id}
+              href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`}
+            />
+          ))}
+        </aside>
+      )}
 
       {/* Content */}
-      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
+      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
         {activeSection === "organization" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
@@ -3148,6 +3601,20 @@ export default function SettingsPage({
               focusAreaLabel={focusAreaLabel}
               onChange={onShiftCodesChange}
               canManageShiftCodes={canManageShiftCodes}
+            />
+          </Section>
+        )}
+
+        {activeSection === "coverage" && canManageOrg && (
+          <Section title="Coverage Requirements">
+            <CoverageRequirementsSettings
+              orgId={organization.id}
+              focusAreas={focusAreas}
+              shiftCategories={shiftCategories}
+              shiftCodes={shiftCodes}
+              coverageRequirements={coverageRequirements}
+              onCoverageRequirementsChange={onCoverageRequirementsChange}
+              canEdit={canManageCoverageRequirements}
             />
           </Section>
         )}

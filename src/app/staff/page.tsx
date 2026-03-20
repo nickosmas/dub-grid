@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Header from "@/components/Header";
 import StaffView from "@/components/StaffView";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import ProgressBar from "@/components/ProgressBar";
-import { usePageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 
 function StaffPageContent() {
-  const { canViewStaff, canEditShifts, canManageEmployees, isLoading: permsLoading } = usePermissions();
+  const { canViewStaff, canEditShifts, canManageEmployees, isLoading: permsLoading, orgId } = usePermissions();
   const {
     org, focusAreas, shiftCodes, certifications, orgRoles, shiftCodeMap,
     loading: refLoading, loadError,
@@ -20,16 +18,11 @@ function StaffPageContent() {
     loading: empLoading,
     handleAddEmployee, handleSaveEmployee, handleDeleteEmployee,
     handleBenchEmployee, handleActivateEmployee,
-  } = useEmployees(org?.id ?? null);
+  } = useEmployees(orgId ?? org?.id ?? null);
 
-  const { setPageReady } = usePageTransition();
   const [showAddModal, setShowAddModal] = useState(false);
   const isLoading = refLoading || empLoading || permsLoading;
 
-  useEffect(() => {
-    if (!isLoading || (loadError && !org)) setPageReady();
-  }, [isLoading, loadError, org, setPageReady]);
-  
   useEffect(() => {
     if (!permsLoading && !canViewStaff) {
       window.location.replace("/schedule");
@@ -62,18 +55,6 @@ function StaffPageContent() {
       }}
     >
       <ProgressBar loading={isLoading} />
-      <div
-        className="no-print"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          background: "var(--color-bg)",
-          boxShadow: "var(--shadow-raised)",
-        }}
-      >
-        <Header orgName={org?.name} />
-      </div>
 
       {!isLoading && (
         <>

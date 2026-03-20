@@ -119,7 +119,7 @@ export default function EnhancedImpersonation({
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         User Impersonation
       </h2>
       <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -149,7 +149,7 @@ export default function EnhancedImpersonation({
               {selectedUser?.orgName && ` (${selectedUser.orgName})`}
             </div>
             {countdown && (
-              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-info)", marginTop: 6, fontFamily: "var(--font-dm-mono), monospace" }}>
+              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-info)", marginTop: 6, fontFamily: "var(--font-dm-mono), monospace" }}>
                 {countdown}
               </div>
             )}

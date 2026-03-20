@@ -1,3 +1,74 @@
+# Workflow & Behavioral Rules
+
+---
+
+## 1. Plan Before Building
+
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately — don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+---
+
+## 2. Subagent Strategy
+
+- Use subagents to keep the main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One focused task per subagent — but related questions can share one explore agent
+
+---
+
+## 3. Verification Before Done
+
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
+
+---
+
+## 4. Simplicity First (with Taste)
+
+- Make every change as simple as possible. Impact minimal code
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky and the code is read/maintained frequently, implement the clean solution
+- For simple, obvious fixes — don't over-engineer. Simplicity wins by default
+- Challenge your own work before presenting it
+
+---
+
+## 5. Autonomous Bug Fixing
+
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests — then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+---
+
+## 6. Core Principles
+
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards
+- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs
+- **Self-Improvement**: After corrections that reveal a pattern or misunderstanding,
+  record the lesson in memory files for future sessions
+
+---
+
+## 7. Project-Specific Constraints
+
+- **Migrations**: All schema lives in exactly 4 files (001-004). NEVER create new migration files
+- **Routes**: All routes must be simple (`src/app/staff/page.tsx`), NOT catch-all.
+  Catch-all routes break static prerendering on Vercel
+- **Naming**: `gridmaster` = platform_role (route: `/gridmaster`). `admin` = org_role.
+  Never call the gridmaster portal "admin portal"
+- **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
+
+---
+---
+
 # React Best Practices
 
 ## State & Derived Values

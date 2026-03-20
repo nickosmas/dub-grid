@@ -128,6 +128,7 @@ CREATE POLICY "super_admin_delete_memberships"
   USING (
     org_id = public.caller_org_id()
     AND public.caller_org_role() = 'super_admin'
+    AND user_id != auth.uid()  -- prevent super_admin from deleting their own membership
   );
 
 
@@ -586,3 +587,53 @@ COMMENT ON POLICY "gridmaster_all_impersonation" ON public.impersonation_session
 CREATE POLICY "own_sessions_only"
   ON public.user_sessions
   USING (user_id = auth.uid());
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 14. COVERAGE REQUIREMENTS
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.coverage_requirements ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "gridmaster_all_coverage_requirements"
+  ON public.coverage_requirements FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_coverage_requirements"
+  ON public.coverage_requirements FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_coverage_requirements"
+  ON public.coverage_requirements FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+
+CREATE POLICY "admin_update_coverage_requirements"
+  ON public.coverage_requirements FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_coverage_requirements"
+  ON public.coverage_requirements FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 15. SHIFT REQUESTS (org members can read; all mutations via SECURITY DEFINER RPCs)
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.shift_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "shift_requests_select"
+  ON public.shift_requests FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id() OR public.is_gridmaster());
+
+-- INSERT/UPDATE blocked for direct client access. All mutations go through
+-- SECURITY DEFINER functions (create_shift_request, respond_to_shift_request,
+-- resolve_shift_request, cancel_shift_request) which bypass RLS.
+CREATE POLICY "shift_requests_insert"
+  ON public.shift_requests FOR INSERT TO authenticated
+  WITH CHECK (FALSE);
+
+CREATE POLICY "shift_requests_update"
+  ON public.shift_requests FOR UPDATE TO authenticated
+  USING (FALSE);

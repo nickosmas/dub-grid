@@ -21,6 +21,10 @@ import {
   DraftKind,
   Invitation,
   AssignableOrganizationRole,
+  ShiftRequest,
+  ShiftRequestType,
+  ShiftRequestStatus,
+  CoverageRequirement,
 } from "@/types";
 
 // ── Optimistic Locking Error ──────────────────────────────────────────────────
@@ -82,6 +86,15 @@ interface DbShiftCategory {
   sort_order: number;
   focus_area_id: number | null;
   archived_at: string | null;
+}
+
+interface DbCoverageRequirement {
+  id: number;
+  org_id: string;
+  focus_area_id: number;
+  shift_code_id: number;
+  day_of_week: number | null;
+  min_staff: number;
 }
 
 export interface DbShiftCode {
@@ -215,6 +228,17 @@ function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
     sortOrder: row.sort_order,
     focusAreaId: row.focus_area_id ?? null,
     archivedAt: row.archived_at ?? null,
+  };
+}
+
+function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRequirement {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    focusAreaId: row.focus_area_id,
+    shiftCodeId: row.shift_code_id,
+    dayOfWeek: row.day_of_week,
+    minStaff: row.min_staff,
   };
 }
 
@@ -622,6 +646,59 @@ export async function deleteShiftCategory(id: number): Promise<void> {
     .eq("id", id);
   if (error) throw error;
 }
+
+// ── Coverage Requirements ─────────────────────────────────────────────────────
+
+export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
+  const { data, error } = await supabase
+    .from("coverage_requirements")
+    .select("*")
+    .eq("org_id", orgId);
+  if (error) throw error;
+  return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
+}
+
+/**
+ * Batch save coverage requirements for a (focus_area, shift_code) combo.
+ * Replaces all existing rows for that combo (delete + insert).
+ */
+export async function saveCoverageRequirements(
+  orgId: string,
+  focusAreaId: number,
+  shiftCodeId: number,
+  requirements: { dayOfWeek: number | null; minStaff: number }[],
+): Promise<CoverageRequirement[]> {
+  // Delete existing rows for this combo
+  const { error: delError } = await supabase
+    .from("coverage_requirements")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("focus_area_id", focusAreaId)
+    .eq("shift_code_id", shiftCodeId);
+  if (delError) throw delError;
+
+  // Filter out zero-value rows and insert
+  const rows = requirements
+    .filter((r) => r.minStaff > 0)
+    .map((r) => ({
+      org_id: orgId,
+      focus_area_id: focusAreaId,
+      shift_code_id: shiftCodeId,
+      day_of_week: r.dayOfWeek,
+      min_staff: r.minStaff,
+    }));
+
+  if (rows.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("coverage_requirements")
+    .insert(rows)
+    .select();
+  if (error) throw error;
+  return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
+}
+
+// ── Shift Codes ───────────────────────────────────────────────────────────────
 
 export async function upsertShiftCode(
   st: Omit<ShiftCode, "id"> & { id?: number }
@@ -1861,4 +1938,220 @@ export async function fetchTenantStats(): Promise<TenantStats[]> {
   }
 
   return Array.from(statsMap.values());
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SHIFT REQUESTS — Pickup & Swap
+// ══════════════════════════════════════════════════════════════════════════════
+
+interface DbShiftRequest {
+  id: string;
+  org_id: string;
+  type: ShiftRequestType;
+  status: ShiftRequestStatus;
+  requester_emp_id: string;
+  requester_shift_date: string;
+  requester_shift_code_ids: number[];
+  requester_focus_area_id: number | null;
+  requester_custom_start_time: string | null;
+  requester_custom_end_time: string | null;
+  target_emp_id: string | null;
+  target_shift_date: string | null;
+  target_shift_code_ids: number[] | null;
+  target_focus_area_id: number | null;
+  target_custom_start_time: string | null;
+  target_custom_end_time: string | null;
+  admin_user_id: string | null;
+  admin_note: string | null;
+  expires_at: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields from employees
+  requester_first_name?: string;
+  requester_last_name?: string;
+  target_first_name?: string | null;
+  target_last_name?: string | null;
+}
+
+function rowToShiftRequest(
+  row: DbShiftRequest,
+  shiftCodeMap: Map<number, string>
+): ShiftRequest {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    type: row.type,
+    status: row.status,
+    requesterEmpId: row.requester_emp_id,
+    requesterName: [row.requester_first_name, row.requester_last_name]
+      .filter(Boolean)
+      .join(" ") || "Unknown",
+    requesterShiftDate: row.requester_shift_date,
+    requesterShiftCodeIds: row.requester_shift_code_ids ?? [],
+    requesterShiftLabel: resolveCodeLabels(
+      row.requester_shift_code_ids ?? [],
+      shiftCodeMap
+    ),
+    requesterFocusAreaId: row.requester_focus_area_id,
+    requesterCustomStartTime: row.requester_custom_start_time,
+    requesterCustomEndTime: row.requester_custom_end_time,
+    targetEmpId: row.target_emp_id,
+    targetName: row.target_first_name
+      ? [row.target_first_name, row.target_last_name]
+          .filter(Boolean)
+          .join(" ")
+      : null,
+    targetShiftDate: row.target_shift_date,
+    targetShiftCodeIds: row.target_shift_code_ids,
+    targetShiftLabel: row.target_shift_code_ids
+      ? resolveCodeLabels(row.target_shift_code_ids, shiftCodeMap)
+      : null,
+    targetFocusAreaId: row.target_focus_area_id,
+    targetCustomStartTime: row.target_custom_start_time,
+    targetCustomEndTime: row.target_custom_end_time,
+    adminUserId: row.admin_user_id,
+    adminNote: row.admin_note,
+    expiresAt: row.expires_at,
+    resolvedAt: row.resolved_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function fetchShiftRequests(
+  orgId: string,
+  shiftCodeMap: Map<number, string>,
+  filters?: {
+    status?: ShiftRequestStatus[];
+    type?: ShiftRequestType;
+    empId?: string;
+  }
+): Promise<ShiftRequest[]> {
+  let query = supabase
+    .from("shift_requests")
+    .select(
+      `*,
+       requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
+       target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`
+    )
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
+
+  if (filters?.status?.length) {
+    query = query.in("status", filters.status);
+  }
+  if (filters?.type) {
+    query = query.eq("type", filters.type);
+  }
+  if (filters?.empId) {
+    query = query.or(
+      `requester_emp_id.eq.${filters.empId},target_emp_id.eq.${filters.empId}`
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const requester = row.requester as {
+      first_name: string;
+      last_name: string;
+    } | null;
+    const target = row.target as {
+      first_name: string;
+      last_name: string;
+    } | null;
+    return rowToShiftRequest(
+      {
+        ...(row as unknown as DbShiftRequest),
+        requester_first_name: requester?.first_name,
+        requester_last_name: requester?.last_name,
+        target_first_name: target?.first_name ?? null,
+        target_last_name: target?.last_name ?? null,
+      },
+      shiftCodeMap
+    );
+  });
+}
+
+export async function fetchPendingApprovalCount(
+  orgId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("shift_requests")
+    .select("*", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("status", "pending_approval");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function createShiftRequest(
+  orgId: string,
+  type: ShiftRequestType,
+  requesterEmpId: string,
+  requesterShiftDate: string,
+  targetEmpId?: string,
+  targetShiftDate?: string
+): Promise<string> {
+  const { data, error } = await supabase.rpc("create_shift_request", {
+    p_org_id: orgId,
+    p_type: type,
+    p_requester_emp_id: requesterEmpId,
+    p_requester_shift_date: requesterShiftDate,
+    p_target_emp_id: targetEmpId ?? null,
+    p_target_shift_date: targetShiftDate ?? null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function claimShiftRequest(
+  requestId: string,
+  claimerEmpId: string
+): Promise<void> {
+  const { error } = await supabase.rpc("claim_shift_request", {
+    p_request_id: requestId,
+    p_claimer_emp_id: claimerEmpId,
+  });
+  if (error) throw error;
+}
+
+export async function respondToShiftRequest(
+  requestId: string,
+  empId: string,
+  accept: boolean
+): Promise<void> {
+  const { error } = await supabase.rpc("respond_to_shift_request", {
+    p_request_id: requestId,
+    p_emp_id: empId,
+    p_accept: accept,
+  });
+  if (error) throw error;
+}
+
+export async function resolveShiftRequest(
+  requestId: string,
+  approved: boolean,
+  note?: string
+): Promise<void> {
+  const { error } = await supabase.rpc("resolve_shift_request", {
+    p_request_id: requestId,
+    p_approved: approved,
+    p_note: note ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function cancelShiftRequest(
+  requestId: string,
+  empId: string
+): Promise<void> {
+  const { error } = await supabase.rpc("cancel_shift_request", {
+    p_request_id: requestId,
+    p_emp_id: empId,
+  });
+  if (error) throw error;
 }

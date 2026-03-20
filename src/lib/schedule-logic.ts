@@ -1,4 +1,12 @@
-import { Employee, ShiftCode } from "@/types";
+import type {
+  Employee,
+  ShiftCode,
+  FocusArea,
+  ShiftCategory,
+  CoverageRequirement,
+  CoverageStatus,
+  CoverageGap,
+} from "@/types";
 
 /**
  * Checks whether an employee is qualified for a given shift code based on
@@ -98,4 +106,129 @@ export function filterAndSortEmployees(
         (activeFocusAreaId === null || e.focusAreaIds.includes(activeFocusAreaId)),
     )
     .sort((a, b) => a.seniority - b.seniority);
+}
+
+// ── Coverage Intelligence ─────────────────────────────────────────────────────
+
+/**
+ * Resolves the coverage requirement for a given (focusAreaId, shiftCodeId, dayOfWeek).
+ * Checks for a day-specific row first, then falls back to the "every day" row (dayOfWeek=null).
+ */
+export function resolveRequirement(
+  requirements: CoverageRequirement[],
+  focusAreaId: number,
+  shiftCodeId: number,
+  dayOfWeek: number,
+): { minStaff: number } | null {
+  const daySpecific = requirements.find(
+    (r) =>
+      r.focusAreaId === focusAreaId &&
+      r.shiftCodeId === shiftCodeId &&
+      r.dayOfWeek === dayOfWeek,
+  );
+  if (daySpecific) return { minStaff: daySpecific.minStaff };
+
+  const everyDay = requirements.find(
+    (r) =>
+      r.focusAreaId === focusAreaId &&
+      r.shiftCodeId === shiftCodeId &&
+      r.dayOfWeek === null,
+  );
+  if (everyDay) return { minStaff: everyDay.minStaff };
+
+  return null;
+}
+
+/**
+ * Computes coverage status for a single (focusArea, shiftCode, date) cell.
+ * Counts actual headcount and qualified headcount against the requirement.
+ */
+export function computeCoverageStatus(
+  employees: Employee[],
+  date: Date,
+  shiftCodeIdsForKey: (empId: string, date: Date) => number[],
+  sectionCodeIds: Set<number>,
+  shiftCodeId: number,
+  requirement: { minStaff: number },
+): CoverageStatus {
+  let actual = 0;
+
+  for (const emp of employees) {
+    const codeIds = shiftCodeIdsForKey(emp.id, date);
+    if (codeIds.includes(shiftCodeId) && sectionCodeIds.has(shiftCodeId)) {
+      actual++;
+    }
+  }
+
+  const hasRequirement = requirement.minStaff > 0;
+  const isMet = actual >= requirement.minStaff;
+
+  return {
+    actual,
+    required: requirement.minStaff,
+    isMet,
+    hasRequirement,
+  };
+}
+
+/**
+ * Computes all coverage gaps across all focus areas, shift codes, and dates.
+ * Returns only cells where requirements are not met.
+ */
+export function computeCoverageGaps(
+  focusAreas: FocusArea[],
+  shiftCategories: ShiftCategory[],
+  shiftCodes: ShiftCode[],
+  requirements: CoverageRequirement[],
+  dates: Date[],
+  employeesByFocusArea: Map<number, Employee[]>,
+  shiftCodeIdsForKey: (empId: string, date: Date) => number[],
+  shiftCodeById: Map<number, ShiftCode>,
+  shiftCodeIdsByFocusArea: Map<number, Set<number>>,
+): CoverageGap[] {
+  const gaps: CoverageGap[] = [];
+  const categoryById = new Map(shiftCategories.map((c) => [c.id, c]));
+  const requiredCodeIds = new Set(requirements.map((r) => r.shiftCodeId));
+
+  for (const fa of focusAreas) {
+    const employees = employeesByFocusArea.get(fa.id) ?? [];
+    const sectionCodeIds = shiftCodeIdsByFocusArea.get(fa.id) ?? new Set();
+
+    for (const codeId of requiredCodeIds) {
+      const code = shiftCodeById.get(codeId);
+      if (!code || !sectionCodeIds.has(codeId)) continue;
+
+      const cat = code.categoryId != null ? categoryById.get(code.categoryId) : undefined;
+
+      for (const date of dates) {
+        const dow = date.getDay();
+        const req = resolveRequirement(requirements, fa.id, codeId, dow);
+        if (!req) continue;
+
+        const status = computeCoverageStatus(
+          employees,
+          date,
+          shiftCodeIdsForKey,
+          sectionCodeIds,
+          codeId,
+          req,
+        );
+
+        if (status.hasRequirement && !status.isMet) {
+          gaps.push({
+            focusAreaId: fa.id,
+            focusAreaName: fa.name,
+            shiftCodeId: codeId,
+            shiftCodeLabel: code.label,
+            shiftCategoryId: cat?.id ?? 0,
+            shiftCategoryName: cat?.name ?? "Uncategorized",
+            date,
+            status,
+          });
+        }
+      }
+    }
+  }
+
+  return gaps;
 }

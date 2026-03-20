@@ -62,7 +62,7 @@ function PageShell({
           alignItems: "center",
           justifyContent: footerCenteredOnly ? "center" : "space-between",
           padding: "0 8px",
-          fontSize: "13px",
+          fontSize: "var(--dg-fs-label)",
           color: "#9CA3AF",
         }}
       >
@@ -98,16 +98,7 @@ function PageShell({
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "18px",
-        padding: "48px 44px 44px",
-        width: "100%",
-        maxWidth: "440px",
-        boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-      }}
-    >
+    <div className="dg-auth-card">
       {children}
     </div>
   );
@@ -202,7 +193,7 @@ function DomainSelector() {
         <p
           style={{
             textAlign: "center",
-            fontSize: "15px",
+            fontSize: "var(--dg-fs-body)",
             color: "#374151",
             marginBottom: "28px",
             fontWeight: 500,
@@ -227,6 +218,7 @@ function DomainSelector() {
             <input
               type="text"
               autoFocus
+              className="dg-standalone-input"
               value={slug}
               onChange={(e) => {
                 setSlug(e.target.value);
@@ -238,7 +230,7 @@ function DomainSelector() {
                 padding: "13px 14px 13px 16px",
                 border: "none",
                 outline: "none",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 color: "#111827",
                 background: "transparent",
                 minWidth: 0,
@@ -247,7 +239,7 @@ function DomainSelector() {
             <span
               style={{
                 padding: "13px 16px",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 color: "#6B7280",
                 background: "#F9FAFB",
                 borderLeft: "1px solid #E5E7EB",
@@ -263,7 +255,7 @@ function DomainSelector() {
             <p
               style={{
                 color: "#EF4444",
-                fontSize: "13px",
+                fontSize: "var(--dg-fs-label)",
                 marginBottom: "16px",
               }}
             >
@@ -288,7 +280,7 @@ function DomainSelector() {
                 border: "none",
                 borderRadius: "999px",
                 padding: "12px 28px",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer",
                 whiteSpace: "nowrap",
@@ -303,7 +295,7 @@ function DomainSelector() {
                 background: "none",
                 border: "none",
                 color: "#6B7280",
-                fontSize: "14px",
+                fontSize: "var(--dg-fs-body-sm)",
                 cursor: "pointer",
                 padding: 0,
                 textDecoration: "underline",
@@ -347,7 +339,7 @@ function DomainSelector() {
               id="subdomain-help-title"
               style={{
                 margin: "0 0 12px",
-                fontSize: "18px",
+                fontSize: "var(--dg-fs-heading)",
                 fontWeight: 600,
                 color: "#111827",
               }}
@@ -357,7 +349,7 @@ function DomainSelector() {
             <p
               style={{
                 margin: "0 0 20px",
-                fontSize: "14px",
+                fontSize: "var(--dg-fs-body-sm)",
                 lineHeight: 1.5,
                 color: "#374151",
               }}
@@ -376,7 +368,7 @@ function DomainSelector() {
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
-                fontSize: "14px",
+                fontSize: "var(--dg-fs-body-sm)",
                 fontWeight: 600,
                 cursor: "pointer",
               }}
@@ -470,7 +462,7 @@ function GridmasterLogin() {
           <DubGridLogo size={48} color="#F8FAFC" />
           <span
             style={{
-              fontSize: "12px",
+              fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
@@ -483,7 +475,7 @@ function GridmasterLogin() {
 
         <h1
           style={{
-            fontSize: "20px",
+            fontSize: "var(--dg-fs-card-title)",
             fontWeight: 700,
             color: "#F8FAFC",
             textAlign: "center",
@@ -501,7 +493,7 @@ function GridmasterLogin() {
             <label
               style={{
                 display: "block",
-                fontSize: "13px",
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
                 color:"#64748B",
@@ -513,6 +505,7 @@ function GridmasterLogin() {
               type="email"
               required
               autoComplete="email"
+              className="dg-standalone-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{
@@ -520,7 +513,7 @@ function GridmasterLogin() {
                 padding: "11px 13px",
                 border: "1px solid #334155",
                 borderRadius: "8px",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 background: "#0F172A",
                 color: "#F8FAFC",
                 outline: "none",
@@ -533,7 +526,7 @@ function GridmasterLogin() {
             <label
               style={{
                 display: "block",
-                fontSize: "13px",
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
                 color:"#64748B",
@@ -545,6 +538,7 @@ function GridmasterLogin() {
               type="password"
               required
               autoComplete="current-password"
+              className="dg-standalone-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
@@ -552,7 +546,7 @@ function GridmasterLogin() {
                 padding: "11px 13px",
                 border: "1px solid #334155",
                 borderRadius: "8px",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 background: "#0F172A",
                 color: "#F8FAFC",
                 outline: "none",
@@ -572,7 +566,7 @@ function GridmasterLogin() {
               color: "#fff",
               border: "none",
               borderRadius: "8px",
-              fontSize: "15px",
+              fontSize: "var(--dg-fs-body)",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
             }}
@@ -730,7 +724,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               border: "1px solid #BBF7D0",
               borderRadius: "999px",
               padding: "4px 14px",
-              fontSize: "13px",
+              fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
               letterSpacing: "0.01em",
             }}
@@ -741,7 +735,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
         <h1
           style={{
-            fontSize: "20px",
+            fontSize: "var(--dg-fs-card-title)",
             fontWeight: 700,
             color: "#111827",
             textAlign: "center",
@@ -759,7 +753,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <label
               style={{
                 display: "block",
-                fontSize: "13px",
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
                 color: "#374151",
@@ -771,6 +765,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               type="email"
               required
               autoComplete="email"
+              className="dg-standalone-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{
@@ -778,7 +773,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 padding: "11px 13px",
                 border: "1.5px solid #D1D5DB",
                 borderRadius: "8px",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 outline: "none",
                 boxSizing: "border-box",
               }}
@@ -789,7 +784,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <label
               style={{
                 display: "block",
-                fontSize: "13px",
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
                 color: "#374151",
@@ -801,6 +796,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               type="password"
               required
               autoComplete="current-password"
+              className="dg-standalone-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
@@ -808,7 +804,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 padding: "11px 13px",
                 border: "1.5px solid #D1D5DB",
                 borderRadius: "8px",
-                fontSize: "15px",
+                fontSize: "var(--dg-fs-body)",
                 outline: "none",
                 boxSizing: "border-box",
               }}
@@ -826,7 +822,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               color: "#fff",
               border: "none",
               borderRadius: "999px",
-              fontSize: "15px",
+              fontSize: "var(--dg-fs-body)",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
             }}
@@ -857,7 +853,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               background: "none",
               border: "none",
               color: "#9CA3AF",
-              fontSize: "13px",
+              fontSize: "var(--dg-fs-label)",
               cursor: "pointer",
               padding: 0,
               textDecoration: "underline",

@@ -32,10 +32,10 @@ const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+      <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {label}
       </span>
-      <span style={{ fontSize: 14, color: value ? "var(--color-text-primary)" : "var(--color-text-subtle)" }}>
+      <span style={{ fontSize: "var(--dg-fs-body-sm)", color: value ? "var(--color-text-primary)" : "var(--color-text-subtle)" }}>
         {value || "—"}
       </span>
     </div>
@@ -108,7 +108,7 @@ export default function ProfilePage() {
             background: "transparent",
             border: "none",
             cursor: "pointer",
-            fontSize: 13,
+            fontSize: "var(--dg-fs-label)",
             color: "var(--color-text-muted)",
             fontFamily: "inherit",
             padding: "4px 0",
@@ -122,7 +122,7 @@ export default function ProfilePage() {
           Back
         </button>
         <span style={{ color: "var(--color-border)", fontSize: 16, fontWeight: 300, userSelect: "none" }}>|</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)" }}>Profile</span>
+        <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Profile</span>
       </div>
 
       {/* Content */}
@@ -148,7 +148,7 @@ export default function ProfilePage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 22,
+              fontSize: "var(--dg-fs-card-title)",
               fontWeight: 700,
               color: "#fff",
               flexShrink: 0,
@@ -156,12 +156,12 @@ export default function ProfilePage() {
               {isLoading ? "" : initials}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 4 }}>
+              <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 4 }}>
                 {name ?? user?.email?.split("@")[0] ?? "—"}
               </div>
               <span style={{
                 display: "inline-block",
-                fontSize: 12,
+                fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
                 padding: "2px 10px",
                 borderRadius: 20,
@@ -182,7 +182,7 @@ export default function ProfilePage() {
             overflow: "hidden",
           }}>
             <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border)" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 Account details
               </span>
             </div>

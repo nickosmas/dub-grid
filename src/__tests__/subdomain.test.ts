@@ -10,8 +10,8 @@ describe("parseHost", () => {
   });
 
   it("parses localhost tenant subdomains", () => {
-    const parsed = parseHost("ardenwood.localhost:3000");
-    expect(parsed.subdomain).toBe("ardenwood");
+    const parsed = parseHost("calmhaven.localhost:3000");
+    expect(parsed.subdomain).toBe("calmhaven");
     expect(parsed.rootDomain).toBe("localhost");
     expect(parsed.port).toBe(":3000");
   });
@@ -25,8 +25,8 @@ describe("parseHost", () => {
   });
 
   it("parses production tenant subdomains", () => {
-    const parsed = parseHost("ardenwood.dubgrid.com");
-    expect(parsed.subdomain).toBe("ardenwood");
+    const parsed = parseHost("calmhaven.dubgrid.com");
+    expect(parsed.subdomain).toBe("calmhaven");
     expect(parsed.rootDomain).toBe("dubgrid.com");
   });
 
@@ -45,8 +45,8 @@ describe("parseHost", () => {
   });
 
   it("parses tenant.project.vercel.app as subdomain host", () => {
-    const parsed = parseHost("ardenwood.dub-grid.vercel.app");
-    expect(parsed.subdomain).toBe("ardenwood");
+    const parsed = parseHost("calmhaven.dub-grid.vercel.app");
+    expect(parsed.subdomain).toBe("calmhaven");
     expect(parsed.rootDomain).toBe("dub-grid.vercel.app");
     expect(buildSubdomainHost("oak", parsed)).toBe("oak.dub-grid.vercel.app");
   });
@@ -66,8 +66,8 @@ describe("parseHost with NEXT_PUBLIC_BASE_DOMAIN anchor", () => {
 
   it("parses tenant.app.dubgrid.com correctly", () => {
     process.env.NEXT_PUBLIC_BASE_DOMAIN = "app.dubgrid.com";
-    const parsed = parseHost("ardenwood.app.dubgrid.com");
-    expect(parsed.subdomain).toBe("ardenwood");
+    const parsed = parseHost("calmhaven.app.dubgrid.com");
+    expect(parsed.subdomain).toBe("calmhaven");
     expect(parsed.rootDomain).toBe("app.dubgrid.com");
     process.env.NEXT_PUBLIC_BASE_DOMAIN = originalBaseDomain;
   });

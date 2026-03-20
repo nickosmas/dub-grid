@@ -14,6 +14,8 @@ CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'none');
 CREATE TYPE public.org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly');
 CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
+CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap');
+CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired');
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -25,7 +27,14 @@ CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
 CREATE TABLE public.organizations (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                 TEXT NOT NULL DEFAULT 'My Organization',
-  slug                 TEXT UNIQUE,
+  slug                 TEXT UNIQUE
+    CONSTRAINT slug_format CHECK (
+      slug IS NULL
+      OR (
+        slug ~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+        AND slug NOT IN ('www','login','gridmaster','api','admin','status','app')
+      )
+    ),
   address              TEXT NOT NULL DEFAULT '',
   phone                TEXT NOT NULL DEFAULT '',
   employee_count       INTEGER,
@@ -466,6 +475,77 @@ CREATE TABLE public.recurring_shifts_draft_sessions (
 );
 
 
+-- ── coverage_requirements ─────────────────────────────────────────────────────
+
+CREATE TABLE public.coverage_requirements (
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id            UUID NOT NULL,
+  focus_area_id     BIGINT NOT NULL,
+  shift_code_id     BIGINT NOT NULL,
+  day_of_week       SMALLINT,          -- 0=Sun..6=Sat, NULL = every day
+  min_staff         INTEGER NOT NULL DEFAULT 0,
+  created_by        UUID,
+  updated_by        UUID,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT coverage_req_day_check CHECK (day_of_week IS NULL OR (day_of_week >= 0 AND day_of_week <= 6)),
+  CONSTRAINT coverage_req_min_check CHECK (min_staff >= 0)
+);
+
+-- Unique: one requirement per (org, focus_area, shift_code, day_of_week)
+CREATE UNIQUE INDEX coverage_req_per_day_unique
+  ON public.coverage_requirements(org_id, focus_area_id, shift_code_id, day_of_week)
+  WHERE day_of_week IS NOT NULL;
+
+CREATE UNIQUE INDEX coverage_req_every_day_unique
+  ON public.coverage_requirements(org_id, focus_area_id, shift_code_id)
+  WHERE day_of_week IS NULL;
+
+
+-- ── shift_requests ──────────────────────────────────────────────────────────
+
+CREATE TABLE public.shift_requests (
+  id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                      UUID NOT NULL,
+  type                        public.shift_request_type NOT NULL,
+  status                      public.shift_request_status NOT NULL DEFAULT 'open',
+  requester_emp_id            UUID NOT NULL,
+  requester_shift_date        DATE NOT NULL,
+  requester_shift_code_ids    BIGINT[] NOT NULL DEFAULT '{}',
+  requester_focus_area_id     BIGINT,
+  requester_custom_start_time TIME,
+  requester_custom_end_time   TIME,
+  target_emp_id               UUID,
+  target_shift_date           DATE,
+  target_shift_code_ids       BIGINT[],
+  target_focus_area_id        BIGINT,
+  target_custom_start_time    TIME,
+  target_custom_end_time      TIME,
+  admin_user_id               UUID,
+  admin_note                  TEXT,
+  expires_at                  TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '72 hours'),
+  resolved_at                 TIMESTAMPTZ,
+  idempotency_key             UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ONLY public.shift_requests REPLICA IDENTITY FULL;
+
+-- Swaps must specify a target employee and target shift date
+ALTER TABLE public.shift_requests ADD CONSTRAINT target_required_for_swap
+  CHECK (type = 'pickup' OR (target_emp_id IS NOT NULL AND target_shift_date IS NOT NULL));
+
+-- Cannot swap with yourself
+ALTER TABLE public.shift_requests ADD CONSTRAINT no_self_swap
+  CHECK (requester_emp_id != target_emp_id OR target_emp_id IS NULL);
+
+-- Expiry must be after creation
+ALTER TABLE public.shift_requests ADD CONSTRAINT valid_expiry
+  CHECK (expires_at > created_at);
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 3. FOREIGN KEYS
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -583,6 +663,15 @@ ALTER TABLE public.impersonation_sessions
 ALTER TABLE public.user_sessions
   ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
+-- shift_requests
+ALTER TABLE public.shift_requests
+  ADD CONSTRAINT shift_requests_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT shift_requests_requester_emp_id_fkey FOREIGN KEY (requester_emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
+  ADD CONSTRAINT shift_requests_requester_focus_area_id_fkey FOREIGN KEY (requester_focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_requests_target_emp_id_fkey FOREIGN KEY (target_emp_id) REFERENCES public.employees(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_requests_target_focus_area_id_fkey FOREIGN KEY (target_focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_requests_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
 -- schedule_draft_sessions
 ALTER TABLE public.schedule_draft_sessions
   ADD CONSTRAINT schedule_draft_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -592,6 +681,14 @@ ALTER TABLE public.schedule_draft_sessions
 ALTER TABLE public.recurring_shifts_draft_sessions
   ADD CONSTRAINT recurring_shifts_draft_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT recurring_shifts_draft_user_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id);
+
+-- coverage_requirements
+ALTER TABLE public.coverage_requirements
+  ADD CONSTRAINT coverage_requirements_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_requirements_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_requirements_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_requirements_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT coverage_requirements_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- publish_history
 ALTER TABLE public.publish_history
@@ -697,6 +794,17 @@ CREATE INDEX idx_impersonation_sessions_expires_at ON public.impersonation_sessi
 -- user_sessions
 CREATE INDEX idx_user_sessions_user_last_active ON public.user_sessions(user_id, last_active_at DESC);
 
+-- coverage_requirements
+CREATE INDEX idx_coverage_requirements_org ON public.coverage_requirements(org_id);
+CREATE INDEX idx_coverage_requirements_lookup ON public.coverage_requirements(org_id, focus_area_id, shift_code_id);
+
+-- shift_requests
+CREATE INDEX idx_shift_requests_org_status ON public.shift_requests(org_id, status);
+CREATE INDEX idx_shift_requests_requester ON public.shift_requests(requester_emp_id, status);
+CREATE INDEX idx_shift_requests_target ON public.shift_requests(target_emp_id, status) WHERE target_emp_id IS NOT NULL;
+CREATE INDEX idx_shift_requests_org_open_pickups ON public.shift_requests(org_id) WHERE type = 'pickup' AND status = 'open';
+CREATE INDEX idx_shift_requests_expiry ON public.shift_requests(expires_at) WHERE status IN ('open', 'pending_approval');
+
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 5. REALTIME
@@ -707,3 +815,5 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_notes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.focus_areas;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_codes;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_requirements;
