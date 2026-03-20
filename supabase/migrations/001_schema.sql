@@ -262,7 +262,10 @@ CREATE TABLE public.indicator_types (
   name        TEXT NOT NULL,
   color       TEXT NOT NULL DEFAULT '#000000',
   sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_by  UUID,
+  updated_by  UUID,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now(),
   archived_at TIMESTAMPTZ
 );
 
@@ -620,7 +623,9 @@ ALTER TABLE public.schedule_notes
 
 -- indicator_types
 ALTER TABLE public.indicator_types
-  ADD CONSTRAINT indicator_types_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+  ADD CONSTRAINT indicator_types_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT indicator_types_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT indicator_types_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- recurring_shifts
 ALTER TABLE public.recurring_shifts

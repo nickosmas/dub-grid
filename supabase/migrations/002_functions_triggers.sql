@@ -331,6 +331,10 @@ CREATE TRIGGER trigger_coverage_requirements_audit
   BEFORE INSERT OR UPDATE ON public.coverage_requirements
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
+CREATE TRIGGER trigger_indicator_types_audit
+  BEFORE INSERT OR UPDATE ON public.indicator_types
+  FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
+
 -- Shifts updated_at (fires in addition to audit trigger)
 CREATE TRIGGER trigger_shifts_updated_at
   BEFORE UPDATE ON public.shifts
@@ -1265,22 +1269,6 @@ GRANT EXECUTE ON FUNCTION public.get_audit_log(UUID, INTEGER, INTEGER) TO authen
 -- SHIFT REQUESTS: Pickup & Swap Functions
 -- ══════════════════════════════════════════════════════════════════════════════
 
--- Helper: check if two time ranges overlap. NULL times = full day (always overlaps).
-CREATE OR REPLACE FUNCTION public.shift_times_overlap(
-  p_start1 TIME, p_end1 TIME,
-  p_start2 TIME, p_end2 TIME
-) RETURNS BOOLEAN
-LANGUAGE SQL IMMUTABLE
-AS $$
-  SELECT CASE
-    -- If either shift has no times defined, treat as full-day → always overlaps
-    WHEN p_start1 IS NULL OR p_end1 IS NULL OR p_start2 IS NULL OR p_end2 IS NULL THEN TRUE
-    -- Standard overlap check: start1 < end2 AND start2 < end1
-    ELSE p_start1 < p_end2 AND p_start2 < p_end1
-  END;
-$$;
-
-
 -- ── create_shift_request ────────────────────────────────────────────────────
 -- Creates a pickup or swap request. Validates shift ownership and snapshots data.
 
@@ -1342,7 +1330,7 @@ BEGIN
     RAISE EXCEPTION 'Cannot create a request for an off-day shift';
   END IF;
 
-  -- Check no active request already exists for this shift
+  -- Check no active request already exists for this shift (as requester or target)
   IF EXISTS (
     SELECT 1 FROM public.shift_requests
     WHERE requester_emp_id = p_requester_emp_id
@@ -1351,6 +1339,16 @@ BEGIN
       AND status IN ('open', 'pending_approval')
   ) THEN
     RAISE EXCEPTION 'An active request already exists for this shift';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.shift_requests
+    WHERE target_emp_id = p_requester_emp_id
+      AND target_shift_date = p_requester_shift_date
+      AND org_id = p_org_id
+      AND status IN ('open', 'pending_approval')
+  ) THEN
+    RAISE EXCEPTION 'This shift is already involved in another active request';
   END IF;
 
   -- For swaps: validate target
@@ -1389,6 +1387,19 @@ BEGIN
         AND is_off_day = TRUE
     ) THEN
       RAISE EXCEPTION 'Cannot swap with an off-day shift';
+    END IF;
+
+    -- Block if target's shift is already involved in any active request
+    IF EXISTS (
+      SELECT 1 FROM public.shift_requests
+      WHERE (
+        (requester_emp_id = p_target_emp_id AND requester_shift_date = p_target_shift_date)
+        OR (target_emp_id = p_target_emp_id AND target_shift_date = p_target_shift_date)
+      )
+        AND org_id = p_org_id
+        AND status IN ('open', 'pending_approval')
+    ) THEN
+      RAISE EXCEPTION 'The target''s shift is already involved in another active request';
     END IF;
   END IF;
 
@@ -1448,12 +1459,6 @@ AS $$
 DECLARE
   v_request RECORD;
   v_claimer RECORD;
-  v_req_start TIME;
-  v_req_end TIME;
-  v_existing RECORD;
-  v_ex_start TIME;
-  v_ex_end TIME;
-  v_has_conflict BOOLEAN := FALSE;
 BEGIN
   -- Lock and fetch the request
   SELECT * INTO v_request
@@ -1474,8 +1479,6 @@ BEGIN
   END IF;
 
   IF v_request.expires_at < now() THEN
-    UPDATE public.shift_requests SET status = 'expired', resolved_at = now(), updated_at = now()
-    WHERE id = p_request_id;
     RAISE EXCEPTION 'Request has expired';
   END IF;
 
@@ -1513,39 +1516,28 @@ BEGIN
     RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
   END IF;
 
-  -- Time-based conflict check: resolve the requested shift's effective times
-  -- MIN for start (earliest begin), MAX for end (latest finish) across multi-code shifts
-  SELECT
-    COALESCE(v_request.requester_custom_start_time, MIN(sc.default_start_time)),
-    COALESCE(v_request.requester_custom_end_time, MAX(sc.default_end_time))
-  INTO v_req_start, v_req_end
-  FROM public.shift_codes sc
-  WHERE sc.id = ANY(v_request.requester_shift_code_ids);
+  -- Block if claimer already has a shift on the requested date (PK: one shift per emp per date)
+  IF EXISTS (
+    SELECT 1 FROM public.shifts
+    WHERE emp_id = p_claimer_emp_id
+      AND date = v_request.requester_shift_date
+      AND array_length(published_shift_code_ids, 1) IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'You already have a shift on this date';
+  END IF;
 
-  -- Check each existing shift the claimer has on that date
-  FOR v_existing IN
-    SELECT s.published_shift_code_ids, s.custom_start_time, s.custom_end_time
-    FROM public.shifts s
-    WHERE s.emp_id = p_claimer_emp_id
-      AND s.date = v_request.requester_shift_date
-      AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-  LOOP
-    -- Resolve the existing shift's effective times
-    SELECT
-      COALESCE(v_existing.custom_start_time, MIN(sc.default_start_time)),
-      COALESCE(v_existing.custom_end_time, MAX(sc.default_end_time))
-    INTO v_ex_start, v_ex_end
-    FROM public.shift_codes sc
-    WHERE sc.id = ANY(v_existing.published_shift_code_ids);
-
-    IF public.shift_times_overlap(v_req_start, v_req_end, v_ex_start, v_ex_end) THEN
-      v_has_conflict := TRUE;
-      EXIT;
-    END IF;
-  END LOOP;
-
-  IF v_has_conflict THEN
-    RAISE EXCEPTION 'You have a conflicting shift at this time';
+  -- Block if claimer is already involved in another active request on this date
+  IF EXISTS (
+    SELECT 1 FROM public.shift_requests sr
+    WHERE sr.org_id = v_request.org_id
+      AND sr.id != p_request_id
+      AND sr.status IN ('open', 'pending_approval')
+      AND (
+        (sr.requester_emp_id = p_claimer_emp_id AND sr.requester_shift_date = v_request.requester_shift_date)
+        OR (sr.target_emp_id = p_claimer_emp_id AND sr.target_shift_date = v_request.requester_shift_date)
+      )
+  ) THEN
+    RAISE EXCEPTION 'You are involved in another active shift request on this date';
   END IF;
 
   -- Claim the request
@@ -1574,6 +1566,8 @@ AS $$
 DECLARE
   v_request RECORD;
   v_emp RECORD;
+  v_req_shift RECORD;
+  v_tgt_shift RECORD;
 BEGIN
   -- Lock and fetch
   SELECT * INTO v_request
@@ -1592,8 +1586,6 @@ BEGIN
   END IF;
 
   IF v_request.expires_at < now() THEN
-    UPDATE public.shift_requests SET status = 'expired', resolved_at = now(), updated_at = now()
-    WHERE id = p_request_id;
     RAISE EXCEPTION 'Request has expired';
   END IF;
 
@@ -1611,6 +1603,24 @@ BEGIN
   END IF;
 
   IF p_accept THEN
+    -- Verify requester's shift still matches snapshot
+    SELECT * INTO v_req_shift
+    FROM public.shifts
+    WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+
+    IF NOT FOUND OR v_req_shift.published_shift_code_ids IS DISTINCT FROM v_request.requester_shift_code_ids THEN
+      RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. This request is no longer valid.';
+    END IF;
+
+    -- Verify target's shift still matches snapshot
+    SELECT * INTO v_tgt_shift
+    FROM public.shifts
+    WHERE emp_id = v_request.target_emp_id AND date = v_request.target_shift_date;
+
+    IF NOT FOUND OR v_tgt_shift.published_shift_code_ids IS DISTINCT FROM v_request.target_shift_code_ids THEN
+      RAISE EXCEPTION 'Your shift has been modified since the request was created. This request is no longer valid.';
+    END IF;
+
     UPDATE public.shift_requests
     SET status = 'pending_approval', updated_at = now()
     WHERE id = p_request_id;
@@ -1642,12 +1652,6 @@ DECLARE
   v_admin_user_id UUID := auth.uid();
   v_req_shift RECORD;
   v_tgt_shift RECORD;
-  v_req_start TIME;
-  v_req_end TIME;
-  v_existing RECORD;
-  v_ex_start TIME;
-  v_ex_end TIME;
-  v_has_conflict BOOLEAN := FALSE;
   v_row_count INTEGER;
 BEGIN
   -- Validate admin permissions
@@ -1670,9 +1674,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- Advisory lock prevents concurrent approvals per org
-  PERFORM pg_advisory_xact_lock(hashtext('resolve_shift_request_' || p_request_id::TEXT));
-
   -- Lock and fetch the request
   SELECT * INTO v_request
   FROM public.shift_requests
@@ -1686,8 +1687,6 @@ BEGIN
   END IF;
 
   IF v_request.expires_at < now() THEN
-    UPDATE public.shift_requests SET status = 'expired', resolved_at = now(), updated_at = now()
-    WHERE id = p_request_id;
     RAISE EXCEPTION 'Request has expired';
   END IF;
 
@@ -1707,6 +1706,39 @@ BEGIN
 
   -- ── APPROVAL: execute the shift reassignment ──
 
+  -- Advisory lock on involved shifts to prevent concurrent modifications.
+  -- For swaps, acquire in deterministic order (alphabetical by key) to prevent deadlocks.
+  IF v_request.type = 'pickup' THEN
+    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+  ELSIF v_request.type = 'swap' THEN
+    IF (v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
+       < (v_request.target_emp_id::TEXT || '_' || v_request.target_shift_date::TEXT)
+    THEN
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.target_shift_date::TEXT));
+    ELSE
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.target_shift_date::TEXT));
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+    END IF;
+  END IF;
+
+  -- Re-validate both employees are still active (status could change between creation and approval)
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE id = v_request.requester_emp_id AND org_id = v_request.org_id
+      AND archived_at IS NULL AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Requester is no longer active. Cannot approve.';
+  END IF;
+
+  IF v_request.target_emp_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE id = v_request.target_emp_id AND org_id = v_request.org_id
+      AND archived_at IS NULL AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Target employee is no longer active. Cannot approve.';
+  END IF;
+
   -- Verify requester's shift still exists as snapshotted
   SELECT * INTO v_req_shift
   FROM public.shifts
@@ -1717,37 +1749,14 @@ BEGIN
   END IF;
 
   IF v_request.type = 'pickup' THEN
-    -- Time-based conflict re-check at approval time
-    -- MIN for start (earliest begin), MAX for end (latest finish) across multi-code shifts
-    SELECT
-      COALESCE(v_request.requester_custom_start_time, MIN(sc.default_start_time)),
-      COALESCE(v_request.requester_custom_end_time, MAX(sc.default_end_time))
-    INTO v_req_start, v_req_end
-    FROM public.shift_codes sc
-    WHERE sc.id = ANY(v_request.requester_shift_code_ids);
-
-    FOR v_existing IN
-      SELECT s.published_shift_code_ids, s.custom_start_time, s.custom_end_time
-      FROM public.shifts s
-      WHERE s.emp_id = v_request.target_emp_id
-        AND s.date = v_request.requester_shift_date
-        AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-    LOOP
-      SELECT
-        COALESCE(v_existing.custom_start_time, MIN(sc.default_start_time)),
-        COALESCE(v_existing.custom_end_time, MAX(sc.default_end_time))
-      INTO v_ex_start, v_ex_end
-      FROM public.shift_codes sc
-      WHERE sc.id = ANY(v_existing.published_shift_code_ids);
-
-      IF public.shift_times_overlap(v_req_start, v_req_end, v_ex_start, v_ex_end) THEN
-        v_has_conflict := TRUE;
-        EXIT;
-      END IF;
-    END LOOP;
-
-    IF v_has_conflict THEN
-      RAISE EXCEPTION 'The target employee now has a conflicting shift. Cannot approve.';
+    -- Re-check at approval: target must not have a shift on this date (PK: one per emp per date)
+    IF EXISTS (
+      SELECT 1 FROM public.shifts
+      WHERE emp_id = v_request.target_emp_id
+        AND date = v_request.requester_shift_date
+        AND array_length(published_shift_code_ids, 1) IS NOT NULL
+    ) THEN
+      RAISE EXCEPTION 'The target employee now has a shift on this date. Cannot approve.';
     END IF;
 
     -- Delete requester's shift
@@ -1784,12 +1793,48 @@ BEGIN
       RAISE EXCEPTION 'The target''s shift has been modified since the request was created. Please ask the employees to resubmit.';
     END IF;
 
-    -- Delete both shifts
+    -- Block if merging would create duplicate shift categories (e.g. two day shifts)
+    -- Only relevant when dates differ (same-day swaps replace, they don't merge)
+    IF v_request.requester_shift_date IS DISTINCT FROM v_request.target_shift_date THEN
+      -- Requester side: check requester's existing shift on target_date vs incoming target codes
+      IF EXISTS (
+        SELECT 1 FROM public.shifts s
+        WHERE s.emp_id = v_request.requester_emp_id AND s.date = v_request.target_shift_date
+          AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM public.shift_codes sc1
+            JOIN public.shift_codes sc2
+              ON sc1.category_id = sc2.category_id AND sc1.category_id IS NOT NULL
+            WHERE sc1.id = ANY(s.published_shift_code_ids)
+              AND sc2.id = ANY(v_request.target_shift_code_ids)
+          )
+      ) THEN
+        RAISE EXCEPTION 'Cannot approve: requester would have duplicate shift categories on the target''s date';
+      END IF;
+
+      -- Target side: check target's existing shift on requester_date vs incoming requester codes
+      IF EXISTS (
+        SELECT 1 FROM public.shifts s
+        WHERE s.emp_id = v_request.target_emp_id AND s.date = v_request.requester_shift_date
+          AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM public.shift_codes sc1
+            JOIN public.shift_codes sc2
+              ON sc1.category_id = sc2.category_id AND sc1.category_id IS NOT NULL
+            WHERE sc1.id = ANY(s.published_shift_code_ids)
+              AND sc2.id = ANY(v_request.requester_shift_code_ids)
+          )
+      ) THEN
+        RAISE EXCEPTION 'Cannot approve: target would have duplicate shift categories on the requester''s date';
+      END IF;
+    END IF;
+
+    -- Delete the specific swapped shifts from their original owners
     DELETE FROM public.shifts
     WHERE (emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date)
        OR (emp_id = v_request.target_emp_id AND date = v_request.target_shift_date);
 
-    -- Insert requester's old shift under target
+    -- Give requester's old shift to target on requester_date (merge if target already has a shift there)
     INSERT INTO public.shifts (
       emp_id, date, org_id, user_id,
       published_shift_code_ids, draft_shift_code_ids,
@@ -1801,14 +1846,36 @@ BEGIN
       v_request.requester_shift_code_ids, '{}',
       v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
       v_admin_user_id, v_admin_user_id
-    FROM public.employees e WHERE e.id = v_request.target_emp_id;
+    FROM public.employees e WHERE e.id = v_request.target_emp_id
+    ON CONFLICT (emp_id, date) DO UPDATE SET
+      published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
+      -- Merge pipe-delimited custom times (each segment maps to a shift code)
+      custom_start_time = CASE
+        WHEN shifts.custom_start_time IS NOT NULL AND EXCLUDED.custom_start_time IS NOT NULL
+          THEN shifts.custom_start_time || '|' || EXCLUDED.custom_start_time
+        WHEN EXCLUDED.custom_start_time IS NOT NULL THEN EXCLUDED.custom_start_time
+        ELSE shifts.custom_start_time
+      END,
+      custom_end_time = CASE
+        WHEN shifts.custom_end_time IS NOT NULL AND EXCLUDED.custom_end_time IS NOT NULL
+          THEN shifts.custom_end_time || '|' || EXCLUDED.custom_end_time
+        WHEN EXCLUDED.custom_end_time IS NOT NULL THEN EXCLUDED.custom_end_time
+        ELSE shifts.custom_end_time
+      END,
+      -- Keep existing focus area (double shift spans areas; NULL if they differ)
+      focus_area_id = CASE
+        WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
+        ELSE NULL
+      END,
+      updated_by = EXCLUDED.updated_by,
+      updated_at = now();
 
     GET DIAGNOSTICS v_row_count = ROW_COUNT;
     IF v_row_count = 0 THEN
       RAISE EXCEPTION 'Failed to swap shift: target employee not found';
     END IF;
 
-    -- Insert target's old shift under requester
+    -- Give target's old shift to requester on target_date (merge if requester already has a shift there)
     INSERT INTO public.shifts (
       emp_id, date, org_id, user_id,
       published_shift_code_ids, draft_shift_code_ids,
@@ -1820,7 +1887,27 @@ BEGIN
       v_request.target_shift_code_ids, '{}',
       v_request.target_focus_area_id, v_request.target_custom_start_time, v_request.target_custom_end_time,
       v_admin_user_id, v_admin_user_id
-    FROM public.employees e WHERE e.id = v_request.requester_emp_id;
+    FROM public.employees e WHERE e.id = v_request.requester_emp_id
+    ON CONFLICT (emp_id, date) DO UPDATE SET
+      published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
+      custom_start_time = CASE
+        WHEN shifts.custom_start_time IS NOT NULL AND EXCLUDED.custom_start_time IS NOT NULL
+          THEN shifts.custom_start_time || '|' || EXCLUDED.custom_start_time
+        WHEN EXCLUDED.custom_start_time IS NOT NULL THEN EXCLUDED.custom_start_time
+        ELSE shifts.custom_start_time
+      END,
+      custom_end_time = CASE
+        WHEN shifts.custom_end_time IS NOT NULL AND EXCLUDED.custom_end_time IS NOT NULL
+          THEN shifts.custom_end_time || '|' || EXCLUDED.custom_end_time
+        WHEN EXCLUDED.custom_end_time IS NOT NULL THEN EXCLUDED.custom_end_time
+        ELSE shifts.custom_end_time
+      END,
+      focus_area_id = CASE
+        WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
+        ELSE NULL
+      END,
+      updated_by = EXCLUDED.updated_by,
+      updated_at = now();
 
     GET DIAGNOSTICS v_row_count = ROW_COUNT;
     IF v_row_count = 0 THEN
@@ -1833,6 +1920,22 @@ BEGIN
   SET status = 'approved', admin_user_id = v_admin_user_id,
       admin_note = p_note, resolved_at = now(), updated_at = now()
   WHERE id = p_request_id;
+
+  -- Cascade-cancel all other active requests involving the modified shifts
+  UPDATE public.shift_requests
+  SET status = 'cancelled',
+      admin_note = 'Auto-cancelled: shift was reassigned by another approved request',
+      resolved_at = now(),
+      updated_at = now()
+  WHERE id != p_request_id
+    AND org_id = v_request.org_id
+    AND status IN ('open', 'pending_approval')
+    AND (
+      (requester_emp_id = v_request.requester_emp_id AND requester_shift_date = v_request.requester_shift_date)
+      OR (target_emp_id = v_request.requester_emp_id AND target_shift_date = v_request.requester_shift_date)
+      OR (v_request.type = 'swap' AND requester_emp_id = v_request.target_emp_id AND requester_shift_date = v_request.target_shift_date)
+      OR (v_request.type = 'swap' AND target_emp_id = v_request.target_emp_id AND target_shift_date = v_request.target_shift_date)
+    );
 END;
 $$;
 
@@ -1866,6 +1969,9 @@ BEGIN
 
   -- Validate caller is the requester
   SELECT id, user_id INTO v_emp FROM public.employees WHERE id = p_emp_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Employee not found';
+  END IF;
   IF v_request.requester_emp_id != p_emp_id THEN
     RAISE EXCEPTION 'Only the requester can cancel this request';
   END IF;

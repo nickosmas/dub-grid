@@ -846,7 +846,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               const { protocol, port } = window.location;
               const portStr = port ? `:${port}` : "";
               const target = `${protocol}//${baseDomain}${portStr}/login`;
-              console.log("[Login] Redirecting to apex:", target);
               window.location.href = target;
             }}
             style={{
@@ -875,7 +874,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     const slug = getOrgSlug();
-    console.log("[Login] Detected org slug:", slug, "host:", typeof window !== "undefined" ? window.location.host : "ssr");
     setOrgSlug(slug);
     setMounted(true);
   }, []);

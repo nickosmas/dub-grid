@@ -589,6 +589,20 @@ function SchedulerContent() {
     [shifts],
   );
 
+  /** Returns the set of category IDs for an employee's shift on a given date. */
+  const getShiftCategoryIds = useCallback(
+    (empId: string, date: Date): number[] => {
+      const codeIds = shifts[`${empId}_${formatDateKey(date)}`]?.shiftCodeIds ?? [];
+      const cats: number[] = [];
+      for (const id of codeIds) {
+        const sc = shiftCodes.find(c => c.id === id);
+        if (sc?.categoryId != null) cats.push(sc.categoryId);
+      }
+      return cats;
+    },
+    [shifts, shiftCodes],
+  );
+
   // ── Coverage gaps ──────────────────────────────────────────────────────────
   const shiftCodeById = useMemo(() => {
     const map = new Map<number, ShiftCode>();
@@ -1969,6 +1983,7 @@ function SchedulerContent() {
           employees={employees}
           shiftForKey={shiftForKey}
           isRequestableShift={isRequestableShift}
+          getShiftCategoryIds={getShiftCategoryIds}
           onSubmit={(targetEmpId, targetShiftDate) => {
             shiftRequests.create('swap', swapModalState.empId, swapModalState.shiftDate, targetEmpId, targetShiftDate);
             setSwapModalState(null);

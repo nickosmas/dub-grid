@@ -128,13 +128,14 @@ export async function middleware(req: NextRequest) {
     } else {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
-  } catch (err) {
-    console.warn("JWT verification failed, falling back to unverified decode");
+  } catch {
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
       // Don't trust elevated roles from unverified tokens — a forged JWT
-      // could claim gridmaster access. Force re-auth instead.
-      if (claims.platform_role === "gridmaster") {
+      // could claim gridmaster/super_admin/admin access. Only allow 'user'
+      // role through; RLS is the real security gate.
+      const unverifiedRole = calculateEffectiveRole(claims);
+      if (unverifiedRole !== "user") {
         return NextResponse.redirect(new URL("/login", req.url));
       }
     } catch {

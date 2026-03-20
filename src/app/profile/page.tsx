@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { usePermissions } from "@/hooks";
+import { ProtectedRoute } from "@/components/RouteGuards";
 import type { User } from "@supabase/supabase-js";
 
 interface ProfileData {
@@ -42,7 +43,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const router = useRouter();
   const { role, orgId, isLoading } = usePermissions();
   const [user, setUser] = useState<User | null>(null);
@@ -51,10 +52,7 @@ export default function ProfilePage() {
   useEffect(() => {
     void (async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        router.replace("/");
-        return;
-      }
+      if (!data.session) return;
       setUser(data.session.user);
       const { data: prof } = await supabase
         .from("profiles")
@@ -63,7 +61,7 @@ export default function ProfilePage() {
         .single();
       setProfile(prof ?? null);
     })();
-  }, [router]);
+  }, []);
 
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
@@ -203,5 +201,13 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <ProtectedRoute>
+      <ProfilePageContent />
+    </ProtectedRoute>
   );
 }
