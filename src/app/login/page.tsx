@@ -221,7 +221,7 @@ function DomainSelector() {
               className="dg-standalone-input"
               value={slug}
               onChange={(e) => {
-                setSlug(e.target.value);
+                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                 setError("");
               }}
               placeholder="yourorg"
