@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import Modal from "@/components/Modal";
@@ -53,10 +53,10 @@ describe("Modal — Rendering", () => {
 });
 
 describe("Modal — Focus", () => {
-  it("dialog element receives focus on mount", () => {
+  it("first focusable element receives focus on mount", () => {
     renderModal();
-    const dialog = screen.getByRole("dialog");
-    expect(document.activeElement).toBe(dialog);
+    const closeBtn = screen.getByRole("button", { name: "Close modal" });
+    expect(document.activeElement).toBe(closeBtn);
   });
 });
 
@@ -65,7 +65,7 @@ describe("Modal — Close interactions", () => {
     const onClose = vi.fn();
     renderModal(onClose);
     await userEvent.click(screen.getByRole("button", { name: "Close modal" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it("clicking backdrop calls onClose", async () => {
@@ -73,7 +73,7 @@ describe("Modal — Close interactions", () => {
     renderModal(onClose);
     const backdrop = screen.getByRole("presentation");
     await userEvent.click(backdrop);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it("clicking inside dialog content does NOT call onClose", async () => {
@@ -83,11 +83,11 @@ describe("Modal — Close interactions", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("pressing Escape key calls onClose", () => {
+  it("pressing Escape key calls onClose", async () => {
     const onClose = vi.fn();
     renderModal(onClose);
     const backdrop = screen.getByRole("presentation");
     fireEvent.keyDown(backdrop, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });

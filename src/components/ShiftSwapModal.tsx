@@ -3,6 +3,8 @@
 import { useState, useMemo, useCallback } from "react";
 import type { Employee } from "@/types";
 import Modal from "@/components/Modal";
+import { timesOverlap } from "@/lib/schedule-logic";
+import type { TimeRange } from "@/lib/schedule-logic";
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
 
@@ -31,8 +33,8 @@ interface ShiftSwapModalProps {
   employees: Employee[];
   shiftForKey: (empId: string, date: Date) => string | null;
   isRequestableShift: (empId: string, date: Date) => boolean;
-  /** Returns category IDs for an employee's shift on a given date */
-  getShiftCategoryIds: (empId: string, date: Date) => number[];
+  /** Returns time ranges (from shift categories) for an employee's shift on a given date */
+  getShiftTimeRanges: (empId: string, date: Date) => TimeRange[];
   onSubmit: (targetEmpId: string, targetShiftDate: string) => void;
   onClose: () => void;
 }
@@ -47,7 +49,7 @@ export default function ShiftSwapModal({
   employees,
   shiftForKey,
   isRequestableShift,
-  getShiftCategoryIds,
+  getShiftTimeRanges,
   onSubmit,
   onClose,
 }: ShiftSwapModalProps) {
@@ -66,35 +68,41 @@ export default function ShiftSwapModal({
   }, []);
 
   /**
-   * Check if swapping with a target would create a duplicate shift category for either party.
-   * A swap gives requester the target's shift on viewDate and gives target the requester's shift on shiftDate.
+   * Check if swapping with a target would create a time overlap for either party.
+   * Uses shift category start/end times to detect conflicts across focus areas.
    */
-  const hasCategoryConflict = useCallback(
+  const hasTimeConflict = useCallback(
     (targetEmpId: string): boolean => {
-      if (viewDate === shiftDate) return false; // same-day swap replaces, no merge
       const viewDateObj = new Date(viewDate + "T00:00:00");
       const shiftDateObj = new Date(shiftDate + "T00:00:00");
 
-      // Requester side: existing categories on viewDate vs incoming target's categories from viewDate
-      const requesterExisting = getShiftCategoryIds(requesterEmpId, viewDateObj);
-      if (requesterExisting.length > 0) {
-        const incoming = getShiftCategoryIds(targetEmpId, viewDateObj);
-        if (incoming.some((c) => requesterExisting.includes(c))) return true;
+      if (viewDate === shiftDate) {
+        // Same-day swap: block if both shifts cover the same time slot
+        const requesterTimes = getShiftTimeRanges(requesterEmpId, shiftDateObj);
+        const targetTimes = getShiftTimeRanges(targetEmpId, viewDateObj);
+        return timesOverlap(requesterTimes, targetTimes);
       }
 
-      // Target side: existing categories on shiftDate vs incoming requester's categories from shiftDate
-      const targetExisting = getShiftCategoryIds(targetEmpId, shiftDateObj);
+      // Cross-day: requester gets target's shift on viewDate — check vs requester's existing on viewDate
+      const requesterExisting = getShiftTimeRanges(requesterEmpId, viewDateObj);
+      if (requesterExisting.length > 0) {
+        const incoming = getShiftTimeRanges(targetEmpId, viewDateObj);
+        if (timesOverlap(requesterExisting, incoming)) return true;
+      }
+
+      // Target gets requester's shift on shiftDate — check vs target's existing on shiftDate
+      const targetExisting = getShiftTimeRanges(targetEmpId, shiftDateObj);
       if (targetExisting.length > 0) {
-        const incoming = getShiftCategoryIds(requesterEmpId, shiftDateObj);
-        if (incoming.some((c) => targetExisting.includes(c))) return true;
+        const incoming = getShiftTimeRanges(requesterEmpId, shiftDateObj);
+        if (timesOverlap(targetExisting, incoming)) return true;
       }
 
       return false;
     },
-    [viewDate, shiftDate, requesterEmpId, getShiftCategoryIds],
+    [viewDate, shiftDate, requesterEmpId, getShiftTimeRanges],
   );
 
-  /** Employees who have a requestable shift on the viewed date with no category conflicts */
+  /** Employees who have a requestable shift on the viewed date with no time conflicts */
   const eligibleEmployees = useMemo(() => {
     const viewDateObj = new Date(viewDate + "T00:00:00");
     return employees.filter(
@@ -103,9 +111,9 @@ export default function ShiftSwapModal({
         !emp.archivedAt &&
         emp.status === "active" &&
         isRequestableShift(emp.id, viewDateObj) &&
-        !hasCategoryConflict(emp.id),
+        !hasTimeConflict(emp.id),
     );
-  }, [employees, requesterEmpId, viewDate, isRequestableShift, hasCategoryConflict]);
+  }, [employees, requesterEmpId, viewDate, isRequestableShift, hasTimeConflict]);
 
   function handleSelectEmployee(emp: Employee) {
     const dateObj = new Date(viewDate + "T00:00:00");

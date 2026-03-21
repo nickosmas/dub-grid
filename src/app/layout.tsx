@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, DM_Mono } from "next/font/google";
+import { DM_Sans, DM_Mono, Geist } from "next/font/google";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -51,6 +51,10 @@ import AuthProvider from "@/components/AuthProvider";
 import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
 import { Analytics } from "@vercel/analytics/next";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
 
 export default function RootLayout({
   children,
@@ -60,7 +64,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${dmMono.variable}`}
+      className={cn(dmSans.variable, dmMono.variable, "font-sans", geist.variable)}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

@@ -45,7 +45,10 @@ export default function ShiftContextMenu({
       }
     }
     function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
@@ -54,6 +57,15 @@ export default function ShiftContextMenu({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [onClose]);
+
+  // Auto-focus first enabled menu item on mount
+  useEffect(() => {
+    if (!menuRef.current) return;
+    const firstItem = menuRef.current.querySelector<HTMLElement>(
+      'button[role="menuitem"]:not([disabled])'
+    );
+    firstItem?.focus();
+  }, []);
 
   // Adjust position so menu doesn't overflow viewport
   const menuStyle: React.CSSProperties = {
@@ -101,13 +113,37 @@ export default function ShiftContextMenu({
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
-      <div ref={menuRef} style={menuStyle}>
+      <div
+        ref={menuRef}
+        role="menu"
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            e.stopPropagation();
+            const items = Array.from(
+              menuRef.current?.querySelectorAll<HTMLElement>(
+                'button[role="menuitem"]:not([disabled])'
+              ) ?? []
+            );
+            if (items.length === 0) return;
+            const currentIdx = items.indexOf(document.activeElement as HTMLElement);
+            const nextIdx =
+              e.key === "ArrowDown"
+                ? (currentIdx + 1) % items.length
+                : (currentIdx - 1 + items.length) % items.length;
+            items[nextIdx].focus();
+          }
+        }}
+        style={menuStyle}
+      >
         {canEdit && (
           <>
             <button
+              role="menuitem"
+              disabled={!hasShift}
               style={hasShift ? itemStyle : disabledStyle}
               onMouseEnter={(e) => {
-                if (hasShift) e.currentTarget.style.background = "#F1F5F9";
+                if (hasShift) e.currentTarget.style.background = "var(--color-surface-overlay)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "none";
@@ -121,9 +157,11 @@ export default function ShiftContextMenu({
               Copy Shift
             </button>
             <button
+              role="menuitem"
+              disabled={!hasClipboard}
               style={hasClipboard ? itemStyle : disabledStyle}
               onMouseEnter={(e) => {
-                if (hasClipboard) e.currentTarget.style.background = "#F1F5F9";
+                if (hasClipboard) e.currentTarget.style.background = "var(--color-surface-overlay)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "none";
@@ -146,9 +184,10 @@ export default function ShiftContextMenu({
                   }}
                 />
                 <button
-                  style={{ ...itemStyle, color: "#DC2626" }}
+                  role="menuitem"
+                  style={{ ...itemStyle, color: "var(--color-danger)" }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#FEF2F2";
+                    e.currentTarget.style.background = "var(--color-danger-bg)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "none";
@@ -178,9 +217,10 @@ export default function ShiftContextMenu({
             )}
             {onMakeAvailable && (
               <button
-                style={{ ...itemStyle, color: "#2563EB" }}
+                role="menuitem"
+                style={{ ...itemStyle, color: "var(--color-link)" }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#EFF6FF";
+                  e.currentTarget.style.background = "var(--color-info-bg)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "none";
@@ -196,9 +236,10 @@ export default function ShiftContextMenu({
             )}
             {onProposeSwap && (
               <button
-                style={{ ...itemStyle, color: "#4F46E5" }}
+                role="menuitem"
+                style={{ ...itemStyle, color: "var(--color-accent-text)" }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#EEF2FF";
+                  e.currentTarget.style.background = "var(--color-accent-bg)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "none";
@@ -229,7 +270,7 @@ export default function ShiftContextMenu({
               style={{
                 padding: "8px 14px",
                 fontSize: 12,
-                color: "#92400E",
+                color: "var(--color-warning-text)",
                 fontStyle: "italic",
               }}
             >

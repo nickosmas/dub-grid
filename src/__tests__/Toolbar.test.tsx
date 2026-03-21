@@ -81,7 +81,7 @@ describe("Toolbar — Tools dropdown", () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
-    expect(screen.getByRole("button", { name: /Print/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Print/i })).toBeInTheDocument();
   });
 
   it("Print calls onPrintOpen when clicked from Tools dropdown", async () => {
@@ -89,7 +89,7 @@ describe("Toolbar — Tools dropdown", () => {
     const onPrintOpen = vi.fn();
     render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
-    await user.click(screen.getByRole("button", { name: /Print/i }));
+    await user.click(screen.getByRole("menuitem", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
   });
 });

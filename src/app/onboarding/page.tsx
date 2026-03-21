@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { DubGridLogo } from "@/components/Logo";
+import { supabase } from "@/lib/supabase";
 
 export default function OnboardingPage() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
   const router = useRouter();
-  
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (isAuthLoading) return;
 
@@ -19,6 +22,31 @@ export default function OnboardingPage() {
       router.replace("/login");
     }
   }, [user, isAuthLoading, router]);
+
+  // Auto-poll for org assignment every 15s
+  useEffect(() => {
+    if (!user) return;
+    pollRef.current = setInterval(async () => {
+      setChecking(true);
+      try {
+        const { data } = await supabase
+          .from("organization_memberships")
+          .select("org_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data?.org_id) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // silently retry next interval
+      } finally {
+        setChecking(false);
+      }
+    }, 15000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [user]);
 
   if (isAuthLoading || loading) {
     return (
@@ -77,7 +105,7 @@ export default function OnboardingPage() {
             fontSize: "28px",
             fontWeight: 800,
             marginBottom: "16px",
-            color: "#0F172A",
+            color: "var(--color-text-primary)",
             letterSpacing: "-0.03em",
           }}
         >
@@ -87,7 +115,7 @@ export default function OnboardingPage() {
         <p
           style={{
             fontSize: "16px",
-            color:"#475569",
+            color:"var(--color-text-muted)",
             lineHeight: 1.6,
             marginBottom: "40px",
           }}
@@ -103,7 +131,7 @@ export default function OnboardingPage() {
             style={{
               width: "100%",
               padding: "14px",
-              background: "#1B3A2D",
+              background: "var(--color-brand)",
               color: "#fff",
               border: "none",
               borderRadius: "12px",
@@ -114,7 +142,7 @@ export default function OnboardingPage() {
               boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
             }}
           >
-            I've been invited — refresh
+            {checking ? "Checking..." : "I've been invited — refresh"}
           </button>
           
           <button
@@ -122,8 +150,8 @@ export default function OnboardingPage() {
             style={{
               width: "100%",
               padding: "14px",
-              background: "#F1F5F9",
-              color: "#475569",
+              background: "var(--color-surface-overlay)",
+              color: "var(--color-text-muted)",
               border: "none",
               borderRadius: "12px",
               fontSize: "15px",
@@ -136,10 +164,10 @@ export default function OnboardingPage() {
           </button>
         </div>
         
-        <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid #F1F5F9" }}>
-          <p style={{ fontSize: "14px", color:"#64748B" }}>
+        <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid var(--color-surface-overlay)" }}>
+          <p style={{ fontSize: "14px", color:"var(--color-text-subtle)" }}>
             Setting up a new facility? <br />
-            <span style={{ color: "#2563EB", fontWeight: 600, cursor: "pointer" }}>Contact sales</span>
+            <a href="mailto:support@dubgrid.com" style={{ color: "var(--color-link)", fontWeight: 600, textDecoration: "none" }}>Contact us</a>
           </p>
         </div>
       </div>

@@ -241,7 +241,7 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
         >
           <button
             onClick={addRow}
-            className="dg-btn"
+            className="dg-btn dg-btn-ghost"
             style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

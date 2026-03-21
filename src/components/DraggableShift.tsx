@@ -37,13 +37,17 @@ export default function DraggableShift({
     <div
       ref={setNodeRef}
       {...(disabled ? {} : { ...attributes, ...listeners })}
+      aria-roledescription="draggable shift"
+      aria-label={data.label}
       style={{
         position: "absolute",
         top: 0,
         right: 0,
         bottom: 0,
         left: 0,
-        opacity: isDragging ? 0.3 : 1,
+        opacity: isDragging ? 0.4 : 1,
+        transform: isDragging ? "scale(0.95)" : "none",
+        transition: "opacity 150ms ease, transform 150ms ease",
         cursor: disabled ? undefined : "grab",
       }}
     >

@@ -50,7 +50,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
     <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
       <span
         style={{
-          fontSize: 11,
+          fontSize: "var(--dg-fs-footnote)",
           fontWeight: 600,
           color: "var(--color-text-faint)",
           marginRight: 8,
@@ -69,7 +69,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             background: "#22C55E",
           }}
         />
-        {onlineUsers.length} online
+        <span role="status">{onlineUsers.length} online</span>
       </span>
 
       {visible.map((user, i) => (
@@ -80,6 +80,8 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             const rect = e.currentTarget.getBoundingClientRect();
             setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
           }}
+          role="img"
+          aria-label={user.userName}
           onMouseLeave={() => {
             setHoveredUser(null);
             setTooltipPos(null);
@@ -93,7 +95,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 11,
+            fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
             color: "#fff",
             flexShrink: 0,
@@ -129,7 +131,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 10,
+            fontSize: "var(--dg-fs-badge)",
             fontWeight: 700,
             color: "var(--color-text-muted)",
             flexShrink: 0,
@@ -155,7 +157,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             boxShadow:
               "0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)",
             zIndex: 1000,
-            fontSize: 12,
+            fontSize: "var(--dg-fs-caption)",
             fontWeight: 600,
             color: "var(--color-text)",
             whiteSpace: "nowrap",

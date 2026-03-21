@@ -101,20 +101,6 @@ function SidebarLink({
         position: "relative",
       }}
     >
-      {active && (
-        <span
-          style={{
-            position: "absolute",
-            left: 0,
-            top: "20%",
-            height: "60%",
-            width: 3,
-            borderRadius: "0 2px 2px 0",
-            background: "var(--color-accent-gradient)",
-            boxShadow: "0 0 8px rgba(56, 189, 248, 0.4)",
-          }}
-        />
-      )}
       <span
         style={{
           color: active
@@ -213,6 +199,7 @@ function MembersSection({
   roleLabel,
   orgId,
   orgName,
+  onDetailPanelChange,
 }: {
   employees: Employee[];
   benchedEmployees: Employee[];
@@ -231,6 +218,7 @@ function MembersSection({
   roleLabel: string;
   orgId?: string;
   orgName?: string;
+  onDetailPanelChange?: (isOpen: boolean) => void;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -242,6 +230,11 @@ function MembersSection({
   const [pendingOrder, setPendingOrder] = useState<Employee[] | null>(null);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  // Notify parent when detail panel opens/closes
+  useEffect(() => {
+    onDetailPanelChange?.(!!expandedEmpId);
+  }, [!!expandedEmpId, onDetailPanelChange]);
 
   // Invitation state
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
@@ -455,8 +448,17 @@ function MembersSection({
   const unlinkedCount = unlinkedActive.length;
   const unlinkedNoEmail = unlinkedActive.filter((e) => !e.email).length;
 
+  // Find the currently selected employee for the detail panel
+  const selectedEmployee = expandedEmpId
+    ? [...employees, ...benchedEmployees, ...terminatedEmployees].find((e) => e.id === expandedEmpId)
+    : null;
+
+  // Detect desktop (≥1024px) for inline split vs overlay
+  const isDesktop = !isMobile && !isTablet;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+    <div className="staff-master-detail">
+      <div className="staff-list-pane">
       {/* Unlinked accounts banner */}
       {canManageEmployees && unlinkedCount > 0 && (
         <div
@@ -589,10 +591,8 @@ function MembersSection({
           {(searchQuery || filterFocusArea || filterRole) && (
             <button
               onClick={() => { setSearchQuery(""); setFilterFocusArea(null); setFilterRole(null); }}
-              style={{
-                background: "none", border: "none", color: "var(--color-today-text)", fontSize: 12,
-                fontWeight: 600, cursor: "pointer", padding: "4px 8px", whiteSpace: "nowrap",
-              }}
+              className="dg-btn dg-btn-ghost"
+              style={{ color: "var(--color-today-text)", fontSize: 12, padding: "4px 8px" }}
             >
               Clear
             </button>
@@ -625,8 +625,8 @@ function MembersSection({
           {activeTab === "active" && sortBy === "seniority" && !searchQuery && !filterFocusArea && !filterRole && !isReordering && canManageEmployees && (
             <button
               onClick={handleEnterReorder}
-              className="dg-btn"
-              style={{ padding: "6px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 5, background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
+              className="dg-btn dg-btn-secondary"
+              style={{ padding: "6px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="7 15 12 20 17 15" />
@@ -1054,44 +1054,18 @@ function MembersSection({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "var(--color-text-faint)",
-                    transform: isExpanded ? "rotate(180deg)" : "none",
-                    transition: "transform 0.15s",
+                    color: isExpanded ? "var(--color-today-text)" : "var(--color-text-faint)",
+                    transition: "color 0.15s",
                     userSelect: "none",
                     visibility: isReordering ? "hidden" : "visible",
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 12 15 18 9" />
+                    <polyline points="9 6 15 12 9 18" />
                   </svg>
                 </div>
               </div>
 
-              {isExpanded && (
-                <div
-                  style={{
-                    borderTop: "1px solid var(--color-border-light)",
-                    borderLeft: "4px solid #2563EB",
-                    background: "#FAFBFF",
-                  }}
-                >
-                  <InlineEditEmployee
-                    employee={emp}
-                    focusAreas={focusAreas}
-                    certifications={certifications}
-                    roles={roles}
-                    roleLabel={roleLabel}
-                    focusAreaLabel={focusAreaLabel}
-                    certificationLabel={certificationLabel}
-                    onSave={handleSave}
-                    onDelete={handleDelete}
-                    onBench={(empId, note) => { onBench(empId, note); setExpandedEmpId(null); }}
-                    onActivate={(empId) => { onActivate(empId); setExpandedEmpId(null); }}
-                    onCancel={() => setExpandedEmpId(null)}
-                    onInvite={canManageEmployees && orgId && !pendingInviteByEmployeeId.has(emp.id) ? (e) => { setExpandedEmpId(null); setInviteEmployee(e); } : undefined}
-                  />
-                </div>
-              )}
             </div>
           );
         })}
@@ -1114,7 +1088,7 @@ function MembersSection({
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="dg-btn"
+                className="dg-btn dg-btn-secondary"
                 style={{ padding: "5px 12px", fontSize: 12, opacity: page === 1 ? 0.4 : 1 }}
               >
                 Previous
@@ -1122,7 +1096,7 @@ function MembersSection({
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="dg-btn"
+                className="dg-btn dg-btn-secondary"
                 style={{ padding: "5px 12px", fontSize: 12, opacity: page === totalPages ? 0.4 : 1 }}
               >
                 Next
@@ -1192,6 +1166,91 @@ function MembersSection({
             refreshInvitations();
           }}
         />
+      )}
+      </div>
+
+      {/* Detail panel */}
+      {selectedEmployee && (
+        <>
+          {!isDesktop && (
+            <div className="staff-detail-overlay" onClick={() => setExpandedEmpId(null)} />
+          )}
+          <div className="staff-detail-pane" key={selectedEmployee.id}>
+            {/* Panel header */}
+            <div className="staff-detail-header">
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: `hsl(${hashCode(selectedEmployee.id) % 360}, 70%, 92%)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  color: `hsl(${hashCode(selectedEmployee.id) % 360}, 70%, 35%)`,
+                  flexShrink: 0,
+                  border: `1.5px solid hsl(${hashCode(selectedEmployee.id) % 360}, 70%, 82%)`,
+                }}
+              >
+                {getInitials(getEmployeeDisplayName(selectedEmployee))}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>
+                    {getEmployeeDisplayName(selectedEmployee)}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    background: selectedEmployee.status === "active" ? "#DCFCE7" : selectedEmployee.status === "benched" ? "#FEF3C7" : "#FEE2E2",
+                    color: selectedEmployee.status === "active" ? "#166534" : selectedEmployee.status === "benched" ? "#92400E" : "#991B1B",
+                    textTransform: "capitalize",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {selectedEmployee.status}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                  {selectedEmployee.email && <span>{selectedEmployee.email}</span>}
+                  {selectedEmployee.email && selectedEmployee.phone && <span style={{ color: "var(--color-border)" }}>·</span>}
+                  {selectedEmployee.phone && <span>{selectedEmployee.phone}</span>}
+                </div>
+              </div>
+              <button
+                className="staff-detail-close"
+                onClick={() => setExpandedEmpId(null)}
+                aria-label="Close detail panel"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Edit form */}
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <InlineEditEmployee
+                employee={selectedEmployee}
+                focusAreas={focusAreas}
+                certifications={certifications}
+                roles={roles}
+                roleLabel={roleLabel}
+                focusAreaLabel={focusAreaLabel}
+                certificationLabel={certificationLabel}
+                onSave={handleSave}
+                onDelete={handleDelete}
+                onBench={(empId, note) => { onBench(empId, note); setExpandedEmpId(null); }}
+                onActivate={(empId) => { onActivate(empId); setExpandedEmpId(null); }}
+                onCancel={() => setExpandedEmpId(null)}
+                onInvite={canManageEmployees && orgId && !pendingInviteByEmployeeId.has(selectedEmployee.id) ? (e) => { setExpandedEmpId(null); setInviteEmployee(e); } : undefined}
+              />
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1537,14 +1596,14 @@ function RecurringScheduleSection({
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={handleSaveDraft}
-              className="dg-btn"
+              className="dg-btn dg-btn-secondary"
               style={{ padding: "6px 14px", fontSize: 12 }}
             >
               Save Draft
             </button>
             <button
               onClick={handleDiscardDraft}
-              className="dg-btn"
+              className="dg-btn dg-btn-ghost"
               style={{ padding: "6px 14px", fontSize: 12, color: "#DC2626" }}
             >
               Discard
@@ -2106,6 +2165,21 @@ export default function StaffView({
   const getCertValues = useCallback((emp: Employee) => emp.certificationId != null ? [emp.certificationId] : [], []);
   const getRoleValues = useCallback((emp: Employee) => emp.roleIds, []);
 
+  // Track whether the detail panel is open (for sidebar collapse)
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [userCollapsed, setUserCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dg-sidebar-collapsed-staff") === "true";
+  });
+  const toggleSidebar = useCallback(() => {
+    setUserCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("dg-sidebar-collapsed-staff", String(next));
+      return next;
+    });
+  }, []);
+  const sidebarCollapsed = userCollapsed || (detailOpen && !isMobile && !isTablet);
+
   // Register sub-nav items for the mobile bottom sheet
   const subNavItems: SubNavItem[] = useMemo(
     () =>
@@ -2122,10 +2196,20 @@ export default function StaffView({
   useSetMobileSubNav(subNavItems);
 
   return (
-    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden", position: "relative" }}>
+      {/* Expand button (shown when sidebar is collapsed) */}
+      {sidebarCollapsed && !isMobile && (
+        <button className="dg-sidebar-expand" onClick={toggleSidebar} title="Expand sidebar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      )}
+
       {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
       {isMobile ? null : (
         <aside
+          className={`dg-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
           style={{
             width: isTablet ? 180 : 240,
             flexShrink: 0,
@@ -2136,9 +2220,15 @@ export default function StaffView({
             flexDirection: "column",
             padding: isTablet ? "20px 8px" : "24px 12px",
             gap: 4,
-            overflowY: "auto",
           }}
         >
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <button className="dg-sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          </div>
           {links.map((link) => (
             <SidebarLink
               key={link.id}
@@ -2172,6 +2262,7 @@ export default function StaffView({
             roleLabel={roleLabel}
             orgId={orgId}
             orgName={orgName}
+            onDetailPanelChange={setDetailOpen}
           />
         )}
 

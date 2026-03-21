@@ -134,8 +134,8 @@ export default function EditEmployeePanel({
     <div style={{ padding: isMobile ? "16px 16px" : "20px 24px" }}>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          display: "flex",
+          flexDirection: "column",
           gap: 24,
           ...(readOnly ? { opacity: 0.6, pointerEvents: "none" } : {}),
         }}
@@ -315,14 +315,14 @@ export default function EditEmployeePanel({
         style={{
           marginTop: 24,
           paddingTop: 16,
-          borderTop: "1px solid var(--color-border)",
+          borderTop: "1px solid var(--color-border-light)",
           display: "flex",
           flexDirection: "column",
           gap: 12,
         }}
       >
         {isActive && showBenchConfirm ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEF3C7", padding: "12px 16px", borderRadius: 8, width: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEF3C7", padding: "12px 16px", borderRadius: 10, width: "100%" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
               Bench {getEmployeeDisplayName(form)}? They will be removed from the schedule but their data will be preserved.
             </span>
@@ -350,7 +350,7 @@ export default function EditEmployeePanel({
             </div>
           </div>
         ) : employee.status !== "terminated" && showDeleteConfirm ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEE2E2", padding: "12px 16px", borderRadius: 8, width: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#FEE2E2", padding: "12px 16px", borderRadius: 10, width: "100%" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#991B1B" }}>
               Terminate {getEmployeeDisplayName(form)}? They will be permanently removed from the schedule and staff list. Historical shift data will be preserved.
             </span>
@@ -371,83 +371,92 @@ export default function EditEmployeePanel({
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", gap: isMobile ? 8 : 12, alignItems: "center", flexWrap: "wrap" }}>
-            {canEdit && (
-              <>
-                <button
-                  onClick={handleSave}
-                  disabled={
-                    !isModified || !form.firstName.trim() || form.focusAreaIds.length === 0
-                  }
-                  className="dg-btn dg-btn-primary"
-                  style={{ minWidth: 120 }}
-                >
-                  Save Changes
-                </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Primary actions */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {canEdit && (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={
+                      !isModified || !form.firstName.trim() || form.focusAreaIds.length === 0
+                    }
+                    className="dg-btn dg-btn-primary"
+                    style={{ flex: 1 }}
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={onCancel}
+                    className="dg-btn dg-btn-secondary"
+                    style={{ flex: 1 }}
+                  >
+                    {isModified ? "Discard Changes" : "Cancel"}
+                  </button>
+                </>
+              )}
+              {!canEdit && (
                 <button
                   onClick={onCancel}
                   className="dg-btn dg-btn-secondary"
+                  style={{ flex: 1 }}
                 >
-                  Discard Changes
+                  Close
                 </button>
-              </>
-            )}
-            {!canEdit && (
-              <button
-                onClick={onCancel}
-                className="dg-btn dg-btn-secondary"
-              >
-                Close
-              </button>
-            )}
-            <div style={{ flex: 1 }} />
-            {(employee.status === "benched" || employee.status === "terminated") && (
-              <button
-                onClick={() => onActivate(employee.id)}
-                className="dg-btn dg-btn-ghost"
-                style={{ color: "#059669", border: "1px solid #D1FAE5" }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Activate
-              </button>
-            )}
-            {onInvite && employee.email && !employee.userId && (
-              <button
-                onClick={() => onInvite(employee)}
-                className="dg-btn dg-btn-ghost"
-                style={{ color: "#2563EB", border: "1px solid #BFDBFE" }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
-                </svg>
-                Invite
-              </button>
-            )}
-            {isActive && (
-              <button
-                onClick={() => setShowBenchConfirm(true)}
-                className="dg-btn dg-btn-ghost"
-                style={{ color: "#D97706", border: "1px solid #FDE68A" }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                Bench
-              </button>
-            )}
-            {employee.status !== "terminated" && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="dg-btn dg-btn-ghost"
-                style={{ color: "var(--color-error)", border: "1px solid #FEE2E2" }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
-                Terminate
-              </button>
+              )}
+            </div>
+            {/* Secondary actions */}
+            {canEdit && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {(employee.status === "benched" || employee.status === "terminated") && (
+                  <button
+                    onClick={() => onActivate(employee.id)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ color: "#059669", border: "1px solid #D1FAE5", fontSize: 12, padding: "5px 10px" }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Activate
+                  </button>
+                )}
+                {onInvite && employee.email && !employee.userId && (
+                  <button
+                    onClick={() => onInvite(employee)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ color: "#2563EB", border: "1px solid #BFDBFE", fontSize: 12, padding: "5px 10px" }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    Invite
+                  </button>
+                )}
+                {isActive && (
+                  <button
+                    onClick={() => setShowBenchConfirm(true)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ color: "#D97706", border: "1px solid #FDE68A", fontSize: 12, padding: "5px 10px" }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    Bench
+                  </button>
+                )}
+                {employee.status !== "terminated" && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ color: "#DC2626", border: "1px solid #FEE2E2", fontSize: 12, padding: "5px 10px" }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                    Terminate
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

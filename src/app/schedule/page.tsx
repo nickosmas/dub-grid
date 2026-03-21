@@ -15,7 +15,8 @@ import ShiftSwapModal from "@/components/ShiftSwapModal";
 
 import { AnimatedDubGridLogo } from "@/components/Logo";
 import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName } from "@/lib/utils";
-import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps } from "@/lib/schedule-logic";
+import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, timesOverlap } from "@/lib/schedule-logic";
+import type { TimeRange } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
 import { OptimisticLockError } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
@@ -590,18 +591,32 @@ function SchedulerContent() {
     [shifts],
   );
 
-  /** Returns the set of category IDs for an employee's shift on a given date. */
-  const getShiftCategoryIds = useCallback(
-    (empId: string, date: Date): number[] => {
-      const codeIds = shifts[`${empId}_${formatDateKey(date)}`]?.shiftCodeIds ?? [];
-      const cats: number[] = [];
-      for (const id of codeIds) {
-        const sc = shiftCodes.find(c => c.id === id);
-        if (sc?.categoryId != null) cats.push(sc.categoryId);
+  /** Returns time ranges for an employee's shift. Prefers custom times, falls back to category times. */
+  const getShiftTimeRanges = useCallback(
+    (empId: string, date: Date): { start: string; end: string }[] => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry || entry.shiftCodeIds.length === 0) return [];
+      const startParts = entry.customStartTime?.split("|") ?? [];
+      const endParts = entry.customEndTime?.split("|") ?? [];
+      const ranges: { start: string; end: string }[] = [];
+      for (let i = 0; i < entry.shiftCodeIds.length; i++) {
+        const customStart = startParts[i] || null;
+        const customEnd = endParts[i] || null;
+        if (customStart && customEnd) {
+          ranges.push({ start: customStart, end: customEnd });
+          continue;
+        }
+        const sc = shiftCodes.find(c => c.id === entry.shiftCodeIds[i]);
+        if (sc?.categoryId != null) {
+          const cat = shiftCategories.find(c => c.id === sc.categoryId);
+          if (cat?.startTime && cat?.endTime) {
+            ranges.push({ start: cat.startTime, end: cat.endTime });
+          }
+        }
       }
-      return cats;
+      return ranges;
     },
-    [shifts, shiftCodes],
+    [shifts, shiftCodes, shiftCategories],
   );
 
   // ── Coverage gaps ──────────────────────────────────────────────────────────
@@ -1956,8 +1971,24 @@ function SchedulerContent() {
       {/* ── Shift Request Board (slide-out panel) ── */}
       {showRequestBoard && (
         <ShiftRequestBoard
-          requests={shiftRequests.requests}
-          openPickups={shiftRequests.openPickups}
+          openPickups={shiftRequests.openPickups.filter(req => {
+            if (!currentEmpId) return true;
+            const dateObj = new Date(req.requesterShiftDate + "T00:00:00");
+            const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
+            if (myRanges.length === 0) return true;
+            const pickupRanges: TimeRange[] = [];
+            for (const codeId of req.requesterShiftCodeIds) {
+              const sc = shiftCodes.find(c => c.id === codeId);
+              if (sc?.categoryId != null) {
+                const cat = shiftCategories.find(c => c.id === sc.categoryId);
+                if (cat?.startTime && cat?.endTime) {
+                  pickupRanges.push({ start: cat.startTime, end: cat.endTime });
+                }
+              }
+            }
+            if (pickupRanges.length === 0) return true;
+            return !timesOverlap(myRanges, pickupRanges);
+          })}
           myRequests={shiftRequests.myRequests}
           pendingApproval={shiftRequests.pendingApproval}
           loading={shiftRequests.loading}
@@ -1992,7 +2023,7 @@ function SchedulerContent() {
           employees={employees}
           shiftForKey={shiftForKey}
           isRequestableShift={isRequestableShift}
-          getShiftCategoryIds={getShiftCategoryIds}
+          getShiftTimeRanges={getShiftTimeRanges}
           onSubmit={(targetEmpId, targetShiftDate) => {
             shiftRequests.create('swap', swapModalState.empId, swapModalState.shiftDate, targetEmpId, targetShiftDate);
             setSwapModalState(null);

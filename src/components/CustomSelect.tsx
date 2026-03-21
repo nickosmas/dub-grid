@@ -16,7 +16,7 @@ interface CustomSelectProps<T extends string | number> {
   /** Extra style on the trigger button */
   style?: React.CSSProperties;
   /** Font size override (default 13) */
-  fontSize?: number;
+  fontSize?: number | string;
 }
 
 export default function CustomSelect<T extends string | number>({
@@ -29,6 +29,7 @@ export default function CustomSelect<T extends string | number>({
 }: CustomSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   useEffect(() => { setMounted(true); }, []);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -54,6 +55,11 @@ export default function CustomSelect<T extends string | number>({
     }
   }, [open]);
 
+  // Reset focusedIndex when dropdown closes
+  useEffect(() => {
+    if (!open) setFocusedIndex(-1);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -73,7 +79,21 @@ export default function CustomSelect<T extends string | number>({
     <div ref={ref} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
       <button
         type="button"
+        aria-expanded={open}
+        aria-haspopup="listbox"
         onClick={() => !disabled && setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setFocusedIndex(0);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+            setFocusedIndex(options.length - 1);
+          }
+        }}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -124,6 +144,26 @@ export default function CustomSelect<T extends string | number>({
   const menu = open && mounted && !disabled ? createPortal(
     <div
       ref={menuRef}
+      role="listbox"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setFocusedIndex((i) => (i + 1) % options.length);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setFocusedIndex((i) => (i - 1 + options.length) % options.length);
+        } else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (focusedIndex >= 0 && focusedIndex < options.length) {
+            onChange(options[focusedIndex].value);
+            setOpen(false);
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setOpen(false);
+        }
+      }}
       style={{
         ...menuStyle,
         background: "#fff",
@@ -135,12 +175,15 @@ export default function CustomSelect<T extends string | number>({
         padding: "4px 0",
       }}
     >
-      {options.map((opt) => {
+      {options.map((opt, idx) => {
         const isActive = opt.value === value;
+        const isFocused = idx === focusedIndex;
         return (
           <button
             key={String(opt.value)}
             type="button"
+            role="option"
+            aria-selected={isActive}
             onClick={() => { onChange(opt.value); setOpen(false); }}
             style={{
               display: "block",
@@ -151,7 +194,7 @@ export default function CustomSelect<T extends string | number>({
               fontSize,
               fontWeight: isActive ? 700 : 500,
               color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              background: isActive ? "var(--color-border-light)" : "transparent",
+              background: isFocused ? "var(--color-surface-overlay)" : isActive ? "var(--color-border-light)" : "transparent",
               border: "none",
               borderRadius: 7,
               cursor: "pointer",
@@ -161,10 +204,11 @@ export default function CustomSelect<T extends string | number>({
               transition: "background 100ms ease",
             }}
             onMouseEnter={(e) => {
+              setFocusedIndex(idx);
               if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--color-surface-overlay)";
             }}
             onMouseLeave={(e) => {
-              if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
+              if (!isFocused && !isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
             }}
           >
             {opt.label}

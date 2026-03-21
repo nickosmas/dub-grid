@@ -1,4 +1,4 @@
-const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const SHIFTS = [
   { label: "A", color: "#DBEAFE", text: "#1E40AF", border: "#BFDBFE" },
@@ -11,25 +11,25 @@ const ENTRIES = [
     name: "Sarah Mitchell",
     initials: "SM",
     hue: 210,
-    shift: 0,
-    frequency: "Weekly",
-    days: [true, true, true, true, true, false, false],
+    cert: "CSN III",
+    // A shifts Mon-Fri, off Sat-Sun
+    days: [null, 0, 0, 0, 0, 0, null],
   },
   {
     name: "James Cooper",
     initials: "JC",
     hue: 150,
-    shift: 1,
-    frequency: "Biweekly",
-    days: [true, false, true, false, true, true, false],
+    cert: "CSN II",
+    // B shifts Mon/Wed/Fri/Sat, off others
+    days: [null, 1, null, 1, null, 1, 1],
   },
   {
     name: "Maria Santos",
     initials: "MS",
     hue: 30,
-    shift: 2,
-    frequency: "Daily",
-    days: [true, true, true, true, true, true, true],
+    cert: "JLCSN",
+    // P shifts Mon-Sat, off Sun
+    days: [null, 2, 2, 2, 2, 2, null],
   },
 ];
 
@@ -46,153 +46,166 @@ export default function RecurringShiftsMockup() {
         margin: "0 auto",
       }}
     >
-      {/* Header */}
-      <div
-        className="hidden sm:grid"
-        style={{
-          gridTemplateColumns: "1.4fr 0.5fr 0.6fr 1fr",
-          padding: "12px 24px",
-          background: "#FAFBFC",
-          borderBottom: "1px solid #E2E8F0",
-        }}
-      >
-        {["Employee", "Shift", "Frequency", "Days"].map((col) => (
-          <span
-            key={col}
+      <div style={{ overflowX: "auto" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "200px repeat(7, minmax(0, 1fr))",
+            minWidth: 520,
+          }}
+        >
+          {/* ── Header row ── */}
+          <div
             style={{
-              fontSize: 11,
+              background: "#FAFBFC",
+              padding: "10px 14px",
+              borderBottom: "1px solid #E2E8F0",
+              borderRight: "1px solid #E2E8F0",
+              fontSize: 10,
               fontWeight: 700,
               color: "#64748B",
-              letterSpacing: "0.06em",
-            }}
-          >
-            {col}
-          </span>
-        ))}
-      </div>
-
-      {/* Rows */}
-      {ENTRIES.map((entry, idx) => {
-        const shift = SHIFTS[entry.shift];
-        return (
-          <div
-            key={entry.name}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.4fr 0.5fr 0.6fr 1fr",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              display: "flex",
               alignItems: "center",
-              padding: "14px 24px",
-              borderTop: idx > 0 ? "1px solid #E2E8F0" : undefined,
             }}
           >
-            {/* Name + avatar */}
+            Staff
+          </div>
+          {DAY_LABELS.map((day) => (
             <div
+              key={day}
               style={{
+                background: "#FAFBFC",
+                padding: "10px 0",
+                borderBottom: "1px solid #E2E8F0",
+                borderLeft: "1px solid #E2E8F0",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#94A3B8",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase" as const,
+                textAlign: "center",
+              }}
+            >
+              {day}
+            </div>
+          ))}
+
+          {/* ── Employee rows ── */}
+          {ENTRIES.map((entry, rowIdx) => [
+            /* Name cell */
+            <div
+              key={`name-${entry.name}`}
+              style={{
+                padding: "10px 14px",
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
+                borderTop: rowIdx > 0 ? "1px solid #E2E8F0" : undefined,
+                borderRight: "1px solid #E2E8F0",
                 minWidth: 0,
               }}
             >
               <div
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: 800,
                   background: `hsl(${entry.hue}, 70%, 92%)`,
                   color: `hsl(${entry.hue}, 70%, 35%)`,
                   border: `1px solid hsl(${entry.hue}, 70%, 85%)`,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
                   flexShrink: 0,
                 }}
               >
                 {entry.initials}
               </div>
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#1E293B",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {entry.name}
-              </span>
-            </div>
-
-            {/* Shift code pill */}
-            <div>
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 800,
-                  borderRadius: 6,
-                  padding: "4px 12px",
-                  background: shift.color,
-                  color: shift.text,
-                  border: `1px solid ${shift.border}`,
-                  display: "inline-block",
-                }}
-              >
-                {shift.label}
-              </span>
-            </div>
-
-            {/* Frequency */}
-            <div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  borderRadius: 10,
-                  padding: "2px 8px",
-                  background: "#F1F5F9",
-                  color: "#475569",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {entry.frequency}
-              </span>
-            </div>
-
-            {/* Days of week */}
-            <div
-              style={{
-                display: "flex",
-                gap: 4,
-              }}
-            >
-              {DAY_LABELS.map((d, di) => (
+              <div style={{ minWidth: 0 }}>
                 <div
-                  key={`${entry.name}-${di}`}
                   style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#1E293B",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {entry.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#64748B",
+                    lineHeight: 1.2,
+                    marginTop: 1,
+                  }}
+                >
+                  {entry.cert}
+                </div>
+              </div>
+            </div>,
+
+            /* Day cells */
+            ...entry.days.map((shiftIdx, dayI) => {
+              const shift = shiftIdx !== null ? SHIFTS[shiftIdx] : null;
+              return (
+                <div
+                  key={`${entry.name}-${dayI}`}
+                  style={{
+                    borderTop: rowIdx > 0 ? "1px solid #E2E8F0" : undefined,
+                    borderLeft: "1px solid #E2E8F0",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: entry.days[di] ? "#1B3A2D" : "#F1F5F9",
-                    color: entry.days[di] ? "#fff" : "#94A3B8",
-                    cursor: "default",
+                    padding: "8px 4px",
+                    background: shift ? "transparent" : "#F8FAFC",
                   }}
                 >
-                  {d}
+                  {shift ? (
+                    <div
+                      style={{
+                        width: "100%",
+                        maxWidth: 64,
+                        height: 32,
+                        background: shift.color,
+                        border: `1px solid ${shift.border}`,
+                        borderRadius: 6,
+                        color: shift.text,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 14,
+                        fontWeight: 800,
+                        lineHeight: 1,
+                        cursor: "default",
+                      }}
+                    >
+                      {shift.label}
+                    </div>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "#CBD5E1",
+                        fontWeight: 500,
+                      }}
+                    >
+                      --
+                    </span>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+              );
+            }),
+          ])}
+        </div>
+      </div>
     </div>
   );
 }

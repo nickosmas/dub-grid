@@ -7,7 +7,6 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ShiftRequestBoardProps {
-  requests: ShiftRequest[];
   openPickups: ShiftRequest[];
   myRequests: ShiftRequest[];
   pendingApproval: ShiftRequest[];
@@ -44,9 +43,9 @@ function timeRemainingLabel(expiresAt: string): string {
 
 const STATUS_COLORS: Record<ShiftRequestStatus, { bg: string; text: string; border: string }> = {
   open: { bg: "#DBEAFE", text: "#1D4ED8", border: "#93C5FD" },
-  pending_approval: { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
+  pending_approval: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", border: "#FCD34D" },
   approved: { bg: "#D1FAE5", text: "#065F46", border: "#6EE7B7" },
-  rejected: { bg: "#FEE2E2", text: "#991B1B", border: "#FCA5A5" },
+  rejected: { bg: "#FEE2E2", text: "var(--color-danger-dark)", border: "var(--color-danger-border)" },
   cancelled: { bg: "#F3F4F6", text: "#6B7280", border: "#D1D5DB" },
   expired: { bg: "#F3F4F6", text: "#6B7280", border: "#D1D5DB" },
 };
@@ -314,7 +313,7 @@ export default function ShiftRequestBoard({
             />
             <div style={{ display: "flex", gap: 6 }}>
               <button
-                className="dg-btn"
+                className="dg-btn dg-btn-danger-filled"
                 onClick={() => {
                   onResolve(req.id, false, rejectNotes[req.id] || undefined);
                   setShowRejectInput((prev) => ({ ...prev, [req.id]: false }));
@@ -328,9 +327,6 @@ export default function ShiftRequestBoard({
                   flex: 1,
                   fontSize: 12,
                   padding: "7px 14px",
-                  background: "#EF4444",
-                  color: "#fff",
-                  border: "none",
                 }}
               >
                 Confirm Reject
@@ -370,8 +366,8 @@ export default function ShiftRequestBoard({
             style={{
               fontSize: 12,
               padding: "7px 14px",
-              border: "1px solid #FCA5A5",
-              color: "#EF4444",
+              border: "1px solid var(--color-danger-border)",
+              color: "var(--color-danger)",
             }}
           >
             Reject
@@ -390,8 +386,8 @@ export default function ShiftRequestBoard({
           style={{
             fontSize: 12,
             padding: "7px 14px",
-            border: "1px solid #FCA5A5",
-            color: "#EF4444",
+            border: "1px solid var(--color-danger-border)",
+            color: "var(--color-danger)",
           }}
         >
           Cancel

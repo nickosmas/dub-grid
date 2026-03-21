@@ -20,6 +20,7 @@ export default function AcceptInvitePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [emailFromUrl, setEmailFromUrl] = useState(false);
 
   // Extract token and email from URL on mount
   useEffect(() => {
@@ -30,7 +31,10 @@ export default function AcceptInvitePage() {
       setState("no-token");
     } else {
       setToken(t);
-      if (emailParam) setEmail(emailParam);
+      if (emailParam) {
+        setEmail(emailParam);
+        setEmailFromUrl(true);
+      }
       setState("form");
     }
   }, []);
@@ -118,7 +122,7 @@ export default function AcceptInvitePage() {
       // 3. Sign out so user re-authenticates with fresh JWT claims.
       // Use global scope to revoke the server-side refresh token too,
       // otherwise the login page will find a stale token in cookies.
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "global" });
 
       setOrgSlug(slug);
       setState("success");
@@ -197,22 +201,26 @@ export default function AcceptInvitePage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                readOnly={!!new URLSearchParams(window.location.search).get("email")}
+                readOnly={emailFromUrl}
                 style={{
                   ...inputStyle,
-                  ...(new URLSearchParams(window.location.search).get("email")
+                  ...(emailFromUrl
                     ? { background: "#F1F5F9", color: "#64748B" }
                     : {}),
                 }}
               />
 
-              <PasswordInput
-                placeholder="Password"
-                value={password}
-                onChange={setPassword}
-                showPassword={showPassword}
-                onToggle={() => setShowPassword(!showPassword)}
-              />
+              <div>
+                <PasswordInput
+                  placeholder="Password"
+                  value={password}
+                  onChange={setPassword}
+                  showPassword={showPassword}
+                  onToggle={() => setShowPassword(!showPassword)}
+                  ariaDescribedBy="password-strength-label"
+                />
+                {password.length > 0 && <PasswordStrength password={password} />}
+              </div>
               <PasswordInput
                 placeholder="Confirm password"
                 value={confirmPassword}
@@ -261,12 +269,14 @@ function PasswordInput({
   onChange,
   showPassword,
   onToggle,
+  ariaDescribedBy,
 }: {
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
   showPassword: boolean;
   onToggle: () => void;
+  ariaDescribedBy?: string;
 }) {
   return (
     <div style={{ position: "relative" }}>
@@ -278,6 +288,7 @@ function PasswordInput({
         onChange={(e) => onChange(e.target.value)}
         required
         minLength={6}
+        aria-describedby={ariaDescribedBy}
         style={{ ...inputStyle, paddingRight: 48 }}
       />
       <button
@@ -378,6 +389,24 @@ function ErrorState({ title, message }: { title: string; message: string }) {
         Go to Login
       </button>
     </>
+  );
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const level = password.length < 8 ? 0 : password.length < 10 ? 1 : /[A-Z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password) ? 3 : /[A-Z]/.test(password) && /[0-9]/.test(password) ? 2 : 1;
+  const labels = ["Too short", "Weak", "Fair", "Strong"];
+  const colors = ["#EF4444", "#F59E0B", "#EAB308", "#22C55E"];
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 4 }} role="meter" aria-label="Password strength" aria-valuenow={level} aria-valuemin={0} aria-valuemax={3}>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= level ? colors[level] : "#E2E8F0", transition: "background 0.2s" }} />
+        ))}
+      </div>
+      <span id="password-strength-label" style={{ fontSize: "var(--dg-fs-caption)", color: colors[level], fontWeight: 500 }}>
+        {labels[level]}
+      </span>
+    </div>
   );
 }
 

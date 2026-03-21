@@ -64,46 +64,20 @@ export default function ImpersonationPanel() {
           value={targetUserId}
           onChange={(e) => setTargetUserId(e.target.value)}
           placeholder="target user uuid"
-          style={{
-            flex: "1 1 280px",
-            padding: "8px 10px",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            fontSize: 13,
-          }}
+          className="dg-input"
+          style={{ flex: "1 1 280px" }}
         />
         <button
+          className="dg-btn dg-btn-primary"
           onClick={start}
           disabled={loading || !targetUserId.trim()}
-          style={{
-            background:
-              targetUserId.trim() && !loading
-                ? "var(--color-accent-gradient)"
-                : "#ccc",
-            border: "none",
-            color: "#fff",
-            borderRadius: 8,
-            padding: "8px 14px",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: targetUserId.trim() && !loading ? "pointer" : "not-allowed",
-          }}
         >
           {loading ? "Starting..." : "Start session"}
         </button>
         <button
+          className="dg-btn dg-btn-secondary"
           onClick={end}
           disabled={loading || !sessionId}
-          style={{
-            background: "#fff",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text-secondary)",
-            borderRadius: 8,
-            padding: "8px 14px",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: sessionId && !loading ? "pointer" : "not-allowed",
-          }}
         >
           End session
         </button>
@@ -118,7 +92,7 @@ export default function ImpersonationPanel() {
         </div>
       )}
 
-      {error && <div style={{ fontSize: 13, color: "#B91C1C" }}>{error}</div>}
+      {error && <div style={{ fontSize: 13, color: "var(--color-danger)" }}>{error}</div>}
     </div>
   );
 }

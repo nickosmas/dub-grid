@@ -155,7 +155,8 @@ export default function GridmasterDashboard({
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
           <thead>
             <tr>
               {["Name", "Slug", "Users", "Employees", "Focus Areas", "Certifications", "Roles", "Timezone"].map((h) => (
@@ -230,6 +231,7 @@ export default function GridmasterDashboard({
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </>
   );

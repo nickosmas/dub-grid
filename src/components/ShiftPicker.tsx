@@ -116,6 +116,8 @@ export default function ShiftPicker({
       <button
         key={s.id}
         onClick={handleToggle}
+        aria-pressed={isActive}
+        aria-label={`${s.label} - ${s.name}`}
         style={{
           background: isActive ? s.color : `${s.color}40`,
           border: `1.5px solid ${isActive ? s.border : s.text}`,
@@ -166,7 +168,7 @@ export default function ShiftPicker({
         <div
           style={{
             fontWeight: 800,
-            fontSize: 12,
+            fontSize: "var(--dg-fs-caption)",
             color: s.text,
             opacity: isActive ? 1 : 0.75,
             transition: "opacity 150ms ease",
@@ -190,7 +192,7 @@ export default function ShiftPicker({
 
         <div
           style={{
-            fontSize: 9,
+            fontSize: "var(--dg-fs-micro)",
             color: "var(--color-text-subtle)",
             marginTop: 1,
           }}
@@ -208,7 +210,7 @@ export default function ShiftPicker({
 
   const sectionHeading: React.CSSProperties = {
     marginBottom: 10,
-    fontSize: 11,
+    fontSize: "var(--dg-fs-footnote)",
     fontWeight: 700,
     color: "var(--color-text-subtle)",
     textTransform: "uppercase",
@@ -219,7 +221,7 @@ export default function ShiftPicker({
   };
 
   const countPill: React.CSSProperties = {
-    fontSize: 10,
+    fontSize: "var(--dg-fs-badge)",
     fontWeight: 600,
     color: "var(--color-text-faint)",
     background: "var(--color-surface-overlay)",
@@ -260,7 +262,7 @@ export default function ShiftPicker({
                   borderBottom: isActive ? "2.5px solid var(--color-primary)" : "2.5px solid transparent",
                   background: isActive ? "var(--color-primary-light, rgba(59,130,246,0.08))" : "none",
                   color: isActive ? "var(--color-primary)" : "var(--color-text-subtle)",
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   fontWeight: isActive ? 700 : 500,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -288,7 +290,7 @@ export default function ShiftPicker({
                 <div style={headingLine} />
               </div>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div role="group" aria-label="Shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {areaShifts.map((s) => renderShiftButton(s))}
             </div>
           </div>
@@ -301,7 +303,7 @@ export default function ShiftPicker({
               <span style={countPill}>{generalNonOffShifts.length}</span>
               <div style={headingLine} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div role="group" aria-label="General shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {generalNonOffShifts.map((s) => renderShiftButton(s))}
             </div>
           </div>
@@ -320,7 +322,7 @@ export default function ShiftPicker({
               <span style={countPill}>{offDayShifts.length}</span>
               <div style={headingLine} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div role="group" aria-label="Off day shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {offDayShifts.map((s) => renderShiftButton(s))}
             </div>
           </div>
@@ -332,7 +334,7 @@ export default function ShiftPicker({
               padding: "24px 16px",
               textAlign: "center",
               color: "var(--color-text-subtle)",
-              fontSize: 13,
+              fontSize: "var(--dg-fs-label)",
             }}
           >
             No shifts available.

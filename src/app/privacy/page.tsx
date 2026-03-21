@@ -40,7 +40,7 @@ export default function PrivacyPolicyPage() {
           Privacy Policy
         </h1>
         <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "#6B7280", marginBottom: "40px" }}>
-          Last updated: March 2025
+          Last updated: March 2026
         </p>
 
         <section style={{ marginBottom: "32px" }}>

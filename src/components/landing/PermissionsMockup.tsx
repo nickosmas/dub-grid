@@ -5,6 +5,20 @@ const PERMISSION_GROUPS = [
       { name: "Edit Shifts", checked: true },
       { name: "Publish Schedule", checked: true },
       { name: "Apply Recurring Schedule", checked: false },
+      { name: "Approve Shift Requests", checked: false },
+    ],
+  },
+  {
+    label: "Notes",
+    items: [
+      { name: "Edit Notes", checked: true },
+    ],
+  },
+  {
+    label: "Recurring Shifts",
+    items: [
+      { name: "Manage Recurring Shifts", checked: false },
+      { name: "Manage Shift Series", checked: false },
     ],
   },
   {
@@ -21,6 +35,7 @@ const PERMISSION_GROUPS = [
       { name: "Manage Shift Codes", checked: true },
       { name: "Manage Indicator Types", checked: false },
       { name: "Manage Custom Labels", checked: false },
+      { name: "Manage Coverage Requirements", checked: false },
     ],
   },
 ];
@@ -56,7 +71,9 @@ export default function PermissionsMockup() {
             lineHeight: 1.4,
           }}
         >
-          Configure which actions this admin can perform.
+          Configure which actions this admin can perform.{" "}
+          <em style={{ fontStyle: "italic" }}>View Schedule</em> is always
+          enabled.
         </div>
 
         {/* Select All / Clear All */}
@@ -89,7 +106,7 @@ export default function PermissionsMockup() {
       </div>
 
       {/* Permission groups */}
-      <div style={{ padding: "8px 24px 20px" }}>
+      <div style={{ padding: "8px 24px 0" }}>
         {PERMISSION_GROUPS.map((group, gi) => (
           <div key={group.label} style={{ marginTop: gi > 0 ? 18 : 10 }}>
             <div
@@ -157,6 +174,45 @@ export default function PermissionsMockup() {
             ))}
           </div>
         ))}
+      </div>
+
+      {/* Save / Cancel buttons */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          justifyContent: "flex-end",
+          padding: "20px 24px",
+          borderTop: "1px solid #E2E8F0",
+          marginTop: 20,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#475569",
+            padding: "8px 16px",
+            borderRadius: 8,
+            background: "#F1F5F9",
+            cursor: "default",
+          }}
+        >
+          Cancel
+        </span>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#fff",
+            padding: "8px 16px",
+            borderRadius: 8,
+            background: "#1B3A2D",
+            cursor: "default",
+          }}
+        >
+          Save Permissions
+        </span>
       </div>
     </div>
   );

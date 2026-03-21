@@ -82,10 +82,10 @@ export default function CoveragePanel({
         }}
       >
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" }}>
             Coverage Overview
           </div>
-          <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
             {gaps.length === 0
               ? "All requirements met"
               : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""} found`}
@@ -93,6 +93,7 @@ export default function CoveragePanel({
         </div>
         <button
           onClick={onClose}
+          aria-label="Close coverage panel"
           style={{
             background: "none",
             border: "none",
@@ -125,7 +126,7 @@ export default function CoveragePanel({
             ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
           ]}
           onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
-          fontSize={12}
+          fontSize="var(--dg-fs-caption)"
           style={{ flex: 1 }}
         />
         <CustomSelect
@@ -135,7 +136,7 @@ export default function CoveragePanel({
             ...shiftCategories.map((cat) => ({ value: String(cat.id), label: cat.name })),
           ]}
           onChange={(val) => setFilterCategory(val === "all" ? "all" : Number(val))}
-          fontSize={12}
+          fontSize="var(--dg-fs-caption)"
           style={{ flex: 1 }}
         />
       </div>
@@ -167,8 +168,8 @@ export default function CoveragePanel({
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>All coverage requirements met</div>
-            <div style={{ fontSize: 12, marginTop: 4 }}>
+            <div style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600 }}>All coverage requirements met</div>
+            <div style={{ fontSize: "var(--dg-fs-caption)", marginTop: 4 }}>
               {gaps.length === 0
                 ? "No gaps detected in the current schedule."
                 : "No gaps match the current filters."}
@@ -188,7 +189,7 @@ export default function CoveragePanel({
                     borderRadius: 6,
                     background: fa?.colorBg ?? "#F1F5F9",
                     color: fa?.colorText ?? "#475569",
-                    fontSize: 11,
+                    fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 700,
                     marginBottom: 8,
                   }}
@@ -213,14 +214,14 @@ export default function CoveragePanel({
                           justifyContent: "space-between",
                         }}
                       >
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                        <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
                           {gap.shiftCategoryName} / {gap.shiftCodeLabel}
                         </span>
-                        <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
                           {formatDate(gap.date)}
                         </span>
                       </div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#DC2626", marginTop: 4 }}>
+                      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "#DC2626", marginTop: 4 }}>
                         {gap.status.actual}/{gap.status.required} staff
                       </div>
                     </div>
