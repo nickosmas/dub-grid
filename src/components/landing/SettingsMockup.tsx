@@ -10,9 +10,9 @@ const COLOR_SWATCHES = [
 ];
 
 const FOCUS_AREAS = [
-  { name: "Wing A", colorIdx: 0, editing: false },
-  { name: "Wing B", colorIdx: 1, editing: true },
-  { name: "Wing C", colorIdx: 2, editing: false },
+  { name: "ICU", colorIdx: 0, editing: false },
+  { name: "ER", colorIdx: 1, editing: true },
+  { name: "Rehab", colorIdx: 2, editing: false },
 ];
 
 function DragHandle() {
@@ -50,11 +50,11 @@ export default function SettingsMockup() {
       {/* ── Custom Labels Section ── */}
       <div
         style={{
-          background: "#0F172A",
-          padding: "10px 20px",
-          fontSize: 13,
+          padding: "14px 20px",
+          borderBottom: "1px solid #E2E8F0",
+          fontSize: 14,
           fontWeight: 700,
-          color: "#fff",
+          color: "#1E293B",
         }}
       >
         Custom Labels
@@ -69,19 +69,19 @@ export default function SettingsMockup() {
         >
           {[
             {
-              label: "Focus Area Label",
-              value: "Wings",
-              placeholder: "e.g. Focus Areas, Departments",
+              label: "Focus Areas Label",
+              value: "Focus Areas",
+              placeholder: "e.g. Focus Areas, Departments, Units",
             },
             {
-              label: "Certification Label",
-              value: "Skill Levels",
-              placeholder: "e.g. Certifications, Levels",
+              label: "Certifications Label",
+              value: "Certifications",
+              placeholder: "e.g. Certifications, Designations",
             },
             {
-              label: "Role Label",
+              label: "Roles Label",
               value: "Roles",
-              placeholder: "e.g. Roles, Positions",
+              placeholder: "e.g. Responsibilities, Positions",
             },
           ].map((field) => (
             <div key={field.label}>
@@ -100,7 +100,7 @@ export default function SettingsMockup() {
               <div
                 style={{
                   fontSize: 13,
-                  padding: "8px 10px",
+                  padding: "8px 11px",
                   border: "1.5px solid #E2E8F0",
                   borderRadius: 8,
                   color: "#1E293B",
@@ -126,15 +126,15 @@ export default function SettingsMockup() {
       {/* ── Focus Areas Section ── */}
       <div
         style={{
-          background: "#0F172A",
-          padding: "10px 20px",
-          fontSize: 13,
+          padding: "14px 20px",
+          borderBottom: "1px solid #E2E8F0",
+          borderTop: "1px solid #E2E8F0",
+          fontSize: 14,
           fontWeight: 700,
-          color: "#fff",
-          borderTop: "1px solid #CBD5E1",
+          color: "#1E293B",
         }}
       >
-        Wings
+        Focus Areas
       </div>
       <div style={{ padding: "16px 20px 20px" }}>
         {FOCUS_AREAS.map((fa, idx) => {

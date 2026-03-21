@@ -138,7 +138,7 @@ function ToolsMenu({
     alignItems: "center",
     gap: 10,
     padding: "9px 14px",
-    fontSize: 13,
+    fontSize: "var(--dg-fs-label)",
     fontWeight: 500,
     color: "var(--color-text)",
     cursor: "pointer",
@@ -153,6 +153,7 @@ function ToolsMenu({
   return createPortal(
     <div
       ref={menuRef}
+      role="menu"
       style={{
         position: "fixed",
         top: pos.top,
@@ -170,6 +171,7 @@ function ToolsMenu({
       {/* Authors toggle */}
       {onAuditToggle && (
         <button
+          role="menuitem"
           style={itemStyle}
           onClick={onAuditToggle}
           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-surface-overlay)")}
@@ -187,6 +189,7 @@ function ToolsMenu({
       {/* Requests */}
       {onRequestsToggle && (
         <button
+          role="menuitem"
           style={itemStyle}
           onClick={() => { onRequestsToggle(); onClose(); }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-surface-overlay)")}
@@ -204,7 +207,7 @@ function ToolsMenu({
               style={{
                 background: "#EF4444",
                 color: "#fff",
-                fontSize: 10,
+                fontSize: "var(--dg-fs-badge)",
                 fontWeight: 700,
                 borderRadius: 10,
                 minWidth: 18,
@@ -225,6 +228,7 @@ function ToolsMenu({
       {/* Print */}
       {onPrintOpen && (
         <button
+          role="menuitem"
           style={itemStyle}
           onClick={() => { onPrintOpen(); onClose(); }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-surface-overlay)")}
@@ -242,6 +246,7 @@ function ToolsMenu({
       {/* Auto Fill Shifts */}
       {canEditShifts && onApplyRecurring && (
         <button
+          role="menuitem"
           style={{
             ...itemStyle,
             opacity: isApplyingRecurring ? 0.6 : 1,
@@ -265,6 +270,7 @@ function ToolsMenu({
       {/* Import Previous Schedule */}
       {canEditShifts && onImportPrevious && (
         <button
+          role="menuitem"
           style={{
             ...itemStyle,
             opacity: isImportingPrevious ? 0.6 : 1,
@@ -342,7 +348,7 @@ export default function Toolbar({
             <button
               className="dg-segment-btn"
               onClick={onPrev}
-              style={{ padding: "7px 10px", fontSize: 15, lineHeight: 1 }}
+              style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
               title="Previous period"
             >
               ‹
@@ -360,7 +366,7 @@ export default function Toolbar({
             >
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
                   color: "var(--color-text-secondary)",
                   whiteSpace: "nowrap",
@@ -373,14 +379,14 @@ export default function Toolbar({
             <button
               className="dg-segment-btn"
               onClick={onToday}
-              style={{ fontSize: 12 }}
+              style={{ fontSize: "var(--dg-fs-caption)" }}
             >
               Today
             </button>
             <button
               className="dg-segment-btn"
               onClick={onNext}
-              style={{ padding: "7px 10px", fontSize: 15, lineHeight: 1 }}
+              style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
               title="Next period"
             >
               ›
@@ -390,11 +396,13 @@ export default function Toolbar({
             value={String(spanWeeks)}
             options={SPAN_OPTIONS}
             onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
-            fontSize={12}
+            fontSize="var(--dg-fs-caption)"
           />
           <button
             ref={toolsBtnRef}
             onClick={toggleTools}
+            aria-expanded={toolsOpen}
+            aria-haspopup="menu"
             className="dg-btn dg-btn-ghost"
             style={{
               border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
@@ -427,7 +435,7 @@ export default function Toolbar({
                   right: -6,
                   background: "#EF4444",
                   color: "#fff",
-                  fontSize: 10,
+                  fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
                   borderRadius: 10,
                   minWidth: 18,
@@ -489,7 +497,7 @@ export default function Toolbar({
                 className="dg-btn-ghost"
                 style={{
                   position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                  padding: "2px 5px", fontSize: 14, lineHeight: 1, borderRadius: 6,
+                  padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 6,
                 }}
                 title="Clear search"
               >
@@ -520,7 +528,7 @@ export default function Toolbar({
         <button
           className="dg-segment-btn"
           onClick={onPrev}
-          style={{ padding: "7px 10px", fontSize: 15, lineHeight: 1 }}
+          style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
           title="Previous period"
         >
           ‹
@@ -536,7 +544,7 @@ export default function Toolbar({
         >
           <span
             style={{
-              fontSize: 13,
+              fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
               color: "var(--color-text-secondary)",
               whiteSpace: "nowrap",
@@ -550,14 +558,14 @@ export default function Toolbar({
         <button
           className="dg-segment-btn"
           onClick={onToday}
-          style={{ fontSize: 12 }}
+          style={{ fontSize: "var(--dg-fs-caption)" }}
         >
           Today
         </button>
         <button
           className="dg-segment-btn"
           onClick={onNext}
-          style={{ padding: "7px 10px", fontSize: 15, lineHeight: 1 }}
+          style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
           title="Next period"
         >
           ›
@@ -613,7 +621,7 @@ export default function Toolbar({
             className="dg-btn-ghost"
             style={{
               position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-              padding: "2px 5px", fontSize: 14, lineHeight: 1, borderRadius: 6,
+              padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 6,
             }}
             title="Clear search"
           >
@@ -651,7 +659,7 @@ export default function Toolbar({
                   right: -6,
                   background: "#EF4444",
                   color: "#fff",
-                  fontSize: 10,
+                  fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
                   borderRadius: 10,
                   minWidth: 18,
@@ -673,6 +681,8 @@ export default function Toolbar({
         <button
           ref={toolsBtnRef}
           onClick={toggleTools}
+          aria-expanded={toolsOpen}
+          aria-haspopup="menu"
           className="dg-btn dg-btn-ghost"
           style={{
             border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
@@ -704,7 +714,7 @@ export default function Toolbar({
                 right: -6,
                 background: "#EF4444",
                 color: "#fff",
-                fontSize: 10,
+                fontSize: "var(--dg-fs-badge)",
                 fontWeight: 700,
                 borderRadius: 10,
                 minWidth: 18,

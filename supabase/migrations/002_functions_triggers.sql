@@ -1269,6 +1269,48 @@ GRANT EXECUTE ON FUNCTION public.get_audit_log(UUID, INTEGER, INTEGER) TO authen
 -- SHIFT REQUESTS: Pickup & Swap Functions
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- ── shift_times_overlap ──────────────────────────────────────────────────────
+-- Returns TRUE if any shift code in set A has a category time window that
+-- overlaps with any shift code in set B. Handles overnight shifts (start > end).
+
+CREATE OR REPLACE FUNCTION public.shift_times_overlap(
+  p_code_ids_a INT8[],
+  p_code_ids_b INT8[]
+) RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.shift_codes sc1
+    JOIN public.shift_categories cat1 ON cat1.id = sc1.category_id
+    CROSS JOIN public.shift_codes sc2
+    JOIN public.shift_categories cat2 ON cat2.id = sc2.category_id
+    WHERE sc1.id = ANY(p_code_ids_a) AND sc2.id = ANY(p_code_ids_b)
+      AND cat1.start_time IS NOT NULL AND cat1.end_time IS NOT NULL
+      AND cat2.start_time IS NOT NULL AND cat2.end_time IS NOT NULL
+      AND (
+        CASE
+          -- Both normal (start < end): standard overlap
+          WHEN cat1.start_time < cat1.end_time AND cat2.start_time < cat2.end_time THEN
+            cat1.start_time < cat2.end_time AND cat2.start_time < cat1.end_time
+          -- cat1 overnight (covers [start1,24:00) + [00:00,end1)), cat2 normal
+          WHEN cat1.start_time >= cat1.end_time AND cat2.start_time < cat2.end_time THEN
+            -- cat2 overlaps [start1, 24:00) OR cat2 overlaps [00:00, end1)
+            (cat2.end_time > cat1.start_time) OR (cat2.start_time < cat1.end_time)
+          -- cat1 normal, cat2 overnight (covers [start2,24:00) + [00:00,end2))
+          WHEN cat1.start_time < cat1.end_time AND cat2.start_time >= cat2.end_time THEN
+            -- cat1 overlaps [start2, 24:00) OR cat1 overlaps [00:00, end2)
+            (cat1.end_time > cat2.start_time) OR (cat1.start_time < cat2.end_time)
+          -- Both overnight: always overlap
+          ELSE TRUE
+        END
+      )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.shift_times_overlap(INT8[], INT8[]) TO authenticated;
+
+
 -- ── create_shift_request ────────────────────────────────────────────────────
 -- Creates a pickup or swap request. Validates shift ownership and snapshots data.
 
@@ -1507,23 +1549,28 @@ BEGIN
   END IF;
 
   -- Check certification requirements
+  -- Handle NULL certification_id: if claimer has no cert, they fail any cert requirement
   IF EXISTS (
     SELECT 1 FROM public.shift_codes sc
     WHERE sc.id = ANY(v_request.requester_shift_code_ids)
       AND array_length(sc.required_certification_ids, 1) IS NOT NULL
-      AND NOT (v_claimer.certification_id = ANY(sc.required_certification_ids))
+      AND (
+        v_claimer.certification_id IS NULL
+        OR NOT (v_claimer.certification_id = ANY(sc.required_certification_ids))
+      )
   ) THEN
     RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
   END IF;
 
-  -- Block if claimer already has a shift on the requested date (PK: one shift per emp per date)
+  -- Block if claimer has a shift on the same date with overlapping time
   IF EXISTS (
-    SELECT 1 FROM public.shifts
-    WHERE emp_id = p_claimer_emp_id
-      AND date = v_request.requester_shift_date
-      AND array_length(published_shift_code_ids, 1) IS NOT NULL
+    SELECT 1 FROM public.shifts s
+    WHERE s.emp_id = p_claimer_emp_id
+      AND s.date = v_request.requester_shift_date
+      AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+      AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
   ) THEN
-    RAISE EXCEPTION 'You already have a shift on this date';
+    RAISE EXCEPTION 'You have a shift with overlapping times on this date';
   END IF;
 
   -- Block if claimer is already involved in another active request on this date
@@ -1707,9 +1754,18 @@ BEGIN
   -- ── APPROVAL: execute the shift reassignment ──
 
   -- Advisory lock on involved shifts to prevent concurrent modifications.
-  -- For swaps, acquire in deterministic order (alphabetical by key) to prevent deadlocks.
+  -- Acquire in deterministic order (alphabetical by key) to prevent deadlocks.
   IF v_request.type = 'pickup' THEN
-    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+    -- Lock both requester and target shifts (UPSERT may merge into target's existing row)
+    IF (v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
+       < (v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
+    THEN
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+    ELSE
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+    END IF;
   ELSIF v_request.type = 'swap' THEN
     IF (v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
        < (v_request.target_emp_id::TEXT || '_' || v_request.target_shift_date::TEXT)
@@ -1749,21 +1805,22 @@ BEGIN
   END IF;
 
   IF v_request.type = 'pickup' THEN
-    -- Re-check at approval: target must not have a shift on this date (PK: one per emp per date)
+    -- Re-check at approval: target must not have an overlapping shift on this date
     IF EXISTS (
-      SELECT 1 FROM public.shifts
-      WHERE emp_id = v_request.target_emp_id
-        AND date = v_request.requester_shift_date
-        AND array_length(published_shift_code_ids, 1) IS NOT NULL
+      SELECT 1 FROM public.shifts s
+      WHERE s.emp_id = v_request.target_emp_id
+        AND s.date = v_request.requester_shift_date
+        AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+        AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
     ) THEN
-      RAISE EXCEPTION 'The target employee now has a shift on this date. Cannot approve.';
+      RAISE EXCEPTION 'The target employee has an overlapping shift on this date. Cannot approve.';
     END IF;
 
     -- Delete requester's shift
     DELETE FROM public.shifts
     WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
 
-    -- Insert as target's shift (goes directly to published)
+    -- Insert as target's shift (merge if target already has a non-overlapping shift on this date)
     INSERT INTO public.shifts (
       emp_id, date, org_id, user_id,
       published_shift_code_ids, draft_shift_code_ids,
@@ -1776,7 +1833,27 @@ BEGIN
       v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
       v_admin_user_id, v_admin_user_id
     FROM public.employees e
-    WHERE e.id = v_request.target_emp_id;
+    WHERE e.id = v_request.target_emp_id
+    ON CONFLICT (emp_id, date) DO UPDATE SET
+      published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
+      custom_start_time = CASE
+        WHEN shifts.custom_start_time IS NOT NULL AND EXCLUDED.custom_start_time IS NOT NULL
+          THEN shifts.custom_start_time || '|' || EXCLUDED.custom_start_time
+        WHEN EXCLUDED.custom_start_time IS NOT NULL THEN EXCLUDED.custom_start_time
+        ELSE shifts.custom_start_time
+      END,
+      custom_end_time = CASE
+        WHEN shifts.custom_end_time IS NOT NULL AND EXCLUDED.custom_end_time IS NOT NULL
+          THEN shifts.custom_end_time || '|' || EXCLUDED.custom_end_time
+        WHEN EXCLUDED.custom_end_time IS NOT NULL THEN EXCLUDED.custom_end_time
+        ELSE shifts.custom_end_time
+      END,
+      focus_area_id = CASE
+        WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
+        ELSE NULL
+      END,
+      updated_by = EXCLUDED.updated_by,
+      updated_at = now();
 
     GET DIAGNOSTICS v_row_count = ROW_COUNT;
     IF v_row_count = 0 THEN
@@ -1793,39 +1870,33 @@ BEGIN
       RAISE EXCEPTION 'The target''s shift has been modified since the request was created. Please ask the employees to resubmit.';
     END IF;
 
-    -- Block if merging would create duplicate shift categories (e.g. two day shifts)
-    -- Only relevant when dates differ (same-day swaps replace, they don't merge)
-    IF v_request.requester_shift_date IS DISTINCT FROM v_request.target_shift_date THEN
-      -- Requester side: check requester's existing shift on target_date vs incoming target codes
+    -- Block if shifts have overlapping time slots (via shift_categories start/end times).
+    -- Applies to both same-day and cross-day swaps.
+
+    -- Same-day: block if requester and target shifts overlap in time (pointless swap)
+    IF v_request.requester_shift_date = v_request.target_shift_date THEN
+      IF public.shift_times_overlap(v_request.requester_shift_code_ids, v_request.target_shift_code_ids) THEN
+        RAISE EXCEPTION 'Cannot approve: shifts have overlapping time slots';
+      END IF;
+    ELSE
+      -- Cross-day: requester's existing shift on target_date vs incoming target codes
       IF EXISTS (
         SELECT 1 FROM public.shifts s
         WHERE s.emp_id = v_request.requester_emp_id AND s.date = v_request.target_shift_date
           AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-          AND EXISTS (
-            SELECT 1 FROM public.shift_codes sc1
-            JOIN public.shift_codes sc2
-              ON sc1.category_id = sc2.category_id AND sc1.category_id IS NOT NULL
-            WHERE sc1.id = ANY(s.published_shift_code_ids)
-              AND sc2.id = ANY(v_request.target_shift_code_ids)
-          )
+          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.target_shift_code_ids)
       ) THEN
-        RAISE EXCEPTION 'Cannot approve: requester would have duplicate shift categories on the target''s date';
+        RAISE EXCEPTION 'Cannot approve: requester would have overlapping shift times on the target''s date';
       END IF;
 
-      -- Target side: check target's existing shift on requester_date vs incoming requester codes
+      -- Cross-day: target's existing shift on requester_date vs incoming requester codes
       IF EXISTS (
         SELECT 1 FROM public.shifts s
         WHERE s.emp_id = v_request.target_emp_id AND s.date = v_request.requester_shift_date
           AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-          AND EXISTS (
-            SELECT 1 FROM public.shift_codes sc1
-            JOIN public.shift_codes sc2
-              ON sc1.category_id = sc2.category_id AND sc1.category_id IS NOT NULL
-            WHERE sc1.id = ANY(s.published_shift_code_ids)
-              AND sc2.id = ANY(v_request.requester_shift_code_ids)
-          )
+          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
       ) THEN
-        RAISE EXCEPTION 'Cannot approve: target would have duplicate shift categories on the requester''s date';
+        RAISE EXCEPTION 'Cannot approve: target would have overlapping shift times on the requester''s date';
       END IF;
     END IF;
 

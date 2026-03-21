@@ -3,6 +3,7 @@ import {
   screen,
   cleanup,
   fireEvent,
+  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
@@ -222,7 +223,7 @@ describe("AddEmployeeModal", () => {
       await userEvent.click(
         screen.getByRole("button", { name: "Close modal" }),
       );
-      expect(onClose).toHaveBeenCalledOnce();
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     });
   });
 

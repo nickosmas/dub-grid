@@ -30,6 +30,7 @@ export default function DroppableCell({
     <div
       ref={setNodeRef}
       {...divProps}
+      aria-label={`Drop zone for ${data.focusAreaName}, ${data.dateKey}`}
       style={{
         ...style,
         ...(isOver && !disabled

@@ -47,6 +47,31 @@ export function getDisqualificationReasons(
   return reasons;
 }
 
+// ── Time Overlap Helpers ──────────────────────────────────────────────────────
+
+export interface TimeRange {
+  start: string;
+  end: string;
+}
+
+/** Checks if two time ranges overlap. Handles overnight shifts where start > end. */
+export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
+  if (a.start > a.end) {
+    return rangesOverlap({ start: a.start, end: "24:00" }, b)
+        || rangesOverlap({ start: "00:00", end: a.end }, b);
+  }
+  if (b.start > b.end) {
+    return rangesOverlap(a, { start: b.start, end: "24:00" })
+        || rangesOverlap(a, { start: "00:00", end: b.end });
+  }
+  return a.start < b.end && b.start < a.end;
+}
+
+/** True if any range in `a` overlaps with any range in `b`. */
+export function timesOverlap(a: TimeRange[], b: TimeRange[]): boolean {
+  return a.some(r1 => b.some(r2 => rangesOverlap(r1, r2)));
+}
+
 export interface Tally {
   [label: string]: number;
 }

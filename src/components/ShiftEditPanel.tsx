@@ -211,7 +211,7 @@ function TimeDropdown({
               onClick={() => { onChange(opt.value); close(); }}
               style={{
                 ...optionStyle,
-                background: opt.value === value ? "#EEF2FF" : "transparent",
+                background: opt.value === value ? "var(--color-accent-bg)" : "transparent",
                 color: opt.value === value ? "#4338CA" : "var(--color-text)",
                 fontWeight: opt.value === value ? 700 : 500,
               }}
@@ -324,7 +324,7 @@ function PillTimeEditor({
       </div>
 
       {hasTimeError && (
-        <div style={{ color: "#DC2626", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
+        <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
           Start time must be before end time
         </div>
       )}
@@ -834,7 +834,13 @@ export default function ShiftEditPanel({
       <div className="dg-panel-overlay" onClick={onClose} />
 
       {/* Slide-over panel */}
-      <div className="dg-panel">
+      <div
+        className="dg-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit shift"
+        onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      >
         {/* Panel Header */}
         <div
           style={{
@@ -978,7 +984,7 @@ export default function ShiftEditPanel({
                   style={{
                     marginBottom: 16,
                     padding: "10px 12px",
-                    background: "#FFFBEB",
+                    background: "var(--color-warning-bg)",
                     border: "1px solid #FCD34D",
                     borderRadius: 8,
                   }}
@@ -987,7 +993,7 @@ export default function ShiftEditPanel({
                     style={{
                       ...sectionLabel,
                       marginBottom: 6,
-                      color: "#92400E",
+                      color: "var(--color-warning-text)",
                     }}
                   >
                     Repeating shift — edit scope
@@ -1017,7 +1023,7 @@ export default function ShiftEditPanel({
                   <div style={sectionLabel}>Repeating</div>
                   <button
                     onClick={() => setShowRepeatForm(true)}
-                    className="dg-btn"
+                    className="dg-btn dg-btn-secondary"
                     style={{
                       width: "100%",
                       display: "flex",
@@ -1091,24 +1097,12 @@ export default function ShiftEditPanel({
                 <div style={{ marginTop: 16 }}>
                   <button
                     onClick={() => setPendingDelete({ type: "all" })}
+                    className="dg-btn dg-btn-danger"
                     style={{
                       width: "100%",
                       fontSize: 12,
                       padding: "9px 12px",
-                      border: "1px solid #FCA5A5",
-                      borderRadius: 8,
-                      background: "#fff",
-                      color: "#EF4444",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      fontFamily: "inherit",
-                      transition: "background 150ms ease",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
                   >
                     <svg
                       width="12"
@@ -1200,7 +1194,7 @@ export default function ShiftEditPanel({
                         padding: "9px 12px",
                         border: "1px solid #93C5FD",
                         borderRadius: 8,
-                        color: "#2563EB",
+                        color: "var(--color-link)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1226,7 +1220,7 @@ export default function ShiftEditPanel({
                         padding: "9px 12px",
                         border: "1px solid #A5B4FC",
                         borderRadius: 8,
-                        color: "#4F46E5",
+                        color: "var(--color-accent-text)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1249,10 +1243,10 @@ export default function ShiftEditPanel({
                   style={{
                     marginTop: 16,
                     padding: "10px 12px",
-                    background: "#FEF3C7",
+                    background: "var(--color-warning-bg)",
                     borderRadius: 8,
                     fontSize: 12,
-                    color: "#92400E",
+                    color: "var(--color-warning-text)",
                     textAlign: "center",
                   }}
                 >
@@ -1339,7 +1333,7 @@ export default function ShiftEditPanel({
             </button>
             <button
               onClick={onClose}
-              className="dg-btn"
+              className="dg-btn dg-btn-primary"
               style={{ flex: 1, fontSize: 12, padding: "9px 12px" }}
             >
               Confirm

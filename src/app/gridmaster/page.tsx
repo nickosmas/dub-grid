@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { usePermissions, useLogout } from "@/hooks";
+import { usePermissions, useLogout, useMediaQuery, MOBILE } from "@/hooks";
 import { DubGridLogo } from "@/components/Logo";
 import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
@@ -75,19 +75,6 @@ function SidebarLink({
         position: "relative",
       }}
     >
-      {active && (
-        <span
-          style={{
-            position: "absolute",
-            left: 0,
-            top: "20%",
-            height: "60%",
-            width: 3,
-            borderRadius: 2,
-            background: "var(--color-accent-gradient)",
-          }}
-        />
-      )}
       <span
         style={{
           color: active ? "var(--color-text-secondary)" : "var(--color-text-muted)",
@@ -217,7 +204,7 @@ function OrgSearchCombobox({
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); } }}
           className="dg-input"
-          style={{ width: 240, fontSize: 13 }}
+          style={{ width: "100%", maxWidth: 280, fontSize: 13 }}
         />
       </div>
 
@@ -315,6 +302,7 @@ function OrgSearchCombobox({
 export default function GridmasterPage() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
   const { signOutLocal } = useLogout();
+  const isMobile = useMediaQuery(MOBILE);
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [stats, setStats] = useState<Map<string, TenantStats>>(new Map());
@@ -324,6 +312,18 @@ export default function GridmasterPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<GridmasterView>("dashboard");
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dg-sidebar-collapsed-gridmaster") === "true";
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("dg-sidebar-collapsed-gridmaster", String(next));
+      return next;
+    });
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -410,31 +410,33 @@ export default function GridmasterPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 20px",
+          padding: isMobile ? "0 12px" : "0 20px",
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexShrink: 0 }}>
           <DubGridLogo size={28} />
           <span style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-primary)" }}>
             Gridmaster
           </span>
-          <span
-            style={{
-              fontSize: "var(--dg-fs-badge)",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "#fff",
-              background: "var(--color-text-primary)",
-              padding: "2px 8px",
-              borderRadius: 4,
-            }}
-          >
-            Command Center
-          </span>
+          {!isMobile && (
+            <span
+              style={{
+                fontSize: "var(--dg-fs-badge)",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "#fff",
+                background: "var(--color-text-primary)",
+                padding: "2px 8px",
+                borderRadius: 4,
+              }}
+            >
+              Command Center
+            </span>
+          )}
         </div>
-        <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
+        <div style={{ flex: 1, display: "flex", justifyContent: isMobile ? "flex-end" : "center", marginLeft: isMobile ? 8 : 0 }}>
           <OrgSearchCombobox
             organizations={organizations}
             stats={stats}
@@ -442,110 +444,153 @@ export default function GridmasterPage() {
             onSelect={selectOrg}
           />
         </div>
-        <button
-          onClick={signOutLocal}
-          className="dg-btn dg-btn-ghost"
-          style={{ fontSize: 13 }}
-        >
-          Sign out
-        </button>
+        {!isMobile && (
+          <button
+            onClick={signOutLocal}
+            className="dg-btn dg-btn-ghost"
+            style={{ fontSize: 13 }}
+          >
+            Sign out
+          </button>
+        )}
       </header>
 
+      {/* Mobile section chips */}
+      {isMobile && (
+        <div className="dg-mobile-section-bar">
+          {([
+            { key: "dashboard", label: "Dashboard" },
+            { key: "all-users", label: "Users" },
+            { key: "audit-log", label: "Audit" },
+            { key: "create-organization", label: "New Org" },
+            { key: "impersonation", label: "Impersonate" },
+          ] as { key: GridmasterView; label: string }[]).map((item) => (
+            <button
+              key={item.key}
+              className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
+              onClick={() => { setView(item.key); setSelectedId(null); if (item.key === "impersonation") setImpersonateTargetId(undefined); }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Body: sidebar + content */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Sidebar */}
-        <aside
-          style={{
-            width: 220,
-            flexShrink: 0,
-            background: "#fff",
-            borderRight: "1px solid var(--color-border)",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          {/* Navigation */}
-          <div style={{ padding: "12px 8px 4px" }}>
-            <div
-              style={{
-                padding: "8px 12px 4px",
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Navigation
-            </div>
-            <SidebarLink
-              label="Dashboard"
-              icon={DashboardIcon}
-              active={view === "dashboard"}
-              onClick={() => { setView("dashboard"); setSelectedId(null); }}
-            />
-            <SidebarLink
-              label="All Users"
-              icon={UsersIcon}
-              active={view === "all-users"}
-              onClick={() => { setView("all-users"); setSelectedId(null); }}
-            />
-            <SidebarLink
-              label="Audit Log"
-              icon={AuditIcon}
-              active={view === "audit-log"}
-              onClick={() => { setView("audit-log"); setSelectedId(null); }}
-            />
-          </div>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
+        {/* Expand button (shown when sidebar is collapsed) */}
+        {sidebarCollapsed && !isMobile && (
+          <button className="dg-sidebar-expand" onClick={toggleSidebar} title="Expand sidebar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        )}
 
-          {/* Actions */}
-          <div style={{ padding: "4px 8px" }}>
-            <div
-              style={{
-                padding: "8px 12px 4px",
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Actions
+        {/* Sidebar (desktop only) */}
+        {!isMobile && (
+          <aside
+            className={`dg-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
+            style={{
+              width: 220,
+              flexShrink: 0,
+              background: "#fff",
+              borderRight: "1px solid var(--color-border)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Collapse toggle */}
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 8px 0" }}>
+              <button className="dg-sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
             </div>
-            <SidebarLink
-              label="New Organization"
-              icon={PlusIcon}
-              active={view === "create-organization"}
-              onClick={() => { setView("create-organization"); setSelectedId(null); }}
-            />
-          </div>
 
-          {/* Tools */}
-          <div style={{ borderTop: "1px solid var(--color-border)", padding: "8px 8px 12px", marginTop: "auto" }}>
-            <div
-              style={{
-                padding: "8px 12px 4px",
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Tools
+            {/* Navigation */}
+            <div style={{ padding: "4px 8px 4px" }}>
+              <div
+                style={{
+                  padding: "8px 12px 4px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Navigation
+              </div>
+              <SidebarLink
+                label="Dashboard"
+                icon={DashboardIcon}
+                active={view === "dashboard"}
+                onClick={() => { setView("dashboard"); setSelectedId(null); }}
+              />
+              <SidebarLink
+                label="All Users"
+                icon={UsersIcon}
+                active={view === "all-users"}
+                onClick={() => { setView("all-users"); setSelectedId(null); }}
+              />
+              <SidebarLink
+                label="Audit Log"
+                icon={AuditIcon}
+                active={view === "audit-log"}
+                onClick={() => { setView("audit-log"); setSelectedId(null); }}
+              />
             </div>
-            <SidebarLink
-              label="Impersonation"
-              icon={ImpersonateIcon}
-              active={view === "impersonation"}
-              onClick={() => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); }}
-            />
-          </div>
-        </aside>
+
+            {/* Actions */}
+            <div style={{ padding: "4px 8px" }}>
+              <div
+                style={{
+                  padding: "8px 12px 4px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Actions
+              </div>
+              <SidebarLink
+                label="New Organization"
+                icon={PlusIcon}
+                active={view === "create-organization"}
+                onClick={() => { setView("create-organization"); setSelectedId(null); }}
+              />
+            </div>
+
+            {/* Tools */}
+            <div style={{ borderTop: "1px solid var(--color-border)", padding: "8px 8px 12px", marginTop: "auto" }}>
+              <div
+                style={{
+                  padding: "8px 12px 4px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Tools
+              </div>
+              <SidebarLink
+                label="Impersonation"
+                icon={ImpersonateIcon}
+                active={view === "impersonation"}
+                onClick={() => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); }}
+              />
+            </div>
+          </aside>
+        )}
 
         {/* Main content */}
-        <main style={{ flex: 1, overflow: "auto", padding: 24 }}>
+        <main style={{ flex: 1, overflow: "auto", padding: isMobile ? 16 : 24 }}>
           {error && (
             <div
               style={{

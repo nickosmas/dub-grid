@@ -26,22 +26,10 @@ export default function RootError({
         padding: 24,
       }}
     >
-      <p style={{ fontSize: 18, color: "#475569" }}>
+      <p style={{ fontSize: "var(--dg-fs-title)", color: "var(--color-text-muted)" }}>
         Something went wrong loading this page.
       </p>
-      <button
-        onClick={reset}
-        style={{
-          padding: "10px 20px",
-          background: "#1B3A2D",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
+      <button onClick={reset} className="dg-btn dg-btn-primary">
         Try again
       </button>
     </div>

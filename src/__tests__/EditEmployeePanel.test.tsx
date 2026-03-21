@@ -151,7 +151,7 @@ describe("EditEmployeePanel", () => {
       renderPanel();
       // Certification is a CustomSelect — open dropdown and pick a different option
       await user.click(screen.getByRole("button", { name: /STAFF/ }));
-      await user.click(screen.getByRole("button", { name: "CSN II" }));
+      await user.click(screen.getByRole("option", { name: "CSN II" }));
       expect(
         screen.getByRole("button", { name: "Save Changes" }),
       ).not.toBeDisabled();
@@ -162,7 +162,7 @@ describe("EditEmployeePanel", () => {
       renderPanel();
       // First modify designation so isModified would be true
       await user.click(screen.getByRole("button", { name: /STAFF/ }));
-      await user.click(screen.getByRole("button", { name: "CSN II" }));
+      await user.click(screen.getByRole("option", { name: "CSN II" }));
       // Then clear the first name
       const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
@@ -220,11 +220,11 @@ describe("EditEmployeePanel", () => {
   // Cancel
   // -------------------------------------------------------------------------
   describe("Cancel", () => {
-    it("clicking Discard Changes calls onCancel", async () => {
+    it("clicking Cancel calls onCancel when no changes made", async () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
       renderPanel({ onCancel });
-      await user.click(screen.getByRole("button", { name: "Discard Changes" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(onCancel).toHaveBeenCalledOnce();
     });
   });

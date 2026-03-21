@@ -74,11 +74,11 @@ function ProfilePageContent() {
   const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.user;
 
   const createdAt = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })
+    ? new Date(user.created_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
     : null;
 
   const lastSignIn = user?.last_sign_in_at
-    ? new Date(user.last_sign_in_at).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })
+    ? new Date(user.last_sign_in_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
     : null;
 
   return (

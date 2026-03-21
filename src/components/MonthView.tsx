@@ -390,7 +390,16 @@ export default function MonthView({
           return (
             <div
               key={dateKey}
+              role="button"
+              tabIndex={0}
+              aria-label={date.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               onClick={(e) => handleCellClick(dateKey, e.currentTarget)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleCellClick(dateKey, e.currentTarget);
+                }
+              }}
               style={{
                 background: isToday ? "#EFF6FF" : "#fff",
                 border: isOpen

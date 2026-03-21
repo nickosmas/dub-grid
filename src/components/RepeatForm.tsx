@@ -221,7 +221,7 @@ export default function RepeatForm({
       {showDayPicker && (
         <div style={{ marginBottom: 18 }}>
           <div style={sectionLabelStyle}>Days of Week</div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div role="group" aria-label="Days of week" style={{ display: "flex", gap: 6 }}>
             {DAY_NAMES_SHORT.map((name, i) => {
               const active = daysOfWeek.includes(i);
               return (
@@ -229,12 +229,14 @@ export default function RepeatForm({
                   key={i}
                   onClick={() => toggleDay(i)}
                   title={DAY_NAMES_FULL[i]}
+                  aria-label={DAY_NAMES_FULL[i]}
+                  aria-pressed={active}
                   style={{
                     width: 38,
                     height: 38,
                     borderRadius: "50%",
-                    border: `1.5px solid ${active ? "#1B3A2D" : "var(--color-border)"}`,
-                    background: active ? "#1B3A2D" : "#fff",
+                    border: `1.5px solid ${active ? "var(--color-brand)" : "var(--color-border)"}`,
+                    background: active ? "var(--color-brand)" : "#fff",
                     color: active ? "#fff" : "var(--color-text-muted)",
                     fontWeight: 700,
                     fontSize: 12,
@@ -250,7 +252,7 @@ export default function RepeatForm({
             })}
           </div>
           {daysOfWeek.length === 0 && (
-            <div style={{ fontSize: 11, color: "#DC2626", marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: "var(--color-danger)", marginTop: 4 }}>
               Select at least one day.
             </div>
           )}
@@ -283,7 +285,7 @@ export default function RepeatForm({
                 type="radio"
                 checked={endType === type}
                 onChange={() => setEndType(type)}
-                style={{ accentColor: "#1B3A2D" }}
+                style={{ accentColor: "var(--color-brand)" }}
               />
               <span style={{ fontSize: 13, color: "var(--color-text-secondary)", fontWeight: 500 }}>
                 {type === 'never' ? 'Never' : type === 'on_date' ? 'On date' : 'After N occurrences'}
@@ -297,7 +299,7 @@ export default function RepeatForm({
                   className="dg-input"
                   style={{
                     fontSize: 12, padding: "4px 8px", flex: 1,
-                    ...(endDateInvalid ? { borderColor: "#DC2626" } : {}),
+                    ...(endDateInvalid ? { borderColor: "var(--color-danger)" } : {}),
                   }}
                 />
               )}
@@ -316,7 +318,7 @@ export default function RepeatForm({
           ))}
         </div>
         {endDateInvalid && (
-          <div style={{ fontSize: 11, color: "#DC2626", marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: "var(--color-danger)", marginTop: 4 }}>
             End date must be on or after start date.
           </div>
         )}
@@ -329,7 +331,7 @@ export default function RepeatForm({
             marginTop: 16,
             padding: "10px 12px",
             borderRadius: 8,
-            background: preview.overwrites > 0 ? "#FEF3C7" : "#F0FDF4",
+            background: preview.overwrites > 0 ? "var(--color-warning-bg)" : "#F0FDF4",
             border: `1px solid ${preview.overwrites > 0 ? "#F59E0B" : "#BBF7D0"}`,
             fontSize: 12,
             lineHeight: 1.5,
@@ -343,12 +345,12 @@ export default function RepeatForm({
             )}
           </div>
           {isCapped && (
-            <div style={{ marginTop: 4, color: "#92400E", fontWeight: 500 }}>
+            <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
               Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date range or &ldquo;After N occurrences&rdquo; for more control.
             </div>
           )}
           {preview.overwrites > 0 && (
-            <div style={{ marginTop: 4, color: "#92400E", fontWeight: 500 }}>
+            <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
               {preview.overwrites} existing shift{preview.overwrites === 1 ? '' : 's'} will be overwritten.
             </div>
           )}
@@ -357,7 +359,7 @@ export default function RepeatForm({
 
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-        <button onClick={onBack} className="dg-btn" style={{ padding: "8px 14px" }}>
+        <button onClick={onBack} className="dg-btn dg-btn-secondary" style={{ padding: "8px 14px" }}>
           Cancel
         </button>
         <button

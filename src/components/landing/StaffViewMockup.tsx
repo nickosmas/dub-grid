@@ -1,12 +1,13 @@
 const FOCUS_AREAS = [
-  { name: "Wing A", bg: "#DBEAFE", text: "#1E40AF" },
-  { name: "Wing B", bg: "#DCFCE7", text: "#166534" },
-  { name: "Wing C", bg: "#FEF3C7", text: "#92400E" },
+  { name: "ICU", bg: "#DBEAFE", text: "#1E40AF" },
+  { name: "ER", bg: "#DCFCE7", text: "#166534" },
+  { name: "Rehab", bg: "#FEF3C7", text: "#92400E" },
 ];
 
 const STATUSES = [
   { label: "Linked", bg: "#DCFCE7", text: "#166534" },
   { label: "Invited", bg: "#FEF3C7", text: "#92400E" },
+  { label: "Not invited", bg: "#FEE2E2", text: "#991B1B" },
 ];
 
 const STAFF = [
@@ -14,41 +15,41 @@ const STAFF = [
     name: "Sarah Mitchell",
     initials: "SM",
     hue: 210,
-    email: "s.mitchell@example.com",
     focusAreas: [0],
     cert: "CSN III",
+    role: "Nurse",
     status: 0,
   },
   {
     name: "James Cooper",
     initials: "JC",
     hue: 150,
-    email: "j.cooper@example.com",
     focusAreas: [1],
     cert: "CSN II",
+    role: "Nurse",
     status: 0,
   },
   {
     name: "Maria Santos",
     initials: "MS",
     hue: 30,
-    email: "m.santos@example.com",
     focusAreas: [0, 2],
     cert: "JLCSN",
+    role: "Aide",
     status: 0,
   },
   {
     name: "David Park",
     initials: "DP",
     hue: 270,
-    email: "d.park@example.com",
     focusAreas: [1],
     cert: "CSN III",
-    status: 1,
+    role: "Nurse",
+    status: 2,
   },
 ];
 
-const HEADER_COLS = ["Name", "Focus Area", "Certification", "Status"];
+const HEADER_COLS = ["Name", "Assigned Focus Area", "Certification", "Roles", "Account"];
 
 export default function StaffViewMockup() {
   return (
@@ -72,56 +73,47 @@ export default function StaffViewMockup() {
         }}
       >
         {/* Status tabs */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              border: "1px solid #E2E8F0",
-              borderRadius: 8,
-              background: "#fff",
-              overflow: "hidden",
-            }}
-          >
+        <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+          {[
+            { label: "Active", color: "#0284C7", count: 4, active: true },
+            { label: "Benched", color: "#F59E0B", count: 0, active: false },
+            { label: "Terminated", color: "#EF4444", count: 0, active: false },
+          ].map((tab) => (
             <span
+              key={tab.label}
               style={{
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#fff",
-                background: "#16A34A",
-                borderRadius: 6,
+                padding: "8px 20px",
+                fontSize: 13,
+                fontWeight: tab.active ? 700 : 500,
+                color: tab.active ? tab.color : "#64748B",
+                borderBottom: tab.active
+                  ? `2px solid ${tab.color}`
+                  : "2px solid transparent",
                 cursor: "default",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              Active
+              {tab.label}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  borderRadius: 10,
+                  padding: "1px 7px",
+                  background: tab.active ? `${tab.color}15` : "#F1F5F9",
+                  color: tab.active ? tab.color : "#64748B",
+                }}
+              >
+                {tab.count}
+              </span>
             </span>
-            <span
-              style={{
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#64748B",
-                cursor: "default",
-              }}
-            >
-              Benched
-            </span>
-          </div>
-          <span
-            className="hidden sm:inline"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#64748B",
-            }}
-          >
-            4 members
-          </span>
+          ))}
         </div>
 
         {/* Search */}
-        <div style={{ position: "relative", minWidth: 160 }}>
+        <div className="hidden sm:block" style={{ position: "relative", minWidth: 160 }}>
           <svg
             style={{
               position: "absolute",
@@ -155,7 +147,7 @@ export default function StaffViewMockup() {
               alignItems: "center",
             }}
           >
-            Find staff&hellip;
+            Search&hellip;
           </div>
         </div>
       </div>
@@ -164,7 +156,7 @@ export default function StaffViewMockup() {
       <div
         className="hidden sm:grid"
         style={{
-          gridTemplateColumns: "1.4fr 1fr 0.6fr 0.5fr",
+          gridTemplateColumns: "1.4fr 0.8fr 0.5fr 0.5fr 0.45fr",
           padding: "12px 24px",
           background: "#FAFBFC",
           borderBottom: "1px solid #E2E8F0",
@@ -195,11 +187,10 @@ export default function StaffViewMockup() {
             key={person.name}
             style={{
               display: "grid",
-              gridTemplateColumns: "1.4fr 1fr 0.6fr 0.5fr",
+              gridTemplateColumns: "1.4fr 0.8fr 0.5fr 0.5fr 0.45fr",
               alignItems: "center",
               padding: "14px 24px",
               borderTop: idx > 0 ? "1px solid #E2E8F0" : undefined,
-              borderLeft: "4px solid transparent",
               transition: "all 0.15s ease",
             }}
           >
@@ -241,16 +232,6 @@ export default function StaffViewMockup() {
                   }}
                 >
                   {person.name}
-                </div>
-                <div
-                  className="hidden sm:block"
-                  style={{
-                    fontSize: 11,
-                    color: "#94A3B8",
-                    marginTop: 1,
-                  }}
-                >
-                  {person.email}
                 </div>
               </div>
             </div>
@@ -302,7 +283,24 @@ export default function StaffViewMockup() {
               </span>
             </div>
 
-            {/* Status */}
+            {/* Roles */}
+            <div className="hidden sm:block">
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderRadius: 20,
+                  padding: "3px 9px",
+                  background: "#F1F5F9",
+                  color: "#475569",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {person.role}
+              </span>
+            </div>
+
+            {/* Account */}
             <div
               className="hidden sm:flex"
               style={{ justifyContent: "flex-start" }}

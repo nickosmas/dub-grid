@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import React from "react";
 import { useMediaQuery, MOBILE } from "@/hooks";
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 interface ModalProps {
   title: string;
@@ -13,25 +16,74 @@ interface ModalProps {
 
 export default function Modal({ title, onClose, children, style }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const closingRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const isMobile = useMediaQuery(MOBILE);
+  const [closing, setClosing] = useState(false);
 
-  // Auto-focus the modal on open for keyboard accessibility
+  // Auto-focus first interactive child, fall back to dialog container
   useEffect(() => {
-    dialogRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const first = dialog.querySelector<HTMLElement>(FOCUSABLE);
+    if (first) first.focus();
+    else dialog.focus();
   }, []);
 
-  // Close on Escape key
+  // Clear timeout on unmount to prevent stale onClose calls
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  // Animated close — ref guard prevents double-fire race condition
+  const handleClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    timeoutRef.current = setTimeout(() => onClose(), 150);
+  }, [onClose]);
+
+  // Keyboard: Escape to close + focus trap
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        handleClose();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const focusable = Array.from(
+          dialog.querySelectorAll<HTMLElement>(FOCUSABLE)
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     },
-    [onClose]
+    [handleClose]
   );
 
   return (
     <div
-      className="dg-modal-overlay"
-      onClick={onClose}
+      className={`dg-modal-overlay${closing ? " closing" : ""}`}
+      onClick={handleClose}
       onKeyDown={handleKeyDown}
       role="presentation"
     >
@@ -63,12 +115,12 @@ export default function Modal({ title, onClose, children, style }: ModalProps) {
             {title}
           </span>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close modal"
             className="dg-btn dg-btn-ghost"
             style={{ fontSize: "var(--dg-fs-card-title)", lineHeight: 1, padding: isMobile ? "8px 10px" : "2px 6px", minWidth: isMobile ? 44 : undefined, minHeight: isMobile ? 44 : undefined }}
           >
-            ×
+            &times;
           </button>
         </div>
         {children}

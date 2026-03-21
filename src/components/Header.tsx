@@ -292,7 +292,7 @@ export default function Header({ orgName }: HeaderProps) {
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                maxWidth: isTablet ? 120 : 200,
+                maxWidth: isTablet ? 160 : 200,
               }}
               title={orgName}
             >
@@ -335,7 +335,7 @@ export default function Header({ orgName }: HeaderProps) {
               gap: 4,
               background: "transparent",
               border: "1px solid var(--color-border)",
-              color: "#2563EB",
+              color: "var(--color-link)",
               borderRadius: 8,
               padding: "5px 14px",
               fontSize: 13,
@@ -346,7 +346,7 @@ export default function Header({ orgName }: HeaderProps) {
               transition: "background 150ms ease, border-color 150ms ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#EFF6FF";
+              e.currentTarget.style.background = "var(--color-info-bg)";
               e.currentTarget.style.borderColor = "#BFDBFE";
             }}
             onMouseLeave={(e) => {

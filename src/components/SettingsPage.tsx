@@ -796,7 +796,7 @@ function FocusAreasSettings({
         {!isEditing && (
           <button
             onClick={handleEnterEdit}
-            className="dg-btn"
+            className="dg-btn dg-btn-secondary"
             style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -812,7 +812,7 @@ function FocusAreasSettings({
           </button>
         )}
         {isEditing && (
-          <button onClick={handleCancel} className="dg-btn" style={{ padding: "7px 14px" }}>
+          <button onClick={handleCancel} className="dg-btn dg-btn-secondary" style={{ padding: "7px 14px" }}>
             Cancel
           </button>
         )}
@@ -1636,7 +1636,7 @@ function StringListSettings({
         {!isEditing && (
           <button
             onClick={handleEnterEdit}
-            className="dg-btn"
+            className="dg-btn dg-btn-secondary"
             style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1652,7 +1652,7 @@ function StringListSettings({
           </button>
         )}
         {isEditing && (
-          <button onClick={handleCancel} className="dg-btn" style={{ padding: "7px 14px" }}>
+          <button onClick={handleCancel} className="dg-btn dg-btn-secondary" style={{ padding: "7px 14px" }}>
             Cancel
           </button>
         )}
@@ -2009,16 +2009,12 @@ function IndicatorTypesSettings({
               <button
                 onClick={() => handleSave(indicator)}
                 disabled={isSavingThis || !indicator.name.trim()}
+                className="dg-btn dg-btn-primary"
                 style={{
-                  background: indicator.name.trim() ? "var(--color-accent-gradient)" : "#ccc",
-                  border: "none",
-                  color: "#fff",
-                  borderRadius: 7,
                   padding: "7px 14px",
                   fontSize: 12,
-                  fontWeight: 700,
+                  opacity: indicator.name.trim() ? 1 : 0.5,
                   cursor: indicator.name.trim() ? "pointer" : "not-allowed",
-                  whiteSpace: "nowrap",
                 }}
               >
                 {isSavingThis ? "…" : "Save"}
@@ -2028,16 +2024,10 @@ function IndicatorTypesSettings({
               <button
                 onClick={() => indicator.isNew ? handleDelete(indicator) : setConfirmDeleteId(indicator.id)}
                 disabled={isDeletingThis}
+                className="dg-btn dg-btn-danger"
                 style={{
-                  background: "none",
-                  border: "1px solid #FEE2E2",
-                  borderRadius: 7,
-                  color: "#EF4444",
                   padding: "7px 12px",
                   fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
                 }}
               >
                 {isDeletingThis ? "…" : "Delete"}
@@ -3302,7 +3292,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                             }
                           }}
                           disabled={savingPerms === user.id}
-                          className="dg-btn"
+                          className="dg-btn dg-btn-secondary"
                           style={{ padding: "7px 14px" }}
                         >
                           {hasUnsavedChanges ? "Undo" : "Cancel"}
@@ -3410,17 +3400,6 @@ function SidebarLink({
         position: "relative",
       }}
     >
-      {active && (
-        <span style={{
-          position: "absolute",
-          left: 0,
-          top: "20%",
-          height: "60%",
-          width: 3,
-          borderRadius: 2,
-          background: "var(--color-accent-gradient)",
-        }} />
-      )}
       <span style={{
         color: active ? "var(--color-text-secondary)" : "var(--color-text-muted)",
         flexShrink: 0,
@@ -3468,6 +3447,18 @@ export default function SettingsPage({
   const defaultSection = canManageOrg ? "organization" : "impersonation";
   const activeSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : defaultSection;
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dg-sidebar-collapsed-settings") === "true";
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("dg-sidebar-collapsed-settings", String(next));
+      return next;
+    });
+  }, []);
+
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
@@ -3514,22 +3505,40 @@ export default function SettingsPage({
   useSetMobileSubNav(subNavItems);
 
   return (
-    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden", position: "relative" }}>
+
+      {/* Expand button (shown when sidebar is collapsed) */}
+      {sidebarCollapsed && !isMobile && (
+        <button className="dg-sidebar-expand" onClick={toggleSidebar} title="Expand sidebar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      )}
 
       {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
       {isMobile ? null : (
-        <aside style={{
-          width: isTablet ? 180 : 220,
-          flexShrink: 0,
-          height: "100%",
-          borderRight: "1px solid var(--color-border)",
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          padding: isTablet ? "24px 8px" : "32px 12px",
-          gap: 2,
-          overflowY: "auto",
-        }}>
+        <aside
+          className={`dg-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
+          style={{
+            width: isTablet ? 180 : 220,
+            flexShrink: 0,
+            height: "100%",
+            borderRight: "1px solid var(--color-border)",
+            background: "#fff",
+            display: "flex",
+            flexDirection: "column",
+            padding: isTablet ? "24px 8px" : "32px 12px",
+            gap: 2,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <button className="dg-sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          </div>
           {allLinks.map((link) => (
             <SidebarLink
               key={link.id}

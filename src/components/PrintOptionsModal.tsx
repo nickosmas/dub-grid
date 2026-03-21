@@ -83,6 +83,7 @@ export default function PrintOptionsModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close print options"
             className="dg-btn dg-btn-ghost"
             style={{ padding: "4px 8px", fontSize: 18, lineHeight: 1 }}
           >

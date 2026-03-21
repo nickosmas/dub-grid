@@ -133,7 +133,9 @@ describe("StaffView", () => {
       render(<StaffView {...defaultProps} />);
       await userEvent.click(screen.getByText("Alice Smith"));
       expect(screen.getByTestId("edit-panel")).toBeInTheDocument();
-      await userEvent.click(screen.getByText("Alice Smith"));
+      // Name appears in both the table row and the detail panel header;
+      // click the first one (the table row) to collapse
+      await userEvent.click(screen.getAllByText("Alice Smith")[0]);
       expect(screen.queryByTestId("edit-panel")).not.toBeInTheDocument();
     });
   });
@@ -215,12 +217,13 @@ describe("Property-based tests", () => {
         );
 
         // StaffView renders sidebar (children[0]) + content area (children[1]).
-        // Content area > MembersSection root (children[0]) > table card (children[2]).
-        // children[0] = status tabs, children[1] = controls, children[2] = table
+        // Content area > .staff-master-detail (children[0]) > .staff-list-pane (children[0]) > table card (children[2]).
+        // .staff-list-pane: children[0] = status tabs, children[1] = controls, children[2] = table
         const rootDiv = container.children[0] as HTMLElement;
         const contentArea = rootDiv.children[1] as HTMLElement;
-        const membersSectionRoot = contentArea.children[0] as HTMLElement;
-        const tableContainer = membersSectionRoot.children[2] as HTMLElement;
+        const masterDetail = contentArea.children[0] as HTMLElement;
+        const listPane = masterDetail.children[0] as HTMLElement;
+        const tableContainer = listPane.children[2] as HTMLElement;
 
         // Employee data rows: skip the header row (first child), get remaining row wrappers
         const allRowWrappers = Array.from(tableContainer.children).slice(1);
@@ -280,15 +283,16 @@ describe("Property-based tests", () => {
           await userEvent.click(
             within(container).getByRole("button", { name: /Seniority/ }),
           );
-          await userEvent.click(screen.getByRole("button", { name: "Name" }));
+          await userEvent.click(screen.getByRole("option", { name: "Name" }));
 
           // StaffView renders sidebar (children[0]) + content area (children[1]).
-          // Content area > MembersSection root (children[0]).
-          // children[0] = status tabs, children[1] = controls, children[2] = table
+          // Content area > .staff-master-detail (children[0]) > .staff-list-pane (children[0]).
+          // .staff-list-pane: children[0] = status tabs, children[1] = controls, children[2] = table
           const rootDiv = container.children[0] as HTMLElement;
           const contentArea = rootDiv.children[1] as HTMLElement;
-          const membersSectionRoot = contentArea.children[0] as HTMLElement;
-          const tableContainer = membersSectionRoot.children[2] as HTMLElement;
+          const masterDetail = contentArea.children[0] as HTMLElement;
+          const listPane = masterDetail.children[0] as HTMLElement;
+          const tableContainer = listPane.children[2] as HTMLElement;
 
           // Employee data rows: skip the header row (first child), get remaining row wrappers
           const allRowWrappers = Array.from(tableContainer.children).slice(1);
@@ -348,20 +352,19 @@ describe("Property-based tests", () => {
             />,
           );
 
-          // Open sort dropdown and click "Focus Areas" (use getAllByRole since sidebar also has this label)
+          // Open sort dropdown and click "Focus Areas"
           await userEvent.click(
             within(container).getByRole("button", { name: /Seniority/ }),
           );
-          const focusAreaBtns = screen.getAllByRole("button", { name: "Focus Areas" });
-          // The portaled dropdown option is the last one added to the DOM
-          await userEvent.click(focusAreaBtns[focusAreaBtns.length - 1]);
+          await userEvent.click(screen.getByRole("option", { name: "Focus Areas" }));
 
           // Read rendered names from the DOM (same structure as name sort test)
-          // children[0] = status tabs, children[1] = controls, children[2] = table
+          // .staff-master-detail > .staff-list-pane: children[0] = status tabs, children[1] = controls, children[2] = table
           const rootDiv = container.children[0] as HTMLElement;
           const contentArea = rootDiv.children[1] as HTMLElement;
-          const membersSectionRoot = contentArea.children[0] as HTMLElement;
-          const tableContainer = membersSectionRoot.children[2] as HTMLElement;
+          const masterDetail = contentArea.children[0] as HTMLElement;
+          const listPane = masterDetail.children[0] as HTMLElement;
+          const tableContainer = listPane.children[2] as HTMLElement;
           const allRowWrappers = Array.from(tableContainer.children).slice(1);
 
           const renderedNames = allRowWrappers.map((wrapper) => {
