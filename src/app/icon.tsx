@@ -5,7 +5,7 @@ export const contentType = "image/png";
 
 export default function Icon() {
   const cells = [];
-  const color = "#1B3A2D";
+  const color = "#0357CA";
   for (let row = 0; row < 4; row++) {
     for (let col = 0; col < 4; col++) {
       let opacity = 0.3;

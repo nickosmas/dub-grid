@@ -95,46 +95,25 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
     );
   }, [validRows, onAdd]);
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: 10,
-    fontWeight: 700,
-    color: "var(--color-text-subtle)",
-    letterSpacing: "0.06em",
-  };
-
   return (
     <Modal title="Add Staff Members" onClose={onClose} style={{ maxWidth: 960, width: "92vw" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <div className="flex flex-col">
 
         {/* Column headers */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 140px 1fr 28px",
-            gap: 8,
-            paddingBottom: 6,
-            borderBottom: "1px solid var(--color-border-light)",
-            marginBottom: 4,
-          }}
-        >
+        <div className="grid grid-cols-[1fr_1fr_140px_1fr_28px] gap-2 pb-1.5 border-b border-[var(--color-border-light)] mb-1">
           {["FIRST NAME", "LAST NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h) => (
-            <div key={h} style={labelStyle}>{h}</div>
+            <div key={h} className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-wider">{h}</div>
           ))}
         </div>
 
         {/* Rows */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 380, overflowY: "auto", paddingRight: 2 }}>
+        <div className="flex flex-col gap-1.5 max-h-[380px] overflow-y-auto pr-0.5">
           {rows.map((row, idx) => {
             const isLast = idx === rows.length - 1;
             return (
               <div
                 key={row._id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 140px 1fr 28px",
-                  gap: 8,
-                  alignItems: "center",
-                }}
+                className="grid grid-cols-[1fr_1fr_140px_1fr_28px] gap-2 items-center"
               >
                 {/* First Name */}
                 <input
@@ -149,7 +128,6 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                   }}
                   placeholder="First name"
                   autoFocus={idx === 0}
-                  style={{ fontSize: 13 }}
                 />
 
                 {/* Last Name */}
@@ -165,7 +143,6 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                     }
                   }}
                   placeholder="Last name"
-                  style={{ fontSize: 13 }}
                 />
 
                 {/* Certification */}
@@ -181,26 +158,26 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                 />
 
                 {/* Focus Areas */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <div className="flex flex-wrap gap-1.5">
                   {focusAreas.map((focusArea) => {
                     const active = row.focusAreaIds.includes(focusArea.id);
                     return (
                       <button
                         key={focusArea.id}
                         onClick={() => toggleFocusArea(row._id, focusArea.id)}
-                        style={{
-                          background: active ? focusArea.colorBg : "var(--color-border-light)",
-                          color: active ? focusArea.colorText : "var(--color-text-muted)",
-                          border: active ? `1.5px solid ${focusArea.colorText}40` : "1.5px solid transparent",
-                          borderRadius: 20,
-                          padding: "2px 8px",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                          transition: "all 120ms ease",
-                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold cursor-pointer whitespace-nowrap transition-all duration-150 border-[1.5px] border-transparent ${
+                          active
+                            ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
+                            : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
+                        }`}
                       >
+                        <span
+                          className="w-[7px] h-[7px] rounded-full shrink-0"
+                          style={{
+                            background: focusArea.colorBg,
+                            border: active ? "1px solid rgba(255,255,255,0.3)" : "none",
+                          }}
+                        />
                         {focusArea.name}
                       </button>
                     );
@@ -210,18 +187,16 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                 {/* Remove */}
                 <button
                   onClick={() => removeRow(row._id)}
-                  className="dg-btn dg-btn-ghost"
-                  style={{
-                    fontSize: 16,
-                    lineHeight: 1,
-                    padding: "2px 4px",
-                    color: "var(--color-text-faint)",
-                    opacity: rows.length === 1 ? 0.3 : 1,
-                    cursor: rows.length === 1 ? "default" : "pointer",
-                  }}
                   disabled={rows.length === 1}
+                  className={`flex items-center justify-center w-7 h-7 rounded-lg text-[var(--color-text-faint)] transition-colors duration-120 ${
+                    rows.length === 1
+                      ? "opacity-30 cursor-default"
+                      : "hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                  }`}
                 >
-                  ×
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
             );
@@ -229,20 +204,10 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: 16,
-            paddingTop: 16,
-            borderTop: "1px solid var(--color-border-light)",
-          }}
-        >
+        <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--color-border-light)]">
           <button
             onClick={addRow}
-            className="dg-btn dg-btn-ghost"
-            style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+            className="dg-btn dg-btn-ghost text-[var(--dg-fs-caption)] flex items-center gap-1.5"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -252,8 +217,7 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
           </button>
           <button
             onClick={handleSubmit}
-            className="dg-btn dg-btn-primary"
-            style={{ padding: "10px 20px" }}
+            className="dg-btn dg-btn-primary px-5 py-2.5"
             disabled={validRows.length === 0}
           >
             Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member{validRows.length !== 1 ? "s" : ""}

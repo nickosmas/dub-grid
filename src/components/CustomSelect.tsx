@@ -99,10 +99,11 @@ export default function CustomSelect<T extends string | number>({
           alignItems: "center",
           gap: 8,
           width: "100%",
-          background: disabled ? "var(--color-bg)" : "#fff",
+          height: "var(--dg-toolbar-h)",
+          background: disabled ? "var(--color-bg)" : "var(--color-surface)",
           border: "1px solid var(--color-border)",
           borderRadius: 10,
-          padding: "7px 10px 7px 12px",
+          padding: "0 10px 0 12px",
           fontSize,
           fontWeight: 500,
           color: disabled ? "var(--color-text-subtle)" : "var(--color-text-secondary)",
@@ -113,7 +114,7 @@ export default function CustomSelect<T extends string | number>({
           transition: "box-shadow 150ms ease",
           boxShadow: open ? "0 0 0 3px rgba(56,189,248,0.15)" : undefined,
           borderColor: open ? "var(--color-border-focus)" : "var(--color-border)",
-          opacity: disabled ? 0.7 : 1,
+          opacity: disabled ? 0.5 : 1,
         }}
       >
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -146,6 +147,7 @@ export default function CustomSelect<T extends string | number>({
       ref={menuRef}
       role="listbox"
       tabIndex={-1}
+      className="dg-menu"
       onKeyDown={(e) => {
         if (e.key === "ArrowDown") {
           e.preventDefault();
@@ -166,13 +168,8 @@ export default function CustomSelect<T extends string | number>({
       }}
       style={{
         ...menuStyle,
-        background: "#fff",
-        border: "1px solid var(--color-border)",
-        borderRadius: 10,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)",
         overflowY: "auto",
         overflowX: "hidden",
-        padding: "4px 0",
       }}
     >
       {options.map((opt, idx) => {
@@ -184,31 +181,13 @@ export default function CustomSelect<T extends string | number>({
             type="button"
             role="option"
             aria-selected={isActive}
+            className="dg-menu-item"
             onClick={() => { onChange(opt.value); setOpen(false); }}
+            onMouseEnter={() => setFocusedIndex(idx)}
             style={{
-              display: "block",
-              width: "calc(100% - 8px)",
-              margin: "2px 4px",
-              textAlign: "left",
-              padding: "8px 12px",
-              fontSize,
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              background: isFocused ? "var(--color-surface-overlay)" : isActive ? "var(--color-border-light)" : "transparent",
-              border: "none",
-              borderRadius: 7,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              whiteSpace: "normal",
-              wordBreak: "break-word",
-              transition: "background 100ms ease",
-            }}
-            onMouseEnter={(e) => {
-              setFocusedIndex(idx);
-              if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--color-surface-overlay)";
-            }}
-            onMouseLeave={(e) => {
-              if (!isFocused && !isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
+              fontWeight: isActive ? 700 : undefined,
+              color: isActive ? "var(--color-text-primary)" : undefined,
+              background: isFocused ? "var(--color-bg-secondary)" : isActive ? "var(--color-border-light)" : undefined,
             }}
           >
             {opt.label}

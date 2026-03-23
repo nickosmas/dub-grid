@@ -225,15 +225,15 @@ export default function RootPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#F8FAFC",
+          background: "var(--color-bg)",
         }}
       >
         <div
           style={{
             width: 32,
             height: 32,
-            border: "3px solid #E2E8F0",
-            borderTopColor: "#1B3A2D",
+            border: "3px solid var(--color-border)",
+            borderTopColor: "var(--color-brand)",
             borderRadius: "50%",
             animation: "spin 0.7s linear infinite",
           }}
@@ -244,13 +244,13 @@ export default function RootPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-950 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--color-surface)] text-slate-950 font-sans overflow-x-hidden">
       {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <DubGridLogo size={28} color="#1B3A2D" />
-            <DubGridWordmark fontSize={18} color="#1B3A2D" />
+            <DubGridLogo size={28} color="var(--color-brand)" />
+            <DubGridWordmark fontSize={18} color="var(--color-brand)" />
           </div>
 
           {/* Desktop nav links */}
@@ -272,14 +272,14 @@ export default function RootPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/login"
-              className="hidden sm:inline-flex px-5 py-2 rounded-full bg-[#1B3A2D] text-white text-sm font-semibold hover:bg-[#2D5A45] transition-colors"
+              className="hidden sm:inline-flex px-5 py-2 rounded-full bg-[var(--color-brand)] text-white text-sm font-semibold hover:bg-[var(--color-brand-light)] transition-colors"
             >
               Sign In
             </Link>
             {/* Mobile hamburger */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 -mr-2 text-slate-600 hover:text-slate-900 transition-colors"
+              className="md:hidden p-2 -mr-2 text-[var(--color-text-muted)] hover:text-slate-900 transition-colors"
               aria-label="Open menu"
             >
               <Menu size={22} />
@@ -290,15 +290,15 @@ export default function RootPage() {
 
       {/* ── Mobile Menu Overlay ── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-white/95 backdrop-blur-xl flex flex-col">
-          <div className="flex items-center justify-between px-6 h-16">
+        <div className="fixed inset-0 z-[60] bg-[var(--color-surface)]/95 backdrop-blur-xl flex flex-col">
+          <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
-              <DubGridLogo size={28} color="#1B3A2D" />
-              <DubGridWordmark fontSize={18} color="#1B3A2D" />
+              <DubGridLogo size={28} color="var(--color-brand)" />
+              <DubGridWordmark fontSize={18} color="var(--color-brand)" />
             </div>
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-2 -mr-2 text-slate-600 hover:text-slate-900 transition-colors"
+              className="p-2 -mr-2 text-[var(--color-text-muted)] hover:text-slate-900 transition-colors"
               aria-label="Close menu"
             >
               <X size={22} />
@@ -308,20 +308,20 @@ export default function RootPage() {
             <a
               href="#features"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-slate-900 hover:text-[#1B3A2D] transition-colors"
+              className="text-2xl font-semibold text-slate-900 hover:text-[var(--color-brand)] transition-colors"
             >
               Features
             </a>
             <a
               href="#security"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-slate-900 hover:text-[#1B3A2D] transition-colors"
+              className="text-2xl font-semibold text-slate-900 hover:text-[var(--color-brand)] transition-colors"
             >
               Security
             </a>
             <Link
               href="/login"
-              className="mt-4 px-8 py-3 rounded-full bg-[#1B3A2D] text-white text-lg font-semibold hover:bg-[#2D5A45] transition-colors"
+              className="mt-4 px-8 py-3 rounded-full bg-[var(--color-brand)] text-white text-lg font-semibold hover:bg-[var(--color-brand-light)] transition-colors"
             >
               Sign In
             </Link>
@@ -337,7 +337,7 @@ export default function RootPage() {
             className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full opacity-[0.04]"
             style={{
               background:
-                "radial-gradient(circle, #1B3A2D 0%, transparent 70%)",
+                "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)",
             }}
           />
           <div
@@ -351,7 +351,7 @@ export default function RootPage() {
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.02]"
             style={{
               background:
-                "radial-gradient(circle, #1B3A2D 0%, transparent 60%)",
+                "radial-gradient(circle, var(--color-brand) 0%, transparent 60%)",
             }}
           />
         </div>
@@ -361,7 +361,7 @@ export default function RootPage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-slate-950 leading-[1.05]">
             Purpose built for
             <br />
-            <span className="text-[#1B3A2D]">CS Care Facilities</span>
+            <span className="text-[var(--color-brand)]">CS Care Facilities</span>
           </h1>
 
           {/* Subtitle */}
@@ -374,14 +374,14 @@ export default function RootPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <Link
               href="/login"
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[#1B3A2D] text-white font-semibold text-base hover:-translate-y-0.5 hover:shadow-xl transition-all duration-200"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[var(--color-brand)] text-white font-semibold text-base hover:-translate-y-0.5 hover:shadow-xl transition-all duration-200"
             >
               Get Started
               <ArrowRight size={18} className="ml-2" />
             </Link>
             <a
               href="#features"
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full border border-slate-200 text-slate-700 font-semibold text-base hover:border-slate-400 transition-colors duration-200"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full border border-slate-200 text-[var(--color-text-secondary)] font-semibold text-base hover:border-slate-400 transition-colors duration-200"
             >
               See Features
             </a>
@@ -401,7 +401,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Bento Feature Grid ── */}
-      <RevealSection id="features" className="py-16 sm:py-20 lg:py-24 bg-slate-50">
+      <RevealSection id="features" className="py-16 sm:py-20 lg:py-24 bg-[var(--color-bg)]">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
@@ -419,13 +419,13 @@ export default function RootPage() {
               return (
                 <div
                   key={feature.title}
-                  className="group rounded-2xl border border-slate-100 bg-white p-6 lg:p-8 hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                  className="group rounded-2xl border border-slate-100 bg-[var(--color-surface)] p-6 lg:p-8 hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                   style={{ transitionDelay: `${i * 75}ms` }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-[#1B3A2D]/10 transition-colors duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-[var(--color-brand)]/10 transition-colors duration-300">
                     <Icon
                       size={20}
-                      className="text-slate-600 group-hover:text-[#1B3A2D] transition-colors duration-300"
+                      className="text-[var(--color-text-muted)] group-hover:text-[var(--color-brand)] transition-colors duration-300"
                     />
                   </div>
                   <h3 className="text-base font-semibold text-slate-900 mb-2">
@@ -458,7 +458,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Recurring Shifts Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-slate-50">
+      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
@@ -512,11 +512,11 @@ export default function RootPage() {
                 return (
                   <div
                     key={signal.title}
-                    className="p-6 rounded-2xl bg-white border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200"
+                    className="p-6 rounded-2xl bg-[var(--color-surface)] border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
-                        <Icon size={18} className="text-slate-600" />
+                        <Icon size={18} className="text-[var(--color-text-muted)]" />
                       </div>
                       <h3 className="text-base font-semibold text-slate-900">
                         {signal.title}
@@ -539,7 +539,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── CTA ── */}
-      <RevealSection className="py-16 sm:py-20 lg:py-24 bg-[#1B3A2D] relative overflow-hidden">
+      <RevealSection className="py-16 sm:py-20 lg:py-24 bg-[var(--color-brand)] relative overflow-hidden">
         {/* Subtle grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -561,7 +561,7 @@ export default function RootPage() {
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 rounded-full bg-white text-[#1B3A2D] font-semibold text-base hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
+            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 rounded-full bg-[var(--color-surface)] text-[var(--color-brand)] font-semibold text-base hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
           >
             Get Started
             <ArrowRight size={18} />
@@ -581,13 +581,13 @@ export default function RootPage() {
           <div className="flex gap-6">
             <Link
               href="/privacy"
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              className="text-xs text-slate-400 hover:text-[var(--color-text-muted)] transition-colors"
             >
               Privacy Policy
             </Link>
             <Link
               href="/terms"
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              className="text-xs text-slate-400 hover:text-[var(--color-text-muted)] transition-colors"
             >
               Terms of Service
             </Link>

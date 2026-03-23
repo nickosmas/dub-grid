@@ -66,10 +66,10 @@ export default function DraftBanner({
             onClick={onToggleDiff}
             className="dg-btn dg-btn-secondary"
             style={{
-              fontSize: 12,
-              padding: "5px 12px",
-              background: showDiff ? "#E0E7FF" : undefined,
-              color: showDiff ? "#4338CA" : undefined,
+              fontSize: "var(--dg-fs-caption)",
+              padding: "6px 14px",
+              background: showDiff ? "var(--color-info-bg)" : undefined,
+              color: showDiff ? "var(--color-accent-text)" : undefined,
             }}
           >
             {showDiff ? (
@@ -96,7 +96,7 @@ export default function DraftBanner({
           onClick={onCancel}
           disabled={isDisabled}
           className="dg-btn dg-btn-secondary"
-          style={{ fontSize: 12, padding: "5px 12px", color: "#DC2626" }}
+          style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 14px", color: "var(--color-danger-dark)" }}
         >
           {isCanceling ? (
             <>
@@ -112,7 +112,7 @@ export default function DraftBanner({
             onClick={onPublish}
             disabled={isDisabled}
             className="dg-btn dg-btn-primary"
-            style={{ fontSize: 12, padding: "5px 12px" }}
+            style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
           >
             {isPublishing ? (
               <>

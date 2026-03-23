@@ -192,7 +192,7 @@ export default function MobileDayView({
               <div
                 style={{
                   padding: "8px 16px 4px",
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   fontWeight: 700,
                   color: "var(--color-text-muted)",
                   textTransform: "uppercase",
@@ -204,7 +204,7 @@ export default function MobileDayView({
                 }}
               >
                 {sectionName}
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-faint)" }}>
+                <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 500, color: "var(--color-text-faint)" }}>
                   ({sectionEmps.length})
                 </span>
               </div>
@@ -226,7 +226,7 @@ export default function MobileDayView({
                       style={{
                         textAlign: "center",
                         padding: "2px 0",
-                        borderRadius: 6,
+                        borderRadius: 8,
                         background: isToday ? "var(--color-today-bg)" : "transparent",
                       }}
                     >
@@ -240,7 +240,7 @@ export default function MobileDayView({
                         {DAY_LABELS[d.getDay()]}
                       </div>
                       <div style={{
-                        fontSize: 13,
+                        fontSize: "var(--dg-fs-label)",
                         fontWeight: 700,
                         color: isToday ? "var(--color-today-text)" : "var(--color-text-secondary)",
                         lineHeight: 1.2,
@@ -268,7 +268,7 @@ export default function MobileDayView({
                     padding: "0 12px",
                     alignItems: "center",
                     minHeight: 44,
-                    background: isGuest ? "var(--color-surface-overlay)" : "#fff",
+                    background: isGuest ? "var(--color-bg-secondary)" : "var(--color-surface)",
                     borderBottom: "1px solid var(--color-border)",
                   }}
                 >
@@ -276,7 +276,7 @@ export default function MobileDayView({
                   <div style={{ padding: "6px 0 6px 4px", minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: "var(--dg-fs-caption)",
                         fontWeight: 600,
                         color: "var(--color-text-secondary)",
                         whiteSpace: "nowrap",
@@ -287,7 +287,7 @@ export default function MobileDayView({
                       {empName}
                     </div>
                     {certAbbr && (
-                      <div style={{ fontSize: 10, color: "var(--color-text-faint)", fontWeight: 500 }}>
+                      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", fontWeight: 500 }}>
                         {certAbbr}
                       </div>
                     )}
@@ -307,7 +307,7 @@ export default function MobileDayView({
                     // Build pills for all codes (supports split shifts)
                     const pills = codeIds.map((id) => {
                       const sc = shiftCodeById.get(id);
-                      if (!sc) return { label: "?", bg: "#E2E8F0", text: "#64748B", border: "#CBD5E1", foreignInitials: null, foreignBg: null, foreignText: null };
+                      if (!sc) return { label: "?", bg: "var(--color-border-light)", text: "var(--color-text-subtle)", border: "var(--color-border)", foreignInitials: null, foreignBg: null, foreignText: null };
                       // Cross-wing: show initials if code belongs to a different focus area
                       const isForeign = sc.focusAreaId != null && sectionId != null && sc.focusAreaId !== sectionId;
                       const foreignInitials = isForeign ? focusAreaInitials.get(sc.focusAreaId!) ?? null : null;
@@ -353,7 +353,7 @@ export default function MobileDayView({
                                 style={{
                                   fontSize: fs,
                                   fontWeight: 700,
-                                  background: pill.foreignInitials ? "#ffffff" : pill.bg,
+                                  background: pill.foreignInitials ? "var(--color-surface)" : pill.bg,
                                   color: pill.text,
                                   borderRadius: pill.foreignInitials ? "0 0 2px 2px" : 3,
                                   padding: pills.length > 1 ? "1px 2px" : "2px 2px",
@@ -409,7 +409,7 @@ export default function MobileDayView({
                         ) : (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: "var(--dg-fs-footnote)",
                               fontWeight: 500,
                               color: "var(--color-text-faint)",
                               lineHeight: 1.2,
@@ -452,7 +452,7 @@ export default function MobileDayView({
                   display: "flex",
                   gap: 8,
                   flexWrap: "wrap",
-                  background: "var(--color-surface-overlay)",
+                  background: "var(--color-bg-secondary)",
                   borderBottom: "1px solid var(--color-border)",
                 }}
               >
@@ -463,12 +463,12 @@ export default function MobileDayView({
                       <span
                         key={`${catId}-${label}`}
                         style={{
-                          fontSize: 11,
+                          fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           color: sc ? borderColor(sc.color) : "var(--color-text-muted)",
                           background: sc ? `${sc.color}30` : "var(--color-border-light)",
                           padding: "2px 8px",
-                          borderRadius: 6,
+                          borderRadius: 8,
                         }}
                       >
                         {label}: {count}
@@ -485,13 +485,13 @@ export default function MobileDayView({
       {/* Empty state */}
       {!hasAnySectionContent && (
         <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--color-text-muted)" }}>
-          <div style={{ color: "var(--color-text-faint)", background: "#F8FAFC", padding: 12, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+          <div style={{ color: "var(--color-text-faint)", background: "var(--color-bg)", padding: 12, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
           </div>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+          <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, marginBottom: 4 }}>
             No shifts found for this period
           </div>
-          <div style={{ fontSize: 13 }}>
+          <div style={{ fontSize: "var(--dg-fs-label)" }}>
             {isCellInteractive
               ? "No employees are assigned to this focus area. Add employees in the Staff view."
               : "No shifts have been published for this period yet."}

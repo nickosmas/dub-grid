@@ -134,19 +134,19 @@ export default function AdminPermissionsEditor({
   return (
     <Modal title={`Admin Permissions — ${userName}`} onClose={onClose} style={{ maxWidth: 520 }}>
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16, flexShrink: 0 }}>
+        <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", marginBottom: 16, flexShrink: 0 }}>
           Configure which actions this admin can perform. <em>View Schedule</em> is always enabled.
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexShrink: 0 }}>
-          <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: 12 }}>Select All</button>
-          <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: 12 }}>Clear All</button>
+          <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: "var(--dg-fs-caption)" }}>Select All</button>
+          <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: "var(--dg-fs-caption)" }}>Clear All</button>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           {PERMISSION_GROUPS.map((group) => (
             <div key={group.label} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+              <div style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
                 {group.label}
               </div>
               {group.permissions.map((p) => {
@@ -160,7 +160,7 @@ export default function AdminPermissionsEditor({
                       gap: 10,
                       padding: "6px 0",
                       cursor: "pointer",
-                      fontSize: 13,
+                      fontSize: "var(--dg-fs-label)",
                       color: "var(--color-text-primary)",
                     }}
                   >

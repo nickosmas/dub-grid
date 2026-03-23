@@ -4,25 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { fetchAllUsers, startImpersonation, endImpersonation } from "@/lib/db";
 import type { PlatformUser } from "@/types";
-import { BOX_SHADOW_CARD } from "@/lib/constants";
-
-const sectionStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  overflow: "hidden",
-  boxShadow: BOX_SHADOW_CARD,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: "14px 20px",
-  borderBottom: "1px solid var(--color-border-light)",
-  fontWeight: 700,
-  fontSize: 14,
-  color: "var(--color-text-secondary)",
-};
-
-const sectionBodyStyle: React.CSSProperties = { padding: 20 };
+import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
 
 export default function EnhancedImpersonation({
   initialTargetId,
@@ -122,7 +104,7 @@ export default function EnhancedImpersonation({
       <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         User Impersonation
       </h2>
-      <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--color-text-muted)" }}>
+      <p style={{ margin: "0 0 20px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
         Start a support impersonation session. Sessions are capped at 30 minutes.
       </p>
 
@@ -141,10 +123,10 @@ export default function EnhancedImpersonation({
           }}
         >
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-info)" }}>
+            <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-info)" }}>
               Active Session
             </div>
-            <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
+            <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 4 }}>
               Impersonating <strong>{selectedUser?.email}</strong>
               {selectedUser?.orgName && ` (${selectedUser.orgName})`}
             </div>
@@ -158,7 +140,7 @@ export default function EnhancedImpersonation({
             className="dg-btn dg-btn-danger"
             onClick={handleEnd}
             disabled={loading}
-            style={{ fontSize: 12, flexShrink: 0 }}
+            style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
           >
             {loading ? "Ending…" : "End Session"}
           </button>
@@ -179,13 +161,13 @@ export default function EnhancedImpersonation({
             />
 
             {loadingUsers ? (
-              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: 13 }}>
+              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
                 Loading users…
               </div>
             ) : (
               <div style={{ maxHeight: 280, overflowY: "auto" }}>
                 {filtered.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: 13 }}>
+                  <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
                     No matching users
                   </div>
                 ) : (
@@ -200,28 +182,28 @@ export default function EnhancedImpersonation({
                           alignItems: "center",
                           width: "100%",
                           padding: "8px 12px",
-                          background: isSelected ? "var(--color-surface-overlay)" : "transparent",
+                          background: isSelected ? "var(--color-bg-secondary)" : "transparent",
                           border: isSelected ? "1px solid var(--color-border)" : "1px solid transparent",
                           borderRadius: 8,
                           cursor: "pointer",
                           fontFamily: "inherit",
                           textAlign: "left",
                           marginBottom: 2,
-                          transition: "background 100ms ease",
+                          transition: "background 150ms ease",
                         }}
                       >
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+                          <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                             {u.email ?? "No email"}
                           </div>
                           {u.orgName && (
-                            <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1 }}>
+                            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 1 }}>
                               {u.orgName} · {u.orgRole?.replace("_", " ") ?? "user"}
                             </div>
                           )}
                         </div>
                         {isSelected && (
-                          <span style={{ fontSize: 12, color: "var(--color-info)", fontWeight: 600 }}>Selected</span>
+                          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-info)", fontWeight: 600 }}>Selected</span>
                         )}
                       </button>
                     );

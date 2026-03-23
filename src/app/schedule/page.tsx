@@ -14,7 +14,7 @@ import CoveragePanel from "@/components/CoveragePanel";
 import ShiftSwapModal from "@/components/ShiftSwapModal";
 
 import { AnimatedDubGridLogo } from "@/components/Logo";
-import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName } from "@/lib/utils";
+import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName, iterateDateRange } from "@/lib/utils";
 import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
 import * as db from "@/lib/db";
@@ -33,7 +33,7 @@ import type { CellDropData } from "@/components/DroppableCell";
 import ShiftContextMenu from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import MobileDayView from "@/components/MobileDayView";
-import { useMediaQuery, MOBILE } from "@/hooks";
+import { useMediaQuery, MOBILE, SMALL_DESKTOP } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import {
   Employee,
@@ -50,6 +50,7 @@ import {
 
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
+  const isSmallDesktop = useMediaQuery(SMALL_DESKTOP);
   const { user: authUser } = useAuth();
   const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId } = usePermissions();
   const {
@@ -72,9 +73,15 @@ function SchedulerContent() {
   );
   const [activeFocusArea, setActiveFocusArea] = useState<number | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
+  // Ref always points to the latest shifts — used in setShift to read fresh version
+  // numbers even when the useCallback closure captures a stale `shifts` object.
+  const shiftsRef = useRef(shifts);
+  shiftsRef.current = shifts;
   const [notes, setNotes] = useState<Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>>({});
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
-  const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(2);
+  const [preferredSpan, setPreferredSpan] = useState<1 | 2 | "month">(2);
+  // Auto-downgrade 2-week to 1-week on narrow screens to prevent column squeeze
+  const spanWeeks: 1 | 2 | "month" = isSmallDesktop && preferredSpan === 2 ? 1 : preferredSpan;
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -161,6 +168,12 @@ function SchedulerContent() {
     date: Date;
     focusAreaName: string;
   } | null>(null);
+  const [pendingClearShift, setPendingClearShift] = useState<{
+    empId: string;
+    date: Date;
+    empName: string;
+    shiftLabel: string;
+  } | null>(null);
 
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,8 +200,16 @@ function SchedulerContent() {
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
+  const draftCheckStarted = useRef(false);
   const initialLoadUsedEditPerms = useRef(false);
+  const prevOrgIdRef = useRef<string | null>(null);
   useEffect(() => {
+    // Reset load guards when org changes (e.g. org switcher)
+    if (org && org.id !== prevOrgIdRef.current) {
+      prevOrgIdRef.current = org.id;
+      scheduleLoadStarted.current = false;
+      draftCheckStarted.current = false;
+    }
     if (orgLoading || !org || scheduleLoadStarted.current) return;
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
@@ -497,7 +518,6 @@ function SchedulerContent() {
   // Re-fetch with scheduler visibility once permissions resolve, so editors
   // see draft data even if the initial load ran before permissions were ready.
   // Skip if the initial load already used canEditShifts=true (no extra fetch needed).
-  const draftCheckStarted = useRef(false);
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
     if (permsLoading || !org || scheduleLoading || draftCheckStarted.current) return;
@@ -563,9 +583,6 @@ function SchedulerContent() {
   );
   useSetMobileSubNav(focusAreaSubNav);
 
-  const visibleScheduleEmployees = useMemo(() => {
-    return filteredEmployees;
-  }, [filteredEmployees]);
 
   const highlightEmpIds = useMemo(() => {
     if (!staffSearch.trim()) return undefined;
@@ -810,7 +827,8 @@ function SchedulerContent() {
 
       const dateKey = formatDateKey(date);
       const key = `${empId}_${dateKey}`;
-      const existing = shifts[key];
+      // Read from ref to get the latest version, not the stale closure value
+      const existing = shiftsRef.current[key];
       const existingVersion = existing?.version;
 
       const handleConflict = async () => {
@@ -820,21 +838,35 @@ function SchedulerContent() {
       };
 
       if (label === "OFF" || shiftCodeIds.length === 0) {
-        const ex = shifts[key];
-        const deleteValue = {
-          label: "OFF", shiftCodeIds: [] as number[], isDraft: true, isDelete: true,
-          draftKind: (ex?.publishedShiftCodeIds?.length ? 'deleted' : 'new') as 'deleted' | 'new',
-          publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
-          publishedLabel: ex?.publishedLabel ?? '',
-          createdBy: ex?.createdBy ?? null,
-          updatedBy: currentUser?.id ?? null,
-        };
-        setShifts((prev) => ({ ...prev, [key]: deleteValue }));
-        db.deleteShift(empId, dateKey).catch((err) => {
-          toast.error("Failed to delete shift");
-          console.error(err);
-        });
-        broadcastDraftChanged({ shifts: { [key]: deleteValue } });
+        const ex = shiftsRef.current[key];
+        // Nothing to delete — cell is already empty
+        if (!ex || (ex.shiftCodeIds.length === 0 && !ex.publishedShiftCodeIds?.length)) return;
+
+        if (ex.publishedShiftCodeIds?.length) {
+          // Published shift being deleted → mark as draft-deleted
+          const deleteValue = {
+            label: "OFF", shiftCodeIds: [] as number[], isDraft: true, isDelete: true,
+            draftKind: 'deleted' as const,
+            publishedShiftCodeIds: ex.publishedShiftCodeIds,
+            publishedLabel: ex.publishedLabel ?? '',
+            createdBy: ex.createdBy ?? null,
+            updatedBy: currentUser?.id ?? null,
+          };
+          setShifts((prev) => ({ ...prev, [key]: deleteValue }));
+          db.deleteShift(empId, dateKey).catch((err) => {
+            toast.error("Failed to delete shift");
+            console.error(err);
+          });
+          broadcastDraftChanged({ shifts: { [key]: deleteValue } });
+        } else {
+          // Never-published draft being cleared → remove from map entirely
+          setShifts((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          db.deleteShift(empId, dateKey).catch((err) => {
+            toast.error("Failed to delete shift");
+            console.error(err);
+          });
+          broadcastDraftChanged({ shifts: { [key]: null } });
+        }
       } else {
         // Filter out any stale/archived shift code IDs
         const validCodeIds = shiftCodeIds.filter((id) => shiftCodeMap.has(id));
@@ -845,7 +877,7 @@ function SchedulerContent() {
         if (validCodeIds.length < shiftCodeIds.length) {
           toast.warning("Some shift codes were removed (no longer available)");
         }
-        const ex = shifts[key];
+        const ex = shiftsRef.current[key];
         const hasPublished = ex?.publishedShiftCodeIds?.length ?? 0;
         const upsertValue = {
           label, shiftCodeIds: validCodeIds, isDraft: true,
@@ -865,7 +897,7 @@ function SchedulerContent() {
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
-    [org?.id, shifts, canEditShifts, shiftCodeMap, broadcastDraftChanged],
+    [org?.id, canEditShifts, shiftCodeMap, broadcastDraftChanged, currentUser],
   );
 
   const getShiftStyle = useCallback(
@@ -893,9 +925,9 @@ function SchedulerContent() {
         orgId: "",
         label: type,
         name: type,
-        color: "#F8FAFC",
-        border: "#CBD5E1",
-        text:"#475569",
+        color: "var(--color-bg)",
+        border: "var(--color-border)",
+        text:"var(--color-text-muted)",
         sortOrder: 999,
       } satisfies ShiftCode;
     },
@@ -925,7 +957,7 @@ function SchedulerContent() {
         activeFocusAreaId: activeFaId,
       });
     },
-    [canEditNotes, focusAreas, getCellLock, lockCell],
+    [focusAreas, getCellLock, lockCell],
   );
 
   const handleShiftSelect = useCallback(
@@ -1119,11 +1151,58 @@ function SchedulerContent() {
       return;
     }
 
-    // Move shift: create at target, delete at source
-    setShift(dropData.empId, dropData.date, dragData.label, dragData.shiftCodeIds);
-    setShift(dragData.empId, dragData.date, "OFF", []);
-    toast.success("Shift moved");
-  }, [setShift, getCellLock, checkQualification]);
+    // Atomic move via RPC — prevents duplication on partial failure
+    const sourceEntry = shifts[sourceKey];
+
+    // Optimistic UI update
+    setShifts(prev => {
+      const next = { ...prev };
+      next[targetKey] = {
+        label: dragData.label, shiftCodeIds: dragData.shiftCodeIds,
+        isDraft: true, draftKind: 'new' as DraftKind,
+        publishedShiftCodeIds: prev[targetKey]?.publishedShiftCodeIds ?? [],
+        publishedLabel: prev[targetKey]?.publishedLabel ?? '',
+      };
+      if (sourceEntry?.publishedShiftCodeIds?.length) {
+        next[sourceKey] = {
+          label: "OFF", shiftCodeIds: [], isDraft: true, isDelete: true,
+          draftKind: 'deleted' as DraftKind,
+          publishedShiftCodeIds: sourceEntry.publishedShiftCodeIds,
+          publishedLabel: sourceEntry.publishedLabel ?? '',
+        };
+      } else {
+        delete next[sourceKey];
+      }
+      return next;
+    });
+
+    broadcastDraftChanged({
+      shifts: {
+        [targetKey]: { label: dragData.label, shiftCodeIds: dragData.shiftCodeIds, isDraft: true, draftKind: 'new' },
+        [sourceKey]: sourceEntry?.publishedShiftCodeIds?.length
+          ? { label: "OFF", shiftCodeIds: [], isDraft: true, draftKind: 'deleted' }
+          : null,
+      },
+    });
+
+    db.moveShift(
+      org!.id,
+      dragData.empId, dragData.dateKey,
+      dropData.empId, dropData.dateKey,
+      dragData.shiftCodeIds,
+      sourceEntry?.version,
+    ).then(() => {
+      toast.success("Shift moved");
+    }).catch(async (err) => {
+      if (err instanceof OptimisticLockError) {
+        toast.error("Shift was modified by another user — refreshing");
+      } else {
+        toast.error("Failed to move shift");
+        console.error(err);
+      }
+      await refetchScheduleData();
+    });
+  }, [shifts, org, getCellLock, checkQualification, broadcastDraftChanged, refetchScheduleData]);
 
   // ── Copy-paste handlers ──────────────────────────────────────────────────
   const handleCopyShift = useCallback((empId: string, date: Date) => {
@@ -1161,8 +1240,11 @@ function SchedulerContent() {
       toast.info(`Cell is being edited by ${lock.userName}`);
       return;
     }
-    setShift(empId, date, "OFF", []);
-  }, [setShift, getCellLock]);
+    const emp = employees.find(e => e.id === empId);
+    const empName = emp ? getEmployeeDisplayName(emp) : "";
+    const label = shiftForKey(empId, date) ?? "";
+    setPendingClearShift({ empId, date, empName, shiftLabel: label });
+  }, [getCellLock, employees, shiftForKey]);
 
   // Context menu handlers
   const handleCellContextMenu = useCallback((e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => {
@@ -1224,7 +1306,7 @@ function SchedulerContent() {
     const freshRecurringShifts = await db.fetchRecurringShifts(org.id, undefined, shiftCodeMap);
     setRecurringShifts(freshRecurringShifts);
 
-    // Count empty slots that would be filled (same logic as applyRecurringSchedules but client-side only)
+    // Count empty slots that would be filled (matches server-side RPC logic)
     const byEmp: Record<string, RecurringShift[]> = {};
     for (const rs of freshRecurringShifts) {
       if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
@@ -1232,24 +1314,22 @@ function SchedulerContent() {
     }
 
     let count = 0;
-    const current = new Date(startDate);
-    current.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
-
-    while (current <= end) {
-      const y = current.getFullYear();
-      const m = String(current.getMonth() + 1).padStart(2, '0');
-      const d = String(current.getDate()).padStart(2, '0');
-      const dateKey = `${y}-${m}-${d}`;
-      const dayOfWeek = current.getDay();
-
+    // DST-safe iteration using UTC arithmetic
+    for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
       for (const [empId, empShifts] of Object.entries(byEmp)) {
         if (shifts[`${empId}_${dateKey}`]) continue;
-        const candidates = empShifts.filter(rs => rs.dayOfWeek === dayOfWeek);
-        if (candidates.length > 0) count++;
+        // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
+        const candidates = empShifts
+          .filter(rs => rs.dayOfWeek === dayOfWeek)
+          .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+        const match = candidates.find(rs => {
+          const from = rs.effectiveFrom;
+          const until = rs.effectiveUntil;
+          return from <= dateKey && (!until || until >= dateKey);
+        });
+        // Also verify the shift code is still active (not archived)
+        if (match && shiftCodes.some(sc => sc.id === match.shiftCodeId)) count++;
       }
-      current.setDate(current.getDate() + 1);
     }
 
     if (count === 0) {
@@ -1260,7 +1340,7 @@ function SchedulerContent() {
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     setAutoFillPreview({ count, dateRange });
     setShowAutoFillConfirm(true);
-  }, [org, getAutoFillRange, shiftCodeMap, shifts]);
+  }, [org, getAutoFillRange, shiftCodes, shifts]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
@@ -1270,26 +1350,14 @@ function SchedulerContent() {
     try {
       const { startDate, endDate } = getAutoFillRange();
 
-      const generated = await db.applyRecurringSchedules(
-        org.id,
-        startDate,
-        endDate,
-        recurringShifts,
-        shifts,
-      );
+      // RPC reads fresh data from DB — no stale closures for recurringShifts/shifts
+      const generated = await db.applyRecurringSchedules(org.id, startDate, endDate);
 
       if (generated.length > 0) {
-        const shiftUpdates: Record<string, ShiftMap[string]> = {};
-        for (const { empId, date, label, shiftCodeId } of generated) {
-          const key = `${empId}_${date}`;
-          shiftUpdates[key] = {
-            label, shiftCodeIds: [shiftCodeId], isDraft: true, fromRecurring: true,
-            draftKind: 'new', publishedShiftCodeIds: [], publishedLabel: '',
-          };
-        }
-        setShifts(prev => ({ ...prev, ...shiftUpdates }));
+        // Refetch to get accurate state (including from_recurring flags)
+        await refetchScheduleData();
         toast.success(`Recurring schedule applied (${generated.length} shifts)`);
-        broadcastDraftChanged({ shifts: shiftUpdates });
+        broadcastDraftChanged({});
       } else {
         toast.info("No empty slots to fill");
       }
@@ -1300,7 +1368,7 @@ function SchedulerContent() {
       setIsApplyingRecurring(false);
       setAutoFillPreview(null);
     }
-  }, [org, getAutoFillRange, recurringShifts, shifts, broadcastDraftChanged]);
+  }, [org, getAutoFillRange, refetchScheduleData, broadcastDraftChanged]);
 
   // ── Import Previous Schedule ────────────────────────────────────────────────
 
@@ -1399,19 +1467,21 @@ function SchedulerContent() {
         }
       }
 
-      // Batch all upserts
-      await Promise.all(upsertPromises);
-
-      // Apply optimistic state update
+      // Apply optimistic state update immediately for responsive UI
       setShifts(prev => ({ ...prev, ...shiftUpdates }));
       broadcastDraftChanged({ shifts: shiftUpdates });
 
       const count = Object.keys(shiftUpdates).length;
       toast.success(`Imported ${count} shift${count !== 1 ? 's' : ''} from previous ${spanWeeks === 1 ? 'week' : '2 weeks'}`);
+
+      // Persist to DB in background
+      await Promise.all(upsertPromises);
+      // Always refetch to reconcile — catches race conditions where another user
+      // filled slots between preview and import
+      await refetchScheduleData();
     } catch (err) {
-      toast.error("Failed to import schedule");
+      toast.error("Failed to save some imported shifts — refreshing");
       console.error(err);
-      // Refetch to ensure consistency
       await refetchScheduleData();
     } finally {
       setIsImportingPrevious(false);
@@ -1466,6 +1536,8 @@ function SchedulerContent() {
         broadcastDraftChanged({ notes: { [key]: updated } });
       } catch (error) {
         console.error(error);
+        toast.error("Failed to save note");
+        setNotes(prev => ({ ...prev, [key]: existing }));
       }
     },
     [editPanel, org, notes, broadcastDraftChanged],
@@ -1497,6 +1569,14 @@ function SchedulerContent() {
     () => setWeekStart(getWeekStart(today)),
     [today],
   );
+
+  const handleSpanChange = useCallback((next: 1 | 2 | "month") => {
+    if (next !== "month") {
+      // Snap weekStart to Sunday when leaving month view
+      setWeekStart(prev => getWeekStart(prev));
+    }
+    setPreferredSpan(next);
+  }, []);
 
   const handlePublish = useCallback(async () => {
     if (!org) return;
@@ -1536,7 +1616,7 @@ function SchedulerContent() {
     } finally {
       setIsPublishing(false);
     }
-  }, [org, weekStart, monthStart, spanWeeks, canEditShifts, setIsPublishing, refetchScheduleData]);
+  }, [org, weekStart, monthStart, spanWeeks, refetchScheduleData]);
 
   const handleCancelChanges = useCallback(async (discardAll = false) => {
     if (!org || !currentUser) return;
@@ -1565,7 +1645,7 @@ function SchedulerContent() {
     } finally {
       setCancelingMode(null);
     }
-  }, [org, currentUser, canEditShifts, shiftCodeMap, broadcastDraftChanged, refetchScheduleData]);
+  }, [org, currentUser, broadcastDraftChanged, refetchScheduleData]);
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
@@ -1589,7 +1669,7 @@ function SchedulerContent() {
           flexDirection: "column",
           gap: 24,
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-          background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+          background: "linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-surface) 100%)",
           padding: 24,
           textAlign: "center",
         }}
@@ -1599,14 +1679,14 @@ function SchedulerContent() {
             width: 64,
             height: 64,
             borderRadius: "50%",
-            background: "#FEF2F2",
+            background: "var(--color-danger-bg)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             marginBottom: 8
           }}
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -1614,10 +1694,10 @@ function SchedulerContent() {
         </div>
 
         <div style={{ maxWidth: 400 }}>
-          <h1 style={{ fontSize: "var(--dg-fs-section-title)", fontWeight: 800, color: "#0F172A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+          <h1 style={{ fontSize: "var(--dg-fs-section-title)", fontWeight: 800, color: "var(--color-text-primary)", marginBottom: 12, letterSpacing: "-0.02em" }}>
             Workspace Setup Required
           </h1>
-          <p style={{ fontSize: "var(--dg-fs-title)", color: "#475569", lineHeight: 1.6, marginBottom: 32 }}>
+          <p style={{ fontSize: "var(--dg-fs-title)", color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 32 }}>
             Your account is active, but it looks like your workspace hasn't been initialized yet.
             Once your administrator completes the setup, you'll be able to access the schedule.
           </p>
@@ -1627,14 +1707,14 @@ function SchedulerContent() {
               onClick={() => window.location.reload()}
               style={{
                 padding: "12px 24px",
-                background: "#1B3A2D",
-                color: "#fff",
+                background: "var(--color-brand)",
+                color: "var(--color-surface)",
                 border: "none",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
                 cursor: "pointer",
-                transition: "opacity 0.2s"
+                transition: "opacity 150ms ease"
               }}
             >
               Check Again
@@ -1643,8 +1723,8 @@ function SchedulerContent() {
               onClick={() => window.location.href = "mailto:support@dubgrid.com"}
               style={{
                 padding: "12px 24px",
-                background: "#F1F5F9",
-                color: "#475569",
+                background: "var(--color-bg-secondary)",
+                color: "var(--color-text-secondary)",
                 border: "none",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
@@ -1658,7 +1738,7 @@ function SchedulerContent() {
         </div>
 
         {/* Technical details accessible only via hover/inspect for developers */}
-        <div style={{ marginTop: 40, opacity: 0.1, fontSize: 11, color: "var(--color-text-faint)" }}>
+        <div style={{ marginTop: 40, opacity: 0.1, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)" }}>
            System status: {loadError}
         </div>
       </div>
@@ -1688,7 +1768,7 @@ function SchedulerContent() {
             className="no-print"
             style={{
               position: "sticky",
-              top: 0,
+              top: 56,
               zIndex: 99,
               background: "var(--color-bg)",
             }}
@@ -1706,8 +1786,8 @@ function SchedulerContent() {
               />
             )}
             {!hasUnpublishedChanges && canEditShifts && publishHistory && publishHistory.changeCount > 0 && (
-              <div className="dg-draft-banner no-print" style={{ background: "#EEF2FF", borderColor: "#A5B4FC", color: "#3730A3" }}>
-                <div className="dg-draft-banner-dot" style={{ background: "#6366F1" }} />
+              <div className="dg-draft-banner no-print" style={{ background: "var(--color-info-bg)", borderColor: "var(--color-info-border)", color: "var(--color-info-text)" }}>
+                <div className="dg-draft-banner-dot" style={{ background: "var(--color-primary)" }} />
                 <span style={{ fontWeight: 600 }}>
                   Published {(() => {
                     const diff = Date.now() - new Date(publishHistory.publishedAt).getTime();
@@ -1725,7 +1805,7 @@ function SchedulerContent() {
                 </span>
                 <div className="dg-draft-banner-actions">
                   {isMobile ? (
-                    <span style={{ fontSize: 11, opacity: 0.6, fontStyle: "italic" }}>
+                    <span style={{ fontSize: "var(--dg-fs-footnote)", opacity: 0.6, fontStyle: "italic" }}>
                       Use a larger screen to view details
                     </span>
                   ) : (
@@ -1733,10 +1813,10 @@ function SchedulerContent() {
                       onClick={() => setShowPublishDiff(v => !v)}
                       className="dg-btn dg-btn-secondary"
                       style={{
-                        fontSize: 12,
+                        fontSize: "var(--dg-fs-caption)",
                         padding: "5px 12px",
-                        background: showPublishDiff ? "#E0E7FF" : undefined,
-                        color: showPublishDiff ? "#4338CA" : undefined,
+                        background: showPublishDiff ? "var(--color-info-bg)" : undefined,
+                        color: showPublishDiff ? "var(--color-accent-text)" : undefined,
                       }}
                     >
                       {showPublishDiff ? "Hide Changes" : "Show What Changed"}
@@ -1755,7 +1835,7 @@ function SchedulerContent() {
                 onPrev={handlePrev}
                 onNext={handleNext}
                 onToday={handleToday}
-                onSpanChange={setSpanWeeks}
+                onSpanChange={handleSpanChange}
                 onFocusAreaChange={setActiveFocusArea}
                 onStaffSearchChange={setStaffSearch}
                 canEditShifts={canEditShifts && canApplyRecurringSchedule}
@@ -1771,6 +1851,7 @@ function SchedulerContent() {
                 onRequestsToggle={() => setShowRequestBoard(prev => !prev)}
                 coverageGapCount={coverageGaps.length}
                 onCoverageToggle={() => setShowCoveragePanel(prev => !prev)}
+                hideTwoWeek={isSmallDesktop}
               />
             </div>
           </div>
@@ -1780,7 +1861,7 @@ function SchedulerContent() {
             {/* Mobile Day View */}
             {spanWeeks !== "month" && isMobile && (
               <MobileDayView
-                filteredEmployees={visibleScheduleEmployees}
+                filteredEmployees={filteredEmployees}
                 allEmployees={employees}
                 dates={dates.slice(0, 7)}
                 shiftForKey={shiftForKey}
@@ -1805,7 +1886,7 @@ function SchedulerContent() {
             {spanWeeks !== "month" && !isMobile && (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <ScheduleGrid
-              filteredEmployees={visibleScheduleEmployees}
+              filteredEmployees={filteredEmployees}
               allEmployees={employees}
               week1={week1}
               week2={week2}
@@ -1846,11 +1927,11 @@ function SchedulerContent() {
                     background: activeDrag.pillColor,
                     color: activeDrag.pillText,
                     border: `1px solid ${activeDrag.pillText}20`,
-                    borderRadius: 6,
+                    borderRadius: 8,
                     padding: "6px 16px",
                     fontSize: "var(--dg-fs-title)",
                     fontWeight: 800,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.1)",
+                    boxShadow: "var(--shadow-drag)",
                     cursor: "grabbing",
                     whiteSpace: "nowrap",
                   }}
@@ -1901,10 +1982,25 @@ function SchedulerContent() {
           />
         )}
 
+        {/* Confirm dialog for context-menu shift removal */}
+        {pendingClearShift && (
+          <ConfirmDialog
+            title="Remove Shift?"
+            message={`Remove "${pendingClearShift.shiftLabel}" from ${pendingClearShift.empName} on ${formatDate(pendingClearShift.date)}?`}
+            confirmLabel="Remove"
+            variant="danger"
+            onConfirm={() => {
+              setShift(pendingClearShift.empId, pendingClearShift.date, "OFF", []);
+              setPendingClearShift(null);
+            }}
+            onCancel={() => setPendingClearShift(null)}
+          />
+        )}
+
         {spanWeeks === "month" && (
           <MonthView
             monthStart={monthStart}
-            filteredEmployees={visibleScheduleEmployees}
+            filteredEmployees={filteredEmployees}
             shiftForKey={shiftForKey}
             shiftCodeIdsForKey={shiftCodeIdsForKey}
             getShiftStyle={getShiftStyle}

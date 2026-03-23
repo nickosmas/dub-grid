@@ -42,12 +42,12 @@ function timeRemainingLabel(expiresAt: string): string {
 }
 
 const STATUS_COLORS: Record<ShiftRequestStatus, { bg: string; text: string; border: string }> = {
-  open: { bg: "#DBEAFE", text: "#1D4ED8", border: "#93C5FD" },
-  pending_approval: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", border: "#FCD34D" },
-  approved: { bg: "#D1FAE5", text: "#065F46", border: "#6EE7B7" },
-  rejected: { bg: "#FEE2E2", text: "var(--color-danger-dark)", border: "var(--color-danger-border)" },
-  cancelled: { bg: "#F3F4F6", text: "#6B7280", border: "#D1D5DB" },
-  expired: { bg: "#F3F4F6", text: "#6B7280", border: "#D1D5DB" },
+  open: { bg: "var(--color-info-bg)", text: "var(--color-info-text)", border: "var(--color-info-border)" },
+  pending_approval: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", border: "var(--color-warning-border)" },
+  approved: { bg: "var(--color-success-bg)", text: "var(--color-success-text)", border: "var(--color-success)" },
+  rejected: { bg: "var(--color-danger-bg)", text: "var(--color-danger-dark)", border: "var(--color-danger-border)" },
+  cancelled: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)", border: "var(--color-border)" },
+  expired: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)", border: "var(--color-border)" },
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ export default function ShiftRequestBoard({
       <span
         style={{
           display: "inline-block",
-          fontSize: 10,
+          fontSize: "var(--dg-fs-footnote)",
           fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: "0.04em",
@@ -155,7 +155,7 @@ export default function ShiftRequestBoard({
           border: "1px solid var(--color-border)",
           borderRadius: 10,
           padding: "14px 16px",
-          background: "#fff",
+          background: "var(--color-surface)",
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -165,7 +165,7 @@ export default function ShiftRequestBoard({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <span
             style={{
-              fontSize: 13,
+              fontSize: "var(--dg-fs-label)",
               fontWeight: 700,
               color: "var(--color-text-primary)",
               overflow: "hidden",
@@ -183,7 +183,7 @@ export default function ShiftRequestBoard({
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <span
             style={{
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
               color: "var(--color-text-secondary)",
             }}
@@ -196,7 +196,7 @@ export default function ShiftRequestBoard({
               {renderSwapArrow()}
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
                   color: "var(--color-text-secondary)",
                 }}
@@ -210,7 +210,7 @@ export default function ShiftRequestBoard({
         {/* Expiry */}
         <div
           style={{
-            fontSize: 11,
+            fontSize: "var(--dg-fs-footnote)",
             color: "var(--color-text-muted)",
             display: "flex",
             alignItems: "center",
@@ -252,7 +252,7 @@ export default function ShiftRequestBoard({
           key="claim"
           className="dg-btn dg-btn-primary"
           onClick={() => onClaim(req.id)}
-          style={{ fontSize: 12, padding: "7px 14px" }}
+          style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Claim
         </button>,
@@ -266,7 +266,7 @@ export default function ShiftRequestBoard({
           key="accept"
           className="dg-btn dg-btn-primary"
           onClick={() => onRespond(req.id, true)}
-          style={{ fontSize: 12, padding: "7px 14px" }}
+          style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Accept
         </button>,
@@ -275,7 +275,7 @@ export default function ShiftRequestBoard({
           className="dg-btn dg-btn-ghost"
           onClick={() => onRespond(req.id, false)}
           style={{
-            fontSize: 12,
+            fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
             border: "1px solid var(--color-border)",
           }}
@@ -303,8 +303,8 @@ export default function ShiftRequestBoard({
                 minHeight: 56,
                 padding: "8px 10px",
                 border: "1px solid var(--color-border)",
-                borderRadius: 6,
-                fontSize: 12,
+                borderRadius: 8,
+                fontSize: "var(--dg-fs-caption)",
                 fontFamily: "inherit",
                 resize: "vertical",
                 outline: "none",
@@ -325,7 +325,7 @@ export default function ShiftRequestBoard({
                 }}
                 style={{
                   flex: 1,
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   padding: "7px 14px",
                 }}
               >
@@ -337,7 +337,7 @@ export default function ShiftRequestBoard({
                   setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))
                 }
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   padding: "7px 14px",
                   border: "1px solid var(--color-border)",
                 }}
@@ -353,7 +353,7 @@ export default function ShiftRequestBoard({
             key="approve"
             className="dg-btn dg-btn-primary"
             onClick={() => onResolve(req.id, true)}
-            style={{ fontSize: 12, padding: "7px 14px" }}
+            style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
           >
             Approve
           </button>,
@@ -364,7 +364,7 @@ export default function ShiftRequestBoard({
               setShowRejectInput((prev) => ({ ...prev, [req.id]: true }))
             }
             style={{
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               padding: "7px 14px",
               border: "1px solid var(--color-danger-border)",
               color: "var(--color-danger)",
@@ -384,7 +384,7 @@ export default function ShiftRequestBoard({
           className="dg-btn dg-btn-ghost"
           onClick={() => onCancel(req.id)}
           style={{
-            fontSize: 12,
+            fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
             border: "1px solid var(--color-danger-border)",
             color: "var(--color-danger)",
@@ -424,7 +424,7 @@ export default function ShiftRequestBoard({
             alignItems: "center",
             gap: 12,
             flexShrink: 0,
-            background: "#fff",
+            background: "var(--color-surface)",
           }}
         >
           {isMobile && (
@@ -462,7 +462,7 @@ export default function ShiftRequestBoard({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontSize: 15,
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
                 color: "var(--color-text-secondary)",
               }}
@@ -471,7 +471,7 @@ export default function ShiftRequestBoard({
             </div>
             <div
               style={{
-                fontSize: 12,
+                fontSize: "var(--dg-fs-caption)",
                 color: "var(--color-text-subtle)",
                 marginTop: 2,
               }}
@@ -486,7 +486,7 @@ export default function ShiftRequestBoard({
               style={{
                 border: "1px solid var(--color-border)",
                 padding: "4px 8px",
-                fontSize: 16,
+                fontSize: "var(--dg-fs-body)",
                 lineHeight: 1,
               }}
               title="Close"
@@ -501,7 +501,7 @@ export default function ShiftRequestBoard({
           style={{
             display: "flex",
             borderBottom: "1px solid var(--color-border)",
-            background: "#fff",
+            background: "var(--color-surface)",
             flexShrink: 0,
             overflowX: "auto",
           }}
@@ -517,7 +517,7 @@ export default function ShiftRequestBoard({
                   style={{
                     flex: 1,
                     padding: "10px 12px",
-                    fontSize: 12,
+                    fontSize: "var(--dg-fs-caption)",
                     fontWeight: isActive ? 700 : 500,
                     color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
                     background: "transparent",
@@ -543,10 +543,10 @@ export default function ShiftRequestBoard({
                       height: 18,
                       padding: "0 5px",
                       borderRadius: 9,
-                      fontSize: 10,
+                      fontSize: "var(--dg-fs-footnote)",
                       fontWeight: 700,
-                      background: isActive ? "var(--color-text-primary)" : "var(--color-bg-secondary)",
-                      color: isActive ? "#fff" : "var(--color-text-muted)",
+                      background: isActive ? "var(--color-brand)" : "var(--color-bg-secondary)",
+                      color: isActive ? "var(--color-text-inverse)" : "var(--color-text-muted)",
                       lineHeight: 1,
                     }}
                   >
@@ -573,7 +573,7 @@ export default function ShiftRequestBoard({
                 justifyContent: "center",
                 padding: "40px 0",
                 color: "var(--color-text-muted)",
-                fontSize: 13,
+                fontSize: "var(--dg-fs-label)",
               }}
             >
               Loading requests...
@@ -607,7 +607,7 @@ export default function ShiftRequestBoard({
               </svg>
               <span
                 style={{
-                  fontSize: 13,
+                  fontSize: "var(--dg-fs-label)",
                   color: "var(--color-text-muted)",
                   fontWeight: 500,
                 }}

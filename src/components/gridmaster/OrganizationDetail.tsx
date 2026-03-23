@@ -19,7 +19,7 @@ import type {
 } from "@/types";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
-import { BOX_SHADOW_CARD } from "@/lib/constants";
+import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 
 type Tab = "overview" | "users" | "employees" | "config" | "activity";
@@ -32,73 +32,19 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "activity", label: "Activity" },
 ];
 
-// ── Shared styles ────────────────────────────────────────────────────────────
-
-const sectionStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  overflow: "hidden",
-  boxShadow: BOX_SHADOW_CARD,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: "14px 20px",
-  borderBottom: "1px solid var(--color-border-light)",
-  fontWeight: 700,
-  fontSize: 14,
-  color: "var(--color-text-secondary)",
-};
-
-const sectionBodyStyle: React.CSSProperties = { padding: 20 };
-
-const thStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  fontSize: 11,
-  fontWeight: 700,
-  color: "var(--color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  textAlign: "left",
-  whiteSpace: "nowrap",
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  fontSize: 13,
-  color: "var(--color-text-primary)",
-  borderTop: "1px solid var(--color-border-light)",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "var(--color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  marginBottom: 6,
-  display: "block",
-};
-
-const roleBadgeColors: Record<string, { bg: string; text: string }> = {
-  super_admin: { bg: "#FEF3C7", text: "#92400E" },
-  admin: { bg: "#DBEAFE", text: "#1E40AF" },
-  user: { bg: "var(--color-surface-overlay)", text: "var(--color-text-muted)" },
-  gridmaster: { bg: "#F3E8FF", text: "#6B21A8" },
-};
-
 function RoleBadge({ role }: { role: string }) {
-  const c = roleBadgeColors[role] ?? roleBadgeColors.user;
+  const c = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
   return (
     <span
       style={{
         display: "inline-block",
-        fontSize: 11,
+        fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
         borderRadius: 4,
         background: c.bg,
         color: c.text,
+        border: `1px solid ${c.border}`,
         textTransform: "uppercase",
         letterSpacing: "0.03em",
       }}
@@ -116,7 +62,7 @@ function StatusDot({ status }: { status: string }) {
         ? "var(--color-warning)"
         : "var(--color-danger)";
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500 }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--dg-fs-caption)", fontWeight: 500 }}>
       <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
       <span style={{ textTransform: "capitalize", color: "var(--color-text-secondary)" }}>{status}</span>
     </span>
@@ -137,10 +83,10 @@ function shortTz(iana: string | null): string {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-subtle)", minWidth: 120, flexShrink: 0 }}>
+      <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-subtle)", minWidth: 120, flexShrink: 0 }}>
         {label}
       </span>
-      <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{value || "—"}</span>
+      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-primary)" }}>{value || "—"}</span>
     </div>
   );
 }
@@ -157,7 +103,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
       }}
     >
       <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{value}</div>
-      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -266,10 +212,10 @@ export default function OrganizationDetail({
         {organization.slug && (
           <span
             style={{
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               fontFamily: "var(--font-dm-mono), monospace",
               color: "var(--color-text-muted)",
-              background: "var(--color-surface-overlay)",
+              background: "var(--color-bg-secondary)",
               padding: "2px 8px",
               borderRadius: 4,
             }}
@@ -280,7 +226,7 @@ export default function OrganizationDetail({
         {organization.archivedAt && (
           <span
             style={{
-              fontSize: 11,
+              fontSize: "var(--dg-fs-footnote)",
               fontWeight: 600,
               padding: "2px 8px",
               borderRadius: 4,
@@ -294,7 +240,7 @@ export default function OrganizationDetail({
         )}
       </div>
       {organization.timezone && (
-        <div style={{ fontSize: 12, color: "var(--color-text-subtle)", marginBottom: 20 }}>
+        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 20 }}>
           {organization.timezone} ({shortTz(organization.timezone)})
         </div>
       )}
@@ -314,7 +260,7 @@ export default function OrganizationDetail({
             onClick={() => setTab(t.id)}
             style={{
               padding: "10px 18px",
-              fontSize: 13,
+              fontSize: "var(--dg-fs-label)",
               fontWeight: tab === t.id ? 700 : 500,
               color: tab === t.id ? "var(--color-text-primary)" : "var(--color-text-muted)",
               background: "transparent",
@@ -323,7 +269,7 @@ export default function OrganizationDetail({
               marginBottom: -2,
               cursor: "pointer",
               fontFamily: "inherit",
-              transition: "color 120ms ease",
+              transition: "color 150ms ease",
             }}
           >
             {t.label}
@@ -338,7 +284,7 @@ export default function OrganizationDetail({
             background: "var(--color-danger-bg)",
             color: "var(--color-danger)",
             borderRadius: 10,
-            fontSize: 13,
+            fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
             marginBottom: 16,
           }}
@@ -348,7 +294,7 @@ export default function OrganizationDetail({
       )}
 
       {tabLoading && (
-        <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: 13 }}>
+        <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
           Loading…
         </div>
       )}
@@ -476,7 +422,7 @@ function OverviewTab({
         <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Organization Details</span>
           {!editing && (
-            <button className="dg-btn dg-btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditing(true)}>
+            <button className="dg-btn dg-btn-ghost" style={{ fontSize: "var(--dg-fs-caption)" }} onClick={() => setEditing(true)}>
               Edit
             </button>
           )}
@@ -526,7 +472,7 @@ function OverviewTab({
       <div style={sectionStyle}>
         <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Custom Labels</span>
-          {editing && <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>Editing above</span>}
+          {editing && <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)" }}>Editing above</span>}
         </div>
         <div style={sectionBodyStyle}>
           {editing ? (
@@ -561,10 +507,10 @@ function OverviewTab({
         </div>
         <div style={{ ...sectionBodyStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+            <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
               {organization.archivedAt ? "Restore this organization" : "Archive this organization"}
             </div>
-            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+            <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
               {organization.archivedAt
                 ? "Restoring will make this organization active again."
                 : "Archiving hides the organization from active listings. Data is preserved."}
@@ -669,11 +615,11 @@ function UsersTab({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
           {users.length} user{users.length !== 1 ? "s" : ""}
         </span>
         <div style={{ flex: 1 }} />
-        <button className="dg-btn dg-btn-primary" style={{ padding: "7px 14px", fontSize: 13 }} onClick={() => setShowAddForm(!showAddForm)}>
+        <button className="dg-btn dg-btn-primary" style={{ padding: "7px 14px", fontSize: "var(--dg-fs-label)" }} onClick={() => setShowAddForm(!showAddForm)}>
           {showAddForm ? (
             "Cancel"
           ) : (
@@ -712,7 +658,7 @@ function UsersTab({
                 style={{ width: "100%" }}
               />
             </div>
-            <button type="submit" className="dg-btn dg-btn-primary" disabled={adding} style={{ fontSize: 12 }}>
+            <button type="submit" className="dg-btn dg-btn-primary" disabled={adding} style={{ fontSize: "var(--dg-fs-caption)" }}>
               {adding ? "Adding…" : "Add"}
             </button>
           </div>
@@ -761,11 +707,11 @@ function UsersTab({
                         />
                       )}
                     </td>
-                    <td style={{ ...tdStyle, fontSize: 11, color: "var(--color-text-muted)" }}>
+                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
                       {u.orgRole === "admin" ? (
                         <button
                           className="dg-btn dg-btn-ghost"
-                          style={{ fontSize: 11, padding: "2px 6px" }}
+                          style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px" }}
                           onClick={() => setEditingPerms(u)}
                         >
                           {u.adminPermissions
@@ -783,7 +729,7 @@ function UsersTab({
                         {onImpersonate && u.platformRole !== "gridmaster" && (
                           <button
                             className="dg-btn dg-btn-ghost"
-                            style={{ fontSize: 11, padding: "3px 6px" }}
+                            style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px" }}
                             onClick={() => onImpersonate(u.id)}
                           >
                             Impersonate
@@ -792,7 +738,7 @@ function UsersTab({
                         {u.orgRole !== "super_admin" && (
                           <button
                             className="dg-btn dg-btn-ghost"
-                            style={{ fontSize: 11, padding: "3px 6px", color: "var(--color-danger)" }}
+                            style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px", color: "var(--color-danger)" }}
                             onClick={() => setRemoveConfirm(u)}
                           >
                             Remove
@@ -876,7 +822,7 @@ function EmployeesTab({
               onClick={() => setShowStatus(tab.key)}
               style={{
                 padding: "8px 20px",
-                fontSize: 13,
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: isActive ? 700 : 500,
                 color: isActive ? tab.color : "var(--color-text-muted)",
                 background: "transparent",
@@ -888,13 +834,13 @@ function EmployeesTab({
                 gap: 6,
                 marginBottom: -1,
                 fontFamily: "inherit",
-                transition: "color 120ms ease, border-color 120ms ease",
+                transition: "color 150ms ease, border-color 150ms ease",
               }}
             >
               {tab.label}
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
                   background: isActive ? `${tab.color}15` : "var(--color-border-light)",
                   color: isActive ? tab.color : "var(--color-text-faint)",
@@ -936,8 +882,8 @@ function EmployeesTab({
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{getEmployeeDisplayName(emp)}</td>
                     <td style={tdStyle}><StatusDot status={emp.status} /></td>
                     <td style={{ ...tdStyle, textAlign: "center" }}>{emp.seniority}</td>
-                    <td style={{ ...tdStyle, fontSize: 12, color: "var(--color-text-muted)" }}>{emp.phone || "—"}</td>
-                    <td style={{ ...tdStyle, fontSize: 12, color: "var(--color-text-muted)" }}>{emp.email || "—"}</td>
+                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>{emp.phone || "—"}</td>
+                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>{emp.email || "—"}</td>
                   </tr>
                 ))
               )}
@@ -981,14 +927,14 @@ function ConfigTab({
         <div style={sectionHeaderStyle}>
           {organization.focusAreaLabel || "Focus Areas"} ({activeFocusAreas.length})
           {archivedFocusAreas.length > 0 && (
-            <span style={{ fontWeight: 400, fontSize: 12, color: "var(--color-text-muted)", marginLeft: 8 }}>
+            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
               +{archivedFocusAreas.length} archived
             </span>
           )}
         </div>
         <div style={sectionBodyStyle}>
           {activeFocusAreas.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeFocusAreas.map((fa) => (
@@ -997,8 +943,8 @@ function ConfigTab({
                   style={{
                     display: "inline-block",
                     padding: "5px 12px",
-                    borderRadius: 6,
-                    fontSize: 12,
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
                     background: fa.colorBg,
                     color: fa.colorText,
@@ -1017,14 +963,14 @@ function ConfigTab({
         <div style={sectionHeaderStyle}>
           Shift Codes ({activeShiftCodes.length})
           {archivedShiftCodes.length > 0 && (
-            <span style={{ fontWeight: 400, fontSize: 12, color: "var(--color-text-muted)", marginLeft: 8 }}>
+            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
               +{archivedShiftCodes.length} archived
             </span>
           )}
         </div>
         <div style={{ ...sectionBodyStyle, padding: activeShiftCodes.length > 0 ? 0 : sectionBodyStyle.padding }}>
           {activeShiftCodes.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -1067,8 +1013,8 @@ function ConfigTab({
                             minWidth: 32,
                             height: 26,
                             padding: "0 8px",
-                            borderRadius: 6,
-                            fontSize: 12,
+                            borderRadius: 8,
+                            fontSize: "var(--dg-fs-caption)",
                             fontWeight: 700,
                             background: sc.color,
                             color: sc.text,
@@ -1078,10 +1024,10 @@ function ConfigTab({
                           {sc.label}
                         </span>
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
                         {sc.name}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: 12, borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>
                         {sc.isOffDay ? (
                           <span style={{ color: "var(--color-text-muted)", fontWeight: 600 }}>Off Day</span>
                         ) : sc.isGeneral ? (
@@ -1090,13 +1036,13 @@ function ConfigTab({
                           <span style={{ color: "var(--color-text-subtle)" }}>Shift</span>
                         )}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: 12, fontFamily: "var(--font-dm-mono), monospace", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)", whiteSpace: "nowrap" }}>
                         {hasTime ? `${sc.defaultStartTime ?? "—"} – ${sc.defaultEndTime ?? "—"}` : "—"}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: 12, color: faName ? "var(--color-text-secondary)" : "var(--color-text-subtle)", fontWeight: faName ? 600 : 400, borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: faName ? "var(--color-text-secondary)" : "var(--color-text-subtle)", fontWeight: faName ? 600 : 400, borderBottom: "1px solid var(--color-border-light)" }}>
                         {faName ?? "Global"}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: 12, color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>
                         {certNames.length > 0 ? certNames.join(", ") : "—"}
                       </td>
                     </tr>
@@ -1115,7 +1061,7 @@ function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeCerts.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeCerts.map((c) => (
@@ -1124,10 +1070,10 @@ function ConfigTab({
                   style={{
                     display: "inline-block",
                     padding: "4px 10px",
-                    borderRadius: 6,
-                    fontSize: 12,
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-surface-overlay)",
+                    background: "var(--color-bg-secondary)",
                     color: "var(--color-text-secondary)",
                   }}
                 >
@@ -1146,7 +1092,7 @@ function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeRoles.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeRoles.map((r) => (
@@ -1155,10 +1101,10 @@ function ConfigTab({
                   style={{
                     display: "inline-block",
                     padding: "4px 10px",
-                    borderRadius: 6,
-                    fontSize: 12,
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-surface-overlay)",
+                    background: "var(--color-bg-secondary)",
                     color: "var(--color-text-secondary)",
                   }}
                 >
@@ -1177,7 +1123,7 @@ function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeIndicators.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeIndicators.map((ind) => (
@@ -1188,10 +1134,10 @@ function ConfigTab({
                     alignItems: "center",
                     gap: 6,
                     padding: "4px 10px",
-                    borderRadius: 6,
-                    fontSize: 12,
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-surface-overlay)",
+                    background: "var(--color-bg-secondary)",
                     color: "var(--color-text-secondary)",
                   }}
                 >

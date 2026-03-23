@@ -1,55 +1,76 @@
+/* ── Focus area colors from Calm Haven seed — shown as a 6px dot inside neutral badges ── */
 const FOCUS_AREAS = [
-  { name: "ICU", bg: "#DBEAFE", text: "#1E40AF" },
-  { name: "ER", bg: "#DCFCE7", text: "#166534" },
-  { name: "Rehab", bg: "#FEF3C7", text: "#92400E" },
+  { name: "Skilled Nursing", dotColor: "#FED7AA" },
+  { name: "Sheltered Care", dotColor: "#E9D5FF" },
+  { name: "Night Shift", dotColor: "#FECDD3" },
+  { name: "Visiting CSNS", dotColor: "#FDE68A" },
 ];
 
+/* ── Account statuses — matches real semantic colors ── */
 const STATUSES = [
-  { label: "Linked", bg: "#DCFCE7", text: "#166534" },
-  { label: "Invited", bg: "#FEF3C7", text: "#92400E" },
-  { label: "Not invited", bg: "#FEE2E2", text: "#991B1B" },
+  { label: "Linked", bg: "var(--color-info-bg)", text: "var(--color-link)" },
+  { label: "Invited", bg: "#FFFBEB", text: "#92400E" },
+  { label: "Not invited", bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
 ];
 
 const STAFF = [
   {
-    name: "Sarah Mitchell",
-    initials: "SM",
+    name: "Margaret Sullivan",
+    initials: "MS",
+    hue: 270,
+    focusAreas: [0],
+    cert: "JLCSN",
+    roles: "DCSN",
+    status: 0,
+  },
+  {
+    name: "Carol Henderson",
+    initials: "CH",
+    hue: 150,
+    focusAreas: [0, 1],
+    cert: "JLCSN",
+    roles: "Supv",
+    status: 0,
+  },
+  {
+    name: "Evelyn Hartwell",
+    initials: "EH",
+    hue: 30,
+    focusAreas: [0, 1],
+    cert: "JLCSN",
+    roles: "SC Mgr",
+    status: 0,
+  },
+  {
+    name: "Kevin Donovan",
+    initials: "KD",
     hue: 210,
     focusAreas: [0],
-    cert: "CSN III",
-    role: "Nurse",
-    status: 0,
+    cert: "STAFF",
+    roles: "",
+    status: 1,
   },
   {
-    name: "James Cooper",
-    initials: "JC",
-    hue: 150,
-    focusAreas: [1],
-    cert: "CSN II",
-    role: "Nurse",
-    status: 0,
-  },
-  {
-    name: "Maria Santos",
-    initials: "MS",
-    hue: 30,
-    focusAreas: [0, 2],
+    name: "Hannah Stratton",
+    initials: "HS",
+    hue: 340,
+    focusAreas: [2],
     cert: "JLCSN",
-    role: "Aide",
+    roles: "Supv",
     status: 0,
   },
   {
-    name: "David Park",
-    initials: "DP",
-    hue: 270,
-    focusAreas: [1],
-    cert: "CSN III",
-    role: "Nurse",
+    name: "Marilyn Davenport",
+    initials: "MD",
+    hue: 50,
+    focusAreas: [3],
+    cert: "JLCSN",
+    roles: "DVCSN",
     status: 2,
   },
 ];
 
-const HEADER_COLS = ["Name", "Assigned Focus Area", "Certification", "Roles", "Account"];
+const HEADER_COLS = ["Name", "Assigned Wings", "Certification", "Roles", "Account"];
 
 export default function StaffViewMockup() {
   return (
@@ -57,53 +78,58 @@ export default function StaffViewMockup() {
       style={{
         background: "#fff",
         borderRadius: 14,
-        border: "1px solid #CBD5E1",
+        border: "1px solid var(--color-border)",
         overflow: "hidden",
         boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06)",
       }}
     >
-      {/* Toolbar */}
+      {/* ── Tabs bar — matches real TabsTrigger line variant ── */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "8px 24px",
-          borderBottom: "1px solid #E2E8F0",
+          padding: "0 24px",
+          background: "#F8FAFC",
+          borderBottom: "1px solid var(--color-border)",
         }}
       >
-        {/* Status tabs */}
         <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
           {[
-            { label: "Active", color: "#0284C7", count: 4, active: true },
-            { label: "Benched", color: "#F59E0B", count: 0, active: false },
-            { label: "Terminated", color: "#EF4444", count: 0, active: false },
+            { label: "Active", count: 6, active: true },
+            { label: "Benched", count: 0, active: false },
+            { label: "Terminated", count: 0, active: false },
           ].map((tab) => (
             <span
               key={tab.label}
               style={{
-                padding: "8px 20px",
+                padding: "12px 12px",
                 fontSize: 13,
-                fontWeight: tab.active ? 700 : 500,
-                color: tab.active ? tab.color : "#64748B",
-                borderBottom: tab.active
-                  ? `2px solid ${tab.color}`
-                  : "2px solid transparent",
+                fontWeight: tab.active ? 600 : 400,
+                color: tab.active ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                borderBottom: tab.active ? "2px solid var(--color-text-primary)" : "2px solid transparent",
                 cursor: "default",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
+                position: "relative",
               }}
             >
               {tab.label}
               <span
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  height: 16,
+                  minWidth: 16,
                   borderRadius: 10,
-                  padding: "1px 7px",
-                  background: tab.active ? `${tab.color}15` : "#F1F5F9",
-                  color: tab.active ? tab.color : "#64748B",
+                  padding: "0 4px",
+                  background: tab.active ? "var(--color-bg-secondary)" : "var(--color-bg-secondary)",
+                  color: tab.active ? "var(--color-text-muted)" : "var(--color-text-subtle)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
                 }}
               >
                 {tab.count}
@@ -112,7 +138,7 @@ export default function StaffViewMockup() {
           ))}
         </div>
 
-        {/* Search */}
+        {/* Search — matches .dg-input style */}
         <div className="hidden sm:block" style={{ position: "relative", minWidth: 160 }}>
           <svg
             style={{
@@ -120,7 +146,7 @@ export default function StaffViewMockup() {
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#94A3B8",
+              color: "var(--color-text-faint)",
             }}
             width="13"
             height="13"
@@ -136,13 +162,14 @@ export default function StaffViewMockup() {
           </svg>
           <div
             style={{
-              height: 30,
+              height: 34,
               borderRadius: 10,
-              border: "1px solid #E2E8F0",
+              border: "1px solid var(--color-border)",
               background: "#fff",
               paddingLeft: 32,
-              fontSize: 12,
-              color: "#94A3B8",
+              fontSize: 13,
+              fontWeight: 500,
+              color: "var(--color-text-faint)",
               display: "flex",
               alignItems: "center",
             }}
@@ -152,23 +179,35 @@ export default function StaffViewMockup() {
         </div>
       </div>
 
-      {/* Header row */}
+      {/* ── Header row — matches real grid columns and styling ── */}
       <div
         className="hidden sm:grid"
         style={{
-          gridTemplateColumns: "1.4fr 0.8fr 0.5fr 0.5fr 0.45fr",
+          gridTemplateColumns: "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px",
           padding: "12px 24px",
           background: "#FAFBFC",
-          borderBottom: "1px solid #E2E8F0",
+          borderBottom: "1px solid var(--color-border-light)",
         }}
       >
+        {/* Checkbox column header */}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <div
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: 3,
+              border: "1.5px solid var(--color-border)",
+              background: "#fff",
+            }}
+          />
+        </div>
         {HEADER_COLS.map((col) => (
           <span
             key={col}
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "#64748B",
+              color: "var(--color-text-subtle)",
               letterSpacing: "0.06em",
               display: "flex",
               alignItems: "center",
@@ -177,9 +216,11 @@ export default function StaffViewMockup() {
             {col}
           </span>
         ))}
+        {/* Menu column spacer */}
+        <div />
       </div>
 
-      {/* Rows */}
+      {/* ── Rows ── */}
       {STAFF.map((person, idx) => {
         const status = STATUSES[person.status];
         return (
@@ -187,13 +228,26 @@ export default function StaffViewMockup() {
             key={person.name}
             style={{
               display: "grid",
-              gridTemplateColumns: "1.4fr 0.8fr 0.5fr 0.5fr 0.45fr",
+              gridTemplateColumns: "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px",
               alignItems: "center",
               padding: "14px 24px",
-              borderTop: idx > 0 ? "1px solid #E2E8F0" : undefined,
-              transition: "all 0.15s ease",
+              borderTop: idx > 0 ? "1px solid var(--color-border-light)" : undefined,
+              transition: "background 150ms ease",
             }}
           >
+            {/* Checkbox */}
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <div
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 3,
+                  border: "1.5px solid var(--color-border)",
+                  background: "#fff",
+                }}
+              />
+            </div>
+
             {/* Name + avatar */}
             <div
               style={{
@@ -216,7 +270,7 @@ export default function StaffViewMockup() {
                   background: `hsl(${person.hue}, 70%, 92%)`,
                   color: `hsl(${person.hue}, 70%, 35%)`,
                   border: `1px solid hsl(${person.hue}, 70%, 85%)`,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
                   flexShrink: 0,
                 }}
               >
@@ -227,7 +281,7 @@ export default function StaffViewMockup() {
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: "#1E293B",
+                    color: "var(--color-text-secondary)",
                     lineHeight: 1.3,
                   }}
                 >
@@ -236,7 +290,7 @@ export default function StaffViewMockup() {
               </div>
             </div>
 
-            {/* Focus areas */}
+            {/* Focus areas — neutral badge with color dot (matches real StaffView) */}
             <div
               className="hidden sm:flex"
               style={{
@@ -251,22 +305,35 @@ export default function StaffViewMockup() {
                   <span
                     key={fa.name}
                     style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
                       fontSize: 11,
                       fontWeight: 600,
                       borderRadius: 20,
                       padding: "2px 8px",
-                      background: fa.bg,
-                      color: fa.text,
+                      background: "var(--color-bg-secondary)",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border-light)",
                       whiteSpace: "nowrap",
                     }}
                   >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: fa.dotColor,
+                        flexShrink: 0,
+                      }}
+                    />
                     {fa.name}
                   </span>
                 );
               })}
             </div>
 
-            {/* Certification */}
+            {/* Certification — matches real: var(--color-border-light) bg, var(--color-text-muted) text */}
             <div className="hidden sm:block">
               <span
                 style={{
@@ -274,8 +341,8 @@ export default function StaffViewMockup() {
                   fontWeight: 600,
                   borderRadius: 20,
                   padding: "3px 9px",
-                  background: "#E2E8F0",
-                  color: "#475569",
+                  background: "var(--color-border-light)",
+                  color: "var(--color-text-muted)",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -283,24 +350,19 @@ export default function StaffViewMockup() {
               </span>
             </div>
 
-            {/* Roles */}
+            {/* Roles — plain text, not badge (matches real StaffView) */}
             <div className="hidden sm:block">
               <span
                 style={{
                   fontSize: 11,
-                  fontWeight: 600,
-                  borderRadius: 20,
-                  padding: "3px 9px",
-                  background: "#F1F5F9",
-                  color: "#475569",
-                  whiteSpace: "nowrap",
+                  color: "var(--color-text-muted)",
                 }}
               >
-                {person.role}
+                {person.roles || "—"}
               </span>
             </div>
 
-            {/* Account */}
+            {/* Account status */}
             <div
               className="hidden sm:flex"
               style={{ justifyContent: "flex-start" }}
@@ -318,6 +380,18 @@ export default function StaffViewMockup() {
               >
                 {status.label}
               </span>
+            </div>
+
+            {/* Menu chevron */}
+            <div
+              className="hidden sm:flex"
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--color-text-faint)",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </div>
           </div>
         );

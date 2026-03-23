@@ -52,20 +52,10 @@ export default function SuperAdminLoginPage() {
           minHeight: "100vh",
           padding: "20px",
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-          background: "#0F172A",
+          background: "var(--color-surface)",
         }}
       >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "360px",
-            padding: "32px",
-            background: "#1E293B",
-            borderRadius: "12px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-            border: "1px solid #334155",
-          }}
-        >
+        <div className="dg-auth-card">
           <div
             style={{
               display: "flex",
@@ -73,15 +63,15 @@ export default function SuperAdminLoginPage() {
               marginBottom: "24px",
             }}
           >
-            <DubGridLogo size={48} color="#F8FAFC" />
+            <DubGridLogo size={52} />
           </div>
           <h1
             style={{
-              fontSize: "20px",
+              fontSize: "var(--dg-fs-card-title)",
               fontWeight: 700,
               marginBottom: "24px",
               textAlign: "center",
-              color: "#F8FAFC",
+              color: "var(--color-text-primary)",
             }}
           >
             Gridmaster Portal
@@ -91,12 +81,12 @@ export default function SuperAdminLoginPage() {
             <div
               style={{
                 padding: "12px",
-                background: "#7F1D1D",
-                color: "#FECACA",
-                borderRadius: "6px",
+                background: "var(--color-danger-bg)",
+                color: "var(--color-danger-text)",
+                borderRadius: 10,
                 fontSize: "14px",
                 marginBottom: "16px",
-                border: "1px solid #991B1B",
+                border: "1px solid var(--color-danger-border)",
               }}
             >
               {message}
@@ -111,10 +101,10 @@ export default function SuperAdminLoginPage() {
               <label
                 style={{
                   display: "block",
-                  fontSize: "14px",
+                  fontSize: "var(--dg-fs-body-sm)",
                   fontWeight: 500,
                   marginBottom: "6px",
-                  color:"#64748B",
+                  color: "var(--color-text-muted)",
                 }}
               >
                 Email
@@ -124,15 +114,8 @@ export default function SuperAdminLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  border: "1px solid #334155",
-                  borderRadius: "6px",
-                  fontSize: "15px",
-                  background: "#0F172A",
-                  color: "#F8FAFC",
-                }}
+                className="dg-input"
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -140,10 +123,10 @@ export default function SuperAdminLoginPage() {
               <label
                 style={{
                   display: "block",
-                  fontSize: "14px",
+                  fontSize: "var(--dg-fs-body-sm)",
                   fontWeight: 500,
                   marginBottom: "6px",
-                  color:"#64748B",
+                  color: "var(--color-text-muted)",
                 }}
               >
                 Password
@@ -153,15 +136,8 @@ export default function SuperAdminLoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  border: "1px solid #334155",
-                  borderRadius: "6px",
-                  fontSize: "15px",
-                  background: "#0F172A",
-                  color: "#F8FAFC",
-                }}
+                className="dg-input"
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -172,20 +148,20 @@ export default function SuperAdminLoginPage() {
                 marginTop: "8px",
                 width: "100%",
                 padding: "12px",
-                background: "#2563EB",
+                background: "var(--color-brand)",
                 color: "#fff",
                 border: "none",
-                borderRadius: "6px",
-                fontSize: "15px",
+                borderRadius: 999,
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer",
-                transition: "background 0.2s",
+                transition: "background 150ms ease",
               }}
               onMouseOver={(e) => {
-                if (!loading) e.currentTarget.style.background = "#1D4ED8";
+                if (!loading) e.currentTarget.style.background = "var(--color-brand-light)";
               }}
               onMouseOut={(e) => {
-                if (!loading) e.currentTarget.style.background = "#2563EB";
+                if (!loading) e.currentTarget.style.background = "var(--color-brand)";
               }}
             >
               {message === "Redirecting..."
@@ -200,8 +176,8 @@ export default function SuperAdminLoginPage() {
             style={{
               marginTop: "24px",
               textAlign: "center",
-              fontSize: "13px",
-              color:"#475569",
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-muted)",
               display: "flex",
               flexDirection: "column",
               gap: "8px",
@@ -214,7 +190,7 @@ export default function SuperAdminLoginPage() {
               style={{
                 background: "none",
                 border: "none",
-                color:"#64748B",
+                color: "var(--color-text-subtle)",
                 cursor: "pointer",
                 padding: 0,
                 textDecoration: "underline",
@@ -228,7 +204,7 @@ export default function SuperAdminLoginPage() {
               style={{
                 background: "none",
                 border: "none",
-                color:"#475569",
+                color: "var(--color-text-muted)",
                 cursor: "pointer",
                 padding: 0,
                 textDecoration: "underline",

@@ -42,9 +42,9 @@ beforeEach(() => {
 });
 
 describe("Toolbar — schedule mode rendering", () => {
-  it("renders ‹ previous button", () => {
+  it("renders previous period button", () => {
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "‹" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous period" })).toBeInTheDocument();
   });
 
   it("renders Today button", () => {
@@ -52,9 +52,9 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
   });
 
-  it("renders › next button", () => {
+  it("renders next period button", () => {
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "›" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next period" })).toBeInTheDocument();
   });
 
   it("renders date label showing the current period", () => {
@@ -114,17 +114,17 @@ describe("Toolbar — active state styles", () => {
 });
 
 describe("Toolbar — callbacks", () => {
-  it("clicking ‹ calls onPrev", async () => {
+  it("clicking previous chevron calls onPrev", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "‹" }));
+    await user.click(screen.getByRole("button", { name: "Previous period" }));
     expect(defaultProps.onPrev).toHaveBeenCalledTimes(1);
   });
 
-  it("clicking › calls onNext", async () => {
+  it("clicking next chevron calls onNext", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "›" }));
+    await user.click(screen.getByRole("button", { name: "Next period" }));
     expect(defaultProps.onNext).toHaveBeenCalledTimes(1);
   });
 

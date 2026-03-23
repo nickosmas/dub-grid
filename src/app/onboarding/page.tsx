@@ -73,7 +73,7 @@ export default function OnboardingPage() {
         minHeight: "100vh",
         padding: "24px",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)",
+        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-info-bg) 100%)",
       }}
     >
       <div
@@ -92,11 +92,11 @@ export default function OnboardingPage() {
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "32px" }}>
           <div style={{ 
             padding: "16px", 
-            background: "linear-gradient(135deg, #1B3A2D 0%, #2D5A47 100%)", 
+            background: "var(--color-brand)",
             borderRadius: "20px",
-            boxShadow: "0 8px 16px rgba(27, 58, 45, 0.2)"
+            boxShadow: "0 8px 16px rgba(3, 87, 202, 0.25)"
           }}>
-            <DubGridLogo size={40} color="#fff" />
+            <DubGridLogo size={40} color="var(--color-text-inverse)" />
           </div>
         </div>
 
@@ -132,14 +132,14 @@ export default function OnboardingPage() {
               width: "100%",
               padding: "14px",
               background: "var(--color-brand)",
-              color: "#fff",
+              color: "var(--color-text-inverse)",
               border: "none",
               borderRadius: "12px",
               fontSize: "16px",
               fontWeight: 700,
               cursor: "pointer",
-              transition: "transform 0.15s, box-shadow 0.15s",
-              boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
+              transition: "transform 150ms ease, box-shadow 150ms ease",
+              boxShadow: "0 4px 12px rgba(3, 87, 202, 0.2)",
             }}
           >
             {checking ? "Checking..." : "I've been invited — refresh"}
@@ -150,21 +150,21 @@ export default function OnboardingPage() {
             style={{
               width: "100%",
               padding: "14px",
-              background: "var(--color-surface-overlay)",
+              background: "var(--color-bg-secondary)",
               color: "var(--color-text-muted)",
               border: "none",
               borderRadius: "12px",
               fontSize: "15px",
               fontWeight: 600,
               cursor: "pointer",
-              transition: "background 0.2s",
+              transition: "background 150ms ease",
             }}
           >
             Sign Out
           </button>
         </div>
         
-        <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid var(--color-surface-overlay)" }}>
+        <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid var(--color-bg-secondary)" }}>
           <p style={{ fontSize: "14px", color:"var(--color-text-subtle)" }}>
             Setting up a new facility? <br />
             <a href="mailto:support@dubgrid.com" style={{ color: "var(--color-link)", fontWeight: 600, textDecoration: "none" }}>Contact us</a>

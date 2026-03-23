@@ -3,5 +3,6 @@ const fontStub = () => ({ variable: "", className: "" });
 
 export const DM_Sans = fontStub;
 export const DM_Mono = fontStub;
+export const Geist = fontStub;
 export const Inter = fontStub;
 export const Roboto = fontStub;

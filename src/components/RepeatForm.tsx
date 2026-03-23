@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { SeriesFrequency, ShiftCode } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { MAX_SERIES_OCCURRENCES, MS_PER_DAY } from "@/lib/constants";
+import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
+import { iterateDateRange } from "@/lib/utils";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -33,7 +34,7 @@ function formatLocalDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Compute occurrence dates (mirrors generateSeriesDates in db.ts). */
+/** Compute occurrence dates (mirrors generateSeriesDates in db.ts). DST-safe. */
 function countOccurrences(
   frequency: SeriesFrequency,
   daysOfWeek: number[] | null,
@@ -43,32 +44,31 @@ function countOccurrences(
 ): string[] {
   const dates: string[] = [];
   const start = new Date(startDate + 'T00:00:00');
-  const end = endDate ? new Date(endDate + 'T00:00:00') : null;
-  const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES; // 6 months
+  const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
 
-  const current = new Date(start);
+  const maxEnd = endDate
+    ? new Date(endDate + 'T00:00:00')
+    : new Date(start.getFullYear(), start.getMonth() + 7, start.getDate());
+  const startDayOfWeek = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())).getUTCDay();
 
-  while (dates.length < cap) {
-    if (end && current > end) break;
-
-    const y = current.getFullYear();
-    const mo = String(current.getMonth() + 1).padStart(2, '0');
-    const d = String(current.getDate()).padStart(2, '0');
-    const dayOfWeek = current.getDay();
+  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
+    if (dates.length >= cap) break;
 
     let include = false;
+    const dayMatch = (daysOfWeek === null || daysOfWeek.length === 0)
+      ? dayOfWeek === startDayOfWeek
+      : daysOfWeek.includes(dayOfWeek);
+
     if (frequency === 'daily') {
       include = true;
     } else if (frequency === 'weekly') {
-      include = !daysOfWeek?.length || daysOfWeek.includes(dayOfWeek);
+      include = dayMatch;
     } else if (frequency === 'biweekly') {
-      const diffDays = Math.round((current.getTime() - start.getTime()) / MS_PER_DAY);
-      const weekNum = Math.floor(diffDays / 7);
-      include = weekNum % 2 === 0 && (!daysOfWeek?.length || daysOfWeek.includes(dayOfWeek));
+      const weekNum = Math.floor(dayIndex / 7);
+      include = weekNum % 2 === 0 && dayMatch;
     }
 
-    if (include) dates.push(`${y}-${mo}-${d}`);
-    current.setDate(current.getDate() + 1);
+    if (include) dates.push(dateKey);
   }
 
   return dates;
@@ -156,7 +156,7 @@ export default function RepeatForm({
         onClick={onBack}
         className="dg-btn dg-btn-ghost"
         style={{
-          fontSize: 12,
+          fontSize: "var(--dg-fs-caption)",
           padding: "5px 10px",
           marginBottom: 12,
           display: "flex",
@@ -189,9 +189,9 @@ export default function RepeatForm({
               background: shiftCode.color,
               color: shiftCode.text,
               border: `1px solid ${shiftCode.border}`,
-              borderRadius: 6,
+              borderRadius: 8,
               padding: "1px 7px",
-              fontSize: 11,
+              fontSize: "var(--dg-fs-footnote)",
               fontWeight: 800,
             }}
           >
@@ -236,14 +236,14 @@ export default function RepeatForm({
                     height: 38,
                     borderRadius: "50%",
                     border: `1.5px solid ${active ? "var(--color-brand)" : "var(--color-border)"}`,
-                    background: active ? "var(--color-brand)" : "#fff",
-                    color: active ? "#fff" : "var(--color-text-muted)",
+                    background: active ? "var(--color-brand)" : "var(--color-surface)",
+                    color: active ? "var(--color-text-inverse)" : "var(--color-text-muted)",
                     fontWeight: 700,
-                    fontSize: 12,
+                    fontSize: "var(--dg-fs-caption)",
                     cursor: "pointer",
                     flexShrink: 0,
                     fontFamily: "inherit",
-                    transition: "background 150ms, border-color 150ms",
+                    transition: "background 150ms ease, border-color 150ms ease",
                   }}
                 >
                   {name}
@@ -252,7 +252,7 @@ export default function RepeatForm({
             })}
           </div>
           {daysOfWeek.length === 0 && (
-            <div style={{ fontSize: 11, color: "var(--color-danger)", marginTop: 4 }}>
+            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
               Select at least one day.
             </div>
           )}
@@ -268,7 +268,7 @@ export default function RepeatForm({
           min={todayStr}
           onChange={e => setStart(e.target.value)}
           className="dg-input"
-          style={{ width: "100%", fontSize: 13 }}
+          style={{ width: "100%", fontSize: "var(--dg-fs-label)" }}
         />
       </div>
 
@@ -287,7 +287,7 @@ export default function RepeatForm({
                 onChange={() => setEndType(type)}
                 style={{ accentColor: "var(--color-brand)" }}
               />
-              <span style={{ fontSize: 13, color: "var(--color-text-secondary)", fontWeight: 500 }}>
+              <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)", fontWeight: 500 }}>
                 {type === 'never' ? 'Never' : type === 'on_date' ? 'On date' : 'After N occurrences'}
               </span>
               {type === 'on_date' && endType === 'on_date' && (
@@ -298,7 +298,7 @@ export default function RepeatForm({
                   onChange={e => setEndDate(e.target.value)}
                   className="dg-input"
                   style={{
-                    fontSize: 12, padding: "4px 8px", flex: 1,
+                    fontSize: "var(--dg-fs-caption)", padding: "4px 8px", flex: 1,
                     ...(endDateInvalid ? { borderColor: "var(--color-danger)" } : {}),
                   }}
                 />
@@ -311,14 +311,14 @@ export default function RepeatForm({
                   value={afterN}
                   onChange={e => setAfterN(Math.min(MAX_SERIES_OCCURRENCES, Math.max(1, parseInt(e.target.value) || 1)))}
                   className="dg-input"
-                  style={{ fontSize: 12, padding: "4px 8px", width: 70 }}
+                  style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 8px", width: 70 }}
                 />
               )}
             </label>
           ))}
         </div>
         {endDateInvalid && (
-          <div style={{ fontSize: 11, color: "var(--color-danger)", marginTop: 4 }}>
+          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
             End date must be on or after start date.
           </div>
         )}
@@ -331,9 +331,9 @@ export default function RepeatForm({
             marginTop: 16,
             padding: "10px 12px",
             borderRadius: 8,
-            background: preview.overwrites > 0 ? "var(--color-warning-bg)" : "#F0FDF4",
-            border: `1px solid ${preview.overwrites > 0 ? "#F59E0B" : "#BBF7D0"}`,
-            fontSize: 12,
+            background: preview.overwrites > 0 ? "var(--color-warning-bg)" : "var(--color-success-bg)",
+            border: `1px solid ${preview.overwrites > 0 ? "var(--color-warning)" : "var(--color-info-border)"}`,
+            fontSize: "var(--dg-fs-caption)",
             lineHeight: 1.5,
             color: "var(--color-text-secondary)",
           }}
@@ -376,7 +376,7 @@ export default function RepeatForm({
 }
 
 const sectionLabelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: "var(--dg-fs-footnote)",
   fontWeight: 700,
   color: "var(--color-text-subtle)",
   textTransform: "uppercase",

@@ -15,6 +15,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com"),
   title: "DubGrid",
   description: "Smart staff scheduling for care facilities",
   icons: {
@@ -52,6 +53,7 @@ import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
 import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -70,7 +72,9 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <AuthProvider>
           <MobileSubNavProvider>
-            <AppShell>{children}</AppShell>
+            <TooltipProvider>
+              <AppShell>{children}</AppShell>
+            </TooltipProvider>
           </MobileSubNavProvider>
         </AuthProvider>
         <Analytics />

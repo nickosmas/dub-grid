@@ -85,7 +85,7 @@ export default function PrintOptionsModal({
             onClick={onClose}
             aria-label="Close print options"
             className="dg-btn dg-btn-ghost"
-            style={{ padding: "4px 8px", fontSize: 18, lineHeight: 1 }}
+            style={{ padding: "4px 8px", fontSize: "var(--dg-fs-title)", lineHeight: 1 }}
           >
             ×
           </button>
@@ -95,7 +95,7 @@ export default function PrintOptionsModal({
         <div style={{ marginBottom: 20 }}>
           <div
             style={{
-              fontSize: 11,
+              fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
               color: "var(--color-text-subtle)",
               letterSpacing: "0.07em",
@@ -119,7 +119,7 @@ export default function PrintOptionsModal({
           {spanWeeks === "month" && (
             <div
               style={{
-                fontSize: 11,
+                fontSize: "var(--dg-fs-footnote)",
                 color: "var(--color-text-muted)",
                 marginTop: 6,
               }}
@@ -133,7 +133,7 @@ export default function PrintOptionsModal({
         <div style={{ marginBottom: 20 }}>
           <div
             style={{
-              fontSize: 11,
+              fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
               color: "var(--color-text-subtle)",
               letterSpacing: "0.07em",
@@ -161,7 +161,7 @@ export default function PrintOptionsModal({
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: 11,
+                fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
                 color: "var(--color-text-subtle)",
                 letterSpacing: "0.07em",
@@ -185,9 +185,9 @@ export default function PrintOptionsModal({
                   gap: 10,
                   padding: "9px 14px",
                   cursor: "pointer",
-                  background: "var(--color-surface-overlay)",
+                  background: "var(--color-bg-secondary)",
                   borderBottom: "1px solid var(--color-border)",
-                  fontSize: 13,
+                  fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
                   color: "var(--color-text-secondary)",
                 }}
@@ -196,7 +196,7 @@ export default function PrintOptionsModal({
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  style={{ accentColor: "#0F172A", width: 14, height: 14 }}
+                  style={{ accentColor: "var(--color-text-primary)", width: 14, height: 14 }}
                 />
                 All Focus Areas
               </label>
@@ -214,7 +214,7 @@ export default function PrintOptionsModal({
                       i < focusAreas.length - 1
                         ? "1px solid var(--color-border-light)"
                         : "none",
-                    fontSize: 13,
+                    fontSize: "var(--dg-fs-label)",
                     color: "var(--color-text-secondary)",
                   }}
                 >
@@ -222,7 +222,7 @@ export default function PrintOptionsModal({
                     type="checkbox"
                     checked={selectedFocusAreas.includes(w.name)}
                     onChange={() => toggleFocusArea(w.name)}
-                    style={{ accentColor: "#0F172A", width: 14, height: 14 }}
+                    style={{ accentColor: "var(--color-text-primary)", width: 14, height: 14 }}
                   />
                   {w.name}
                 </label>

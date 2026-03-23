@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
-import { borderColor } from "@/lib/colors";
-import { BOX_SHADOW_CARD } from "@/lib/constants";
+import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
+import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { Employee, FocusArea, ShiftCode, NamedItem, Invitation } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import { isEmployeeQualified } from "@/lib/schedule-logic";
@@ -19,8 +19,21 @@ import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
+import { useStaffFilters, useStaffSelection, useStaffReorder, StaffTableRow, StaffEmptyState, StaffPagination, StaffDetailPanel, StaffToolbar, StaffFilterPopover, StaffContextBar } from "./staff";
+import type { EmployeeTab } from "./staff";
+import {
+  SidebarProvider,
+  SidebarInset,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const EMPTY_CODE_MAP = new Map<number, string>();
 
 type StaffSection = "members" | "recurring-schedule" | "focus-areas" | "certifications" | "roles";
@@ -57,68 +70,6 @@ function hashCode(s: string): number {
   return Math.abs(h);
 }
 
-// ── Sidebar link (mirrors SettingsPage) ───────────────────────────────────────
-function SidebarLink({
-  label,
-  icon,
-  active,
-  href,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  href: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <Link
-      href={href}
-      replace
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        width: "100%",
-        padding: "8px 12px",
-        background: active
-          ? "var(--color-surface-overlay)"
-          : hovered
-          ? "rgba(0,0,0,0.03)"
-          : "transparent",
-        borderRadius: 8,
-        cursor: "pointer",
-        fontSize: 13,
-        fontWeight: active ? 600 : 500,
-        color: active
-          ? "var(--color-text-primary)"
-          : "var(--color-text-muted)",
-        textAlign: "left",
-        fontFamily: "inherit",
-        textDecoration: "none",
-        transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
-        position: "relative",
-      }}
-    >
-      <span
-        style={{
-          color: active
-            ? "var(--color-today-text)"
-            : "var(--color-text-faint)",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          transition: "color 150ms ease",
-        }}
-      >
-        {icon}
-      </span>
-      {label}
-    </Link>
-  );
-}
-
 // ── Employee avatar chip (used in Focus Areas & Roles sections) ───────────────
 function EmpChip({ emp }: { emp: Employee }) {
   const { user: currentUser } = useAuth();
@@ -130,7 +81,7 @@ function EmpChip({ emp }: { emp: Employee }) {
         display: "flex",
         alignItems: "center",
         gap: 7,
-        background: "#fff",
+        background: "var(--color-surface)",
         border: "1px solid var(--color-border-light)",
         borderRadius: 24,
         padding: "3px 10px 3px 4px",
@@ -157,7 +108,7 @@ function EmpChip({ emp }: { emp: Employee }) {
       </div>
       <span
         style={{
-          fontSize: 12,
+          fontSize: "var(--dg-fs-caption)",
           fontWeight: 600,
           color: "var(--color-text-secondary)",
           whiteSpace: "nowrap",
@@ -169,7 +120,7 @@ function EmpChip({ emp }: { emp: Employee }) {
       {isYou && (
         <span style={{
           fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-          background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap",
+          background: "var(--color-info-bg)", color: "var(--color-link)", whiteSpace: "nowrap",
         }}>
           You
         </span>
@@ -179,7 +130,6 @@ function EmpChip({ emp }: { emp: Employee }) {
 }
 
 // ── Members section (the existing staff table) ────────────────────────────────
-type EmployeeTab = "active" | "benched" | "terminated";
 
 function MembersSection({
   employees,
@@ -199,7 +149,6 @@ function MembersSection({
   roleLabel,
   orgId,
   orgName,
-  onDetailPanelChange,
 }: {
   employees: Employee[];
   benchedEmployees: Employee[];
@@ -218,37 +167,50 @@ function MembersSection({
   roleLabel: string;
   orgId?: string;
   orgName?: string;
-  onDetailPanelChange?: (isOpen: boolean) => void;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"name" | "seniority" | "focusArea">("seniority");
-  const [isReordering, setIsReordering] = useState(false);
-  const [pendingOrder, setPendingOrder] = useState<Employee[] | null>(null);
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Notify parent when detail panel opens/closes
-  useEffect(() => {
-    onDetailPanelChange?.(!!expandedEmpId);
-  }, [!!expandedEmpId, onDetailPanelChange]);
+  // ── Extracted hooks ──
+  const filters = useStaffFilters({ employees, benchedEmployees, terminatedEmployees, focusAreas, showOnlyUnlinked });
+  const { activeTab, setActiveTab, searchQuery, setSearchQuery, sortBy, setSortBy, filterFocusArea, setFilterFocusArea, filterRole, setFilterRole, hasActiveFilters, clearFilters: clearFiltersBase, rawList, sorted, paginatedList: filterPaginatedList, page, setPage, totalPages, totalCount, pageSize: PAGE_SIZE, tabCounts, unlinkedCount, unlinkedNoEmail } = filters;
+  const clearFilters = useCallback(() => { clearFiltersBase(); setShowOnlyUnlinked(false); }, [clearFiltersBase]);
+  const selection = useStaffSelection();
+  const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } = selection;
+  const reorder = useStaffReorder({ sorted, onSave });
+  const { isReordering, isDirty, enterReorder: handleEnterReorder, saveOrder: handleSaveOrder, cancelReorder: handleCancelReorder, draggedIdx, dragOverIdx, handleDragStart, handleDragOver, handleDrop, handleDragEnd, displayList, baseList } = reorder;
+
+  // When reordering, paginate from displayList; otherwise use filter's paginated list
+  const paginatedList = useMemo(
+    () => isReordering ? displayList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : filterPaginatedList,
+    [isReordering, displayList, filterPaginatedList, page, PAGE_SIZE],
+  );
+
+  // Reset selection and close detail when filters/tab change
+  useEffect(() => { clearSelection(); setExpandedEmpId(null); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy, showOnlyUnlinked, clearSelection]);
 
   // Invitation state
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
+  const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   // Fetch pending invitations for badge display
   useEffect(() => {
     if (!orgId) return;
+    let cancelled = false;
     db.fetchInvitations(orgId).then((invites) => {
+      if (cancelled) return;
       setPendingInvitations(
         invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
       );
-    }).catch(() => { /* silently ignore — badges just won't show */ });
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [orgId]);
 
   const pendingInviteByEmployeeId = useMemo(() => {
@@ -268,153 +230,24 @@ function MembersSection({
     }).catch(() => {});
   }
 
-  async function handleRevokeInvitation(invitationId: string) {
+  async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     setRevokingId(invitationId);
     try {
       await db.revokeInvitation(invitationId);
       refreshInvitations();
       toast.success("Invitation revoked");
+      return true;
     } catch {
       toast.error("Failed to revoke invitation");
+      return false;
     } finally {
       setRevokingId(null);
     }
   }
 
-  // Search, Filter, and Pagination state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
-  const [filterRole, setFilterRole] = useState<number | null>(null);
-  const PAGE_SIZE = 15;
-  const [page, setPage] = useState(1);
-
-  // Bulk selection state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  function toggleSelect(empId: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(empId)) next.delete(empId); else next.add(empId);
-      return next;
-    });
-  }
-
-  function toggleSelectAll(list: Employee[]) {
-    const allSelected = list.every((e) => selectedIds.has(e.id));
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(list.map((e) => e.id)));
-    }
-  }
-
-  function clearSelection() { setSelectedIds(new Set()); }
-
-  // Reset to page 1 and clear selection when filters/sort/tab change
-  useEffect(() => { setPage(1); clearSelection(); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy]);
-
-  const rawList = useMemo(() => {
-    const list = activeTab === "active" ? employees : activeTab === "benched" ? benchedEmployees : terminatedEmployees;
-    return list.filter(emp => {
-      const matchesSearch = !searchQuery || 
-        getEmployeeDisplayName(emp).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (emp.email && emp.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (emp.phone && emp.phone.includes(searchQuery));
-      
-      const matchesFocusArea = !filterFocusArea || emp.focusAreaIds.includes(filterFocusArea);
-      const matchesRole = !filterRole || emp.roleIds.includes(filterRole);
-
-      return matchesSearch && matchesFocusArea && matchesRole;
-    });
-  }, [activeTab, employees, benchedEmployees, terminatedEmployees, searchQuery, filterFocusArea, filterRole]);
-
-  const sorted = useMemo(
-    () =>
-      [...rawList].sort((a, b) => {
-        switch (sortBy) {
-          case "name":
-            return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
-          case "focusArea": {
-            const faA = focusAreas.find(f => f.id === a.focusAreaIds[0])?.name ?? "";
-            const faB = focusAreas.find(f => f.id === b.focusAreaIds[0])?.name ?? "";
-            return faA !== faB ? faA.localeCompare(faB) : a.seniority - b.seniority;
-          }
-          default:
-            return a.seniority - b.seniority;
-        }
-      }),
-    [rawList, sortBy, focusAreas],
-  );
-
-  const baseList = isReordering && pendingOrder !== null ? pendingOrder : sorted;
-
-  const displayList = useMemo(() => {
-    if (!isReordering || draggedIdx === null || dragOverIdx === null) return baseList;
-    const list = [...baseList];
-    const [item] = list.splice(draggedIdx, 1);
-    list.splice(dragOverIdx, 0, item);
-    return list;
-  }, [baseList, draggedIdx, dragOverIdx, isReordering]);
-
-  const totalPages = Math.ceil(displayList.length / PAGE_SIZE);
-  const paginatedList = useMemo(
-    () => displayList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [displayList, page],
-  );
-
-  const handleEnterReorder = useCallback(() => {
-    setIsReordering(true);
-    setPendingOrder([...sorted]);
-    setExpandedEmpId(null);
-  }, [sorted]);
-
-  const handleSaveOrder = useCallback(() => {
-    if (!pendingOrder) return;
-    pendingOrder.forEach((emp, i) => {
-      if (emp.seniority !== i + 1) {
-        onSave({ ...emp, seniority: i + 1 });
-      }
-    });
-    setIsReordering(false);
-    setPendingOrder(null);
-  }, [pendingOrder, onSave]);
-
-  const handleCancelReorder = useCallback(() => {
-    setIsReordering(false);
-    setPendingOrder(null);
-    setDraggedIdx(null);
-    setDragOverIdx(null);
-  }, []);
-
-  const handleDragStart = useCallback((idx: number) => {
-    setDraggedIdx(idx);
-    setDragOverIdx(idx);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-    setDragOverIdx(idx);
-  }, []);
-
-  const handleDrop = useCallback(() => {
-    if (draggedIdx === null || dragOverIdx === null || !pendingOrder) return;
-    const list = [...pendingOrder];
-    const [item] = list.splice(draggedIdx, 1);
-    list.splice(dragOverIdx, 0, item);
-    setPendingOrder(list);
-    setDraggedIdx(null);
-    setDragOverIdx(null);
-  }, [draggedIdx, dragOverIdx, pendingOrder]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedIdx(null);
-    setDragOverIdx(null);
-  }, []);
-
   const handleSave = useCallback(
     (emp: Employee) => {
       onSave(emp);
-      setExpandedEmpId(null);
     },
     [onSave],
   );
@@ -426,11 +259,6 @@ function MembersSection({
     },
     [onDelete],
   );
-
-  const isDirty = useMemo(() => {
-    if (!isReordering || !pendingOrder) return false;
-    return pendingOrder.some((emp, i) => emp.id !== sorted[i]?.id);
-  }, [isReordering, pendingOrder, sorted]);
 
   const gridCols = isMobile
     ? "36px 1fr 28px"
@@ -444,815 +272,223 @@ function MembersSection({
     { key: "terminated", label: "Terminated", count: terminatedEmployees.length, color: "var(--color-danger)" },
   ];
 
-  const unlinkedActive = employees.filter((e) => !e.userId);
-  const unlinkedCount = unlinkedActive.length;
-  const unlinkedNoEmail = unlinkedActive.filter((e) => !e.email).length;
-
   // Find the currently selected employee for the detail panel
   const selectedEmployee = expandedEmpId
     ? [...employees, ...benchedEmployees, ...terminatedEmployees].find((e) => e.id === expandedEmpId)
     : null;
 
-  // Detect desktop (≥1024px) for inline split vs overlay
-  const isDesktop = !isMobile && !isTablet;
+  // Can reorder only when: active tab, seniority sort, no filters/search, canManageEmployees
+  const canReorder = activeTab === "active" && sortBy === "seniority" && !searchQuery && !filterFocusArea && !filterRole && !showOnlyUnlinked && canManageEmployees;
 
   return (
-    <div className="staff-master-detail">
-      <div className="staff-list-pane">
-      {/* Unlinked accounts banner */}
-      {canManageEmployees && unlinkedCount > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: isMobile ? "flex-start" : "center",
-            gap: isMobile ? 8 : 12,
-            padding: isMobile ? "10px 12px" : "12px 20px",
-            background: "#FFFBEB",
-            border: "1px solid #FDE68A",
-            borderRadius: 10,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span style={{ fontSize: 13, color: "#92400E" }}>
-            <strong>{unlinkedCount} staff member{unlinkedCount !== 1 ? "s" : ""}</strong>{" "}
-            {unlinkedCount !== 1 ? "don't" : "doesn't"} have a linked account.
-            {unlinkedNoEmail > 0 && <>{" "}<strong>{unlinkedNoEmail}</strong> still need{unlinkedNoEmail === 1 ? "s" : ""} an email address added before they can be invited.</>}
-            {" "}Expand a row and click <strong>Invite</strong> to send an invitation or link an existing account.
-          </span>
-        </div>
-      )}
+    <>
+      {/* ── Sticky header: toolbar + context bar ── */}
+      <div className="sticky top-0 z-50">
+      <StaffToolbar
+        tabs={tabItems}
+        activeTab={activeTab}
+        onTabChange={(tab) => { setActiveTab(tab); setExpandedEmpId(null); if (isReordering) handleCancelReorder(); }}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        canReorder={canReorder}
+        onEnterReorder={() => { handleEnterReorder(); setExpandedEmpId(null); setPage(1); }}
+        hasActiveFilters={hasActiveFilters}
+        hasUnlinked={unlinkedCount > 0 && activeTab === "active"}
+        isReordering={isReordering}
+        canManageEmployees={canManageEmployees}
+        showAdd={activeTab === "active"}
+        onAdd={onAdd}
+        onFilterToggle={() => setFilterOpen((v) => !v)}
+        filterOpen={filterOpen}
+        filterBtnRef={filterBtnRef}
+      />
 
-      {/* Status tabs */}
-      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
-        {tabItems.map((tab) => {
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setExpandedEmpId(null); if (isReordering) handleCancelReorder(); }}
-              style={{
-                padding: "8px 20px",
-                fontSize: 13,
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? tab.color : "var(--color-text-muted)",
-                background: "transparent",
-                border: "none",
-                borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: -1,
-                transition: "color 120ms ease, border-color 120ms ease",
-              }}
-            >
-              {tab.label}
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: isActive ? `${tab.color}15` : "var(--color-border-light)",
-                  color: isActive ? tab.color : "var(--color-text-faint)",
-                  borderRadius: 10,
-                  padding: "1px 7px",
-                  minWidth: 20,
-                  textAlign: "center",
-                }}
-              >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
+      {/* Context bar: filter pills, bulk actions, or reorder bar */}
+      <StaffContextBar
+        filterFocusArea={filterFocusArea}
+        filterRole={filterRole}
+        hasActiveFilters={hasActiveFilters}
+        onClearFocusArea={() => setFilterFocusArea(null)}
+        onClearRole={() => setFilterRole(null)}
+        onClearAll={clearFilters}
+        focusAreas={focusAreas}
+        roles={roles}
+        focusAreaLabel={focusAreaLabel}
+        selectionCount={selectedIds.size}
+        selectedIds={selectedIds}
+        activeTab={activeTab}
+        canManageEmployees={canManageEmployees}
+        displayList={displayList}
+        pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+        onBulkInvite={(emps) => { setInviteEmployee(emps[0]); setInviteQueue(emps.slice(1)); }}
+        onBulkBench={(ids) => { for (const id of ids) onBench(id); clearSelection(); }}
+        onBulkActivate={(ids) => { for (const id of ids) onActivate(id); clearSelection(); }}
+        onBulkTerminate={(ids) => { for (const id of ids) onDelete(id); clearSelection(); }}
+        onClearSelection={clearSelection}
+        isReordering={isReordering}
+        isDirty={isDirty}
+        onSaveOrder={handleSaveOrder}
+        onCancelReorder={handleCancelReorder}
+      />
       </div>
 
-      {/* Toolbar */}
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 8 : 0, alignItems: isMobile ? "stretch" : "center", padding: "4px 0", position: "relative" }}>
-        {/* Reorder hint — stretches to fill all space left of the right-group buttons */}
-        {isReordering && (
-          <div style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            background: "#EFF6FF",
-            border: "1px solid #BFDBFE",
-            borderRadius: 10,
-            padding: "10px 20px",
-            marginRight: isDirty ? 160 : 90,
-            zIndex: 2,
-          }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#1E40AF" }}>
-              Drag rows to reorder seniority
-            </span>
-          </div>
-        )}
-        {/* Left group: dropdowns (hidden but in DOM during reorder to preserve height) */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", visibility: isReordering ? "hidden" : "visible", flexWrap: isMobile ? "wrap" : undefined, flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", whiteSpace: "nowrap" }}>Sort</span>
-          <CustomSelect
-            value={filterFocusArea ?? ""}
-            options={[
-              { value: "", label: `All ${focusAreaLabel}` },
-              ...focusAreas.map(fa => ({ value: fa.id, label: fa.name }))
-            ]}
-            onChange={(val: string | number) => setFilterFocusArea(val ? Number(val) : null)}
-            style={{ width: "auto", minWidth: isMobile ? 100 : 140, flex: isMobile ? "1 1 100px" : undefined }}
-            fontSize={12}
-          />
-          <CustomSelect
-            value={filterRole ?? ""}
-            options={[
-              { value: "", label: `All ${roleLabel}` },
-              ...roles.map(r => ({ value: r.id, label: r.name }))
-            ]}
-            onChange={(val: string | number) => setFilterRole(val ? Number(val) : null)}
-            style={{ width: "auto", minWidth: isMobile ? 100 : 140, flex: isMobile ? "1 1 100px" : undefined }}
-            fontSize={12}
-          />
-          <CustomSelect
-            value={sortBy}
-            options={[
-              { value: "seniority" as const, label: "Seniority" },
-              { value: "name" as const, label: "Name" },
-              { value: "focusArea" as const, label: focusAreaLabel },
-            ]}
-            onChange={(val) => { setSortBy(val as "seniority" | "name" | "focusArea"); }}
-            style={{ width: "auto", minWidth: isMobile ? 80 : 120, flex: isMobile ? "1 1 80px" : undefined }}
-            fontSize={12}
-          />
-          {(searchQuery || filterFocusArea || filterRole) && (
-            <button
-              onClick={() => { setSearchQuery(""); setFilterFocusArea(null); setFilterRole(null); }}
-              className="dg-btn dg-btn-ghost"
-              style={{ color: "var(--color-today-text)", fontSize: 12, padding: "4px 8px" }}
-            >
-              Clear
-            </button>
-          )}
-        </div>
+      {/* Filter popover */}
+      <StaffFilterPopover
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        anchorRef={filterBtnRef.current}
+        filterFocusArea={filterFocusArea}
+        onFilterFocusAreaChange={setFilterFocusArea}
+        filterRole={filterRole}
+        onFilterRoleChange={setFilterRole}
+        focusAreas={focusAreas}
+        roles={roles}
+        focusAreaLabel={focusAreaLabel}
+        roleLabel={roleLabel}
+        unlinkedCount={unlinkedCount}
+        showOnlyUnlinked={showOnlyUnlinked}
+        onShowOnlyUnlinkedChange={setShowOnlyUnlinked}
+        onClearAll={clearFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
 
-        {!isMobile && <div style={{ flex: 1 }} />}
-
-        {/* Right group: search, reorder, add */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative", zIndex: 1 }}>
-          {!isReordering && (
-            <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
-              <svg
-                width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-faint)" }}
-              >
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="dg-input"
-                style={{ paddingLeft: 32, fontSize: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
-              />
-            </div>
-          )}
-
-          {activeTab === "active" && sortBy === "seniority" && !searchQuery && !filterFocusArea && !filterRole && !isReordering && canManageEmployees && (
-            <button
-              onClick={handleEnterReorder}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "6px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="7 15 12 20 17 15" />
-                <polyline points="7 9 12 4 17 9" />
-              </svg>
-              Reorder
-            </button>
-          )}
-          {isReordering && isDirty && (
-            <button onClick={handleSaveOrder} className="dg-btn dg-btn-primary" style={{ padding: "6px 14px", fontSize: 12 }}>
-              Save
-            </button>
-          )}
-          {isReordering && (
-            <button onClick={handleCancelReorder} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}>
-              Cancel
-            </button>
-          )}
-
-          {!isReordering && activeTab === "active" && canManageEmployees && (
-            <button
-              onClick={onAdd}
-              className="dg-btn dg-btn-primary"
-              style={{ padding: "7px 14px", fontSize: 13 }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && canManageEmployees && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: isMobile ? 8 : 12,
-            padding: isMobile ? "10px 12px" : "10px 20px",
-            background: "#EFF6FF",
-            border: "1px solid #BFDBFE",
-            borderRadius: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#1E40AF" }}>
-            {selectedIds.size} selected
-          </span>
-          <div style={{ flex: 1 }} />
-          {activeTab === "active" && (() => {
-            const invitable = displayList.filter(
-              (e) => selectedIds.has(e.id) && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id)
-            );
-            return invitable.length > 0 ? (
-              <button
-                className="dg-btn dg-btn-ghost"
-                style={{ fontSize: 12, fontWeight: 600, color: "#2563EB", border: "1px solid #BFDBFE", padding: "5px 12px" }}
-                onClick={() => {
-                  invitable.forEach((emp) => setInviteEmployee(emp));
-                  // For bulk, open the first one; user can process one by one
-                  setInviteEmployee(invitable[0]);
-                }}
-              >
-                Invite ({invitable.length})
-              </button>
-            ) : null;
-          })()}
-          {activeTab === "active" && (
-            <button
-              className="dg-btn dg-btn-ghost"
-              style={{ fontSize: 12, fontWeight: 600, color: "#D97706", border: "1px solid #FDE68A", padding: "5px 12px" }}
-              onClick={async () => {
-                const ids = [...selectedIds];
-                for (const id of ids) { onBench(id); }
-                clearSelection();
-              }}
-            >
-              Bench ({selectedIds.size})
-            </button>
-          )}
-          {activeTab === "benched" && (
-            <button
-              className="dg-btn dg-btn-ghost"
-              style={{ fontSize: 12, fontWeight: 600, color: "#059669", border: "1px solid #D1FAE5", padding: "5px 12px" }}
-              onClick={async () => {
-                const ids = [...selectedIds];
-                for (const id of ids) { onActivate(id); }
-                clearSelection();
-              }}
-            >
-              Activate ({selectedIds.size})
-            </button>
-          )}
-          <button
-            className="dg-btn dg-btn-ghost"
-            style={{ fontSize: 12, fontWeight: 600, color: "var(--color-error)", border: "1px solid #FEE2E2", padding: "5px 12px" }}
-            onClick={async () => {
-              const ids = [...selectedIds];
-              for (const id of ids) { onDelete(id); }
-              clearSelection();
-            }}
-          >
-            Terminate ({selectedIds.size})
-          </button>
-          <button
-            className="dg-btn dg-btn-ghost"
-            style={{ fontSize: 12, color: "var(--color-text-muted)", padding: "5px 12px" }}
-            onClick={clearSelection}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Table & Empty States */}
-      {rawList.length > 0 ? (
-        <>
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 14,
-            border: "1px solid var(--color-border)",
-            overflow: "hidden",
-            boxShadow: "var(--shadow-raised)",
-          }}
-        >
-          {/* Header row */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: gridCols,
-              padding: isMobile ? "10px 12px" : "12px 24px",
-              borderBottom: "1px solid var(--color-border-light)",
-              background: "var(--color-row-alt)",
-            }}
-          >
-          {(isMobile
-            ? ["", "Name", ""]
-            : isTablet
-              ? ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, ""]
-              : ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", "Account", ""]
-          ).map((h, i) => (
+      {/* Content area with padding — below sticky toolbar */}
+      <div
+        className="px-4 md:px-6 lg:px-12 py-4 md:py-6 lg:py-10 pb-32"
+      >
+        {/* Table & Empty States */}
+        {rawList.length > 0 ? (
+          <>
+          <div data-testid="staff-table" className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
+            {/* Header row */}
             <div
-              key={i}
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                letterSpacing: "0.06em",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
+              className={`grid border-b border-[var(--color-border-light)] bg-[var(--color-row-alt)] ${isMobile ? "px-3 py-2.5" : "px-6 py-3"}`}
+              style={{ gridTemplateColumns: gridCols }}
             >
-              {i === 0 && canManageEmployees && !isReordering && (
-                <input
-                  type="checkbox"
-                  checked={displayList.length > 0 && displayList.every((e) => selectedIds.has(e.id))}
-                  onChange={() => toggleSelectAll(displayList)}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ accentColor: "var(--color-today-text)", cursor: "pointer", width: 14, height: 14 }}
-                />
-              )}
-              {h}
-            </div>
-          ))}
-        </div>
-
-        {/* Employee rows */}
-        {paginatedList.map((emp, i) => {
-          const isExpanded = !isReordering && emp.id === expandedEmpId;
-          const isDragging = isReordering && draggedIdx !== null && baseList[draggedIdx]?.id === emp.id;
-          const isDropTarget = isReordering && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
-          return (
-            <div key={emp.id}>
+            {(isMobile
+              ? ["", "Name", ""]
+              : isTablet
+                ? ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, ""]
+                : ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", "Account", ""]
+            ).map((h, i) => (
               <div
-                draggable={isReordering}
-                onDragStart={isReordering ? () => handleDragStart(i) : undefined}
-                onDragOver={isReordering ? (e) => handleDragOver(e, i) : undefined}
-                onDrop={isReordering ? handleDrop : undefined}
-                onDragEnd={isReordering ? handleDragEnd : undefined}
-                onClick={!isReordering && canManageEmployees ? () => setExpandedEmpId(isExpanded ? null : emp.id) : undefined}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: gridCols,
-                  padding: isMobile ? "10px 12px" : "14px 24px",
-                  borderTop: isDropTarget
-                    ? "2px solid #3B82F6"
-                    : i === 0
-                      ? "none"
-                      : "1px solid var(--color-border-light)",
-                  alignItems: "center",
-                  background: isExpanded
-                    ? "var(--color-today-bg)"
-                    : "#fff",
-                  cursor: isReordering ? "grab" : canManageEmployees ? "pointer" : "default",
-                  transition: "all 0.15s ease",
-                  opacity: isDragging ? 0.4 : 1,
-                  borderLeft: isExpanded ? "4px solid var(--color-today-text)" : "4px solid transparent",
-                  paddingLeft: isMobile ? "calc(12px - 4px)" : "calc(24px - 4px)",
-                  position: "relative",
-                  zIndex: isExpanded ? 1 : 0,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isExpanded && !isReordering) {
-                    e.currentTarget.style.background = "var(--color-row-alt)";
-                    e.currentTarget.style.transform = "translateZ(0)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isExpanded && !isReordering) {
-                    e.currentTarget.style.background = "#fff";
-                  }
-                }}
+                key={i}
+                className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-[0.06em] flex items-center gap-1.5"
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--color-text-faint)" }}>
-                  {isReordering && (
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" style={{ flexShrink: 0 }}>
-                      <rect x="3" y="2" width="2" height="2" rx="1"/>
-                      <rect x="9" y="2" width="2" height="2" rx="1"/>
-                      <rect x="3" y="6" width="2" height="2" rx="1"/>
-                      <rect x="9" y="6" width="2" height="2" rx="1"/>
-                      <rect x="3" y="10" width="2" height="2" rx="1"/>
-                      <rect x="9" y="10" width="2" height="2" rx="1"/>
-                    </svg>
-                  )}
-                  {canManageEmployees && !isReordering && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(emp.id)}
-                      onChange={() => toggleSelect(emp.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ accentColor: "var(--color-today-text)", cursor: "pointer", width: 14, height: 14 }}
-                    />
-                  )}
-                  <span style={{ fontSize: 13, fontWeight: 700 }}>{(page - 1) * PAGE_SIZE + i + 1}</span>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: `hsl(${hashCode(emp.id) % 360}, 70%, 92%)`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        fontWeight: 800,
-                        color: `hsl(${hashCode(emp.id) % 360}, 70%, 35%)`,
-                        flexShrink: 0,
-                        border: `1px solid hsl(${hashCode(emp.id) % 360}, 70%, 85%)`,
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                      }}
-                    >
-                      {getInitials(getEmployeeDisplayName(emp))}
-                    </div>
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        fontSize: 14,
-                        color: "var(--color-text-secondary)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      {getEmployeeDisplayName(emp)}
-                      {emp.userId && currentUser && emp.userId === currentUser.id && (
-                        <span style={{
-                          fontSize: "var(--dg-fs-badge)",
-                          fontWeight: 700,
-                          padding: "1px 6px",
-                          borderRadius: 10,
-                          background: "#EFF6FF",
-                          color: "#2563EB",
-                          whiteSpace: "nowrap",
-                        }}>
-                          You
-                        </span>
-                      )}
-                    </div>
-                    {(emp.email || emp.phone) && (
-                      <div style={{ fontSize: 11, color: "var(--color-text-faint)", marginTop: 1 }}>
-                        {emp.email || emp.phone}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {!isMobile && (
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {emp.focusAreaIds.map((faId) => {
-                      const fa = focusAreas.find(f => f.id === faId);
-                      if (!fa) return null;
-                      const fc = { bg: fa.colorBg, text: fa.colorText };
-                      return (
-                        <span
-                          key={faId}
-                          style={{
-                            background: fc.bg,
-                            color: fc.text,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            borderRadius: 20,
-                            padding: "2px 8px",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {fa.name}
-                        </span>
-                      );
-                    })}
-                  </div>
+                {i === 0 && canManageEmployees && !isReordering && (
+                  <input
+                    type="checkbox"
+                    checked={paginatedList.length > 0 && paginatedList.every((e) => selectedIds.has(e.id))}
+                    onChange={() => toggleSelectAll(paginatedList)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
+                  />
                 )}
-
-                {!isMobile && (
-                  <div>
-                    <span
-                      style={{
-                        background: "var(--color-border-light)",
-                        color: "var(--color-text-muted)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        borderRadius: 20,
-                        padding: "3px 9px",
-                      }}
-                    >
-                      {getCertAbbr(emp.certificationId, certifications)}
-                    </span>
-                  </div>
-                )}
-
-                {!isMobile && !isTablet && (
-                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                    {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "—"}
-                  </div>
-                )}
-
-                {/* Account status column */}
-                {!isMobile && !isTablet && (
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    {emp.userId ? (
-                      <span style={{
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: "#DCFCE7",
-                        color: "#166534",
-                        whiteSpace: "nowrap",
-                      }}>
-                        Linked
-                      </span>
-                    ) : pendingInviteByEmployeeId.has(emp.id) ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <span style={{
-                          fontSize: "var(--dg-fs-badge)",
-                          fontWeight: 700,
-                          padding: "2px 8px",
-                          borderRadius: 10,
-                          background: "#FEF3C7",
-                          color: "#92400E",
-                          whiteSpace: "nowrap",
-                        }}>
-                          Invited
-                        </span>
-                        {canManageEmployees && (() => {
-                          const inv = pendingInviteByEmployeeId.get(emp.id)!;
-                          return (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleRevokeInvitation(inv.id); }}
-                              disabled={revokingId === inv.id}
-                              style={{
-                                fontSize: "var(--dg-fs-badge)",
-                                fontWeight: 600,
-                                padding: "2px 6px",
-                                borderRadius: 10,
-                                background: "none",
-                                color: "#92400E",
-                                border: "1px solid #92400E",
-                                cursor: revokingId === inv.id ? "not-allowed" : "pointer",
-                                opacity: revokingId === inv.id ? 0.5 : 1,
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {revokingId === inv.id ? "..." : "Revoke"}
-                            </button>
-                          );
-                        })()}
-                      </span>
-                    ) : emp.email ? (
-                      <span style={{
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: "#FEE2E2",
-                        color: "#991B1B",
-                        whiteSpace: "nowrap",
-                      }}>
-                        Not invited
-                      </span>
-                    ) : (
-                      <span style={{
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: "var(--color-border-light)",
-                        color: "var(--color-text-muted)",
-                        whiteSpace: "nowrap",
-                      }}>
-                        No email
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: isExpanded ? "var(--color-today-text)" : "var(--color-text-faint)",
-                    transition: "color 0.15s",
-                    userSelect: "none",
-                    visibility: isReordering ? "hidden" : "visible",
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 6 15 12 9 18" />
-                  </svg>
-                </div>
+                {h}
               </div>
-
-            </div>
-          );
-        })}
-        </div>
-
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 24px",
-            fontSize: 13,
-            color: "var(--color-text-muted)",
-          }}>
-            <span style={{ fontSize: 12 }}>
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, displayList.length)} of {displayList.length}
-            </span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="dg-btn dg-btn-secondary"
-                style={{ padding: "5px 12px", fontSize: 12, opacity: page === 1 ? 0.4 : 1 }}
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="dg-btn dg-btn-secondary"
-                style={{ padding: "5px 12px", fontSize: 12, opacity: page === totalPages ? 0.4 : 1 }}
-              >
-                Next
-              </button>
-            </div>
+            ))}
           </div>
-        )}
-        </>
-      ) : (
-        /* Empty state with dashed borders */
-        <div style={{
-          padding: "64px 24px",
-          textAlign: "center",
-          background: "#fff",
-          borderRadius: 14,
-          border: "2px dashed var(--color-border-light)",
-          color: "var(--color-text-muted)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
-          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)",
-        }}>
-          <div style={{
-            color: "var(--color-text-faint)",
-            background: "var(--color-bg)",
-            padding: "16px 20px",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
-          }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-              {searchQuery || filterFocusArea || filterRole ? "No results found" : (activeTab === "active" ? "No active employees" : activeTab === "benched" ? "No benched employees" : "No terminated employees")}
-            </div>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted)" }}>
-              {searchQuery || filterFocusArea || filterRole ? "Try adjusting your search or filters." : "Get started by adding your first staff member."}
-            </p>
-          </div>
-          {(searchQuery || filterFocusArea || filterRole) && (
-            <button
-              onClick={() => { setSearchQuery(""); setFilterFocusArea(null); setFilterRole(null); }}
-              className="dg-btn dg-btn-secondary"
-              style={{ marginTop: 8 }}
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      )}
 
-      {/* Invite Employee Modal */}
-      {inviteEmployee && orgId && (
-        <InviteEmployeeModal
-          employee={inviteEmployee}
-          orgId={orgId}
-          orgName={orgName || "your organization"}
-          onClose={() => setInviteEmployee(null)}
-          onInvited={() => {
-            setInviteEmployee(null);
-            refreshInvitations();
-          }}
-        />
-      )}
-      </div>
-
-      {/* Detail panel */}
-      {selectedEmployee && (
-        <>
-          {!isDesktop && (
-            <div className="staff-detail-overlay" onClick={() => setExpandedEmpId(null)} />
-          )}
-          <div className="staff-detail-pane" key={selectedEmployee.id}>
-            {/* Panel header */}
-            <div className="staff-detail-header">
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  background: `hsl(${hashCode(selectedEmployee.id) % 360}, 70%, 92%)`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  color: `hsl(${hashCode(selectedEmployee.id) % 360}, 70%, 35%)`,
-                  flexShrink: 0,
-                  border: `1.5px solid hsl(${hashCode(selectedEmployee.id) % 360}, 70%, 82%)`,
-                }}
-              >
-                {getInitials(getEmployeeDisplayName(selectedEmployee))}
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>
-                    {getEmployeeDisplayName(selectedEmployee)}
-                  </span>
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "2px 7px",
-                    borderRadius: 10,
-                    background: selectedEmployee.status === "active" ? "#DCFCE7" : selectedEmployee.status === "benched" ? "#FEF3C7" : "#FEE2E2",
-                    color: selectedEmployee.status === "active" ? "#166534" : selectedEmployee.status === "benched" ? "#92400E" : "#991B1B",
-                    textTransform: "capitalize",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {selectedEmployee.status}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-                  {selectedEmployee.email && <span>{selectedEmployee.email}</span>}
-                  {selectedEmployee.email && selectedEmployee.phone && <span style={{ color: "var(--color-border)" }}>·</span>}
-                  {selectedEmployee.phone && <span>{selectedEmployee.phone}</span>}
-                </div>
-              </div>
-              <button
-                className="staff-detail-close"
-                onClick={() => setExpandedEmpId(null)}
-                aria-label="Close detail panel"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Edit form */}
-            <div style={{ flex: 1, overflowY: "auto" }}>
-              <InlineEditEmployee
-                employee={selectedEmployee}
+          {/* Employee rows */}
+          {paginatedList.map((emp, i) => {
+            const globalIdx = (page - 1) * PAGE_SIZE + i;
+            const isExpanded = !isReordering && emp.id === expandedEmpId;
+            const isDragging = isReordering && draggedIdx !== null && baseList[draggedIdx]?.id === emp.id;
+            const isDropTarget = isReordering && dragOverIdx === globalIdx && draggedIdx !== null && draggedIdx !== globalIdx;
+            return (
+              <StaffTableRow
+                key={emp.id}
+                emp={emp}
+                index={i}
+                globalIndex={globalIdx}
+                isExpanded={isExpanded}
+                isReordering={isReordering}
+                isDragging={isDragging}
+                isDropTarget={isDropTarget}
+                canManageEmployees={canManageEmployees}
+                isSelected={selectedIds.has(emp.id)}
+                isMobile={isMobile}
+                isTablet={isTablet}
+                gridCols={gridCols}
                 focusAreas={focusAreas}
                 certifications={certifications}
                 roles={roles}
-                roleLabel={roleLabel}
-                focusAreaLabel={focusAreaLabel}
-                certificationLabel={certificationLabel}
-                onSave={handleSave}
-                onDelete={handleDelete}
-                onBench={(empId, note) => { onBench(empId, note); setExpandedEmpId(null); }}
-                onActivate={(empId) => { onActivate(empId); setExpandedEmpId(null); }}
-                onCancel={() => setExpandedEmpId(null)}
-                onInvite={canManageEmployees && orgId && !pendingInviteByEmployeeId.has(selectedEmployee.id) ? (e) => { setExpandedEmpId(null); setInviteEmployee(e); } : undefined}
+                pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+                revokingId={revokingId}
+                onToggleSelect={toggleSelect}
+                onRowClick={(empId) => setExpandedEmpId(isExpanded ? null : empId)}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                onRevokeInvitation={handleRevokeInvitation}
               />
-            </div>
+            );
+          })}
           </div>
-        </>
+
+          {/* Pagination controls */}
+          <StaffPagination
+            page={page}
+            totalPages={totalPages}
+            totalCount={isReordering ? displayList.length : totalCount}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+          </>
+        ) : (
+          <StaffEmptyState
+            activeTab={activeTab}
+            hasFilters={!!(searchQuery || filterFocusArea || filterRole || showOnlyUnlinked)}
+            onClearFilters={clearFilters}
+          />
+        )}
+
+        {/* Invite Employee Modal */}
+        {inviteEmployee && orgId && (
+          <InviteEmployeeModal
+            employee={inviteEmployee}
+            orgId={orgId}
+            orgName={orgName || "your organization"}
+            onClose={() => { setInviteEmployee(null); setInviteQueue([]); }}
+            onInvited={() => {
+              refreshInvitations();
+              if (inviteQueue.length > 0) {
+                setInviteEmployee(inviteQueue[0]);
+                setInviteQueue((q) => q.slice(1));
+              } else {
+                setInviteEmployee(null);
+              }
+            }}
+          />
+        )}
+      </div>
+
+      {/* Detail panel — fixed positioned, outside content flow */}
+      {selectedEmployee && (
+        <StaffDetailPanel
+          employee={selectedEmployee}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={roles}
+          roleLabel={roleLabel}
+          focusAreaLabel={focusAreaLabel}
+          certificationLabel={certificationLabel}
+          canManageEmployees={canManageEmployees}
+          orgId={orgId}
+          pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onBench={(empId, note) => onBench(empId, note)}
+          onActivate={(empId) => onActivate(empId)}
+          onClose={() => setExpandedEmpId(null)}
+          onInvite={(e) => setInviteEmployee(e)}
+          onRevoke={handleRevokeInvitation}
+        />
       )}
-    </div>
+    </>
   );
 }
 
@@ -1278,37 +514,63 @@ function ShiftCellPopover({
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [arrowLeft, setArrowLeft] = useState(0);
+  const [flippedUp, setFlippedUp] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => { setMounted(true); }, []);
 
-  useLayoutEffect(() => {
-    if (anchorRef) {
-      const rect = anchorRef.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom - 12;
-      const flipUp = spaceBelow < 260;
-      setMenuStyle({
-        position: "absolute",
-        top: flipUp ? undefined : rect.bottom + window.scrollY + 4,
-        bottom: flipUp ? window.innerHeight - rect.top - window.scrollY + 4 : undefined,
-        left: Math.max(8, rect.left + window.scrollX - 40),
-        width: 440,
-        maxHeight: Math.min(flipUp ? rect.top - 12 : spaceBelow, 800),
-        zIndex: 9999,
-      });
-    }
+  const updatePosition = useCallback(() => {
+    if (!anchorRef) return;
+    const rect = anchorRef.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const flipUp = spaceBelow < 260;
+    setFlippedUp(flipUp);
+    const popoverWidth = Math.min(440, window.innerWidth - 16);
+    const isMobileView = window.innerWidth < 768;
+    const GAP = 8; // space between cell and popover (room for arrow)
+    const popoverLeft = isMobileView ? 8 : Math.max(8, Math.min(rect.left + window.scrollX - 40, window.innerWidth - popoverWidth - 8));
+    setMenuStyle({
+      position: "absolute",
+      top: flipUp ? undefined : rect.bottom + window.scrollY + GAP,
+      bottom: flipUp ? window.innerHeight - rect.top - window.scrollY + GAP : undefined,
+      left: isMobileView ? 8 : popoverLeft,
+      width: isMobileView ? undefined : popoverWidth,
+      right: isMobileView ? 8 : undefined,
+      maxHeight: Math.min(flipUp ? rect.top - 12 : spaceBelow, 600),
+      zIndex: 9999,
+    });
+    // Arrow: center on the anchor cell, relative to popover left
+    const anchorCenterX = rect.left + window.scrollX + rect.width / 2;
+    setArrowLeft(isMobileView
+      ? anchorCenterX - 8
+      : Math.max(16, Math.min(anchorCenterX - popoverLeft, popoverWidth - 16)));
   }, [anchorRef]);
+
+  useLayoutEffect(() => { updatePosition(); }, [updatePosition]);
+
+  useEffect(() => {
+    if (!anchorRef) return;
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, updatePosition]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as Node;
       if (menuRef.current && !menuRef.current.contains(target) && anchorRef && !anchorRef.contains(target)) {
-        onClose();
+        onCloseRef.current();
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose, anchorRef]);
+  }, [anchorRef]);
 
   const currentShiftCodeIds = useMemo(() => {
     if (!currentLabel || currentLabel === "OFF") return [];
@@ -1322,32 +584,76 @@ function ShiftCellPopover({
       ref={menuRef}
       style={{
         ...menuStyle,
-        background: "#fff",
+        background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
         borderRadius: 12,
-        boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
-        overflow: "hidden",
+        boxShadow: "var(--shadow-menu)",
+        overflow: "visible",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <div style={{ padding: "12px 12px 8px", fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--color-border-light)" }}>
-        Select Shift
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-        <ShiftPicker
-          shiftCodes={shiftCodes}
-          focusAreas={focusAreas}
-          currentShiftCodeIds={currentShiftCodeIds}
-          onSelect={(label) => {
-            onSelect(label);
-            onClose();
-          }}
-          empFocusAreaIds={empFocusAreaIds}
-          empCertificationId={empCertificationId}
-          multiSelect={false}
-          closeOnSelect={true}
-        />
+      {/* Arrow — two CSS triangles layered for seamless border-to-fill connection */}
+      {/* Outer (border-colored) triangle */}
+      <div style={{
+        position: "absolute", left: arrowLeft - 1, width: 0, height: 0,
+        borderLeft: "9px solid transparent", borderRight: "9px solid transparent",
+        ...(flippedUp
+          ? { bottom: -8, borderTop: "8px solid var(--color-border)" }
+          : { top: -8, borderBottom: "8px solid var(--color-border)" }),
+      }} />
+      {/* Inner (fill-colored) triangle — overlaps box edge by 1px to erase the border seam */}
+      <div style={{
+        position: "absolute", left: arrowLeft, width: 0, height: 0,
+        borderLeft: "8px solid transparent", borderRight: "8px solid transparent",
+        ...(flippedUp
+          ? { bottom: -7, borderTop: "7px solid var(--color-surface)" }
+          : { top: -7, borderBottom: "7px solid var(--color-surface)" }),
+      }} />
+      {/* Inner container clips content while arrow stays visible outside */}
+      <div style={{ overflow: "hidden", borderRadius: 12, display: "flex", flexDirection: "column", maxHeight: "inherit" }}>
+        <div style={{
+          padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "center",
+          borderBottom: "1px solid var(--color-border-light)",
+        }}>
+          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Select Shift
+          </span>
+          <button
+            onClick={onClose}
+            className="dg-btn dg-btn-ghost"
+            style={{ padding: 4, lineHeight: 0 }}
+            aria-label="Close"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          <ShiftPicker
+            shiftCodes={shiftCodes}
+            focusAreas={focusAreas}
+            currentShiftCodeIds={currentShiftCodeIds}
+            onSelect={(label) => {
+              onSelect(label);
+              onClose();
+            }}
+            empFocusAreaIds={empFocusAreaIds}
+            empCertificationId={empCertificationId}
+            multiSelect={false}
+            closeOnSelect={true}
+          />
+          {currentLabel && (
+            <button
+              onClick={() => { onSelect(""); onClose(); }}
+              className="dg-btn dg-btn-ghost"
+              style={{ marginTop: 12, width: "100%", color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", fontWeight: 600 }}
+            >
+              Clear Shift
+            </button>
+          )}
+        </div>
       </div>
     </div>,
     document.body
@@ -1486,20 +792,31 @@ function RecurringScheduleSection({
     setSaving(true);
     setError(null);
     const todayKey = getTodayKey();
+    // Snapshot dirty entries so changes made during save aren't lost
+    const snapshot = dirtySchedules;
+    const savedKeys = new Set<string>();
+    const skippedLabels: string[] = [];
     try {
-      for (const [empId, empDirty] of Object.entries(dirtySchedules)) {
+      for (const [empId, empDirty] of Object.entries(snapshot)) {
         for (const [dayStr, newLabel] of Object.entries(empDirty)) {
           const day = Number(dayStr);
           if (newLabel) {
             const sc = shiftCodes.find((s) => s.label === newLabel);
-            if (!sc) continue;
+            if (!sc) {
+              skippedLabels.push(newLabel);
+              continue;
+            }
             await db.upsertRecurringShift(empId, orgId, day, sc.id, todayKey);
           } else {
             await db.deleteRecurringShift(empId, day);
           }
+          savedKeys.add(`${empId}:${dayStr}`);
         }
       }
-      // Re-fetch from DB to keep both allSchedules and allRecurringShifts in sync
+      if (skippedLabels.length > 0) {
+        const unique = [...new Set(skippedLabels)];
+        toast.error(`Unknown shift code${unique.length > 1 ? "s" : ""}: ${unique.join(", ")}`);
+      }
       // Re-fetch from DB so allSchedules reflects what was actually persisted
       const freshRows = await db.fetchRecurringShifts(orgId, undefined, shiftCodeMap);
       const freshSchedules: Record<string, Record<number, string>> = {};
@@ -1510,7 +827,19 @@ function RecurringScheduleSection({
         }
       }
       setAllSchedules(freshSchedules);
-      setDirtySchedules({});
+      // Only clear the entries we actually saved — preserve any new changes made during save
+      setDirtySchedules((prev) => {
+        const next: Record<string, Record<number, string>> = {};
+        for (const [empId, empDirty] of Object.entries(prev)) {
+          for (const [dayStr, label] of Object.entries(empDirty)) {
+            if (!savedKeys.has(`${empId}:${dayStr}`)) {
+              if (!next[empId]) next[empId] = {};
+              next[empId][Number(dayStr)] = label;
+            }
+          }
+        }
+        return next;
+      });
       setSavedDraftTimestamp(null);
       await db.deleteRecurringDraft(orgId).catch(() => {});
       toast.success("Recurring schedules saved");
@@ -1551,6 +880,14 @@ function RecurringScheduleSection({
     });
   }, [employees, searchQuery, filterFocusArea]);
 
+  // Close popover if the active cell's employee is no longer visible after filtering
+  useEffect(() => {
+    if (activeCell && !filteredEmployees.some((e) => e.id === activeCell.empId)) {
+      setActiveCell(null);
+      setActiveCellEl(null);
+    }
+  }, [filteredEmployees, activeCell]);
+
   const sortedEmployees = useMemo(() => {
     return [...filteredEmployees].sort((a, b) => a.seniority - b.seniority);
   }, [filteredEmployees]);
@@ -1574,20 +911,18 @@ function RecurringScheduleSection({
       {hasDirtyChanges && (
         <div style={{
           position: "sticky", top: 0, zIndex: 20,
-          background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10,
+          background: "var(--color-info-bg)", border: "1px solid var(--color-info-border)", borderRadius: 12,
           padding: isMobile ? "10px 12px" : "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
           boxShadow: "0 2px 8px rgba(0,0,0,0.06)", flexWrap: "wrap", gap: 8,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
+            <div className="dg-draft-banner-dot" />
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#1E40AF" }}>
+              <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-info-text)" }}>
                 {dirtyCount} unsaved change{dirtyCount !== 1 ? "s" : ""}
               </span>
               {savedDraftTimestamp && (
-                <span style={{ fontSize: 11, color: "#3B82F6", opacity: 0.75 }}>
+                <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-info)", opacity: 0.75 }}>
                   Draft saved {new Date(savedDraftTimestamp).toLocaleString()}
                 </span>
               )}
@@ -1597,14 +932,14 @@ function RecurringScheduleSection({
             <button
               onClick={handleSaveDraft}
               className="dg-btn dg-btn-secondary"
-              style={{ padding: "6px 14px", fontSize: 12 }}
+              style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}
             >
               Save Draft
             </button>
             <button
               onClick={handleDiscardDraft}
               className="dg-btn dg-btn-ghost"
-              style={{ padding: "6px 14px", fontSize: 12, color: "#DC2626" }}
+              style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-danger)" }}
             >
               Discard
             </button>
@@ -1612,7 +947,7 @@ function RecurringScheduleSection({
               onClick={handleSaveAll}
               disabled={saving}
               className="dg-btn dg-btn-primary"
-              style={{ padding: "6px 18px", fontSize: 12 }}
+              style={{ padding: "6px 18px", fontSize: "var(--dg-fs-caption)" }}
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
@@ -1625,7 +960,7 @@ function RecurringScheduleSection({
         <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           Recurring Shifts
         </h2>
-        <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-text-muted)" }}>
+        <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
           Set recurring shift patterns for each staff member. Click any cell to assign a shift.
         </p>
       </div>
@@ -1659,10 +994,10 @@ function RecurringScheduleSection({
               padding: "7px 10px 7px 32px",
               border: "1px solid var(--color-border)",
               borderRadius: 10,
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               outline: "none",
               width: isMobile ? "100%" : 180,
-              background: "#fff",
+              background: "var(--color-surface)",
               fontFamily: "inherit",
               transition: "border-color 150ms ease",
             }}
@@ -1675,15 +1010,15 @@ function RecurringScheduleSection({
       {/* Grid table */}
       {loading ? (
         <div style={{
-          background: "#fff", borderRadius: 14, border: "1px solid var(--color-border)",
-          padding: "40px 20px", textAlign: "center", color: "var(--color-text-subtle)", fontSize: 13,
+          background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)",
+          padding: "48px 20px", textAlign: "center", color: "var(--color-text-subtle)", fontSize: "var(--dg-fs-label)",
         }}>
           Loading recurring schedules...
         </div>
       ) : employees.length === 0 ? (
         /* Empty state: no employees */
         <div style={{
-          background: "#fff", borderRadius: 14, border: "2px dashed var(--color-border-light)",
+          background: "var(--color-surface)", borderRadius: 12, border: "2px dashed var(--color-border-light)",
           padding: "64px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
         }}>
           <div style={{
@@ -1694,24 +1029,24 @@ function RecurringScheduleSection({
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-secondary)" }}>No staff members</div>
-          <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-secondary)" }}>No staff members</div>
+          <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
             Add employees in the Members section to set up recurring shifts.
           </div>
         </div>
       ) : sortedEmployees.length === 0 ? (
         /* Empty state: no filter results */
         <div style={{
-          background: "#fff", borderRadius: 14, border: "2px dashed var(--color-border-light)",
+          background: "var(--color-surface)", borderRadius: 12, border: "2px dashed var(--color-border-light)",
           padding: "48px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
         }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-secondary)" }}>No results found</div>
-          <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Try adjusting your search or filter.</div>
+          <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-secondary)" }}>No results found</div>
+          <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>Try adjusting your search or filter.</div>
           <button
             onClick={() => { setSearchQuery(""); setFilterFocusArea(""); }}
             style={{
               marginTop: 4, background: "none", border: "none", cursor: "pointer",
-              fontSize: 12, fontWeight: 600, color: "var(--color-accent)", fontFamily: "inherit",
+              fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-accent)", fontFamily: "inherit",
             }}
           >
             Clear filters
@@ -1719,31 +1054,35 @@ function RecurringScheduleSection({
         </div>
       ) : (
         <div style={{
-          background: "#fff", borderRadius: 14, border: "1px solid var(--color-border)",
-          overflowX: isMobile ? "auto" : "hidden", overflowY: "hidden",
-          boxShadow: "var(--shadow-raised)", position: "relative",
+          background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)",
+          overflowX: "auto",
+          boxShadow: BOX_SHADOW_CARD, position: "relative",
           WebkitOverflowScrolling: "touch",
         }}>
           {/* Header row */}
           <div style={{
             display: "grid",
             minWidth: isMobile ? 448 : undefined,
-            gridTemplateColumns: `${isMobile ? 140 : 200}px repeat(7, minmax(${isMobile ? 44 : 0}px, 1fr))`,
-            background: "var(--color-row-alt)",
-            borderBottom: "1px solid var(--color-border-light)",
+            gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
+            background: "var(--color-bg)",
+            borderBottom: "2px solid var(--color-dark)",
           }}>
             <div style={{
-              padding: "10px 16px", fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)",
-              textTransform: "uppercase", letterSpacing: "0.08em",
+              padding: "10px 12px", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-subtle)",
+              textTransform: "uppercase", letterSpacing: "0.04em",
+              position: isMobile ? undefined : "sticky", left: isMobile ? undefined : 0, zIndex: isMobile ? undefined : 4,
+              background: "var(--color-bg)",
+              borderRight: "1px solid var(--color-border-light)",
+              boxShadow: isMobile ? undefined : "2px 0 4px rgba(0,0,0,0.02)",
             }}>
               Staff
             </div>
-            {DAY_NAMES.map((day) => (
+            {DAY_LABELS.map((day) => (
               <div
                 key={day}
                 style={{
-                  padding: "10px 4px", fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-faint)",
-                  textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center",
+                  padding: "10px 4px", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-subtle)",
+                  textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center",
                 }}
               >
                 {day}
@@ -1753,65 +1092,64 @@ function RecurringScheduleSection({
 
           {/* Employee rows */}
           {sortedEmployees.map((emp, i) => {
-            const qualifiedCodes = getQualifiedCodes(emp);
+            const isCurrentUser = !!(emp.userId && currentUser && emp.userId === currentUser.id);
+            const rowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
+            const certAbbr = emp.certificationId != null ? getCertAbbr(emp.certificationId, certifications) : null;
+            const dc = certAbbr ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR) : null;
             return (
               <div
                 key={emp.id}
+                className="dg-table-row"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: `${isMobile ? 140 : 200}px repeat(7, minmax(${isMobile ? 44 : 0}px, 1fr))`,
+                  gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
                   minWidth: isMobile ? 448 : undefined,
                   borderTop: i === 0 ? "none" : "1px solid var(--color-border-light)",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--color-row-alt)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#fff";
+                  background: rowBg,
+                  transition: "background 150ms ease",
                 }}
               >
                 {/* Name cell */}
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 16px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "7px 12px",
                   borderRight: "1px solid var(--color-border-light)",
+                  position: isMobile ? undefined : "sticky", left: isMobile ? undefined : 0, zIndex: isMobile ? undefined : 3,
+                  background: rowBg,
+                  boxShadow: isMobile ? undefined : "2px 0 4px rgba(0,0,0,0.02)",
                 }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                    background: `hsl(${hashCode(emp.id) % 360}, 70%, 92%)`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 800,
-                    color: `hsl(${hashCode(emp.id) % 360}, 70%, 35%)`,
-                    border: `1px solid hsl(${hashCode(emp.id) % 360}, 70%, 85%)`,
-                  }}>
-                    {getInitials(getEmployeeDisplayName(emp))}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{
-                      fontWeight: 600, fontSize: 13, color: "var(--color-text-secondary)",
+                      fontWeight: 600, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)",
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                       display: "flex", alignItems: "center", gap: 5,
                     }}>
                       {getEmployeeDisplayName(emp)}
-                      {emp.userId && currentUser && emp.userId === currentUser.id && (
+                      {isCurrentUser && (
                         <span style={{
                           fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-                          background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap", flexShrink: 0,
+                          background: "var(--color-info-bg)", color: "var(--color-link)", whiteSpace: "nowrap", flexShrink: 0,
                         }}>
                           You
                         </span>
                       )}
                     </div>
-                    {emp.certificationId != null && (
-                      <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-faint)", marginTop: 1 }}>
-                        {getCertAbbr(emp.certificationId, certifications)}
-                      </div>
-                    )}
                   </div>
+                  {certAbbr && dc && (
+                    <span style={{
+                      fontSize: "var(--dg-fs-caption)", fontWeight: 700,
+                      background: dc.bg, color: dc.text,
+                      padding: "2px 7px", borderRadius: 20,
+                      whiteSpace: "nowrap", flexShrink: 0, letterSpacing: "0.01em",
+                      marginLeft: 6,
+                    }}>
+                      {certAbbr}
+                    </span>
+                  )}
                 </div>
 
                 {/* Day cells */}
-                {DAY_NAMES.map((_, dayIdx) => {
+                {DAY_LABELS.map((_, dayIdx) => {
                   const label = getEffectiveLabel(emp.id, dayIdx);
                   const st = label ? shiftCodes.find((s) => s.label === label) : null;
                   const isDirty = !!(dirtySchedules[emp.id] && dayIdx in dirtySchedules[emp.id]);
@@ -1820,37 +1158,47 @@ function RecurringScheduleSection({
                   return (
                     <div
                       key={dayIdx}
+                      className="dg-grid-cell"
+                      data-interactive={canEdit ? "true" : "false"}
+                      tabIndex={canEdit ? 0 : -1}
+                      role="gridcell"
+                      aria-label={st ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: ${st.label}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: empty`}
                       onClick={(e) => handleCellClick(emp.id, dayIdx, e.currentTarget)}
+                      onKeyDown={(e) => {
+                        if (canEdit && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          handleCellClick(emp.id, dayIdx, e.currentTarget as HTMLElement);
+                        }
+                      }}
                       style={{
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        padding: "6px 4px",
-                        cursor: canEdit ? "pointer" : "default",
-                        position: "relative",
+                        height: "var(--dg-grid-cell-height)",
                         borderLeft: "1px solid var(--color-border-light)",
                         background: isActive ? "rgba(56,189,248,0.08)" : undefined,
                       }}
                     >
                       {st ? (
                         <div style={{
-                          width: "100%", maxWidth: 64, height: 32,
+                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
                           background: st.color,
                           border: isDirty ? `2px dashed ${st.text}` : `1px solid ${borderColor(st.text)}`,
-                          borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
-                          color: st.text, fontSize: 13, fontWeight: 800,
-                          transition: "box-shadow 0.12s",
-                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : undefined,
+                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                          color: st.text,
+                          fontSize: isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)",
+                          fontWeight: 800,
+                          transition: "box-shadow 150ms ease",
+                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
                         }}>
                           {st.label}
                         </div>
                       ) : (
                         <div style={{
-                          width: "100%", maxWidth: 64, height: 32,
-                          background: "#F8FAFC",
-                          border: isDirty ? "2px dashed #94A3B8" : "1px solid var(--color-border-light)",
-                          borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
-                          color: "var(--color-text-faint)", fontSize: 12, fontWeight: 500,
-                          transition: "box-shadow 0.12s",
-                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : undefined,
+                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
+                          background: "transparent",
+                          border: isDirty ? "2px dashed var(--color-text-subtle)" : "1px dashed var(--color-border-light)",
+                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)", fontWeight: 500,
+                          transition: "box-shadow 150ms ease, background 80ms ease",
+                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
                         }}>
                           --
                         </div>
@@ -1865,8 +1213,8 @@ function RecurringScheduleSection({
           {/* Error banner */}
           {error && (
             <div style={{
-              padding: "10px 20px", background: "#FEF2F2", borderTop: "1px solid #FECACA",
-              fontSize: 12, color: "#DC2626",
+              padding: "10px 20px", background: "var(--color-danger-bg)", borderTop: "1px solid var(--color-danger-border)",
+              fontSize: "var(--dg-fs-caption)", color: "var(--color-danger)",
             }}>
               {error}
             </div>
@@ -1920,7 +1268,7 @@ function FocusAreasSection({
         <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {focusAreaLabel}
         </h2>
-        <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-text-muted)" }}>
+        <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
           Staff members grouped by their assigned {focusAreaLabel.toLowerCase()}. Edit assignments from the Members tab.
         </p>
       </div>
@@ -1929,7 +1277,7 @@ function FocusAreasSection({
         <div
           key={focusArea.id}
           style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             borderRadius: 14,
             border: "1px solid var(--color-border)",
             overflow: "hidden",
@@ -1947,23 +1295,28 @@ function FocusAreasSection({
           >
             <span
               style={{
-                background: focusArea.colorBg,
-                color: focusArea.colorText,
-                fontSize: 12,
-                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "var(--color-bg-secondary)",
+                color: "var(--color-text-secondary)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
                 borderRadius: 20,
                 padding: "3px 10px",
+                border: "1px solid var(--color-border-light)",
               }}
             >
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
               {focusArea.name}
             </span>
-            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
               {members.length} {members.length === 1 ? "member" : "members"}
             </span>
           </div>
           <div style={{ padding: "16px 20px" }}>
             {members.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-faint)", fontStyle: "italic" }}>
+              <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-faint)", fontStyle: "italic" }}>
                 No staff assigned to this {focusAreaLabel.replace(/s$/, "").toLowerCase()}.
               </p>
             ) : (
@@ -1980,14 +1333,14 @@ function FocusAreasSection({
       {unassigned.length > 0 && (
         <div
           style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             borderRadius: 12,
             border: "1px solid var(--color-border)",
             overflow: "hidden",
             boxShadow: BOX_SHADOW_CARD,
           }}
         >
-          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: 13, color: "var(--color-text-muted)" }}>
+          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
             Unassigned
           </div>
           <div style={{ padding: "16px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -2028,7 +1381,7 @@ function NamedItemsSection({
     [employees, getEmployeeValues],
   );
 
-  const defaultPill = pillStyle ?? { bg: "var(--color-dark)", text: "#fff" };
+  const defaultPill = pillStyle ?? { bg: "var(--color-brand)", text: "var(--color-text-inverse)" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
@@ -2036,16 +1389,16 @@ function NamedItemsSection({
         <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {label}
         </h2>
-        <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-text-muted)" }}>
+        <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
           Staff members grouped by their assigned {label.toLowerCase()}. Edit assignments from the Members tab.
         </p>
       </div>
 
       {grouped.map(({ item, members }) => (
         <div
-          key={item.name}
+          key={item.id}
           style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             borderRadius: 14,
             border: "1px solid var(--color-border)",
             overflow: "hidden",
@@ -2065,7 +1418,7 @@ function NamedItemsSection({
               style={{
                 background: defaultPill.bg,
                 color: defaultPill.text,
-                fontSize: 11,
+                fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
                 borderRadius: 20,
                 padding: "3px 10px",
@@ -2073,16 +1426,16 @@ function NamedItemsSection({
             >
               {item.abbr}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
               {item.name !== item.abbr ? item.name : ""}
             </span>
-            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
               {members.length} {members.length === 1 ? "member" : "members"}
             </span>
           </div>
           <div style={{ padding: "16px 20px" }}>
             {members.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-faint)", fontStyle: "italic" }}>
+              <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-faint)", fontStyle: "italic" }}>
                 No staff with this {singularLabel.toLowerCase()}.
               </p>
             ) : (
@@ -2099,14 +1452,14 @@ function NamedItemsSection({
       {unassigned.length > 0 && (
         <div
           style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             borderRadius: 12,
             border: "1px solid var(--color-border)",
             overflow: "hidden",
             boxShadow: BOX_SHADOW_CARD,
           }}
         >
-          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: 13, color: "var(--color-text-muted)" }}>
+          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
             Unassigned
           </div>
           <div style={{ padding: "16px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -2143,7 +1496,6 @@ export default function StaffView({
 }: StaffViewProps) {
   const pathname = usePathname();
   const isMobile = useMediaQuery(MOBILE);
-  const isTablet = useMediaQuery(TABLET);
   const VALID_SECTIONS: StaffSection[] = ["members", "recurring-schedule", "focus-areas", "certifications", "roles"];
   const sectionFromPath = pathname.split("/")[2] as StaffSection | undefined;
   const activeSection: StaffSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : "members";
@@ -2155,7 +1507,7 @@ export default function StaffView({
   const iconCert = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
 
   const links: { id: StaffSection; label: string; icon: React.ReactNode }[] = [
-    { id: "members", label: "Members", icon: iconUsers },
+    { id: "members", label: "Staff Members", icon: iconUsers },
     ...(orgId ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
     { id: "focus-areas", label: focusAreaLabel, icon: iconGrid },
     { id: "certifications", label: certificationLabel, icon: iconCert },
@@ -2165,20 +1517,16 @@ export default function StaffView({
   const getCertValues = useCallback((emp: Employee) => emp.certificationId != null ? [emp.certificationId] : [], []);
   const getRoleValues = useCallback((emp: Employee) => emp.roleIds, []);
 
-  // Track whether the detail panel is open (for sidebar collapse)
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [userCollapsed, setUserCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("dg-sidebar-collapsed-staff") === "true";
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dg-sidebar-manual-collapse") !== "true";
   });
-  const toggleSidebar = useCallback(() => {
-    setUserCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("dg-sidebar-collapsed-staff", String(next));
-      return next;
-    });
+
+  const handleSidebarOpenChange = useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    localStorage.setItem("dg-sidebar-manual-collapse", String(!open));
   }, []);
-  const sidebarCollapsed = userCollapsed || (detailOpen && !isMobile && !isTablet);
+
 
   // Register sub-nav items for the mobile bottom sheet
   const subNavItems: SubNavItem[] = useMemo(
@@ -2196,53 +1544,61 @@ export default function StaffView({
   useSetMobileSubNav(subNavItems);
 
   return (
-    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden", position: "relative" }}>
-      {/* Expand button (shown when sidebar is collapsed) */}
-      {sidebarCollapsed && !isMobile && (
-        <button className="dg-sidebar-expand" onClick={toggleSidebar} title="Expand sidebar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      )}
-
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+      style={{ minHeight: "unset", height: "calc(100dvh - 56px)" }}
+    >
       {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
-      {isMobile ? null : (
-        <aside
-          className={`dg-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
-          style={{
-            width: isTablet ? 180 : 240,
-            flexShrink: 0,
-            height: "100%",
-            borderRight: "1px solid var(--color-border)",
-            background: "#fff",
-            display: "flex",
-            flexDirection: "column",
-            padding: isTablet ? "20px 8px" : "24px 12px",
-            gap: 4,
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-            <button className="dg-sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-          </div>
-          {links.map((link) => (
-            <SidebarLink
-              key={link.id}
-              label={link.label}
-              icon={link.icon}
-              active={activeSection === link.id}
-              href={link.id === "members" ? "/staff" : `/staff/${link.id}`}
-            />
-          ))}
-        </aside>
+      {!isMobile && (
+        <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
+          <SidebarContent className="pt-4">
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {links.map((link) => (
+                    <SidebarMenuItem key={link.id}>
+                      <SidebarMenuButton
+                        render={<Link href={link.id === "members" ? "/staff" : `/staff/${link.id}`} replace />}
+                        isActive={activeSection === link.id}
+                        tooltip={link.label}
+                        className="h-9 data-[active=true]:bg-[var(--color-info-bg)] data-[active=true]:text-[var(--color-brand)] hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                      >
+                        <span className={activeSection === link.id ? "text-[var(--color-today-text)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                          {link.icon}
+                        </span>
+                        <span className="font-semibold">{link.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => handleSidebarOpenChange(!sidebarOpen)}
+                  tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
+                  className="h-9 text-[var(--color-text-faint)] hover:text-black hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                >
+                  <span className="flex shrink-0 items-center justify-center">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+                      <polyline points="13 17 18 12 13 7" />
+                      <polyline points="6 17 11 12 6 7" />
+                    </svg>
+                  </span>
+                  <span className="font-semibold ml-2">Collapse Menu</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
       )}
 
-      {/* Content */}
-      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "40px 48px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
+      {/* SidebarInset = scroll container. Toolbar is a DIRECT child → sticky works */}
+      <SidebarInset className="overflow-y-auto">
         {activeSection === "members" && (
           <MembersSection
             employees={employees}
@@ -2262,51 +1618,54 @@ export default function StaffView({
             roleLabel={roleLabel}
             orgId={orgId}
             orgName={orgName}
-            onDetailPanelChange={setDetailOpen}
           />
         )}
 
-        {activeSection === "recurring-schedule" && orgId && (
-          <RecurringScheduleSection
-            employees={employees}
-            orgId={orgId}
-            shiftCodes={shiftCodes ?? []}
-            shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
-            canEdit={canEditShifts ?? false}
-            focusAreas={focusAreas}
-            certifications={certifications}
-          />
-        )}
+        {activeSection !== "members" && (
+          <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+            {activeSection === "recurring-schedule" && orgId && (
+              <RecurringScheduleSection
+                employees={employees}
+                orgId={orgId}
+                shiftCodes={shiftCodes ?? []}
+                shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
+                canEdit={canEditShifts ?? false}
+                focusAreas={focusAreas}
+                certifications={certifications}
+              />
+            )}
 
-        {activeSection === "focus-areas" && (
-          <FocusAreasSection
-            employees={employees}
-            focusAreas={focusAreas}
-            focusAreaLabel={focusAreaLabel}
-          />
-        )}
+            {activeSection === "focus-areas" && (
+              <FocusAreasSection
+                employees={employees}
+                focusAreas={focusAreas}
+                focusAreaLabel={focusAreaLabel}
+              />
+            )}
 
-        {activeSection === "certifications" && (
-          <NamedItemsSection
-            employees={employees}
-            items={certifications}
-            label={certificationLabel}
-            singularLabel={certificationLabel.replace(/s$/, "")}
-            getEmployeeValues={getCertValues}
-            pillStyle={{ bg: "var(--color-border-light)", text: "var(--color-text-muted)" }}
-          />
-        )}
+            {activeSection === "certifications" && (
+              <NamedItemsSection
+                employees={employees}
+                items={certifications}
+                label={certificationLabel}
+                singularLabel={certificationLabel.replace(/s$/, "")}
+                getEmployeeValues={getCertValues}
+                pillStyle={{ bg: "var(--color-border-light)", text: "var(--color-text-muted)" }}
+              />
+            )}
 
-        {activeSection === "roles" && (
-          <NamedItemsSection
-            employees={employees}
-            items={roles}
-            label={roleLabel}
-            singularLabel={roleLabel.replace(/s$/, "")}
-            getEmployeeValues={getRoleValues}
-          />
+            {activeSection === "roles" && (
+              <NamedItemsSection
+                employees={employees}
+                items={roles}
+                label={roleLabel}
+                singularLabel={roleLabel.replace(/s$/, "")}
+                getEmployeeValues={getRoleValues}
+              />
+            )}
+          </div>
         )}
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

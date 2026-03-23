@@ -8,7 +8,7 @@ import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, Organ
 import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
-import { BOX_SHADOW_CARD } from "@/lib/constants";
+import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -16,6 +16,25 @@ import CustomSelect from "@/components/CustomSelect";
 import { useAuth } from "@/components/AuthProvider";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 
 function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: string; onChange: (c: PredefinedColor) => void; disabled?: boolean }) {
   const active = getPresetByBg(valueBg);
@@ -38,7 +57,7 @@ function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: string; o
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            opacity: disabled ? 0.6 : 1,
+            opacity: disabled ? 0.5 : 1,
           }}
           title={c.name}
         >
@@ -82,36 +101,28 @@ function Section({
   title,
   children,
   maxWidth = 860,
+  noPadding = false,
 }: {
   title: string;
   children: React.ReactNode;
   maxWidth?: number;
+  noPadding?: boolean;
 }) {
   return (
     <div
       style={{
-        background: "#fff",
-        borderRadius: 12,
-        border: "1px solid var(--color-border)",
-        overflow: "hidden",
-        boxShadow: BOX_SHADOW_CARD,
+        ...sectionStyle,
         width: "100%",
         maxWidth,
         flexShrink: 0,
       }}
     >
       <div
-        style={{
-          padding: "14px 20px",
-          borderBottom: "1px solid var(--color-border-light)",
-          fontWeight: 700,
-          fontSize: 14,
-          color: "var(--color-text-secondary)",
-        }}
+        style={sectionHeaderStyle}
       >
         {title}
       </div>
-      <div style={{ padding: "20px" }}>{children}</div>
+      {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}
     </div>
   );
 }
@@ -119,22 +130,15 @@ function Section({
 const inputStyle: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
-  padding: "8px 11px",
-  border: "1.5px solid var(--color-border)",
-  borderRadius: 8,
-  fontSize: 13,
+  padding: "7px 12px",
+  border: "1px solid var(--color-border)",
+  borderRadius: 10,
+  fontSize: "var(--dg-fs-label)",
   outline: "none",
-  background: "#fff",
+  background: "var(--color-surface)",
 };
 
-const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "var(--color-text-subtle)",
-  letterSpacing: "0.05em",
-  display: "block",
-  marginBottom: 5,
-};
+const labelStyle = sharedLabelStyle;
 
 // ── Common IANA timezones ─────────────────────────────────────────────────────
 const TIMEZONES = [
@@ -159,17 +163,7 @@ const TIMEZONES = [
 
 // ── 12-hour time picker ───────────────────────────────────────────────────────
 function TimeInput12h({ value, onChange, disabled }: { value: string | null | undefined; onChange: (v: string | null) => void; disabled?: boolean }) {
-  const init = parseTo12h(value);
-  const [hour, setHour] = useState(init.hour);
-  const [minute, setMinute] = useState(init.minute);
-  const [period, setPeriod] = useState<"AM" | "PM">(init.period);
-
-  useEffect(() => {
-    const p = parseTo12h(value);
-    setHour(p.hour);
-    setMinute(p.minute);
-    setPeriod(p.period);
-  }, [value]);
+  const { hour, minute, period } = parseTo12h(value);
 
   const hourOptions = [
     { value: "", label: "--" },
@@ -183,27 +177,27 @@ function TimeInput12h({ value, onChange, disabled }: { value: string | null | un
       <CustomSelect
         value={hour}
         options={hourOptions}
-        onChange={(val) => { setHour(val); onChange(to24h(val, minute, period)); }}
+        onChange={(val) => onChange(to24h(val, minute, period))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 56 }}
+        style={{ width: 68 }}
       />
       <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
       <CustomSelect
         value={minute}
         options={minuteOptions}
-        onChange={(val) => { setMinute(val); onChange(to24h(hour, val, period)); }}
+        onChange={(val) => onChange(to24h(hour, val, period))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 56 }}
+        style={{ width: 68 }}
       />
       <CustomSelect
         value={period}
         options={periodOptions}
-        onChange={(val) => { const p = val as "AM" | "PM"; setPeriod(p); onChange(to24h(hour, minute, p)); }}
+        onChange={(val) => onChange(to24h(hour, minute, val as "AM" | "PM"))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 62 }}
+        style={{ width: 72 }}
       />
     </div>
   );
@@ -246,7 +240,7 @@ function OrganizationDetailsSettings({
         name: form.name.trim(),
         address: form.address.trim(),
         phone: form.phone.trim(),
-        employeeCount: form.employeeCount ? parseInt(form.employeeCount) : null,
+        employeeCount: form.employeeCount ? Math.max(0, Math.round(parseInt(form.employeeCount))) || null : null,
         timezone: form.timezone || null,
       };
       await db.updateOrganization(updated);
@@ -270,6 +264,7 @@ function OrganizationDetailsSettings({
           <input
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            maxLength={60}
             style={inputStyle}
           />
         </div>
@@ -279,6 +274,7 @@ function OrganizationDetailsSettings({
             value={form.phone}
             onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
             placeholder="(415) 555-0100"
+            maxLength={20}
             style={inputStyle}
           />
         </div>
@@ -288,6 +284,7 @@ function OrganizationDetailsSettings({
             value={form.address}
             onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
             placeholder="123 Main St, City, State ZIP"
+            maxLength={120}
             style={inputStyle}
           />
         </div>
@@ -296,10 +293,17 @@ function OrganizationDetailsSettings({
           <input
             type="number"
             min="0"
+            step="1"
             value={form.employeeCount}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, employeeCount: e.target.value }))
-            }
+            onChange={(e) => {
+              const v = e.target.value;
+              // Allow empty, otherwise clamp to non-negative integer
+              if (v === "") setForm((p) => ({ ...p, employeeCount: "" }));
+              else {
+                const n = Math.max(0, Math.round(Number(v)));
+                setForm((p) => ({ ...p, employeeCount: isNaN(n) ? "" : String(n) }));
+              }
+            }}
             placeholder="e.g. 28"
             style={inputStyle}
           />
@@ -325,12 +329,12 @@ function OrganizationDetailsSettings({
           onClick={handleSave}
           disabled={!isModified || saving}
           style={{
-            background: isModified ? "var(--color-accent-gradient)" : "#ccc",
+            background: isModified ? "var(--color-brand)" : "var(--color-border)",
             border: "none",
-            color: "#fff",
+            color: "var(--color-text-inverse)",
             borderRadius: 8,
             padding: "9px 20px",
-            fontSize: 13,
+            fontSize: "var(--dg-fs-label)",
             fontWeight: 700,
             cursor: isModified ? "pointer" : "not-allowed",
           }}
@@ -338,7 +342,7 @@ function OrganizationDetailsSettings({
           {saving ? "Saving…" : "Save"}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>
+          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>
             Saved!
           </span>
         )}
@@ -395,7 +399,7 @@ function OrganizationLabelsSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
+      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
         Customize what your organization calls each feature. These labels appear throughout the app.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16 }}>
@@ -405,9 +409,10 @@ function OrganizationLabelsSettings({
             value={form.focusAreaLabel}
             onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
             placeholder="Focus Areas"
+            maxLength={30}
             style={inputStyle}
           />
-          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+          <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Focus Areas, Departments, Units
           </p>
         </div>
@@ -417,9 +422,10 @@ function OrganizationLabelsSettings({
             value={form.certificationLabel}
             onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
             placeholder="Certifications"
+            maxLength={30}
             style={inputStyle}
           />
-          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+          <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Certifications, Designations
           </p>
         </div>
@@ -429,9 +435,10 @@ function OrganizationLabelsSettings({
             value={form.roleLabel}
             onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
             placeholder="Roles"
+            maxLength={30}
             style={inputStyle}
           />
-          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+          <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Responsibilities, Positions
           </p>
         </div>
@@ -442,12 +449,12 @@ function OrganizationLabelsSettings({
           onClick={handleSave}
           disabled={!isModified || saving}
           style={{
-            background: isModified ? "var(--color-accent-gradient)" : "#ccc",
+            background: isModified ? "var(--color-brand)" : "var(--color-border)",
             border: "none",
-            color: "#fff",
+            color: "var(--color-text-inverse)",
             borderRadius: 8,
             padding: "9px 20px",
-            fontSize: 13,
+            fontSize: "var(--dg-fs-label)",
             fontWeight: 700,
             cursor: isModified ? "pointer" : "not-allowed",
           }}
@@ -455,7 +462,7 @@ function OrganizationLabelsSettings({
           {saving ? "Saving…" : "Save"}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>
+          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>
             Saved!
           </span>
         )}
@@ -503,7 +510,7 @@ function FocusAreaRow({
     if (isReordering) {
       onFormChange(focusArea.id, form);
     }
-  }, [form, isReordering]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [form, isReordering, focusArea.id, onFormChange]);
 
   const handleDelete = useCallback(async () => {
     if (focusArea.isNew) {
@@ -538,17 +545,20 @@ function FocusAreaRow({
       >
         <span
           style={{
-            display: "inline-block",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
             padding: "3px 12px",
             borderRadius: 20,
-            background: focusArea.colorBg,
-            border: "1px solid rgba(0,0,0,0.08)",
-            color: focusArea.colorText,
-            fontSize: 13,
-            fontWeight: 700,
+            background: "var(--color-bg-secondary)",
+            border: "1px solid var(--color-border-light)",
+            color: "var(--color-text-secondary)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
             whiteSpace: "nowrap",
           }}
         >
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
           {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
         </span>
       </div>
@@ -565,12 +575,12 @@ function FocusAreaRow({
       onDragEnd={isReordering ? onDragEnd : undefined}
       style={{
         padding: "12px 12px",
-        borderTop: isDropTarget ? "2px solid #2563EB" : undefined,
+        borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
         borderBottom: "1px solid var(--color-border-light)",
         cursor: "grab",
-        opacity: isDragging ? 0.4 : 1,
+        opacity: isDragging ? 0.5 : 1,
         userSelect: isReordering ? "none" : undefined,
-        transition: "opacity 0.15s",
+        transition: "opacity 150ms ease",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -589,17 +599,20 @@ function FocusAreaRow({
         {/* Live preview badge */}
         <span
           style={{
-            display: "inline-block",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
             padding: "3px 12px",
             borderRadius: 20,
-            background: form.colorBg,
-            border: "1px solid rgba(0,0,0,0.08)",
-            color: form.colorText,
-            fontSize: 13,
-            fontWeight: 700,
+            background: "var(--color-bg-secondary)",
+            border: "1px solid var(--color-border-light)",
+            color: "var(--color-text-secondary)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
             whiteSpace: "nowrap",
           }}
         >
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: form.colorBg, flexShrink: 0 }} />
           {form.name || "Preview"}
         </span>
 
@@ -613,11 +626,11 @@ function FocusAreaRow({
             disabled={deleting}
             style={{
               background: "none",
-              border: "1px solid #FEE2E2",
-              borderRadius: 7,
-              color: "#EF4444",
+              border: "1px solid var(--color-danger-border)",
+              borderRadius: 8,
+              color: "var(--color-danger)",
               padding: "5px 10px",
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -637,6 +650,7 @@ function FocusAreaRow({
           onMouseDown={(e) => e.stopPropagation()}
           draggable={false}
           placeholder="Area name"
+          maxLength={50}
           style={{ ...inputStyle, flex: 1 }}
         />
       </div>
@@ -716,15 +730,20 @@ function FocusAreasSettings({
     setSaving(true);
     try {
       const withOrder = localFocusAreas.map((fa, i) => ({ ...fa, sortOrder: i }));
-      await Promise.all(
-        withOrder
-          .filter((fa) => !fa.isNew)
-          .map((fa) =>
-            db.upsertFocusArea({ id: fa.id, orgId, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText, sortOrder: fa.sortOrder }),
-          ),
+      const saved = await Promise.all(
+        withOrder.map((fa) =>
+          db.upsertFocusArea({
+            id: fa.isNew ? undefined : fa.id,
+            orgId,
+            name: fa.name,
+            colorBg: fa.colorBg,
+            colorText: fa.colorText,
+            sortOrder: fa.sortOrder,
+          }),
+        ),
       );
-      setLocalFocusAreas(withOrder);
-      onChange(withOrder);
+      setLocalFocusAreas(saved);
+      onChange(saved);
       setIsEditing(false);
       toast.success("Focus areas saved");
     } catch {
@@ -748,16 +767,17 @@ function FocusAreasSettings({
     setIsEditing(true);
   };
 
-  const handleFormChange = (id: number, patch: { name: string; colorBg: string; colorText: string }) => {
+  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string }) => {
     setLocalFocusAreas((prev) =>
       prev.map((fa) => (fa.id === id ? { ...fa, ...patch } : fa)),
     );
-  };
+  }, []);
 
   const handleDeleted = (id: number) => {
     const updated = localFocusAreas.filter((w) => w.id !== id);
     setLocalFocusAreas(updated);
-    onChange(updated);
+    // Only propagate to parent when not in edit mode (batch save handles it)
+    if (!isEditing) onChange(updated);
   };
 
   // Drag handlers
@@ -792,12 +812,12 @@ function FocusAreasSettings({
   return (
     <div>
       {/* Controls */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "16px 16px 8px" }}>
         {!isEditing && (
           <button
             onClick={handleEnterEdit}
             className="dg-btn dg-btn-secondary"
-            style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+            style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -818,53 +838,62 @@ function FocusAreasSettings({
         )}
       </div>
 
-      <div
-        style={{
-          borderRadius: 12,
-          border: isEditing ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
-          overflow: "hidden",
-          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : BOX_SHADOW_CARD,
-          transition: "border-color 0.15s, box-shadow 0.15s",
-          marginBottom: 4,
-        }}
-      >
-        {displayList.map((focusArea, i) => {
-          const realIdx = localFocusAreas.findIndex((fa) => fa.id === focusArea.id);
-          return (
-            <FocusAreaRow
-              key={focusArea.id}
-              focusArea={focusArea}
-              onDeleted={handleDeleted}
-              onFormChange={handleFormChange}
-              isReordering={isEditing}
-              isDragging={isEditing && draggedIdx !== null && localFocusAreas[draggedIdx]?.id === focusArea.id}
-              isDropTarget={isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i}
-              onDragStart={() => handleDragStart(realIdx)}
-              onDragOver={(e) => handleDragOver(e, i)}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
-              canManageFocusAreas={canManageFocusAreas}
-            />
-          );
-        })}
-      </div>
-      <button
-        onClick={handleAdd}
-        style={{
-          marginTop: 12,
-          background: "none",
-          border: "1.5px dashed var(--color-border)",
-          borderRadius: 8,
-          color: "var(--color-text-muted)",
-          padding: "8px 16px",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-          width: "100%",
-        }}
-      >
-        + Add {label}
-      </button>
+      {displayList.length === 0 ? (
+        <div style={{
+          border: "1px dashed var(--color-border)", borderRadius: 12,
+          padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+          margin: "0 16px 16px",
+        }}>
+          <span>No {label.toLowerCase()} defined yet</span>
+          {canManageFocusAreas && (
+            <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}>
+              + Add {label}
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div style={{ overflow: "hidden" }}>
+            {displayList.map((focusArea, i) => {
+              const realIdx = localFocusAreas.findIndex((fa) => fa.id === focusArea.id);
+              return (
+                <FocusAreaRow
+                  key={focusArea.id}
+                  focusArea={focusArea}
+                  onDeleted={handleDeleted}
+                  onFormChange={handleFormChange}
+                  isReordering={isEditing}
+                  isDragging={isEditing && draggedIdx !== null && localFocusAreas[draggedIdx]?.id === focusArea.id}
+                  isDropTarget={isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i}
+                  onDragStart={() => handleDragStart(realIdx)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                  canManageFocusAreas={canManageFocusAreas}
+                />
+              );
+            })}
+          </div>
+          <div style={{ padding: "8px 16px 16px" }}>
+            <button
+              onClick={handleAdd}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--color-text-muted)",
+                padding: "6px 0",
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              + Add {label}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -917,26 +946,25 @@ function ShiftCodeRow({
 
   // Re-sync form from prop when the parent data changes (e.g. fresh fetch
   // after cert deletion trigger cleans up IDs).
-  const stIdRef = useRef(st.id);
-  const stVersionRef = useRef(JSON.stringify(st.requiredCertificationIds ?? []));
+  const certIdsKey = JSON.stringify(st.requiredCertificationIds ?? []);
+  const prevStIdRef = useRef(st.id);
+  const prevCertIdsKeyRef = useRef(certIdsKey);
   useEffect(() => {
-    const newVersion = JSON.stringify(st.requiredCertificationIds ?? []);
-    if (st.id !== stIdRef.current || newVersion !== stVersionRef.current) {
-      stIdRef.current = st.id;
-      stVersionRef.current = newVersion;
-      setForm({
-        label: st.label,
-        name: st.name,
-        color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-        border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-        text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-        categoryId: st.categoryId ?? null,
-        isOffDay: st.isOffDay ?? isOffDayRow ?? false,
-        focusAreaId: st.focusAreaId ?? null,
-        requiredCertificationIds: st.requiredCertificationIds ?? [],
-      });
-    }
-  }, [st, isOffDayRow]);
+    if (st.id === prevStIdRef.current && certIdsKey === prevCertIdsKeyRef.current) return;
+    prevStIdRef.current = st.id;
+    prevCertIdsKeyRef.current = certIdsKey;
+    setForm({
+      label: st.label,
+      name: st.name,
+      color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
+      border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
+      text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
+      categoryId: st.categoryId ?? null,
+      isOffDay: st.isOffDay ?? isOffDayRow ?? false,
+      focusAreaId: st.focusAreaId ?? null,
+      requiredCertificationIds: st.requiredCertificationIds ?? [],
+    });
+  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.isOffDay, st.focusAreaId, certIdsKey, isOffDayRow]);
 
   const isDirty = st.isNew ||
     form.label !== st.label ||
@@ -1024,8 +1052,8 @@ function ShiftCodeRow({
             background: form.color,
             border: `1px solid ${borderColor(form.text)}`,
             color: form.text,
-            borderRadius: 6,
-            fontSize: 12,
+            borderRadius: 8,
+            fontSize: "var(--dg-fs-caption)",
             fontWeight: 700,
             textAlign: "center",
           }}
@@ -1034,7 +1062,7 @@ function ShiftCodeRow({
         </span>
         <span
           style={{
-            fontSize: 13,
+            fontSize: "var(--dg-fs-label)",
             color: "var(--color-text-secondary)",
             flex: 1,
           }}
@@ -1042,13 +1070,13 @@ function ShiftCodeRow({
           {form.name || "—"}
         </span>
         {!hideFocusAreaSelect && form.focusAreaId != null && (
-          <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+          <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
             {focusAreas.find((w) => w.id === form.focusAreaId)?.name}
           </span>
         )}
         {form.categoryId !== null && (
           <span style={{
-            fontSize: 11,
+            fontSize: "var(--dg-fs-footnote)",
             fontWeight: 600,
             padding: "2px 6px",
             background: "var(--color-bg-subtle)",
@@ -1061,10 +1089,10 @@ function ShiftCodeRow({
         )}
         <span
           style={{
-            fontSize: 14,
+            fontSize: "var(--dg-fs-body-sm)",
             color: "var(--color-text-faint)",
             transform: expanded ? "rotate(180deg)" : "none",
-            transition: "transform 0.15s",
+            transition: "transform 150ms ease",
           }}
         >
           ▾
@@ -1075,11 +1103,9 @@ function ShiftCodeRow({
       {expanded && (
         <div
           style={{
-            background: "var(--color-bg, #F8FAFC)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
+            background: "var(--color-bg)",
+            borderTop: "1px solid var(--color-border-light)",
             padding: 16,
-            marginBottom: 10,
             display: "flex",
             flexDirection: "column",
             gap: 12,
@@ -1101,6 +1127,7 @@ function ShiftCodeRow({
                   setForm((p) => ({ ...p, label: e.target.value }))
                 }
                 placeholder="e.g. D"
+                maxLength={6}
                 style={inputStyle}
                 disabled={!canManageShiftCodes}
               />
@@ -1113,6 +1140,7 @@ function ShiftCodeRow({
                   setForm((p) => ({ ...p, name: e.target.value }))
                 }
                 placeholder="e.g. Day Shift"
+                maxLength={50}
                 style={inputStyle}
                 disabled={!canManageShiftCodes}
               />
@@ -1191,15 +1219,15 @@ function ShiftCodeRow({
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
-                        fontSize: 13,
+                        fontSize: "var(--dg-fs-label)",
                         cursor: canManageShiftCodes ? "pointer" : "default",
                         padding: "4px 10px",
                         borderRadius: 20,
                         border: `1.5px solid ${
-                          checked ? "var(--color-accent-start)" : "var(--color-border)"
+                          checked ? "var(--color-brand)" : "var(--color-border)"
                         }`,
-                        background: checked ? "#EEF2FF" : "transparent",
-                        transition: "border-color 0.1s, background 0.1s",
+                        background: checked ? "var(--color-info-bg)" : "transparent",
+                        transition: "border-color 150ms ease, background 150ms ease",
                       }}
                     >
                       <input
@@ -1220,7 +1248,7 @@ function ShiftCodeRow({
                         style={{
                           fontWeight: checked ? 700 : 500,
                           color: checked
-                            ? "var(--color-accent-start)"
+                            ? "var(--color-brand)"
                             : "var(--color-text-secondary)",
                         }}
                       >
@@ -1231,7 +1259,7 @@ function ShiftCodeRow({
                 })}
               </div>
               {form.requiredCertificationIds.length > 0 && (
-                <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>
+                <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
                   Only {form.requiredCertificationIds.map(id => certifications.find(s => s.id === id)?.name).filter(Boolean).join(", ")} can be assigned this shift.
                 </p>
               )}
@@ -1240,7 +1268,7 @@ function ShiftCodeRow({
 
           {/* Actions */}
           {saveError && (
-            <p style={{ color: "#EF4444", fontSize: 12, margin: "0 0 8px" }}>
+            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: "0 0 8px" }}>
               <strong>Error:</strong> {saveError}
             </p>
           )}
@@ -1249,12 +1277,12 @@ function ShiftCodeRow({
               onClick={handleSave}
               disabled={saving || !canSave || !canManageShiftCodes}
               style={{
-                background: canSave && canManageShiftCodes ? "var(--color-accent-gradient)" : "var(--color-border-light)",
+                background: canSave && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border-light)",
                 border: "none",
-                color: canSave && canManageShiftCodes ? "#fff" : "var(--color-text-muted)",
-                borderRadius: 7,
+                color: canSave && canManageShiftCodes ? "var(--color-text-inverse)" : "var(--color-text-muted)",
+                borderRadius: 8,
                 padding: "8px 18px",
-                fontSize: 13,
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 700,
                 cursor: canSave && canManageShiftCodes ? "pointer" : "default",
                 opacity: canSave && canManageShiftCodes ? 1 : 0.6,
@@ -1263,31 +1291,31 @@ function ShiftCodeRow({
               {saving ? "Saving…" : "Save"}
             </button>
             <button
-              onClick={() => setExpanded(false)}
+              onClick={() => st.isNew ? onDeleted(st.id) : setExpanded(false)}
               style={{
                 background: "var(--color-border-light)",
                 border: "none",
-                borderRadius: 7,
+                borderRadius: 8,
                 color: "var(--color-text-muted)",
                 padding: "8px 14px",
-                fontSize: 13,
+                fontSize: "var(--dg-fs-label)",
                 cursor: "pointer",
               }}
             >
               Cancel
             </button>
             <div style={{ flex: 1 }} />
-            {canManageShiftCodes && (
+            {canManageShiftCodes && !st.isNew && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleting}
                 style={{
                   background: "none",
-                  border: "1px solid #FEE2E2",
-                  borderRadius: 7,
-                  color: "#EF4444",
+                  border: "1px solid var(--color-danger-border)",
+                  borderRadius: 8,
+                  color: "var(--color-danger)",
                   padding: "8px 14px",
-                  fontSize: 13,
+                  fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
@@ -1355,9 +1383,9 @@ function ShiftCodesSettings({
       orgId: orgId,
       label: "",
       name: "",
-      color: isOffDay ? "#F1F5F9" : "#F8FAFC",
-      border: "#CBD5E1",
-      text:"#475569",
+      color: isOffDay ? "#EEEFEC" : "#F7F8F5",
+      border: "#9EB4D4",
+      text:"#3E433B",
       isOffDay,
       focusAreaId: focusAreaId,
       sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
@@ -1379,16 +1407,14 @@ function ShiftCodesSettings({
   };
 
   const addBtnStyle: React.CSSProperties = {
-    marginTop: 6,
     background: "none",
-    border: "1.5px dashed var(--color-border)",
-    borderRadius: 8,
+    border: "none",
     color: "var(--color-text-muted)",
-    padding: "6px 14px",
-    fontSize: 12,
+    padding: "6px 0",
+    fontSize: "var(--dg-fs-caption)",
     fontWeight: 600,
     cursor: "pointer",
-    width: "100%",
+    fontFamily: "inherit",
   };
 
   const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], isOffDaySection = false, hideAreaSelect = false) =>
@@ -1410,22 +1436,27 @@ function ShiftCodesSettings({
       />
     ));
 
-  const sectionHeader = (label: string, colorBg?: string, colorText?: string) => (
+  const sectionHeader = (label: string, colorBg?: string, _colorText?: string) => (
     <div style={{
-      padding: "10px 16px",
-      background: colorBg || "var(--color-bg-subtle)",
-      color: colorText || "var(--color-text-secondary)",
+      padding: "10px 20px",
+      background: "var(--color-bg)",
+      color: "var(--color-text-secondary)",
       fontWeight: 700,
-      fontSize: 13,
+      fontSize: "var(--dg-fs-label)",
+      borderTop: "1px solid var(--color-border-light)",
       borderBottom: "1px solid var(--color-border-light)",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
     }}>
+      {colorBg && <span style={{ width: 10, height: 10, borderRadius: "50%", background: colorBg, flexShrink: 0 }} />}
       {label}
     </div>
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
         Click any row to expand and edit. The label (code) is used in the schedule grid.
       </p>
 
@@ -1435,15 +1466,32 @@ function ShiftCodesSettings({
           (s) => !s.isOffDay && s.focusAreaId === focusArea.id,
         );
         return (
-          <div key={focusArea.id} style={{ marginBottom: 20, border: "1px solid var(--color-border-light)", borderRadius: 10, overflow: "hidden" }}>
-            {sectionHeader(focusArea.name, focusArea.colorBg, focusArea.colorText)}
-            {areaCodes.length > 0 && (
+          <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
+              {focusArea.name}
+            </div>
+            {areaCodes.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
                 {renderRows(areaCodes, false, true)}
               </div>
+            ) : (
+              <div style={{
+                border: "1px dashed var(--color-border)", borderRadius: 10,
+                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                margin: "12px 16px",
+              }}>
+                <span>No shift codes yet</span>
+                {canManageShiftCodes && (
+                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                    + Add Shift Code
+                  </button>
+                )}
+              </div>
             )}
-            {canManageShiftCodes && (
-              <div style={{ padding: "8px 16px" }}>
+            {areaCodes.length > 0 && canManageShiftCodes && (
+              <div style={{ padding: "8px 16px 12px" }}>
                 <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
                   + Add Shift Code
                 </button>
@@ -1459,15 +1507,31 @@ function ShiftCodesSettings({
           (s) => !s.isOffDay && s.focusAreaId == null,
         );
         return (
-          <div style={{ marginBottom: 20, border: "1px solid var(--color-border-light)", borderRadius: 10, overflow: "hidden" }}>
-            {sectionHeader("General / Cross-Area")}
-            {generalCodes.length > 0 && (
+          <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+              General / Cross-Area
+            </div>
+            {generalCodes.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
                 {renderRows(generalCodes, false, true)}
               </div>
+            ) : (
+              <div style={{
+                border: "1px dashed var(--color-border)", borderRadius: 10,
+                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                margin: "12px 16px",
+              }}>
+                <span>No general codes yet</span>
+                {canManageShiftCodes && (
+                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                    + Add General Code
+                  </button>
+                )}
+              </div>
             )}
-            {canManageShiftCodes && (
-              <div style={{ padding: "8px 16px" }}>
+            {generalCodes.length > 0 && canManageShiftCodes && (
+              <div style={{ padding: "8px 16px 12px" }}>
                 <button onClick={() => handleAdd(null)} style={addBtnStyle}>
                   + Add General Code
                 </button>
@@ -1481,21 +1545,39 @@ function ShiftCodesSettings({
       {(() => {
         const offDayCodes = local.filter((s) => s.isOffDay);
         return (
-          <div style={{ border: "1px solid var(--color-border-light)", borderRadius: 10, overflow: "hidden" }}>
-            {sectionHeader("Off Days")}
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
+          <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+              Off Days
+            </div>
+            <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
               Off days (scheduled off, sick leave, vacation) do not count toward shift totals.
             </p>
-            {offDayCodes.length > 0 && (
+            {offDayCodes.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
                 {renderRows(offDayCodes, true, true)}
               </div>
+            ) : (
+              <div style={{
+                border: "1px dashed var(--color-border)", borderRadius: 10,
+                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                margin: "12px 16px",
+              }}>
+                <span>No off day codes yet</span>
+                {canManageShiftCodes && (
+                  <button onClick={() => handleAdd(null, true)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                    + Add Off Day Code
+                  </button>
+                )}
+              </div>
             )}
-            <div style={{ padding: "8px 16px" }}>
-              <button onClick={() => handleAdd(null, true)} style={addBtnStyle}>
-                + Add Off Day Code
-              </button>
-            </div>
+            {offDayCodes.length > 0 && canManageShiftCodes && (
+              <div style={{ padding: "8px 16px 12px" }}>
+                <button onClick={() => handleAdd(null, true)} style={addBtnStyle}>
+                  + Add Off Day Code
+                </button>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1528,6 +1610,7 @@ function StringListSettings({
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const nextTmpId = useRef(-1);
 
   const isDirty = JSON.stringify(local) !== JSON.stringify(items);
 
@@ -1558,6 +1641,13 @@ function StringListSettings({
   };
 
   const handleSave = async () => {
+    // Validate no duplicate names
+    const names = local.map((it) => it.name.trim().toLowerCase());
+    const dupes = names.filter((n, i) => n && names.indexOf(n) !== i);
+    if (dupes.length > 0) {
+      setError(`Duplicate name: "${dupes[0]}"`);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -1580,7 +1670,7 @@ function StringListSettings({
     const trimmedName = newName.trim();
     const trimmedAbbr = newAbbr.trim() || trimmedName;
     if (!trimmedName || local.some((it) => it.name === trimmedName)) return;
-    setLocal((prev) => [...prev, { id: 0, orgId: "", name: trimmedName, abbr: trimmedAbbr, sortOrder: prev.length }]);
+    setLocal((prev) => [...prev, { id: nextTmpId.current--, orgId: "", name: trimmedName, abbr: trimmedAbbr, sortOrder: prev.length }]);
     setNewName("");
     setNewAbbr("");
   };
@@ -1606,7 +1696,9 @@ function StringListSettings({
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx) {
+    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx
+        && draggedIdx >= 0 && draggedIdx < local.length
+        && dragOverIdx >= 0 && dragOverIdx <= local.length) {
       const list = [...local];
       const [item] = list.splice(draggedIdx, 1);
       list.splice(dragOverIdx, 0, item);
@@ -1626,8 +1718,8 @@ function StringListSettings({
     : (isEditing ? "24px 32px 1fr 200px 28px" : "32px 1fr 200px");
 
   return (
-    <div>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 0, marginBottom: 12 }}>
+    <div style={{ padding: "16px" }}>
+      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 0, marginBottom: 12 }}>
         {label}
       </p>
 
@@ -1637,7 +1729,7 @@ function StringListSettings({
           <button
             onClick={handleEnterEdit}
             className="dg-btn dg-btn-secondary"
-            style={{ padding: "7px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+            style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -1657,19 +1749,29 @@ function StringListSettings({
           </button>
         )}
         {saved && (
-          <span style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>Saved!</span>
+          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>Saved!</span>
         )}
       </div>
 
       {/* Table */}
+      {displayList.length === 0 && !isEditing ? (
+        <div style={{
+          border: "1px dashed var(--color-border)", borderRadius: 12,
+          padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+        }}>
+          <span>No items defined yet</span>
+          {canEdit && (
+            <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary" style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}>
+              + Add New
+            </button>
+          )}
+        </div>
+      ) : (
       <div
         style={{
-          background: "#fff",
-          borderRadius: 12,
-          border: isEditing ? "1.5px solid #2563EB" : "1px solid var(--color-border)",
           overflow: "hidden",
-          boxShadow: isEditing ? "0 0 0 3px rgba(37,99,235,0.1)" : BOX_SHADOW_CARD,
-          transition: "border-color 0.15s, box-shadow 0.15s",
+          transition: "border-color 150ms ease, box-shadow 150ms ease",
         }}
       >
         {/* Header row */}
@@ -1679,7 +1781,7 @@ function StringListSettings({
             gridTemplateColumns: gridCols,
             padding: "10px 16px",
             borderBottom: "1px solid var(--color-border-light)",
-            background: isEditing ? "#EFF6FF" : undefined,
+            background: isEditing ? "var(--color-info-bg)" : undefined,
           }}
         >
           {(isEditing
@@ -1689,7 +1791,7 @@ function StringListSettings({
             <div
               key={i}
               style={{
-                fontSize: 11,
+                fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
                 color: "var(--color-text-subtle)",
                 letterSpacing: "0.06em",
@@ -1702,7 +1804,7 @@ function StringListSettings({
 
         {/* Item rows */}
         {displayList.map((item, i) => {
-          const isDragging = isEditing && draggedIdx !== null && local[draggedIdx]?.name === item.name;
+          const isDragging = isEditing && draggedIdx !== null && local[draggedIdx]?.id === item.id;
           const isDropTarget = isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
           return (
             <div
@@ -1717,15 +1819,15 @@ function StringListSettings({
                 gridTemplateColumns: gridCols,
                 padding: "8px 16px",
                 borderTop: isDropTarget
-                  ? "2px solid #2563EB"
+                  ? "2px solid var(--color-brand)"
                   : i === 0
                     ? "none"
                     : "1px solid var(--color-border-light)",
                 alignItems: "center",
-                background: i % 2 === 0 ? "#fff" : "var(--color-row-alt, #FAFAFA)",
+                background: i % 2 === 0 ? "var(--color-surface)" : "var(--color-row-alt)",
                 cursor: isEditing ? "grab" : "default",
-                transition: "background 0.15s, opacity 0.15s",
-                opacity: isDragging ? 0.4 : 1,
+                transition: "background 150ms ease, opacity 150ms ease",
+                opacity: isDragging ? 0.5 : 1,
                 userSelect: isEditing ? "none" : undefined,
               }}
             >
@@ -1742,7 +1844,7 @@ function StringListSettings({
                 </div>
               )}
 
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-faint)" }}>
+              <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-faint)" }}>
                 {i + 1}
               </div>
 
@@ -1754,10 +1856,10 @@ function StringListSettings({
                   onMouseDown={(e) => e.stopPropagation()}
                   draggable={false}
                   placeholder="Full name"
-                  style={{ ...inputStyle, fontSize: 13, fontWeight: 500 }}
+                  style={{ ...inputStyle, fontSize: "var(--dg-fs-label)", fontWeight: 500 }}
                 />
               ) : (
-                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)" }}>
                   {item.name}
                 </div>
               )}
@@ -1770,10 +1872,10 @@ function StringListSettings({
                   onMouseDown={(e) => e.stopPropagation()}
                   draggable={false}
                   placeholder="Abbreviation"
-                  style={{ ...inputStyle, fontSize: 13, fontWeight: 600 }}
+                  style={{ ...inputStyle, fontSize: "var(--dg-fs-label)", fontWeight: 600 }}
                 />
               ) : (
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-muted)" }}>
+                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-muted)" }}>
                   {item.abbr}
                 </div>
               )}
@@ -1787,7 +1889,7 @@ function StringListSettings({
                     border: "none",
                     cursor: "pointer",
                     color: "var(--color-text-muted)",
-                    fontSize: 16,
+                    fontSize: "var(--dg-fs-body)",
                     lineHeight: 1,
                     padding: "0 2px",
                   }}
@@ -1809,7 +1911,7 @@ function StringListSettings({
               padding: "8px 16px",
               borderTop: "1px solid var(--color-border-light)",
               alignItems: "center",
-              background: "#F8FAFC",
+              background: "var(--color-bg)",
             }}
           >
             <div />
@@ -1819,14 +1921,14 @@ function StringListSettings({
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               placeholder={placeholder}
-              style={{ ...inputStyle, fontSize: 13 }}
+              style={{ ...inputStyle, fontSize: "var(--dg-fs-label)" }}
             />
             <input
               value={newAbbr}
               onChange={(e) => setNewAbbr(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               placeholder="Abbreviation"
-              style={{ ...inputStyle, fontSize: 13 }}
+              style={{ ...inputStyle, fontSize: "var(--dg-fs-label)" }}
             />
             <button
               onClick={handleAdd}
@@ -1835,7 +1937,7 @@ function StringListSettings({
                 background: "none",
                 border: "none",
                 cursor: newName.trim() ? "pointer" : "not-allowed",
-                color: newName.trim() ? "#2563EB" : "var(--color-text-faint)",
+                color: newName.trim() ? "var(--color-brand)" : "var(--color-text-faint)",
                 fontSize: "var(--dg-fs-heading)",
                 fontWeight: 700,
                 lineHeight: 1,
@@ -1848,17 +1950,18 @@ function StringListSettings({
           </div>
         )}
       </div>
+      )}
 
       {error && (
         <div
           style={{
             marginTop: 12,
             padding: 12,
-            background: "#FEF2F2",
-            border: "1px solid #FCA5A5",
+            background: "var(--color-danger-bg)",
+            border: "1px solid var(--color-danger-border)",
             borderRadius: 8,
-            color: "#B91C1C",
-            fontSize: 13,
+            color: "var(--color-danger-text)",
+            fontSize: "var(--dg-fs-label)",
             fontWeight: 500,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
@@ -1896,7 +1999,7 @@ function IndicatorTypesSettings({
       id: nextTmpId.current--,
       orgId: orgId,
       name: "",
-      color: "#6366F1",
+      color: "var(--color-brand)",
       sortOrder: local.length,
       isNew: true,
     };
@@ -1955,9 +2058,34 @@ function IndicatorTypesSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
+      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "0 0 14px" }}>
         Indicators appear as colored dots on shift cells. Add, rename, or recolor them here.
       </p>
+      {local.length === 0 && (
+        <div style={{
+          border: "1px dashed var(--color-border)",
+          borderRadius: 12,
+          padding: "40px 20px",
+          textAlign: "center",
+          color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+        }}>
+          <span>No indicators defined yet</span>
+          {canManageIndicatorTypes && (
+            <button
+              onClick={handleAdd}
+              className="dg-btn dg-btn-secondary"
+              style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}
+            >
+              + Add Indicator
+            </button>
+          )}
+        </div>
+      )}
       {local.map((indicator) => {
         const isSavingThis = saving === indicator.id;
         const isDeletingThis = deleting === indicator.id;
@@ -1978,6 +2106,7 @@ function IndicatorTypesSettings({
               value={indicator.name}
               onChange={(e) => handleChange(indicator.id, "name", e.target.value)}
               placeholder="Indicator name (e.g. Readings)"
+              maxLength={50}
               style={{ ...inputStyle, ...(isMobile ? { width: "100%" } : {}) }}
             />
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2012,7 +2141,7 @@ function IndicatorTypesSettings({
                 className="dg-btn dg-btn-primary"
                 style={{
                   padding: "7px 14px",
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                   opacity: indicator.name.trim() ? 1 : 0.5,
                   cursor: indicator.name.trim() ? "pointer" : "not-allowed",
                 }}
@@ -2027,7 +2156,7 @@ function IndicatorTypesSettings({
                 className="dg-btn dg-btn-danger"
                 style={{
                   padding: "7px 12px",
-                  fontSize: 12,
+                  fontSize: "var(--dg-fs-caption)",
                 }}
               >
                 {isDeletingThis ? "…" : "Delete"}
@@ -2036,23 +2165,24 @@ function IndicatorTypesSettings({
           </div>
         );
       })}
-      <button
-        onClick={handleAdd}
-        style={{
-          marginTop: 8,
-          background: "none",
-          border: "1.5px dashed var(--color-border)",
-          borderRadius: 8,
-          color: "var(--color-text-muted)",
-          padding: "8px 16px",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-          width: "100%",
-        }}
-      >
-        + Add Indicator
-      </button>
+      {local.length > 0 && canManageIndicatorTypes && (
+        <button
+          onClick={handleAdd}
+          style={{
+            marginTop: 8,
+            background: "none",
+            border: "none",
+            color: "var(--color-text-muted)",
+            padding: "6px 0",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          + Add Indicator
+        </button>
+      )}
       {confirmDeleteId !== null && (() => {
         const indicator = local.find(i => i.id === confirmDeleteId);
         if (!indicator) return null;
@@ -2095,6 +2225,10 @@ function ShiftCategoriesSettings({
   const originalRef = useRef<Map<number, ShiftCategory>>(
     new Map(shiftCategories.map((c) => [c.id, c]))
   );
+  // Keep originalRef in sync when props update (e.g. concurrent edits)
+  useEffect(() => {
+    originalRef.current = new Map(shiftCategories.map((c) => [c.id, c]));
+  }, [shiftCategories]);
   const nextTmpId = useRef(-1);
 
   const handleAdd = (focusAreaId: number | null) => {
@@ -2103,7 +2237,7 @@ function ShiftCategoriesSettings({
       id: tmpId,
       orgId: orgId,
       name: "",
-      color: "#EFF6FF",
+      color: "var(--color-info-bg)",
       startTime: null,
       endTime: null,
       sortOrder: local.filter((c) => c.focusAreaId === focusAreaId).length,
@@ -2183,16 +2317,14 @@ function ShiftCategoriesSettings({
   };
 
   const addBtnStyle: React.CSSProperties = {
-    marginTop: 6,
     background: "none",
-    border: "1.5px dashed var(--color-border)",
-    borderRadius: 8,
+    border: "none",
     color: "var(--color-text-muted)",
-    padding: "6px 14px",
-    fontSize: 12,
+    padding: "6px 0",
+    fontSize: "var(--dg-fs-caption)",
     fontWeight: 600,
     cursor: "pointer",
-    width: "100%",
+    fontFamily: "inherit",
   };
 
   const renderCategoryRow = (cat: ShiftCategory & { isNew?: boolean }) => {
@@ -2218,11 +2350,11 @@ function ShiftCategoriesSettings({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
               {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>Untitled</span>}
             </span>
             {(cat.startTime || cat.endTime) && (
-              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
                 {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
               </span>
             )}
@@ -2233,10 +2365,10 @@ function ShiftCategoriesSettings({
               style={{
                 background: "none",
                 border: "1px solid var(--color-border)",
-                borderRadius: 7,
+                borderRadius: 8,
                 color: "var(--color-text-primary)",
                 padding: "6px 12px",
-                fontSize: 12,
+                fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
                 cursor: "pointer",
                 whiteSpace: "nowrap",
@@ -2272,6 +2404,7 @@ function ShiftCategoriesSettings({
               value={cat.name}
               onChange={(e) => handleChange(cat.id, "name", e.target.value)}
               placeholder="e.g. Day Shift"
+              maxLength={50}
               style={{ ...inputStyle }}
               autoFocus
               disabled={!canManageShiftCodes}
@@ -2299,12 +2432,12 @@ function ShiftCategoriesSettings({
             onClick={() => handleSave(cat)}
             disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
             style={{
-              background: cat.name.trim() && isDirty && canManageShiftCodes ? "var(--color-accent-gradient)" : "#ccc",
+              background: cat.name.trim() && isDirty && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border)",
               border: "none",
-              color: "#fff",
-              borderRadius: 7,
+              color: "var(--color-text-inverse)",
+              borderRadius: 8,
               padding: "7px 14px",
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               fontWeight: 700,
               cursor: cat.name.trim() && isDirty && canManageShiftCodes ? "pointer" : "not-allowed",
               whiteSpace: "nowrap",
@@ -2318,10 +2451,10 @@ function ShiftCategoriesSettings({
             style={{
               background: "none",
               border: "1px solid var(--color-border)",
-              borderRadius: 7,
+              borderRadius: 8,
               color: "var(--color-text-primary)",
               padding: "7px 12px",
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
               cursor: "pointer",
               whiteSpace: "nowrap",
@@ -2335,11 +2468,11 @@ function ShiftCategoriesSettings({
               disabled={isDeletingThis}
               style={{
                 background: "none",
-                border: "1px solid #FEE2E2",
-                borderRadius: 7,
-                color: "#EF4444",
+                border: "1px solid var(--color-danger-border)",
+                borderRadius: 8,
+                color: "var(--color-danger)",
                 padding: "7px 12px",
-                fontSize: 12,
+                fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
                 cursor: "pointer",
                 whiteSpace: "nowrap",
@@ -2355,8 +2488,8 @@ function ShiftCategoriesSettings({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
         Define the tally categories for each focus area (e.g. Day, Evening, Night).
       </p>
 
@@ -2366,31 +2499,48 @@ function ShiftCategoriesSettings({
           <div
             key={focusArea.id}
             style={{
-              marginBottom: 20,
-              border: "1px solid var(--color-border-light)",
-              borderRadius: 10,
+              background: "var(--color-surface)",
+              borderRadius: 12,
+              border: "1px solid var(--color-border)",
               overflow: "hidden",
             }}
           >
             <div
               style={{
                 padding: "10px 16px",
-                background: focusArea.colorBg || "var(--color-bg)",
-                color: focusArea.colorText || "var(--color-text-primary)",
+                borderBottom: "1px solid var(--color-border-light)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
                 fontWeight: 700,
-                fontSize: 13,
-                borderBottom: areaCats.length > 0 ? "1px solid var(--color-border-light)" : "none",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-secondary)",
               }}
             >
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg || "var(--color-border)", flexShrink: 0 }} />
               {focusArea.name}
             </div>
-            {areaCats.length > 0 && (
+            {areaCats.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
                 {areaCats.map(renderCategoryRow)}
               </div>
+            ) : (
+              <div style={{
+                border: "1px dashed var(--color-border)", borderRadius: 10,
+                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                margin: "12px 16px",
+              }}>
+                <span>No categories yet</span>
+                {canManageShiftCodes && (
+                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                    + Add Category
+                  </button>
+                )}
+              </div>
             )}
-            {canManageShiftCodes && (
-              <div style={{ padding: "8px 16px" }}>
+            {areaCats.length > 0 && canManageShiftCodes && (
+              <div style={{ padding: "8px 16px 12px" }}>
                 <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
                   + Add Category
                 </button>
@@ -2399,6 +2549,46 @@ function ShiftCategoriesSettings({
           </div>
         );
       })}
+
+      {/* Global / cross-area categories */}
+      {(() => {
+        const globalCats = local.filter((c) => c.focusAreaId == null);
+        if (globalCats.length === 0 && !canManageShiftCodes) return null;
+        return (
+          <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+              Global / Cross-Area
+            </div>
+            {globalCats.length > 0 ? (
+              <div style={{ padding: "0 16px" }}>
+                {globalCats.map(renderCategoryRow)}
+              </div>
+            ) : (
+              <div style={{
+                border: "1px dashed var(--color-border)", borderRadius: 10,
+                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                margin: "12px 16px",
+              }}>
+                <span>No global categories yet</span>
+                {canManageShiftCodes && (
+                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                    + Add Global Category
+                  </button>
+                )}
+              </div>
+            )}
+            {globalCats.length > 0 && canManageShiftCodes && (
+              <div style={{ padding: "8px 16px 12px" }}>
+                <button onClick={() => handleAdd(null)} style={addBtnStyle}>
+                  + Add Global Category
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {confirmDeleteId !== null && (() => {
         const cat = local.find(c => c.id === confirmDeleteId);
         if (!cat) return null;
@@ -2498,7 +2688,7 @@ function CoverageRequirementsSettings({
 }) {
   // Expand key = "focusAreaId-categoryId"
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   // Draft edits keyed by "focusAreaId-categoryId"
   type CodeReq = { shiftCodeId: number; minStaff: number };
@@ -2578,6 +2768,12 @@ function CoverageRequirementsSettings({
         }
         setDraft(focusAreaId, categoryId, { everyDay: false, rows });
       } else {
+        // Check if per-day values differ — warn before collapsing
+        const allValues = current.rows.map((r) => JSON.stringify(r.codeRequirements.map((c) => c.minStaff)));
+        const hasDifferentDays = new Set(allValues).size > 1;
+        if (hasDifferentDays && !window.confirm("Per-day values differ. Switching to 'Same every day' will keep only Monday's values. Continue?")) {
+          return;
+        }
         // Switch to every-day: use Monday's values (index 1)
         const mon = current.rows.find((r) => r.dayOfWeek === 1) ?? current.rows[0];
         const codeReqs = mon?.codeRequirements.map((c) => ({ ...c })) ?? [];
@@ -2611,7 +2807,8 @@ function CoverageRequirementsSettings({
       const draft = getDraft(focusAreaId, categoryId);
       const codes = getCodesForGroup(focusAreaId, categoryId);
       const codeIds = new Set(codes.map((sc) => sc.id));
-      setSaving(true);
+      const key = `${focusAreaId}-${categoryId}`;
+      setSavingKey(key);
       try {
         // Save per code — collect all saved results
         const allSaved: CoverageRequirement[] = [];
@@ -2639,7 +2836,7 @@ function CoverageRequirementsSettings({
         console.error(e);
         toast.error("Failed to save coverage requirements");
       } finally {
-        setSaving(false);
+        setSavingKey(null);
       }
     },
     [getDraft, getCodesForGroup, orgId, coverageRequirements, onCoverageRequirementsChange],
@@ -2650,7 +2847,14 @@ function CoverageRequirementsSettings({
 
   if (activeFocusAreas.length === 0 || activeCategories.length === 0) {
     return (
-      <div style={{ padding: "24px 0", color: "var(--color-text-muted)", fontSize: 13, textAlign: "center" }}>
+      <div style={{
+        border: "1px dashed var(--color-border)",
+        borderRadius: 12,
+        padding: "40px 20px",
+        textAlign: "center",
+        color: "var(--color-text-muted)",
+        fontSize: "var(--dg-fs-label)",
+      }}>
         {activeFocusAreas.length === 0
           ? "Create focus areas first to configure coverage requirements."
           : "Create shift categories first to configure coverage requirements."}
@@ -2661,15 +2865,15 @@ function CoverageRequirementsSettings({
   const inputStyle: React.CSSProperties = {
     width: 48,
     padding: "4px 4px",
-    fontSize: 12,
-    borderRadius: 6,
+    fontSize: "var(--dg-fs-caption)",
+    borderRadius: 8,
     border: "1px solid var(--color-border)",
     textAlign: "center",
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
+      <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: 0 }}>
         Set minimum staffing requirements per focus area and shift code. These will be shown in the schedule grid tally rows and the coverage panel.
       </p>
 
@@ -2677,8 +2881,9 @@ function CoverageRequirementsSettings({
         <div
           key={fa.id}
           style={{
-            border: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
             borderRadius: 12,
+            border: "1px solid var(--color-border)",
             overflow: "hidden",
           }}
         >
@@ -2686,12 +2891,16 @@ function CoverageRequirementsSettings({
           <div
             style={{
               padding: "10px 16px",
-              background: fa.colorBg,
-              color: fa.colorText,
+              color: "var(--color-text-secondary)",
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: "var(--dg-fs-label)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              borderBottom: "1px solid var(--color-border-light)",
             }}
           >
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: fa.colorBg, flexShrink: 0 }} />
             {fa.name}
           </div>
 
@@ -2723,7 +2932,7 @@ function CoverageRequirementsSettings({
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    fontSize: 13,
+                    fontSize: "var(--dg-fs-label)",
                     fontWeight: 600,
                     color: "var(--color-text-secondary)",
                   }}
@@ -2733,10 +2942,10 @@ function CoverageRequirementsSettings({
                     {hasValues && (
                       <span
                         style={{
-                          fontSize: 10,
+                          fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 700,
-                          color: "#16A34A",
-                          background: "#F0FDF4",
+                          color: "var(--color-brand)",
+                          background: "var(--color-info-bg)",
                           padding: "2px 6px",
                           borderRadius: 4,
                         }}
@@ -2753,7 +2962,7 @@ function CoverageRequirementsSettings({
                     stroke="currentColor"
                     strokeWidth="2"
                     style={{
-                      transition: "transform 0.15s",
+                      transition: "transform 150ms ease",
                       transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
                     }}
                   >
@@ -2772,7 +2981,7 @@ function CoverageRequirementsSettings({
                         justifyContent: "space-between",
                       }}
                     >
-                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Same every day</span>
+                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>Same every day</span>
                       <button
                         disabled={!canEdit}
                         onClick={() => handleToggleEveryDay(fa.id, cat.id)}
@@ -2780,12 +2989,12 @@ function CoverageRequirementsSettings({
                           width: 34,
                           height: 20,
                           borderRadius: 10,
-                          background: draft.everyDay ? "#2563EB" : "#CBD5E1",
+                          background: draft.everyDay ? "var(--color-brand)" : "var(--color-border)",
                           border: "none",
                           cursor: canEdit ? "pointer" : "default",
                           position: "relative",
                           padding: 0,
-                          transition: "background 0.15s",
+                          transition: "background 150ms ease",
                         }}
                       >
                         <div
@@ -2797,7 +3006,7 @@ function CoverageRequirementsSettings({
                             position: "absolute",
                             top: 2,
                             left: draft.everyDay ? 16 : 2,
-                            transition: "left 0.15s",
+                            transition: "left 150ms ease",
                             boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
                           }}
                         />
@@ -2814,11 +3023,11 @@ function CoverageRequirementsSettings({
                               display: "inline-flex",
                               alignItems: "center",
                               padding: "3px 10px",
-                              borderRadius: 6,
-                              fontSize: 12,
+                              borderRadius: 8,
+                              fontSize: "var(--dg-fs-caption)",
                               fontWeight: 700,
                               color: sc.text || "var(--color-text-secondary)",
-                              background: sc.color || "#F1F5F9",
+                              background: sc.color || "#EEEFEC",
                               marginBottom: 6,
                             }}
                           >
@@ -2827,7 +3036,7 @@ function CoverageRequirementsSettings({
                           {/* Inputs */}
                           {draft.everyDay ? (
                             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
-                              <span style={{ fontSize: 12, color: "var(--color-text-muted)", width: 60 }}>Min staff</span>
+                              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", width: 60 }}>Min staff</span>
                               <input
                                 type="number"
                                 min={0}
@@ -2842,7 +3051,7 @@ function CoverageRequirementsSettings({
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 4 }}>
                               {draft.rows.map((row, ri) => (
                                 <div key={ri} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", width: 28 }}>
+                                  <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", width: 28 }}>
                                     {DAY_NAMES[row.dayOfWeek ?? 0]}
                                   </span>
                                   <input
@@ -2866,21 +3075,21 @@ function CoverageRequirementsSettings({
                     {canEdit && (
                       <button
                         onClick={() => handleSave(fa.id, cat.id)}
-                        disabled={saving}
+                        disabled={savingKey === key}
                         style={{
                           alignSelf: "flex-start",
                           padding: "7px 16px",
-                          fontSize: 12,
+                          fontSize: "var(--dg-fs-caption)",
                           fontWeight: 600,
                           borderRadius: 8,
                           border: "none",
-                          background: "var(--color-accent-gradient)",
-                          color: "#fff",
-                          cursor: saving ? "not-allowed" : "pointer",
-                          opacity: saving ? 0.7 : 1,
+                          background: "var(--color-brand)",
+                          color: "var(--color-text-inverse)",
+                          cursor: savingKey === key ? "not-allowed" : "pointer",
+                          opacity: savingKey === key ? 0.7 : 1,
                         }}
                       >
-                        {saving ? "Saving..." : "Save"}
+                        {savingKey === key ? "Saving..." : "Save"}
                       </button>
                     )}
                   </div>
@@ -2908,9 +3117,6 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
   const [savingPerms, setSavingPerms] = useState<string | null>(null);
   const [roleChangeConfirm, setRoleChangeConfirm] = useState<{
     userId: string; userName: string; from: OrganizationRole; to: OrganizationRole;
-  } | null>(null);
-  const [resetPermsConfirm, setResetPermsConfirm] = useState<{
-    userId: string; userName: string;
   } | null>(null);
 
   useEffect(() => {
@@ -2979,24 +3185,6 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     }
   };
 
-  const handlePermsReset = async (userId: string) => {
-    setSavingPerms(userId);
-    setError(null);
-    try {
-      await db.updateAdminPermissions(userId, null, orgId);
-      const cleared = emptyAdminPerms();
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: null } : u));
-      setEditingPerms((prev) => ({ ...prev, [userId]: cleared }));
-      setResetPermsConfirm(null);
-      toast.success("Permissions reset");
-    } catch (e) {
-      toast.error("Failed to reset permissions");
-      setError(e instanceof Error ? e.message : "Failed to reset permissions");
-    } finally {
-      setSavingPerms(null);
-    }
-  };
-
   const ROLE_LABELS: Record<string, string> = {
     super_admin: "Super Admin",
     admin: "Admin",
@@ -3004,8 +3192,8 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
   };
 
   const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-    super_admin: { bg: "#F0FDF4", text: "#15803D" },
-    admin: { bg: "#EFF6FF", text: "#2563EB" },
+    super_admin: { bg: "var(--color-info-bg)", text: "var(--color-brand)" },
+    admin: { bg: "var(--color-info-bg)", text: "var(--color-brand)" },
     user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
   };
 
@@ -3040,7 +3228,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     });
 
   if (loading) {
-    return <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Loading users…</p>;
+    return <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>Loading users…</p>;
   }
 
   const roleChangeMessage = roleChangeConfirm ? (() => {
@@ -3061,10 +3249,16 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
       : "info"
     : "info";
 
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
   return (
     <div>
       {error && (
-        <div style={{ marginBottom: 12, padding: 10, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 8, color: "#B91C1C", fontSize: 13 }}>
+        <div style={{ marginBottom: 12, padding: 10, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)" }}>
           {error}
         </div>
       )}
@@ -3073,7 +3267,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
       <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
         {/* Left group: filter */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Filter</span>
+          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Filter</span>
           <CustomSelect
             value={roleFilter}
             options={[
@@ -3090,7 +3284,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
             <button
               onClick={() => { setSearch(""); setRoleFilter("all"); }}
               style={{
-                background: "none", border: "none", color: "var(--color-today-text)", fontSize: 12,
+                background: "none", border: "none", color: "var(--color-today-text)", fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600, cursor: "pointer", padding: "4px 8px",
               }}
             >
@@ -3103,7 +3297,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
 
         {/* Right group: count + search */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
             {sortedUsers.length} of {users.length}
           </span>
           <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
@@ -3118,215 +3312,245 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
-              style={{ paddingLeft: 32, fontSize: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
+              style={{ paddingLeft: 32, fontSize: "var(--dg-fs-caption)", background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
             />
           </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {sortedUsers.map((user, idx) => {
-          const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
-          const roleColor = ROLE_COLORS[user.orgRole] ?? ROLE_COLORS.user;
-          const isSuperAdminUser = user.orgRole === "super_admin";
-          const isExpanded = expandedUserId === user.id;
-          const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
-          const perms = editingPerms[user.id] ?? savedPerms;
-          const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
-          const isLast = idx === sortedUsers.length - 1;
-          const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
-            allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
+      <div className="rounded-xl border border-border overflow-hidden bg-white">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-4 text-[11px] tracking-wide uppercase text-muted-foreground">Name</TableHead>
+              <TableHead className="text-[11px] tracking-wide uppercase text-muted-foreground">Role</TableHead>
+              <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-muted-foreground">Joined</TableHead>
+              <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-muted-foreground">Last Login</TableHead>
+              <TableHead className="w-10 pr-4" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedUsers.length === 0 && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="py-10 text-center text-[13px] text-muted-foreground">
+                  {search || roleFilter !== "all" ? "No users match your filters" : "No users found"}
+                </TableCell>
+              </TableRow>
+            )}
 
-          return (
-            <div key={user.id} style={{ borderBottom: isLast ? "none" : "1px solid var(--color-border-light)" }}>
-              {/* Collapsed row */}
-              <div
-                style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 0", cursor: "pointer",
-                }}
-                onClick={() => openPermissions(user)}
-              >
-                <div style={{
-                  width: 34, height: 34, borderRadius: "50%",
-                  background: "var(--color-accent-gradient)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0,
-                }}>
-                  {(displayName !== "—" ? displayName : "?")[0].toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
-                    {displayName}
-                    {currentUser && user.id === currentUser.id && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10,
-                        background: "#EFF6FF", color: "#2563EB", whiteSpace: "nowrap",
-                      }}>
-                        You
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                    {user.email ?? "—"}
-                  </div>
-                </div>
-                <span style={{
-                  fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 20,
-                  background: roleColor.bg, color: roleColor.text, whiteSpace: "nowrap",
-                }}>
-                  {ROLE_LABELS[user.orgRole] ?? user.orgRole}
-                </span>
-                <svg
-                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{
-                    color: "var(--color-text-faint)",
-                    flexShrink: 0,
-                    transition: "transform 0.15s ease",
-                    transform: isExpanded ? "rotate(180deg)" : "none",
-                  }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </div>
+            {sortedUsers.map((user) => {
+              const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+              const roleColor = ROLE_COLORS[user.orgRole] ?? ROLE_COLORS.user;
+              const isSuperAdminUser = user.orgRole === "super_admin";
+              const isExpanded = expandedUserId === user.id;
+              const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
+              const perms = editingPerms[user.id] ?? savedPerms;
+              const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
+              const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
+                allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
 
-              {/* Expanded edit panel */}
-              {isExpanded && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    padding: isMobile ? "12px 12px 12px 16px" : "12px 16px 12px 44px",
-                    marginBottom: 6,
-                    display: "flex", flexDirection: "column", gap: 12,
-                  }}
-                >
-                  {/* Role selector */}
-                  {myRole === "super_admin" && !isSuperAdminUser && (
-                    <div>
-                      <label style={labelStyle}>ROLE</label>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <CustomSelect
-                          value={user.orgRole}
-                          options={[
-                            { value: "user", label: "User" },
-                            { value: "admin", label: "Admin" },
-                            { value: "super_admin", label: "Super Admin" },
-                          ]}
-                          onChange={(v) => requestRoleChange(user, v as OrganizationRole)}
-                          disabled={saving === user.id}
-                          style={{ width: 160 }}
-                          fontSize={12}
-                        />
-                        {saving === user.id && (
-                          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Saving…</span>
-                        )}
+              return (
+                <React.Fragment key={user.id}>
+                  <TableRow
+                    className="cursor-pointer"
+                    onClick={() => openPermissions(user)}
+                  >
+                    {/* Name + Email */}
+                    <TableCell className="pl-4 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white" style={{ background: "var(--color-brand)" }}>
+                          {(displayName !== "—" ? displayName : "?")[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground truncate">
+                            {displayName}
+                            {currentUser && user.id === currentUser.id && (
+                              <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-blue-50 text-blue-600 shrink-0">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {user.email ?? "—"}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    </TableCell>
 
-                  {/* Permissions (admin only) */}
-                  {user.orgRole === "admin" && myRole === "super_admin" && (
-                    <>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        {PERM_GROUPS.map((group) => {
-                          const keys = group.keys.filter((k) => !SUPER_ADMIN_ONLY.has(k));
-                          if (keys.length === 0) return null;
-                          return (
-                          <div key={group.label}>
-                            <label style={labelStyle}>{group.label}</label>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                              {keys.map((key) => {
-                                const alwaysOn = ALWAYS_ON.has(key);
-                                const isOn = perms[key] ?? false;
-                                const toggleDisabled = alwaysOn || savingPerms === user.id;
-                                return (
-                                  <div
-                                    key={key}
-                                    role="button"
-                                    tabIndex={toggleDisabled ? -1 : 0}
-                                    onClick={() => { if (!toggleDisabled) handlePermToggle(user.id, key, !isOn); }}
-                                    onKeyDown={(e) => { if (!toggleDisabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handlePermToggle(user.id, key, !isOn); } }}
-                                    style={{
-                                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                                      padding: "7px 10px", borderRadius: 8,
-                                      cursor: toggleDisabled ? "default" : "pointer",
-                                      opacity: alwaysOn ? 0.5 : 1,
-                                      transition: "background 100ms ease",
-                                    }}
-                                    onMouseEnter={(e) => { if (!toggleDisabled) e.currentTarget.style.background = "var(--color-border-light)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                  >
-                                    <span style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
-                                      {PERM_LABELS[key]}
-                                    </span>
-                                    <div style={{
-                                      position: "relative", width: 34, height: 20, borderRadius: 10, flexShrink: 0,
-                                      background: isOn ? "#2563EB" : "#CBD5E1",
-                                      transition: "background 150ms ease",
-                                    }}>
-                                      <div style={{
-                                        position: "absolute",
-                                        top: 2, left: isOn ? 16 : 2,
-                                        width: 16, height: 16, borderRadius: "50%",
-                                        background: "#fff",
-                                        boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-                                        transition: "left 150ms ease",
-                                      }} />
+                    {/* Role */}
+                    <TableCell className="py-3">
+                      <span
+                        className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: roleColor.bg, color: roleColor.text }}
+                      >
+                        {ROLE_LABELS[user.orgRole] ?? user.orgRole}
+                      </span>
+                    </TableCell>
+
+                    {/* Joined */}
+                    <TableCell className="hidden md:table-cell py-3 text-[12px] text-muted-foreground">
+                      {formatDate(user.createdAt)}
+                    </TableCell>
+
+                    {/* Last Login */}
+                    <TableCell className="hidden md:table-cell py-3 text-[12px] text-muted-foreground">
+                      {formatDate(user.lastSignInAt)}
+                    </TableCell>
+
+                    {/* Chevron */}
+                    <TableCell className="pr-4 py-3">
+                      <svg
+                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        className="text-muted-foreground/50 transition-transform duration-150"
+                        style={{ transform: isExpanded ? "rotate(180deg)" : "none" }}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Expanded permissions panel */}
+                  {isExpanded && (
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableCell colSpan={5} className="p-0">
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            padding: isMobile ? "12px 12px 12px 16px" : "12px 16px 16px 52px",
+                            display: "flex", flexDirection: "column", gap: 12,
+                          }}
+                        >
+                          {/* Role selector */}
+                          {myRole === "super_admin" && !isSuperAdminUser && (
+                            <div>
+                              <label style={labelStyle}>ROLE</label>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <CustomSelect
+                                  value={user.orgRole}
+                                  options={[
+                                    { value: "user", label: "User" },
+                                    { value: "admin", label: "Admin" },
+                                    { value: "super_admin", label: "Super Admin" },
+                                  ]}
+                                  onChange={(v) => requestRoleChange(user, v as OrganizationRole)}
+                                  disabled={saving === user.id}
+                                  style={{ width: 160 }}
+                                  fontSize={12}
+                                />
+                                {saving === user.id && (
+                                  <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>Saving…</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Permissions (admin only) */}
+                          {user.orgRole === "admin" && myRole === "super_admin" && (
+                            <>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                                {PERM_GROUPS.map((group) => {
+                                  const keys = group.keys.filter((k) => !SUPER_ADMIN_ONLY.has(k));
+                                  if (keys.length === 0) return null;
+                                  return (
+                                  <div key={group.label}>
+                                    <label style={labelStyle}>{group.label}</label>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                      {keys.map((key) => {
+                                        const alwaysOn = ALWAYS_ON.has(key);
+                                        const isOn = perms[key] ?? false;
+                                        const toggleDisabled = alwaysOn || savingPerms === user.id;
+                                        return (
+                                          <div
+                                            key={key}
+                                            role="button"
+                                            tabIndex={toggleDisabled ? -1 : 0}
+                                            onClick={() => { if (!toggleDisabled) handlePermToggle(user.id, key, !isOn); }}
+                                            onKeyDown={(e) => { if (!toggleDisabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handlePermToggle(user.id, key, !isOn); } }}
+                                            style={{
+                                              display: "flex", alignItems: "center", justifyContent: "space-between",
+                                              padding: "7px 10px", borderRadius: 8,
+                                              cursor: toggleDisabled ? "default" : "pointer",
+                                              opacity: alwaysOn ? 0.5 : 1,
+                                              transition: "background 150ms ease",
+                                            }}
+                                            onMouseEnter={(e) => { if (!toggleDisabled) e.currentTarget.style.background = "var(--color-border-light)"; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                          >
+                                            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
+                                              {PERM_LABELS[key]}
+                                            </span>
+                                            <div style={{
+                                              position: "relative", width: 34, height: 20, borderRadius: 10, flexShrink: 0,
+                                              background: isOn ? "var(--color-brand)" : "var(--color-border)",
+                                              transition: "background 150ms ease",
+                                            }}>
+                                              <div style={{
+                                                position: "absolute",
+                                                top: 2, left: isOn ? 16 : 2,
+                                                width: 16, height: 16, borderRadius: "50%",
+                                                background: "#fff",
+                                                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                                transition: "left 150ms ease",
+                                              }} />
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          );
-                        })}
-                      </div>
+                                  );
+                                })}
+                              </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
-                        <button
-                          onClick={() => {
-                            if (hasUnsavedChanges) {
-                              setEditingPerms((prev) => ({ ...prev, [user.id]: { ...savedPerms } }));
-                            } else {
-                              setExpandedUserId(null);
-                            }
-                          }}
-                          disabled={savingPerms === user.id}
-                          className="dg-btn dg-btn-secondary"
-                          style={{ padding: "7px 14px" }}
-                        >
-                          {hasUnsavedChanges ? "Undo" : "Cancel"}
-                        </button>
-                        <button
-                          onClick={() => handlePermsSave(user.id)}
-                          disabled={savingPerms === user.id || !hasUnsavedChanges}
-                          className="dg-btn dg-btn-primary"
-                          style={{ padding: "7px 14px" }}
-                        >
-                          {savingPerms === user.id ? "Saving…" : "Save"}
-                        </button>
-                      </div>
-                    </>
-                  )}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
+                                <button
+                                  onClick={() => {
+                                    if (hasUnsavedChanges) {
+                                      setEditingPerms((prev) => ({ ...prev, [user.id]: { ...savedPerms } }));
+                                    } else {
+                                      setExpandedUserId(null);
+                                    }
+                                  }}
+                                  disabled={savingPerms === user.id}
+                                  className="dg-btn dg-btn-secondary"
+                                  style={{ padding: "7px 14px" }}
+                                >
+                                  {hasUnsavedChanges ? "Undo" : "Cancel"}
+                                </button>
+                                <button
+                                  onClick={() => handlePermsSave(user.id)}
+                                  disabled={savingPerms === user.id || !hasUnsavedChanges}
+                                  className="dg-btn dg-btn-primary"
+                                  style={{ padding: "7px 14px" }}
+                                >
+                                  {savingPerms === user.id ? "Saving…" : "Save"}
+                                </button>
+                              </div>
+                            </>
+                          )}
 
-                  {/* Info for super_admin users */}
-                  {isSuperAdminUser && (
-                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
-                      Super Admins have full access to all organization features.
-                    </p>
-                  )}
+                          {/* Info for super_admin users */}
+                          {isSuperAdminUser && (
+                            <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
+                              Super Admins have full access to all organization features.
+                            </p>
+                          )}
 
-                  {/* Info for regular users */}
-                  {user.orgRole === "user" && myRole === "super_admin" && (
-                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
-                      Users have read-only access. Promote to Admin to configure permissions.
-                    </p>
+                          {/* Info for regular users */}
+                          {user.orgRole === "user" && myRole === "super_admin" && (
+                            <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
+                              Users have read-only access. Promote to Admin to configure permissions.
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                </React.Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
       {/* Role change confirmation */}
@@ -3342,18 +3566,6 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
         />
       )}
 
-      {/* Reset permissions confirmation */}
-      {resetPermsConfirm && (
-        <ConfirmDialog
-          title="Reset Permissions"
-          message={`Reset all admin permissions for "${resetPermsConfirm.userName}"? All custom permissions will be cleared.`}
-          confirmLabel="Reset"
-          variant="warning"
-          isLoading={savingPerms === resetPermsConfirm.userId}
-          onConfirm={() => handlePermsReset(resetPermsConfirm.userId)}
-          onCancel={() => setResetPermsConfirm(null)}
-        />
-      )}
     </div>
   );
 }
@@ -3384,19 +3596,19 @@ function SidebarLink({
         width: "100%",
         padding: "7px 12px",
         background: active
-          ? "var(--color-surface-overlay)"
+          ? "var(--color-bg-secondary)"
           : hovered
           ? "var(--color-border-light)"
           : "transparent",
-        borderRadius: 7,
+        borderRadius: 8,
         cursor: "pointer",
-        fontSize: 13,
+        fontSize: "var(--dg-fs-label)",
         fontWeight: active ? 600 : 500,
         color: active ? "var(--color-text-primary)" : hovered ? "var(--color-text-primary)" : "var(--color-text-secondary)",
         textAlign: "left",
         fontFamily: "inherit",
         textDecoration: "none",
-        transition: "background 120ms ease, color 120ms ease",
+        transition: "background 150ms ease, color 150ms ease",
         position: "relative",
       }}
     >
@@ -3447,16 +3659,14 @@ export default function SettingsPage({
   const defaultSection = canManageOrg ? "organization" : "impersonation";
   const activeSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : defaultSection;
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("dg-sidebar-collapsed-settings") === "true";
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dg-sidebar-manual-collapse") !== "true";
   });
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("dg-sidebar-collapsed-settings", String(next));
-      return next;
-    });
+
+  const handleSidebarOpenChange = useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    localStorage.setItem("dg-sidebar-manual-collapse", String(!open));
   }, []);
 
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
@@ -3505,54 +3715,67 @@ export default function SettingsPage({
   useSetMobileSubNav(subNavItems);
 
   return (
-    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", overflow: "hidden", position: "relative" }}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", width: "100%", overflow: "hidden", position: "relative" }}>
+        {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
+        {!isMobile && (
+          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
+            <SidebarContent className="pt-4">
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {allLinks.map((link) => (
+                      <SidebarMenuItem key={link.id}>
+                        <SidebarMenuButton
+                          render={<Link href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`} replace />}
+                          isActive={activeSection === link.id}
+                          tooltip={link.label}
+                          className="h-9 data-[active=true]:bg-[var(--color-info-bg)] data-[active=true]:text-[var(--color-brand)] hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                        >
+                          <span className={activeSection === link.id ? "text-[var(--color-today-text)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                            {link.icon}
+                          </span>
+                          <span className="font-semibold">{link.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+            <SidebarFooter>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleSidebarOpenChange(!sidebarOpen)}
+                    tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
+                    className="h-9 text-[var(--color-text-faint)] hover:text-black hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                  >
+                    <span className="flex shrink-0 items-center justify-center">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+                        <polyline points="13 17 18 12 13 7" />
+                        <polyline points="6 17 11 12 6 7" />
+                      </svg>
+                    </span>
+                    <span className="font-semibold ml-2">Collapse Menu</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarFooter>
+          </Sidebar>
+        )}
 
-      {/* Expand button (shown when sidebar is collapsed) */}
-      {sidebarCollapsed && !isMobile && (
-        <button className="dg-sidebar-expand" onClick={toggleSidebar} title="Expand sidebar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      )}
+        {/* Content */}
+        <div style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
-      {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
-      {isMobile ? null : (
-        <aside
-          className={`dg-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
-          style={{
-            width: isTablet ? 180 : 220,
-            flexShrink: 0,
-            height: "100%",
-            borderRight: "1px solid var(--color-border)",
-            background: "#fff",
-            display: "flex",
-            flexDirection: "column",
-            padding: isTablet ? "24px 8px" : "32px 12px",
-            gap: 2,
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-            <button className="dg-sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-          </div>
-          {allLinks.map((link) => (
-            <SidebarLink
-              key={link.id}
-              label={link.label}
-              icon={link.icon}
-              active={activeSection === link.id}
-              href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`}
-            />
-          ))}
-        </aside>
-      )}
-
-      {/* Content */}
-      <div style={{ flex: 1, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
+        {(() => {
+          const title = allLinks.find(l => l.id === activeSection)?.label;
+          return title ? (
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 20px", width: "100%", maxWidth: activeSection === "users" ? 1100 : 860 }}>
+              {title}
+            </h1>
+          ) : null;
+        })()}
 
         {activeSection === "organization" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
@@ -3574,7 +3797,7 @@ export default function SettingsPage({
                 />
               </Section>
             )}
-            <Section title={focusAreaLabel}>
+            <Section title={focusAreaLabel} noPadding>
               <FocusAreasSettings
                 focusAreas={focusAreas}
                 orgId={organization.id}
@@ -3587,7 +3810,7 @@ export default function SettingsPage({
         )}
 
         {activeSection === "shift-categories" && canManageOrg && (
-          <Section title="Shift Categories">
+          <div style={{ width: "100%", maxWidth: 860 }}>
             <ShiftCategoriesSettings
               shiftCategories={shiftCategories}
               focusAreas={focusAreas}
@@ -3595,11 +3818,11 @@ export default function SettingsPage({
               onChange={onShiftCategoriesChange}
               canManageShiftCodes={canManageShiftCodes}
             />
-          </Section>
+          </div>
         )}
 
         {activeSection === "shift-codes" && canManageOrg && (
-          <Section title="Shift Codes & Off Days">
+          <div style={{ width: "100%", maxWidth: 860 }}>
             <ShiftCodesSettings
               shiftCodes={shiftCodes}
               focusAreas={focusAreas}
@@ -3611,11 +3834,11 @@ export default function SettingsPage({
               onChange={onShiftCodesChange}
               canManageShiftCodes={canManageShiftCodes}
             />
-          </Section>
+          </div>
         )}
 
         {activeSection === "coverage" && canManageOrg && (
-          <Section title="Coverage Requirements">
+          <div style={{ width: "100%", maxWidth: 860 }}>
             <CoverageRequirementsSettings
               orgId={organization.id}
               focusAreas={focusAreas}
@@ -3625,23 +3848,23 @@ export default function SettingsPage({
               onCoverageRequirementsChange={onCoverageRequirementsChange}
               canEdit={canManageCoverageRequirements}
             />
-          </Section>
+          </div>
         )}
 
         {activeSection === "indicators" && canManageOrg && (
-          <Section title="Indicators">
+          <div style={{ width: "100%", maxWidth: 860 }}>
             <IndicatorTypesSettings
               indicatorTypes={indicatorTypes}
               orgId={organization.id}
               onChange={onIndicatorTypesChange}
               canManageIndicatorTypes={canManageIndicatorTypes}
             />
-          </Section>
+          </div>
         )}
 
         {activeSection === "staff-config" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
-            <Section title={certificationLabel}>
+            <Section title={certificationLabel} noPadding>
               <StringListSettings
                 label={`Define the ${certificationLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
                 items={certifications}
@@ -3659,7 +3882,7 @@ export default function SettingsPage({
                 canEdit={canManageOrgLabels}
               />
             </Section>
-            <Section title={roleLabel}>
+            <Section title={roleLabel} noPadding>
               <StringListSettings
                 label={`Define the ${roleLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
                 items={orgRoles}
@@ -3681,17 +3904,28 @@ export default function SettingsPage({
         )}
 
         {activeSection === "users" && isSuperAdmin && (
-          <Section title="User Management" maxWidth={1100}>
+          <div style={{ width: "100%", maxWidth: 1100 }}>
             <UserManagementSettings orgId={organization.id} isSuperAdmin={isSuperAdmin} />
-          </Section>
+          </div>
         )}
 
         {activeSection === "impersonation" && isGridmaster && (
-          <Section title="Gridmaster Impersonation">
+          <div style={{ width: "100%", maxWidth: 860 }}>
             <ImpersonationPanel />
-          </Section>
+          </div>
+        )}
+
+        {allLinks.length === 0 && (
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            padding: "60px 20px", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)", textAlign: "center", gap: 12,
+          }}>
+            <span style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-secondary)" }}>No access</span>
+            <span>You don't have permission to view settings. Contact your organization admin for access.</span>
+          </div>
         )}
       </div>
     </div>
+    </SidebarProvider>
   );
 }

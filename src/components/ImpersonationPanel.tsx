@@ -47,7 +47,7 @@ export default function ImpersonationPanel() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted)" }}>
+      <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
         Start a support impersonation session by target user id. Sessions are
         capped at 30 minutes.
       </p>
@@ -84,7 +84,7 @@ export default function ImpersonationPanel() {
       </div>
 
       {sessionId && (
-        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
           Active session: <code>{sessionId}</code>
           {expiresAt
             ? ` · expires ${new Date(expiresAt).toLocaleString()}`
@@ -92,7 +92,7 @@ export default function ImpersonationPanel() {
         </div>
       )}
 
-      {error && <div style={{ fontSize: 13, color: "var(--color-danger)" }}>{error}</div>}
+      {error && <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}>{error}</div>}
     </div>
   );
 }

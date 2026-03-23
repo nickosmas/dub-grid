@@ -1,35 +1,44 @@
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/* ── Shift codes from Calm Haven seed ── */
 const SHIFTS = [
-  { label: "A", color: "#DBEAFE", text: "#1E40AF", border: "#BFDBFE" },
-  { label: "B", color: "#FEF3C7", text: "#92400E", border: "#FDE68A" },
-  { label: "P", color: "#D1FAE5", text: "#065F46", border: "#A7F3D0" },
+  { label: "D", color: "#FECACA", text: "#991B1B" },
+  { label: "Ds", color: "#FED7AA", text: "#9A3412" },
+  { label: "E", color: "#FECACA", text: "#991B1B" },
 ];
+
+/* ── borderColor() — matches ScheduleGrid.tsx borderColor helper ── */
+function borderColor(textHex: string) {
+  const r = parseInt(textHex.slice(1, 3), 16);
+  const g = parseInt(textHex.slice(3, 5), 16);
+  const b = parseInt(textHex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},0.35)`;
+}
 
 const ENTRIES = [
   {
-    name: "Sarah Mitchell",
-    initials: "SM",
-    hue: 210,
-    cert: "CSN III",
-    // A shifts Mon-Fri, off Sat-Sun
-    days: [null, 0, 0, 0, 0, 0, null],
-  },
-  {
-    name: "James Cooper",
-    initials: "JC",
+    name: "Carol Henderson",
+    initials: "CH",
     hue: 150,
-    cert: "CSN II",
-    // B shifts Mon/Wed/Fri/Sat, off others
-    days: [null, 1, null, 1, null, 1, 1],
+    cert: "JLCSN",
+    // Ds shifts Mon-Fri, off Sat-Sun
+    days: [null, 1, 1, 1, 1, 1, null],
   },
   {
-    name: "Maria Santos",
-    initials: "MS",
-    hue: 30,
+    name: "Kevin Donovan",
+    initials: "KD",
+    hue: 210,
+    cert: "STAFF",
+    // D shifts Mon/Wed/Fri/Sat, off others
+    days: [null, 0, null, 0, null, 0, 0],
+  },
+  {
+    name: "Nancy Thornton",
+    initials: "NT",
+    hue: 270,
     cert: "JLCSN",
-    // P shifts Mon-Sat, off Sun
-    days: [null, 2, 2, 2, 2, 2, null],
+    // D shifts Mon-Sat, off Sun
+    days: [null, 0, 0, 0, 0, 0, null],
   },
 ];
 
@@ -39,9 +48,9 @@ export default function RecurringShiftsMockup() {
       style={{
         background: "#fff",
         borderRadius: 14,
-        border: "1px solid #CBD5E1",
+        border: "1px solid var(--color-border)",
         overflow: "hidden",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06)",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         maxWidth: 640,
         margin: "0 auto",
       }}
@@ -54,16 +63,16 @@ export default function RecurringShiftsMockup() {
             minWidth: 520,
           }}
         >
-          {/* ── Header row ── */}
+          {/* ── Header row — matches real: #FAFBFC bg, 10px font, 700 weight ── */}
           <div
             style={{
               background: "#FAFBFC",
-              padding: "10px 14px",
-              borderBottom: "1px solid #E2E8F0",
-              borderRight: "1px solid #E2E8F0",
+              padding: "10px 16px",
+              borderBottom: "1px solid var(--color-border-light)",
+              borderRight: "1px solid var(--color-border-light)",
               fontSize: 10,
               fontWeight: 700,
-              color: "#64748B",
+              color: "var(--color-text-subtle)",
               letterSpacing: "0.08em",
               textTransform: "uppercase" as const,
               display: "flex",
@@ -77,12 +86,12 @@ export default function RecurringShiftsMockup() {
               key={day}
               style={{
                 background: "#FAFBFC",
-                padding: "10px 0",
-                borderBottom: "1px solid #E2E8F0",
-                borderLeft: "1px solid #E2E8F0",
+                padding: "10px 4px",
+                borderBottom: "1px solid var(--color-border-light)",
+                borderLeft: "1px solid var(--color-border-light)",
                 fontSize: 10,
                 fontWeight: 700,
-                color: "#94A3B8",
+                color: "var(--color-text-faint)",
                 letterSpacing: "0.06em",
                 textTransform: "uppercase" as const,
                 textAlign: "center",
@@ -94,16 +103,16 @@ export default function RecurringShiftsMockup() {
 
           {/* ── Employee rows ── */}
           {ENTRIES.map((entry, rowIdx) => [
-            /* Name cell */
+            /* Name cell — matches real: padding 10px 16px, borderRight */
             <div
               key={`name-${entry.name}`}
               style={{
-                padding: "10px 14px",
+                padding: "10px 16px",
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                borderTop: rowIdx > 0 ? "1px solid #E2E8F0" : undefined,
-                borderRight: "1px solid #E2E8F0",
+                borderTop: rowIdx > 0 ? "1px solid var(--color-border-light)" : undefined,
+                borderRight: "1px solid var(--color-border-light)",
                 minWidth: 0,
               }}
             >
@@ -130,7 +139,7 @@ export default function RecurringShiftsMockup() {
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: "#1E293B",
+                    color: "var(--color-text-secondary)",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -142,7 +151,7 @@ export default function RecurringShiftsMockup() {
                 <div
                   style={{
                     fontSize: 10,
-                    color: "#64748B",
+                    color: "var(--color-text-faint)",
                     lineHeight: 1.2,
                     marginTop: 1,
                   }}
@@ -159,13 +168,12 @@ export default function RecurringShiftsMockup() {
                 <div
                   key={`${entry.name}-${dayI}`}
                   style={{
-                    borderTop: rowIdx > 0 ? "1px solid #E2E8F0" : undefined,
-                    borderLeft: "1px solid #E2E8F0",
+                    borderTop: rowIdx > 0 ? "1px solid var(--color-border-light)" : undefined,
+                    borderLeft: "1px solid var(--color-border-light)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: "8px 4px",
-                    background: shift ? "transparent" : "#F8FAFC",
+                    padding: "6px 4px",
                   }}
                 >
                   {shift ? (
@@ -175,13 +183,13 @@ export default function RecurringShiftsMockup() {
                         maxWidth: 64,
                         height: 32,
                         background: shift.color,
-                        border: `1px solid ${shift.border}`,
-                        borderRadius: 6,
+                        border: `1px solid ${borderColor(shift.text)}`,
+                        borderRadius: 8,
                         color: shift.text,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: 800,
                         lineHeight: 1,
                         cursor: "default",
@@ -190,15 +198,25 @@ export default function RecurringShiftsMockup() {
                       {shift.label}
                     </div>
                   ) : (
-                    <span
+                    /* Empty cell — matches real: #F8FAFC bg, var(--color-border-light) border, 8px radius */
+                    <div
                       style={{
-                        fontSize: 11,
-                        color: "#CBD5E1",
+                        width: "100%",
+                        maxWidth: 64,
+                        height: 32,
+                        background: "#F8FAFC",
+                        border: "1px solid var(--color-border-light)",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
                         fontWeight: 500,
+                        color: "var(--color-text-faint)",
                       }}
                     >
                       --
-                    </span>
+                    </div>
                   )}
                 </div>
               );

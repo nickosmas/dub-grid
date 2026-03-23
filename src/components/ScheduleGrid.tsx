@@ -26,20 +26,14 @@ function fmt12hShort(time24: string): string {
   return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
 
-const PUBLISH_DIFF_BORDER_COLORS: Record<string, string> = {
-  new: '#059669',
-  modified: '#6366F1',
-  deleted: '#DC2626',
-};
-
 function getDraftBorder(draftKind: DraftKind, fallback: string): string {
   if (!draftKind) return fallback;
   return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
 }
 
 function getPublishDiffBoxShadow(kind: string, fallback: string): string {
-  const color = PUBLISH_DIFF_BORDER_COLORS[kind] ?? fallback;
-  return `0 0 0 1px #fff, 0 0 0 2.5px ${color}`;
+  const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
+  return `0 0 0 1px var(--color-surface), 0 0 0 2.5px ${color}`;
 }
 
 interface ScheduleGridProps {
@@ -245,7 +239,11 @@ const SectionBlock = memo(function SectionBlock({
         {entries.map(([label, cov], ei) => (
           <span key={label} style={{ whiteSpace: "nowrap" }}>
             {ei > 0 && <span style={{ color: "var(--color-text-faint)", margin: "0 0.3em" }}>|</span>}
-            <span style={{ color: cov.isMet ? "#16A34A" : "#DC2626", fontWeight: 700 }}>
+            <span style={{ color: cov.isMet ? "var(--color-success-text)" : "var(--color-danger-dark)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 3 }}>
+              {cov.isMet
+                ? <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm3.78 5.22a.75.75 0 00-1.06 0L7 8.94 5.28 7.22a.75.75 0 10-1.06 1.06l2.25 2.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 000-1.06z"/></svg>
+                : <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 3.5a.75.75 0 00-.75.75v4a.75.75 0 001.5 0v-4A.75.75 0 008 3.5zM8 12a1 1 0 100-2 1 1 0 000 2z"/></svg>
+              }
               {label}: {cov.actual}/{cov.required}
             </span>
           </span>
@@ -291,7 +289,7 @@ const SectionBlock = memo(function SectionBlock({
       .map((cat) => ({ id: cat.id, name: cat.name }));
   }, [dailyCoverageStatus, shiftCategories]);
 
-  const gridTemplate = `220px repeat(${weekDates.length}, minmax(${colWidth}px, 1fr))`;
+  const gridTemplate = `var(--dg-grid-name-col) repeat(${weekDates.length}, minmax(var(--dg-grid-col-min), 1fr))`;
 
   const rowGrid: React.CSSProperties = {
     display: "grid",
@@ -304,19 +302,23 @@ const SectionBlock = memo(function SectionBlock({
       {/* Section label */}
       <div
         style={{
-          fontSize: "var(--dg-fs-title)",
-          fontWeight: 700,
+          fontSize: "var(--dg-fs-heading)",
+          fontWeight: 800,
           color: "var(--color-text-secondary)",
           marginBottom: 10,
           paddingLeft: 4,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
         }}
       >
+        <span style={{ width: 3, height: 18, borderRadius: 2, background: "var(--color-brand)", flexShrink: 0 }} />
         {sectionName}
       </div>
 
       <div
         style={{
-          background: "#fff",
+          background: "var(--color-surface)",
           borderRadius: 12,
           border: "1px solid var(--color-border)",
           overflowX: "auto",
@@ -340,16 +342,16 @@ const SectionBlock = memo(function SectionBlock({
                 left: 0,
                 zIndex: 4,
                 background: "var(--color-bg)",
-                padding: "10px 14px",
-                fontSize: 12,
-                fontWeight: 700,
+                padding: "10px var(--dg-space-md)",
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 600,
                 color: "var(--color-text-subtle)",
-                letterSpacing: "0.08em",
+                letterSpacing: "0.04em",
                 borderRight: "1px solid var(--color-border-light)",
                 boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
               }}
             >
-              STAFF NAME
+              Staff
             </div>
             {weekDates.map((date, i) => {
               const key = formatDateKey(date);
@@ -371,12 +373,12 @@ const SectionBlock = memo(function SectionBlock({
                 >
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: "var(--dg-fs-caption)",
                       fontWeight: 600,
                       color: isToday
                         ? "var(--color-today-text)"
-                        : "var(--color-text-faint)",
-                      letterSpacing: "0.05em",
+                        : "var(--color-text-subtle)",
+                      letterSpacing: "0.04em",
                     }}
                   >
                     {DAY_LABELS[date.getDay()]}
@@ -388,7 +390,7 @@ const SectionBlock = memo(function SectionBlock({
                       color: isToday
                         ? "var(--color-today-text)"
                         : "var(--color-text-secondary)",
-                      lineHeight: 1.2,
+                      lineHeight: "var(--dg-lh-tight)",
                       marginTop: 1,
                     }}
                   >
@@ -406,7 +408,7 @@ const SectionBlock = memo(function SectionBlock({
                 ? highlightEmpIds.has(emp.id)
                 : true;
             const isCurrentUser = !!(emp.userId && currentUser && emp.userId === currentUser.id);
-            const rowBg = isCurrentUser ? "var(--color-today-bg)" : "#fff";
+            const rowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
             const certAbbr = getCertAbbr(emp.certificationId, certifications);
             const dc =
               DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
@@ -418,7 +420,7 @@ const SectionBlock = memo(function SectionBlock({
                   ...rowGrid,
                   background: rowBg,
                   opacity: isHighlighted ? 1 : 0.35,
-                  transition: "opacity 0.15s",
+                  transition: "opacity 150ms ease",
                   alignItems: "stretch",
                 }}
               >
@@ -429,7 +431,7 @@ const SectionBlock = memo(function SectionBlock({
                     left: 0,
                     zIndex: 3,
                     background: rowBg,
-                    padding: "7px 12px 7px 14px",
+                    padding: "7px var(--dg-space-md)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -445,14 +447,15 @@ const SectionBlock = memo(function SectionBlock({
                     display: "flex", flexDirection: "column", justifyContent: "center",
                   }}>
                     <span
+                      title={getEmployeeDisplayName(emp)}
                       style={{
-                        fontSize: getEmployeeDisplayName(emp).length > 22 ? 11 : getEmployeeDisplayName(emp).length > 16 ? 12 : 14,
+                        fontSize: "var(--dg-fs-label)",
                         fontWeight: 600,
                         color: "var(--color-text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        lineHeight: 1.2,
+                        lineHeight: "var(--dg-lh-tight)",
                       }}
                     >
                       {getEmployeeDisplayName(emp)}
@@ -460,12 +463,12 @@ const SectionBlock = memo(function SectionBlock({
                     {emp.roleIds.length > 0 && (
                       <span
                         style={{
-                          fontSize: getEmployeeDisplayName(emp).length > 18 ? "var(--dg-fs-micro)" : 11,
+                          fontSize: "var(--dg-fs-badge)",
                           color: "var(--color-text-subtle)",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          lineHeight: 1.2,
+                          lineHeight: "var(--dg-lh-tight)",
                         }}
                       >
                         {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
@@ -475,7 +478,7 @@ const SectionBlock = memo(function SectionBlock({
                   {emp.certificationId != null && (
                     <span
                       style={{
-                        fontSize: 12,
+                        fontSize: "var(--dg-fs-caption)",
                         fontWeight: 700,
                         background: dc.bg,
                         color: dc.text,
@@ -527,12 +530,15 @@ const SectionBlock = memo(function SectionBlock({
                           onCellContextMenu(e, emp.id, date, sectionName);
                         }
                       }}
+                      className="dg-grid-cell"
+                      role="gridcell"
+                      aria-label={shiftCode && shiftCode !== "OFF" ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftCode}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`}
+                      tabIndex={isCellInteractive ? 0 : -1}
+                      data-interactive={isCellInteractive ? "true" : "false"}
+                      data-locked={isLocked ? "true" : "false"}
+                      data-dragging={isDraggingGlobal ? "true" : "false"}
                       style={{
-                        height: showAudit ? 62 : 48,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        position: "relative",
+                        height: showAudit ? "var(--dg-grid-cell-height-audit)" : "var(--dg-grid-cell-height)",
                         borderTop: ri > 0 && !isSplit ? "1px solid var(--color-border-light)" : undefined,
                         borderLeft: isSplit
                           ? "2px solid var(--color-dark)"
@@ -543,19 +549,13 @@ const SectionBlock = memo(function SectionBlock({
                           : isToday
                             ? "var(--color-today-bg)"
                             : "transparent",
-                        cursor: isLocked ? "not-allowed" : isCellInteractive ? "pointer" : "default",
-                        transition: "background 0.1s",
                       }}
                       onMouseEnter={(e) => {
-                        if (isCellInteractive && !isDraggingGlobal) {
-                          e.currentTarget.style.background = "var(--color-today-bg)";
-                        }
                         onCellHover?.(emp.id, date, sectionName);
                         if (shiftCode && shiftCode !== "OFF") {
                           const rect = e.currentTarget.getBoundingClientRect();
                           const content = shiftCode.split("/").map((l, li) => {
                             const style = getStyleByIdOrLabel(l, cellCodeIds[li]);
-                            // Check if this specific shift code belongs to a different focus area
                             const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
                             const isForeign = codeEntry?.focusAreaId != null
                               && sectionFocusArea != null
@@ -572,13 +572,19 @@ const SectionBlock = memo(function SectionBlock({
                           });
                         }
                       }}
-                      onMouseLeave={(e) => {
-                        if (isCellInteractive && !isDraggingGlobal) {
-                          e.currentTarget.style.background = isToday
-                            ? "var(--color-today-bg)"
-                            : rowBg;
-                        }
+                      onMouseLeave={() => {
                         onTooltipChange(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
+                        }
+                        if (e.shiftKey && e.key === "F10" && isCellInteractive && onCellContextMenu) {
+                          e.preventDefault();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          onCellContextMenu(e as unknown as React.MouseEvent, emp.id, date, sectionName);
+                        }
                       }}
                     >
                       {shiftCode && shiftCode !== "OFF" ? (
@@ -591,8 +597,8 @@ const SectionBlock = memo(function SectionBlock({
                             label: shiftCode,
                             shiftCodeIds: cellCodeIds,
                             focusAreaName: sectionName,
-                            pillColor: firstStyle?.color ?? "#F8FAFC",
-                            pillText: firstStyle?.text ?? "#475569",
+                            pillColor: firstStyle?.color ?? "var(--color-bg)",
+                            pillText: firstStyle?.text ?? "var(--color-text-muted)",
                           }}
                           disabled={!hasDraggableShift}
                         >
@@ -617,9 +623,9 @@ const SectionBlock = memo(function SectionBlock({
                           // Cell-level label below the pill(s)
                           const publishBadge = isPubDiff
                             ? publishDiff!.kind === 'new'
-                              ? { text: 'New', color: '#059669' }
+                              ? { text: 'New', color: 'var(--color-success-text)' }
                               : publishDiff!.kind === 'modified'
-                                ? { text: `was: ${pubFrom.map(id => shiftCodeById.get(id)?.label ?? '?').join('/')}`, color: '#6366F1' }
+                                ? { text: `was: ${pubFrom.map(id => shiftCodeById.get(id)?.label ?? '?').join('/')}`, color: 'var(--color-primary)' }
                                 : null
                             : null;
 
@@ -647,10 +653,10 @@ const SectionBlock = memo(function SectionBlock({
                                    right: "4px",
                                    bottom: (publishBadge && auditName) ? "28px" : (publishBadge || auditName) ? "16px" : customTimes ? "3px" : "4px",
                                    left: "4px",
-                                   background: isCross ? "#ffffff" : style.color,
+                                   background: isCross ? "var(--color-surface)" : style.color,
                                    opacity: draftKind === 'deleted' ? 0.5 : 1,
                                    border: effectiveBorder,
-                                   borderRadius: 6,
+                                   borderRadius: 8,
                                    color: style.text,
                                    boxShadow: pillPublishStatus(0) === 'new' || pillPublishStatus(0) === 'modified'
                                      ? getPublishDiffBoxShadow(pillPublishStatus(0)!, borderColor(style.text))
@@ -661,6 +667,7 @@ const SectionBlock = memo(function SectionBlock({
                                    alignItems: "center",
                                    justifyContent: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "flex-start" : "center",
                                    paddingTop: showDiffOverlay && draftKind && draftKind !== 'deleted' ? 4 : 0,
+                                   paddingLeft: isCross && crossHomeFa ? 18 : 0,
                                    overflow: "hidden",
                                    textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                  }}
@@ -674,7 +681,7 @@ const SectionBlock = memo(function SectionBlock({
                                        left: 0,
                                        display: "flex",
                                        alignItems: "center",
-                                       fontSize: 11,
+                                       fontSize: "var(--dg-fs-footnote)",
                                        fontWeight: 800,
                                        lineHeight: 1,
                                        background: crossHomeFa.colorBg,
@@ -691,7 +698,7 @@ const SectionBlock = memo(function SectionBlock({
                                  <span style={{ fontSize: "var(--dg-fs-title)", fontWeight: 800, lineHeight: 1 }}>{label}</span>
                                  {customTimes && (
                                    <span style={{
-                                     fontSize: 11,
+                                     fontSize: "var(--dg-fs-footnote)",
                                      fontWeight: 500,
                                      lineHeight: 1,
                                      marginTop: 4,
@@ -707,9 +714,9 @@ const SectionBlock = memo(function SectionBlock({
                                      bottom: 2,
                                      left: "50%",
                                      transform: "translateX(-50%)",
-                                     fontSize: 13,
+                                     fontSize: "var(--dg-fs-label)",
                                      fontWeight: 700,
-                                     color: "#D97706",
+                                     color: "var(--color-warning)",
                                      whiteSpace: "nowrap",
                                      pointerEvents: "none",
                                      lineHeight: 1,
@@ -723,9 +730,9 @@ const SectionBlock = memo(function SectionBlock({
                                      bottom: 2,
                                      left: "50%",
                                      transform: "translateX(-50%)",
-                                     fontSize: 13,
+                                     fontSize: "var(--dg-fs-label)",
                                      fontWeight: 800,
-                                     color: "#16A34A",
+                                     color: "var(--color-success-text)",
                                      whiteSpace: "nowrap",
                                      pointerEvents: "none",
                                    }}>
@@ -747,11 +754,11 @@ const SectionBlock = memo(function SectionBlock({
                                          key={ind.name}
                                          title={ind.name}
                                          style={{
-                                           width: 7,
-                                           height: 7,
+                                           width: 8,
+                                           height: 8,
                                            borderRadius: "50%",
                                            background: ind.color,
-                                           border: "1px solid rgba(255,255,255,0.85)",
+                                           border: "1.5px solid rgba(255,255,255,0.9)",
                                            flexShrink: 0,
                                          }}
                                        />
@@ -771,13 +778,13 @@ const SectionBlock = memo(function SectionBlock({
                                      fontWeight: 600,
                                      lineHeight: 1,
                                      textAlign: "center",
-                                     color: "#475569",
+                                     color: "var(--color-text-muted)",
                                      pointerEvents: "none",
                                      overflow: "hidden",
                                      textOverflow: "ellipsis",
                                      whiteSpace: "nowrap",
                                      padding: "1px 5px",
-                                     background: "#fff",
+                                     background: "var(--color-surface)",
                                      borderRadius: 4,
                                      border: "1px solid rgba(0,0,0,0.08)",
                                      boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
@@ -795,7 +802,7 @@ const SectionBlock = memo(function SectionBlock({
                                      bottom: 2,
                                      left: "50%",
                                      transform: "translateX(-50%)",
-                                     fontSize: 11,
+                                     fontSize: "var(--dg-fs-footnote)",
                                      fontWeight: 700,
                                      lineHeight: 1,
                                      color: publishBadge.color,
@@ -856,11 +863,11 @@ const SectionBlock = memo(function SectionBlock({
                                     key={li}
                                     style={{
                                       flex: 1,
-                                      background: isCross ? "#ffffff" : style.color,
+                                      background: isCross ? "var(--color-surface)" : style.color,
                                       border: draftKind === 'deleted'
                                         ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
                                         : pillBorder,
-                                      borderRadius: 6,
+                                      borderRadius: 8,
                                       color: style.text,
                                       boxShadow: (() => {
                                         const ps = pillPublishStatus(li);
@@ -873,13 +880,14 @@ const SectionBlock = memo(function SectionBlock({
                                       alignItems: "center",
                                       justifyContent: "center",
                                       gap: 1,
-                                      fontSize: 13,
+                                      fontSize: "var(--dg-fs-label)",
                                       fontWeight: 800,
                                       position: "relative",
                                       cursor: "pointer",
                                       textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                       lineHeight: 1,
                                       overflow: "hidden",
+                                      paddingLeft: isCross && crossHomeFaLi ? 14 : 0,
                                     }}
                                   >
                                     {isCross && crossHomeFaLi && (
@@ -931,11 +939,11 @@ const SectionBlock = memo(function SectionBlock({
                                       key={ind.name}
                                       title={ind.name}
                                       style={{
-                                        width: 7,
-                                        height: 7,
+                                        width: 8,
+                                        height: 8,
                                         borderRadius: "50%",
                                         background: ind.color,
-                                        border: "1px solid rgba(255,255,255,0.8)",
+                                        border: "1.5px solid rgba(255,255,255,0.9)",
                                         flexShrink: 0,
                                       }}
                                     />
@@ -955,13 +963,13 @@ const SectionBlock = memo(function SectionBlock({
                                   fontWeight: 600,
                                   lineHeight: 1,
                                   textAlign: "center",
-                                  color: "#475569",
+                                  color: "var(--color-text-muted)",
                                   pointerEvents: "none",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
                                   padding: "1px 5px",
-                                  background: "#fff",
+                                  background: "var(--color-surface)",
                                   borderRadius: 4,
                                   border: "1px solid rgba(0,0,0,0.08)",
                                   boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
@@ -978,9 +986,9 @@ const SectionBlock = memo(function SectionBlock({
                                 bottom: 2,
                                 left: "50%",
                                 transform: "translateX(-50%)",
-                                fontSize: 11,
+                                fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 700,
-                                color: "#D97706",
+                                color: "var(--color-warning)",
                                 whiteSpace: "nowrap",
                                 pointerEvents: "none",
                                 lineHeight: 1,
@@ -995,9 +1003,9 @@ const SectionBlock = memo(function SectionBlock({
                                 bottom: 2,
                                 left: "50%",
                                 transform: "translateX(-50%)",
-                                fontSize: 11,
+                                fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 800,
-                                color: "#16A34A",
+                                color: "var(--color-success-text)",
                                 whiteSpace: "nowrap",
                                 pointerEvents: "none",
                                 zIndex: 1,
@@ -1011,7 +1019,7 @@ const SectionBlock = memo(function SectionBlock({
                                 bottom: 2,
                                 left: "50%",
                                 transform: "translateX(-50%)",
-                                fontSize: 11,
+                                fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 700,
                                 color: publishBadge.color,
                                 whiteSpace: "nowrap",
@@ -1041,15 +1049,15 @@ const SectionBlock = memo(function SectionBlock({
                                 right: "4px",
                                 bottom: auditName ? "16px" : "4px",
                                 left: "4px",
-                                background: "#FEF2F2",
-                                border: isDraftDelete ? "2px dashed #DC2626" : "1px solid #FECACA",
-                                borderRadius: 6,
-                                ...(isDraftDelete ? {} : { boxShadow: "0 0 0 1px #fff, 0 0 0 2.5px #DC2626" }),
+                                background: "var(--color-danger-bg)",
+                                border: isDraftDelete ? "2px dashed var(--color-danger-dark)" : "1px solid var(--color-danger-border)",
+                                borderRadius: 8,
+                                ...(isDraftDelete ? {} : { boxShadow: "0 0 0 1px var(--color-surface), 0 0 0 2.5px var(--color-danger-dark)" }),
                                 display: "flex",
                                 flexDirection: "column",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                color: "#DC2626",
+                                color: "var(--color-danger-dark)",
                                 overflow: "hidden",
                               }}
                             >
@@ -1064,7 +1072,7 @@ const SectionBlock = memo(function SectionBlock({
                                 fontSize: "var(--dg-fs-badge)",
                                 fontWeight: 700,
                                 lineHeight: 1,
-                                color: "#DC2626",
+                                color: "var(--color-danger-dark)",
                                 pointerEvents: "none",
                                 whiteSpace: "nowrap",
                                 marginTop: 2,
@@ -1084,13 +1092,13 @@ const SectionBlock = memo(function SectionBlock({
                                   fontWeight: 600,
                                   lineHeight: 1,
                                   textAlign: "center",
-                                  color: "#475569",
+                                  color: "var(--color-text-muted)",
                                   pointerEvents: "none",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
                                   padding: "1px 5px",
-                                  background: "#fff",
+                                  background: "var(--color-surface)",
                                   borderRadius: 4,
                                   border: "1px solid rgba(0,0,0,0.08)",
                                   boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
@@ -1132,11 +1140,11 @@ const SectionBlock = memo(function SectionBlock({
                                   key={ind.name}
                                   title={ind.name}
                                   style={{
-                                    width: 7,
-                                    height: 7,
+                                    width: 8,
+                                    height: 8,
                                     borderRadius: "50%",
                                     background: ind.color,
-                                    border: "1px solid #fff",
+                                    border: "1.5px solid rgba(255,255,255,0.85)",
                                     flexShrink: 0,
                                   }}
                                 />
@@ -1152,12 +1160,12 @@ const SectionBlock = memo(function SectionBlock({
                             position: "absolute",
                             top: 2,
                             right: 2,
-                            width: 16,
-                            height: 16,
+                            width: 20,
+                            height: 20,
                             borderRadius: "50%",
-                            background: "#6366F1",
-                            color: "#fff",
-                            fontSize: 8,
+                            background: "var(--color-primary)",
+                            color: "var(--color-text-inverse)",
+                            fontSize: 9,
                             fontWeight: 700,
                             display: "flex",
                             alignItems: "center",
@@ -1186,7 +1194,7 @@ const SectionBlock = memo(function SectionBlock({
               style={{
                 ...rowGrid,
                 borderTop: ci === 0 ? "2px solid var(--color-dark)" : undefined,
-                background: "#fff",
+                background: "var(--color-surface)",
               }}
             >
               <div
@@ -1194,7 +1202,7 @@ const SectionBlock = memo(function SectionBlock({
                   position: "sticky",
                   left: 0,
                   zIndex: 1,
-                  background: "#fff",
+                  background: "var(--color-surface)",
                   padding: "6px 14px",
                   fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
@@ -1213,7 +1221,7 @@ const SectionBlock = memo(function SectionBlock({
                 const coverageByLabel = dailyCoverageStatus?.[i]?.[row.id];
                 const coverageValues = coverageByLabel ? Object.values(coverageByLabel) : [];
                 const allMet = coverageValues.every((c) => !c.hasRequirement || c.isMet);
-                const cellBg = allMet ? "rgba(22, 163, 74, 0.06)" : "rgba(220, 38, 38, 0.06)";
+                const cellBg = allMet ? "rgba(22, 163, 74, 0.10)" : "rgba(220, 38, 38, 0.10)";
                 return (
                   <div
                     key={i}
@@ -1381,7 +1389,7 @@ export default function ScheduleGrid({
           style={{
             padding: "48px 20px",
             textAlign: "center",
-            background: "#fff",
+            background: "var(--color-surface)",
             borderRadius: 12,
             border: "1px dashed var(--color-border)",
             color: "var(--color-text-muted)",
@@ -1392,14 +1400,14 @@ export default function ScheduleGrid({
             gap: 12,
           }}
         >
-          <div style={{ color: "var(--color-text-faint)", background: "#F8FAFC", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ color: "var(--color-text-faint)", background: "var(--color-bg)", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
           </div>
           <div>
             <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600, marginBottom: 4 }}>
               No shifts found for this period
             </div>
-            <div style={{ fontSize: 13 }}>
+            <div style={{ fontSize: "var(--dg-fs-body)", color: "var(--color-text-faint)" }}>
               {isCellInteractive
                 ? "No employees are assigned to this focus area. Add employees in the Staff view."
                 : "No shifts have been published for this period yet."}
@@ -1415,7 +1423,7 @@ export default function ScheduleGrid({
                 left: tooltip.x,
                 top: tooltip.y - 8,
                 transform: "translate(-50%, -100%)",
-                background: "#FFFFFF",
+                background: "var(--color-surface)",
                 padding: "8px 14px",
                 borderRadius: "10px",
                 boxShadow: `
@@ -1424,9 +1432,9 @@ export default function ScheduleGrid({
                   0 0 0 1px rgba(0,0,0,0.05)
                 `,
                 zIndex: 1000,
-                fontSize: "13px",
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "#1E293B",
+                color: "var(--color-text-primary)",
                 whiteSpace: "nowrap",
                 pointerEvents: "none",
                 animation: "tooltipFadeIn 0.15s cubic-bezier(0, 0, 0.2, 1)",
@@ -1441,16 +1449,10 @@ export default function ScheduleGrid({
                   transform: "translateX(-50%) rotate(45deg)",
                   width: 10,
                   height: 10,
-                  background: "#FFFFFF",
+                  background: "var(--color-surface)",
                   boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
                 }}
               />
-              <style>{`
-                @keyframes tooltipFadeIn {
-                  from { opacity: 0; transform: translate(-50%, -90%); scale: 0.95; }
-                  to { opacity: 1; transform: translate(-50%, -100%); scale: 1; }
-                }
-              `}</style>
             </div>
           )}
           {renderedSections.map((section) => {

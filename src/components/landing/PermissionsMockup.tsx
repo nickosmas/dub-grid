@@ -2,218 +2,198 @@ const PERMISSION_GROUPS = [
   {
     label: "Schedule",
     items: [
-      { name: "Edit Shifts", checked: true },
-      { name: "Publish Schedule", checked: true },
-      { name: "Apply Recurring Schedule", checked: false },
-      { name: "Approve Shift Requests", checked: false },
+      { name: "Edit Shifts", on: true },
+      { name: "Publish Schedule", on: true },
+      { name: "Apply Recurring Schedule", on: false },
+      { name: "Approve Shift Requests", on: false },
     ],
   },
   {
     label: "Notes",
     items: [
-      { name: "Edit Notes", checked: true },
+      { name: "Edit Notes", on: true },
     ],
   },
   {
     label: "Recurring Shifts",
     items: [
-      { name: "Manage Recurring Shifts", checked: false },
-      { name: "Manage Shift Series", checked: false },
+      { name: "Manage Recurring Shifts", on: false },
+      { name: "Manage Shift Series", on: false },
     ],
   },
   {
     label: "Staff",
     items: [
-      { name: "View Staff", checked: true },
-      { name: "Manage Employees", checked: false },
+      { name: "View Staff", on: true },
+      { name: "Manage Employees", on: false },
     ],
   },
   {
     label: "Configuration",
     items: [
-      { name: "Manage Focus Areas", checked: true },
-      { name: "Manage Shift Codes", checked: true },
-      { name: "Manage Indicator Types", checked: false },
-      { name: "Manage Custom Labels", checked: false },
-      { name: "Manage Coverage Requirements", checked: false },
+      { name: "Manage Focus Areas", on: true },
+      { name: "Manage Shift Codes", on: true },
+      { name: "Manage Indicator Types", on: false },
+      { name: "Manage Custom Labels", on: false },
+      { name: "Manage Coverage Requirements", on: false },
     ],
   },
 ];
 
-export default function PermissionsMockup() {
+/* ── Toggle switch — exact copy from Toolbar.tsx ToggleSwitch ── */
+function Toggle({ on }: { on: boolean }) {
   return (
     <div
       style={{
-        background: "#fff",
-        borderRadius: 12,
-        border: "1px solid #CBD5E1",
-        overflow: "hidden",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
-        maxWidth: 420,
+        width: 32,
+        height: 18,
+        borderRadius: 9,
+        background: on ? "var(--color-border-focus)" : "var(--color-border)",
+        position: "relative",
+        transition: "background 150ms ease",
+        flexShrink: 0,
       }}
     >
-      {/* Header */}
-      <div style={{ padding: "20px 24px 0" }}>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            color: "#0F172A",
-            marginBottom: 4,
-          }}
-        >
-          Admin Permissions
-        </div>
-        <div
-          style={{
-            fontSize: 13,
-            color: "#64748B",
-            lineHeight: 1.4,
-          }}
-        >
-          Configure which actions this admin can perform.{" "}
-          <em style={{ fontStyle: "italic" }}>View Schedule</em> is always
-          enabled.
+      <div
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          background: "#fff",
+          position: "absolute",
+          top: 2,
+          left: on ? 16 : 2,
+          transition: "left 150ms ease",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+        }}
+      />
+    </div>
+  );
+}
+
+export default function PermissionsMockup() {
+  return (
+    <div style={{ position: "relative", maxWidth: 420 }}>
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 12,
+          border: "1px solid var(--color-border)",
+          overflow: "hidden",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          /* Cap height to match the 2×2 trust cards grid beside it */
+          maxHeight: 380,
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: "20px 24px 0" }}>
+          <div
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+              marginBottom: 4,
+            }}
+          >
+            Admin Permissions
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: "var(--color-text-muted)",
+              lineHeight: 1.4,
+              marginBottom: 16,
+            }}
+          >
+            Configure which actions this admin can perform.{" "}
+            <em style={{ fontStyle: "italic" }}>View Schedule</em> is always
+            enabled.
+          </div>
+
+          {/* Select All / Clear All — .dg-btn-ghost style */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+            }}
+          >
+            {["Select All", "Clear All"].map((label) => (
+              <span
+                key={label}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--color-text-muted)",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  cursor: "default",
+                  background: "transparent",
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
 
-        {/* Select All / Clear All */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            marginTop: 14,
-            paddingBottom: 14,
-            borderBottom: "1px solid #E2E8F0",
-          }}
-        >
-          {["Select All", "Clear All"].map((label) => (
-            <span
-              key={label}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#64748B",
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: "1px solid #E2E8F0",
-                cursor: "default",
-              }}
-            >
-              {label}
-            </span>
+        {/* Permission groups */}
+        <div style={{ padding: "0 24px" }}>
+          {PERMISSION_GROUPS.map((group) => (
+            <div key={group.label} style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase" as const,
+                  marginBottom: 8,
+                }}
+              >
+                {group.label}
+              </div>
+              {group.items.map((item) => (
+                <div
+                  key={item.name}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "6px 0",
+                    cursor: "default",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    {item.name}
+                  </span>
+                  <Toggle on={item.on} />
+                </div>
+              ))}
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Permission groups */}
-      <div style={{ padding: "8px 24px 0" }}>
-        {PERMISSION_GROUPS.map((group, gi) => (
-          <div key={group.label} style={{ marginTop: gi > 0 ? 18 : 10 }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#64748B",
-                letterSpacing: "0.05em",
-                textTransform: "uppercase" as const,
-                marginBottom: 8,
-              }}
-            >
-              {group.label}
-            </div>
-            {group.items.map((item) => (
-              <label
-                key={item.name}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "5px 0",
-                  cursor: "default",
-                }}
-              >
-                <div
-                  style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 4,
-                    border: item.checked
-                      ? "none"
-                      : "1.5px solid #CBD5E1",
-                    background: item.checked ? "#1B3A2D" : "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  {item.checked && (
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#fff"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "#1E293B",
-                  }}
-                >
-                  {item.name}
-                </span>
-              </label>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* Save / Cancel buttons */}
+      {/* Fade-out gradient at the bottom */}
       <div
         style={{
-          display: "flex",
-          gap: 8,
-          justifyContent: "flex-end",
-          padding: "20px 24px",
-          borderTop: "1px solid #E2E8F0",
-          marginTop: 20,
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 80,
+          background: "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)",
+          borderRadius: "0 0 12px 12px",
+          pointerEvents: "none",
         }}
-      >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#475569",
-            padding: "8px 16px",
-            borderRadius: 8,
-            background: "#F1F5F9",
-            cursor: "default",
-          }}
-        >
-          Cancel
-        </span>
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#fff",
-            padding: "8px 16px",
-            borderRadius: 8,
-            background: "#1B3A2D",
-            cursor: "default",
-          }}
-        >
-          Save Permissions
-        </span>
-      </div>
+      />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createOrganization, assignOrgRoleByEmail } from "@/lib/db";
 import type { Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
-import { BOX_SHADOW_CARD } from "@/lib/constants";
+import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 
 const TIMEZONES = [
   "America/New_York",
@@ -32,34 +32,6 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
 }
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "var(--color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  marginBottom: 6,
-  display: "block",
-};
-
-const sectionStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  overflow: "hidden",
-  boxShadow: BOX_SHADOW_CARD,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: "14px 20px",
-  borderBottom: "1px solid var(--color-border-light)",
-  fontWeight: 700,
-  fontSize: 14,
-  color: "var(--color-text-secondary)",
-};
-
-const sectionBodyStyle: React.CSSProperties = { padding: 20 };
 
 export default function CreateOrganizationForm({
   onCreated,
@@ -183,7 +155,7 @@ export default function CreateOrganizationForm({
                 placeholder="acme-healthcare"
               />
               {slugError && (
-                <span style={{ fontSize: 11, color: "var(--color-danger)", marginTop: 4, display: "block" }}>
+                <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4, display: "block" }}>
                   {slugError}
                 </span>
               )}
@@ -262,7 +234,7 @@ export default function CreateOrganizationForm({
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
         <div style={sectionHeaderStyle}>Seed Super Admin (Optional)</div>
         <div style={sectionBodyStyle}>
-          <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--color-text-muted)" }}>
+          <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
             Assign an existing user as the organization super admin. The user must already have a Supabase account.
           </p>
           <label style={labelStyle}>Super Admin Email</label>

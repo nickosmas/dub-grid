@@ -45,7 +45,7 @@ export default function DraggableShift({
         right: 0,
         bottom: 0,
         left: 0,
-        opacity: isDragging ? 0.4 : 1,
+        opacity: isDragging ? 0.5 : 1,
         transform: isDragging ? "scale(0.95)" : "none",
         transition: "opacity 150ms ease, transform 150ms ease",
         cursor: disabled ? undefined : "grab",

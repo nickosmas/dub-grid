@@ -145,7 +145,7 @@ export default function AcceptInvitePage() {
         minHeight: "100vh",
         padding: "24px",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)",
+        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-info-bg) 100%)",
       }}
     >
       <div
@@ -205,7 +205,7 @@ export default function AcceptInvitePage() {
                 style={{
                   ...inputStyle,
                   ...(emailFromUrl
-                    ? { background: "#F1F5F9", color: "#64748B" }
+                    ? { background: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" }
                     : {}),
                 }}
               />
@@ -230,7 +230,7 @@ export default function AcceptInvitePage() {
               />
 
               {formError && (
-                <p style={{ color: "#DC2626", fontSize: "var(--dg-fs-body-sm)", margin: 0, textAlign: "left" }}>
+                <p style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0, textAlign: "left" }}>
                   {formError}
                 </p>
               )}
@@ -304,7 +304,7 @@ function PasswordInput({
           border: "none",
           cursor: "pointer",
           padding: 4,
-          color: "#94A3B8",
+          color: "var(--color-text-subtle)",
           display: "flex",
           alignItems: "center",
         }}
@@ -395,12 +395,12 @@ function ErrorState({ title, message }: { title: string; message: string }) {
 function PasswordStrength({ password }: { password: string }) {
   const level = password.length < 8 ? 0 : password.length < 10 ? 1 : /[A-Z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password) ? 3 : /[A-Z]/.test(password) && /[0-9]/.test(password) ? 2 : 1;
   const labels = ["Too short", "Weak", "Fair", "Strong"];
-  const colors = ["#EF4444", "#F59E0B", "#EAB308", "#22C55E"];
+  const colors = ["var(--color-danger)", "var(--color-warning)", "var(--color-warning)", "var(--color-success)"];
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 4 }} role="meter" aria-label="Password strength" aria-valuenow={level} aria-valuemin={0} aria-valuemax={3}>
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= level ? colors[level] : "#E2E8F0", transition: "background 0.2s" }} />
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= level ? colors[level] : "var(--color-border-light)", transition: "background 150ms ease" }} />
         ))}
       </div>
       <span id="password-strength-label" style={{ fontSize: "var(--dg-fs-caption)", color: colors[level], fontWeight: 500 }}>
@@ -416,13 +416,13 @@ const headingStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-page-title)",
   fontWeight: 800,
   marginBottom: "16px",
-  color: "#0F172A",
+  color: "var(--color-text-primary)",
   letterSpacing: "-0.03em",
 };
 
 const subtextStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-title)",
-  color: "#475569",
+  color: "var(--color-text-muted)",
   lineHeight: 1.6,
   marginBottom: "24px",
 };
@@ -430,39 +430,39 @@ const subtextStyle: React.CSSProperties = {
 const primaryButtonStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px",
-  background: "#1B3A2D",
-  color: "#fff",
+  background: "var(--color-brand)",
+  color: "var(--color-text-inverse)",
   border: "none",
   borderRadius: "12px",
   fontSize: "var(--dg-fs-title)",
   fontWeight: 700,
   cursor: "pointer",
-  transition: "transform 0.15s, box-shadow 0.15s",
+  transition: "transform 150ms ease, box-shadow 150ms ease",
   boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
 };
 
 const secondaryButtonStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px",
-  background: "#F1F5F9",
-  color: "#475569",
+  background: "var(--color-bg-secondary)",
+  color: "var(--color-text-muted)",
   border: "none",
   borderRadius: "12px",
   fontSize: "var(--dg-fs-body)",
   fontWeight: 600,
   cursor: "pointer",
-  transition: "background 0.2s",
+  transition: "background 150ms ease",
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px 16px",
-  background: "#F8FAFC",
-  border: "1px solid #E2E8F0",
+  background: "var(--color-bg)",
+  border: "1px solid var(--color-border-light)",
   borderRadius: "12px",
   fontSize: "var(--dg-fs-body)",
-  color: "#0F172A",
+  color: "var(--color-text-primary)",
   outline: "none",
-  transition: "border-color 0.2s",
+  transition: "border-color 150ms ease",
   boxSizing: "border-box",
 };

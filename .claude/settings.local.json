@@ -49,7 +49,8 @@
       "Bash(npx vitest run:*)",
       "Bash(PGPASSWORD=\"KrvUpksTnpzjJbTpQqgXHUViKacExDfq\" /opt/homebrew/Cellar/postgresql@15/15.15/bin/psql:*)",
       "Bash(cat:*)",
-      "Bash(npx next build:*)"
+      "Bash(npx next build:*)",
+      "Bash(npx shadcn@latest add:*)"
     ]
   }
 }

@@ -10,6 +10,7 @@
 CREATE OR REPLACE FUNCTION public.is_gridmaster()
 RETURNS BOOLEAN
 LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
@@ -54,6 +55,30 @@ LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
   SELECT COUNT(*)::INTEGER FROM public.schedule_draft_sessions;
+$$;
+
+
+-- ── check_admin_permission ──────────────────────────────────────────────────
+-- Returns TRUE if the current caller has the given fine-grained admin permission.
+-- Gridmasters and super_admins always pass. Admins are checked against the
+-- admin_permissions JSONB column in organization_memberships. Users always fail.
+CREATE OR REPLACE FUNCTION public.check_admin_permission(p_permission TEXT)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT
+    public.is_gridmaster()
+    OR public.caller_org_role()::TEXT = 'super_admin'
+    OR (
+      public.caller_org_role()::TEXT = 'admin'
+      AND COALESCE(
+        (SELECT (cm.admin_permissions->>p_permission)::BOOLEAN
+         FROM public.organization_memberships cm
+         WHERE cm.user_id = auth.uid() AND cm.org_id = public.caller_org_id()),
+        FALSE
+      )
+    );
 $$;
 
 
@@ -151,6 +176,7 @@ GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO service_role
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 DECLARE
   v_full_name TEXT;
@@ -194,6 +220,7 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 CREATE OR REPLACE FUNCTION public.set_audit_fields()
 RETURNS TRIGGER
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -507,10 +534,15 @@ $$;
 CREATE OR REPLACE FUNCTION public.assign_gridmaster_by_email(p_email TEXT)
 RETURNS VOID
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 DECLARE
   target_user_id UUID;
 BEGIN
+  IF NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'Unauthorized: only gridmaster can assign gridmaster role';
+  END IF;
+
   SELECT id INTO target_user_id FROM auth.users WHERE email = p_email;
 
   IF target_user_id IS NULL THEN
@@ -624,6 +656,7 @@ CREATE OR REPLACE FUNCTION public.publish_schedule(
   p_end_date   DATE
 ) RETURNS UUID
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 DECLARE
   v_changes JSONB := '[]'::JSONB;
@@ -754,6 +787,199 @@ BEGIN
   RETURN v_history_id;
 END;
 $$;
+
+
+-- ── move_shift (atomic drag-and-drop) ────────────────────────────────────────
+-- Atomically moves a shift from one employee+date to another.
+-- Prevents duplication that can occur when the two-step client-side approach
+-- partially fails.
+
+CREATE OR REPLACE FUNCTION public.move_shift(
+  p_org_id            UUID,
+  p_source_emp_id     UUID,
+  p_source_date       DATE,
+  p_target_emp_id     UUID,
+  p_target_date       DATE,
+  p_shift_code_ids    BIGINT[],
+  p_expected_version  BIGINT DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_source_shift  RECORD;
+  v_lock_key_src  TEXT;
+  v_lock_key_tgt  TEXT;
+BEGIN
+  -- Permission check
+  IF NOT public.check_admin_permission('canEditShifts') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
+  END IF;
+
+  -- Org scoping: caller must belong to p_org_id (gridmaster exempt)
+  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+    RAISE EXCEPTION 'Unauthorized: org mismatch';
+  END IF;
+
+  -- Reject no-op self-move
+  IF p_source_emp_id = p_target_emp_id AND p_source_date = p_target_date THEN
+    RETURN jsonb_build_object('status', 'ok');
+  END IF;
+
+  -- Validate target employee is active and belongs to org
+  IF NOT EXISTS (
+    SELECT 1 FROM public.employees e
+    WHERE e.id = p_target_emp_id AND e.org_id = p_org_id
+      AND e.status IN ('active', 'benched') AND e.archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Target employee not found, archived, or inactive';
+  END IF;
+
+  -- Advisory locks in deterministic order to prevent deadlocks
+  v_lock_key_src := p_source_emp_id::TEXT || '_' || p_source_date::TEXT;
+  v_lock_key_tgt := p_target_emp_id::TEXT || '_' || p_target_date::TEXT;
+
+  IF v_lock_key_src < v_lock_key_tgt THEN
+    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_lock_key_src));
+    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_lock_key_tgt));
+  ELSE
+    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_lock_key_tgt));
+    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_lock_key_src));
+  END IF;
+
+  -- Validate source shift exists and belongs to org
+  SELECT * INTO v_source_shift FROM public.shifts
+  WHERE emp_id = p_source_emp_id AND date = p_source_date AND org_id = p_org_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Source shift not found';
+  END IF;
+
+  -- Optimistic lock check
+  IF p_expected_version IS NOT NULL AND v_source_shift.version != p_expected_version THEN
+    RAISE EXCEPTION 'Optimistic lock failed: expected version %, found %',
+      p_expected_version, v_source_shift.version;
+  END IF;
+
+  -- Create at target (upsert)
+  INSERT INTO public.shifts (
+    emp_id, date, org_id, draft_shift_code_ids, draft_is_delete,
+    custom_start_time, custom_end_time, focus_area_id,
+    created_by, updated_by
+  ) VALUES (
+    p_target_emp_id, p_target_date, p_org_id, p_shift_code_ids, false,
+    v_source_shift.custom_start_time, v_source_shift.custom_end_time,
+    v_source_shift.focus_area_id,
+    auth.uid(), auth.uid()
+  )
+  ON CONFLICT (emp_id, date) DO UPDATE SET
+    draft_shift_code_ids = EXCLUDED.draft_shift_code_ids,
+    draft_is_delete      = false,
+    custom_start_time    = EXCLUDED.custom_start_time,
+    custom_end_time      = EXCLUDED.custom_end_time,
+    focus_area_id        = EXCLUDED.focus_area_id,
+    updated_by           = auth.uid(),
+    version              = shifts.version + 1;
+
+  -- Delete source: soft-delete if published, hard-delete if draft-only
+  IF v_source_shift.published_shift_code_ids IS NOT NULL
+     AND array_length(v_source_shift.published_shift_code_ids, 1) > 0 THEN
+    UPDATE public.shifts
+    SET draft_shift_code_ids = '{}', draft_is_delete = true,
+        updated_by = auth.uid(), version = version + 1
+    WHERE emp_id = p_source_emp_id AND date = p_source_date;
+  ELSE
+    DELETE FROM public.shifts
+    WHERE emp_id = p_source_emp_id AND date = p_source_date;
+  END IF;
+
+  RETURN jsonb_build_object('status', 'ok');
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.move_shift(UUID, UUID, DATE, UUID, DATE, BIGINT[], BIGINT) TO authenticated;
+
+
+-- ── apply_recurring_schedules (server-side, DST-safe) ────────────────────────
+-- Fills empty schedule slots from recurring shift templates.
+-- Uses PostgreSQL DATE arithmetic (immune to DST issues).
+-- Reads fresh data from DB (no stale client-side closures).
+
+CREATE OR REPLACE FUNCTION public.apply_recurring_schedules(
+  p_org_id     UUID,
+  p_start_date DATE,
+  p_end_date   DATE
+) RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_current   DATE;
+  v_inserted  INTEGER := 0;
+  v_results   JSONB := '[]'::JSONB;
+  r           RECORD;
+BEGIN
+  -- Permission check
+  IF NOT public.check_admin_permission('canApplyRecurringSchedule') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canApplyRecurringSchedule permission';
+  END IF;
+
+  -- Validate org scoping
+  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+    RAISE EXCEPTION 'Unauthorized: org mismatch';
+  END IF;
+
+  -- Iterate dates using pure DATE arithmetic (DST-safe)
+  v_current := p_start_date;
+  WHILE v_current <= p_end_date LOOP
+    -- For each active recurring shift template matching this day-of-week,
+    -- pick the most recent effectiveFrom per employee (DISTINCT ON + ORDER BY DESC)
+    FOR r IN
+      SELECT DISTINCT ON (rs.emp_id)
+        rs.emp_id, rs.shift_code_id, sc.label AS shift_label
+      FROM public.recurring_shifts rs
+      JOIN public.shift_codes sc
+        ON sc.id = rs.shift_code_id AND sc.archived_at IS NULL
+      WHERE rs.org_id = p_org_id
+        AND rs.archived_at IS NULL
+        AND rs.day_of_week = EXTRACT(DOW FROM v_current)::INTEGER
+        AND rs.effective_from <= v_current
+        AND (rs.effective_until IS NULL OR rs.effective_until >= v_current)
+        -- Only for employees who don't already have a shift on this date
+        AND NOT EXISTS (
+          SELECT 1 FROM public.shifts s
+          WHERE s.emp_id = rs.emp_id AND s.date = v_current
+        )
+      ORDER BY rs.emp_id, rs.effective_from DESC
+    LOOP
+      INSERT INTO public.shifts (
+        emp_id, date, org_id, draft_shift_code_ids,
+        draft_is_delete, from_recurring, created_by, updated_by
+      ) VALUES (
+        r.emp_id, v_current, p_org_id, ARRAY[r.shift_code_id],
+        false, true, auth.uid(), auth.uid()
+      )
+      ON CONFLICT (emp_id, date) DO NOTHING;
+
+      IF FOUND THEN
+        v_inserted := v_inserted + 1;
+        v_results := v_results || jsonb_build_array(jsonb_build_object(
+          'empId', r.emp_id,
+          'date', to_char(v_current, 'YYYY-MM-DD'),
+          'label', r.shift_label,
+          'shiftCodeId', r.shift_code_id
+        ));
+      END IF;
+    END LOOP;
+
+    v_current := v_current + 1;  -- DATE + INTEGER is DST-safe in PostgreSQL
+  END LOOP;
+
+  RETURN jsonb_build_object('inserted', v_inserted, 'shifts', v_results);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.apply_recurring_schedules(UUID, DATE, DATE) TO authenticated;
 
 
 -- ── send_invitation ───────────────────────────────────────────────────────────
@@ -1057,6 +1283,7 @@ GRANT EXECUTE ON FUNCTION public.link_employee_to_user(UUID, UUID, UUID) TO auth
 CREATE OR REPLACE FUNCTION public.start_impersonation(p_target_user_id UUID)
 RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 DECLARE
   v_session impersonation_sessions;
@@ -1089,6 +1316,7 @@ COMMENT ON FUNCTION public.start_impersonation IS 'Creates an impersonation sess
 CREATE OR REPLACE FUNCTION public.end_impersonation(p_session_id UUID)
 RETURNS VOID
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 BEGIN
   DELETE FROM impersonation_sessions
@@ -1139,6 +1367,7 @@ GRANT EXECUTE ON FUNCTION public.force_logout_user(UUID) TO authenticated;
 CREATE OR REPLACE FUNCTION public.get_system_stats()
 RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 DECLARE result JSONB;
 BEGIN
@@ -1168,6 +1397,7 @@ RETURNS TABLE (
   last_sign_in_at TIMESTAMPTZ
 )
 LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 BEGIN
   IF NOT public.is_gridmaster() THEN RAISE EXCEPTION 'Unauthorized'; END IF;
@@ -1194,7 +1424,8 @@ RETURNS TABLE (
   platform_role     public.platform_role,
   org_role          public.org_role,
   admin_permissions JSONB,
-  created_at        TIMESTAMPTZ
+  created_at        TIMESTAMPTZ,
+  last_sign_in_at   TIMESTAMPTZ
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
@@ -1212,7 +1443,8 @@ BEGIN
 
   RETURN QUERY
   SELECT p.id, u.email::TEXT, p.first_name, p.last_name, p.platform_role,
-    COALESCE(cm.org_role, 'user'::public.org_role), cm.admin_permissions, p.created_at
+    COALESCE(cm.org_role, 'user'::public.org_role), cm.admin_permissions, p.created_at,
+    u.last_sign_in_at
   FROM public.profiles p
   JOIN auth.users u ON u.id = p.id
   LEFT JOIN public.organization_memberships cm ON cm.user_id = p.id AND cm.org_id = p_org_id
