@@ -36,14 +36,14 @@ export default function ConfirmDialog({
 
   const confirmStyle: React.CSSProperties | undefined =
     variant === "warning"
-      ? { background: "#D97706", border: "none" }
+      ? { background: "var(--color-warning)", border: "none" }
       : undefined;
 
   return (
     <Modal title={title} onClose={onCancel} style={{ maxWidth: 420 }}>
       <div
         style={{
-          fontSize: 14,
+          fontSize: "var(--dg-fs-body-sm)",
           color: "var(--color-text-secondary)",
           marginBottom: 24,
           lineHeight: 1.5,

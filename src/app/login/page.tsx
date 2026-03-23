@@ -41,7 +41,7 @@ function PageShell({
     <div
       style={{
         minHeight: "100vh",
-        background: "#fff",
+        background: "var(--color-surface)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -63,7 +63,7 @@ function PageShell({
           justifyContent: footerCenteredOnly ? "center" : "space-between",
           padding: "0 8px",
           fontSize: "var(--dg-fs-label)",
-          color: "#9CA3AF",
+          color: "var(--color-text-faint)",
         }}
       >
         <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
@@ -71,7 +71,7 @@ function PageShell({
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "#9CA3AF", textDecoration: "none" }}
+            style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
           >
             Privacy Policy
           </a>
@@ -80,7 +80,7 @@ function PageShell({
             href="/terms"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "#9CA3AF", textDecoration: "none" }}
+            style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
           >
             Terms of Service
           </a>
@@ -88,7 +88,7 @@ function PageShell({
         {!footerCenteredOnly && (
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <DubGridLogo size={20} />
-            <DubGridWordmark fontSize={14} color="#6B7280" />
+            <DubGridWordmark fontSize={14} color="var(--color-text-subtle)" />
           </div>
         )}
       </footer>
@@ -194,7 +194,7 @@ function DomainSelector() {
           style={{
             textAlign: "center",
             fontSize: "var(--dg-fs-body)",
-            color: "#374151",
+            color: "var(--color-text-secondary)",
             marginBottom: "28px",
             fontWeight: 500,
           }}
@@ -208,11 +208,11 @@ function DomainSelector() {
             style={{
               display: "flex",
               alignItems: "center",
-              border: `2px solid ${error ? "#EF4444" : "#1B3A2D"}`,
+              border: `2px solid ${error ? "var(--color-danger)" : "var(--color-brand)"}`,
               borderRadius: "10px",
               overflow: "hidden",
               marginBottom: error ? "8px" : "24px",
-              background: "#fff",
+              background: "var(--color-surface)",
             }}
           >
             <input
@@ -231,7 +231,7 @@ function DomainSelector() {
                 border: "none",
                 outline: "none",
                 fontSize: "var(--dg-fs-body)",
-                color: "#111827",
+                color: "var(--color-text-primary)",
                 background: "transparent",
                 minWidth: 0,
               }}
@@ -240,9 +240,9 @@ function DomainSelector() {
               style={{
                 padding: "13px 16px",
                 fontSize: "var(--dg-fs-body)",
-                color: "#6B7280",
-                background: "#F9FAFB",
-                borderLeft: "1px solid #E5E7EB",
+                color: "var(--color-text-subtle)",
+                background: "var(--color-bg)",
+                borderLeft: "1px solid var(--color-border-light)",
                 whiteSpace: "nowrap",
                 flexShrink: 0,
               }}
@@ -254,7 +254,7 @@ function DomainSelector() {
           {error && (
             <p
               style={{
-                color: "#EF4444",
+                color: "var(--color-danger)",
                 fontSize: "var(--dg-fs-label)",
                 marginBottom: "16px",
               }}
@@ -275,8 +275,8 @@ function DomainSelector() {
               type="submit"
               disabled={loading}
               style={{
-                background: loading ? "#6B7280" : "#1B3A2D",
-                color: "#fff",
+                background: loading ? "var(--color-text-subtle)" : "var(--color-brand)",
+                color: "var(--color-text-inverse)",
                 border: "none",
                 borderRadius: "999px",
                 padding: "12px 28px",
@@ -294,7 +294,7 @@ function DomainSelector() {
               style={{
                 background: "none",
                 border: "none",
-                color: "#6B7280",
+                color: "var(--color-text-subtle)",
                 fontSize: "var(--dg-fs-body-sm)",
                 cursor: "pointer",
                 padding: 0,
@@ -327,7 +327,7 @@ function DomainSelector() {
         >
           <div
             style={{
-              background: "#fff",
+              background: "var(--color-surface)",
               borderRadius: "12px",
               padding: "24px",
               maxWidth: "360px",
@@ -341,7 +341,7 @@ function DomainSelector() {
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-heading)",
                 fontWeight: 600,
-                color: "#111827",
+                color: "var(--color-text-primary)",
               }}
             >
               How to find your subdomain
@@ -351,7 +351,7 @@ function DomainSelector() {
                 margin: "0 0 20px",
                 fontSize: "var(--dg-fs-body-sm)",
                 lineHeight: 1.5,
-                color: "#374151",
+                color: "var(--color-text-secondary)",
               }}
             >
               Your subdomain is the first part of your workspace URL (e.g.{" "}
@@ -364,8 +364,8 @@ function DomainSelector() {
               style={{
                 width: "100%",
                 padding: "10px 16px",
-                background: "#1B3A2D",
-                color: "#fff",
+                background: "var(--color-brand)",
+                color: "var(--color-text-inverse)",
                 border: "none",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body-sm)",
@@ -430,7 +430,7 @@ function GridmasterLogin() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#0F172A",
+        background: "#001F52",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -444,10 +444,10 @@ function GridmasterLogin() {
           width: "100%",
           maxWidth: "400px",
           padding: "40px 36px 36px",
-          background: "#1E293B",
+          background: "#00287A",
           borderRadius: "14px",
           boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
-          border: "1px solid #334155",
+          border: "1px solid #0040A0",
         }}
       >
         <div
@@ -459,14 +459,14 @@ function GridmasterLogin() {
             marginBottom: "28px",
           }}
         >
-          <DubGridLogo size={48} color="#F8FAFC" />
+          <DubGridLogo size={48} color="#EFF5FF" />
           <span
             style={{
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color:"#475569",
+              color:"#6690CC",
             }}
           >
             Gridmaster Portal
@@ -477,7 +477,7 @@ function GridmasterLogin() {
           style={{
             fontSize: "var(--dg-fs-card-title)",
             fontWeight: 700,
-            color: "#F8FAFC",
+            color: "#EFF5FF",
             textAlign: "center",
             marginBottom: "24px",
           }}
@@ -496,7 +496,7 @@ function GridmasterLogin() {
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color:"#64748B",
+                color:"#6690CC",
               }}
             >
               Email
@@ -511,11 +511,11 @@ function GridmasterLogin() {
               style={{
                 width: "100%",
                 padding: "11px 13px",
-                border: "1px solid #334155",
+                border: "1px solid #0040A0",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
-                background: "#0F172A",
-                color: "#F8FAFC",
+                background: "#001F52",
+                color: "#EFF5FF",
                 outline: "none",
                 boxSizing: "border-box",
               }}
@@ -529,7 +529,7 @@ function GridmasterLogin() {
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color:"#64748B",
+                color:"#6690CC",
               }}
             >
               Password
@@ -544,11 +544,11 @@ function GridmasterLogin() {
               style={{
                 width: "100%",
                 padding: "11px 13px",
-                border: "1px solid #334155",
+                border: "1px solid #0040A0",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
-                background: "#0F172A",
-                color: "#F8FAFC",
+                background: "#001F52",
+                color: "#EFF5FF",
                 outline: "none",
                 boxSizing: "border-box",
               }}
@@ -562,7 +562,7 @@ function GridmasterLogin() {
               marginTop: "4px",
               width: "100%",
               padding: "13px",
-              background: loading ? "#475569" : "#2563EB",
+              background: loading ? "#1A2640" : "#0058CC",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
@@ -719,9 +719,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           <span
             style={{
               display: "inline-block",
-              background: "#F0FDF4",
-              color: "#1B3A2D",
-              border: "1px solid #BBF7D0",
+              background: "var(--color-info-bg)",
+              color: "var(--color-brand)",
+              border: "1px solid #BDD4F8",
               borderRadius: "999px",
               padding: "4px 14px",
               fontSize: "var(--dg-fs-label)",
@@ -737,7 +737,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           style={{
             fontSize: "var(--dg-fs-card-title)",
             fontWeight: 700,
-            color: "#111827",
+            color: "var(--color-text-primary)",
             textAlign: "center",
             marginBottom: "24px",
           }}
@@ -756,7 +756,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color: "#374151",
+                color: "var(--color-text-secondary)",
               }}
             >
               Email
@@ -771,7 +771,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               style={{
                 width: "100%",
                 padding: "11px 13px",
-                border: "1.5px solid #D1D5DB",
+                border: "1.5px solid var(--color-border)",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
                 outline: "none",
@@ -787,7 +787,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color: "#374151",
+                color: "var(--color-text-secondary)",
               }}
             >
               Password
@@ -802,7 +802,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               style={{
                 width: "100%",
                 padding: "11px 13px",
-                border: "1.5px solid #D1D5DB",
+                border: "1.5px solid var(--color-border)",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
                 outline: "none",
@@ -818,8 +818,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               marginTop: "4px",
               width: "100%",
               padding: "13px",
-              background: loading ? "#6B7280" : "#1B3A2D",
-              color: "#fff",
+              background: loading ? "var(--color-text-subtle)" : "var(--color-brand)",
+              color: "var(--color-text-inverse)",
               border: "none",
               borderRadius: "999px",
               fontSize: "var(--dg-fs-body)",
@@ -851,7 +851,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             style={{
               background: "none",
               border: "none",
-              color: "#9CA3AF",
+              color: "var(--color-text-faint)",
               fontSize: "var(--dg-fs-label)",
               cursor: "pointer",
               padding: 0,

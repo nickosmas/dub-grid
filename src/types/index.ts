@@ -356,6 +356,7 @@ export interface OrganizationUser {
   platformRole: PlatformRole;
   adminPermissions: AdminPermissions | null;
   createdAt: string;
+  lastSignInAt: string | null;
 }
 
 export interface UserSession {

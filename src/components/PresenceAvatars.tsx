@@ -7,11 +7,11 @@ import type { OnlineUser } from "@/hooks/useCellLocks";
 const MAX_VISIBLE = 4;
 
 const AVATAR_GRADIENTS = [
-  "linear-gradient(135deg, #38BDF8, #818CF8)",
+  "linear-gradient(135deg, #66B3FF, #0052E0)",
   "linear-gradient(135deg, #34D399, #06B6D4)",
-  "linear-gradient(135deg, #F472B6, #A78BFA)",
+  "linear-gradient(135deg, #F472B6, #0066FF)",
   "linear-gradient(135deg, #FB923C, #F472B6)",
-  "linear-gradient(135deg, #A78BFA, #38BDF8)",
+  "linear-gradient(135deg, #0066FF, #66B3FF)",
   "linear-gradient(135deg, #FBBF24, #F97316)",
 ];
 
@@ -66,7 +66,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "#22C55E",
+            background: "var(--color-success)",
           }}
         />
         <span role="status">{onlineUsers.length} online</span>
@@ -97,7 +97,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             justifyContent: "center",
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
-            color: "#fff",
+            color: "var(--color-text-inverse)",
             flexShrink: 0,
             marginLeft: i === 0 ? 0 : -8,
             border: "2px solid var(--color-surface)",
@@ -114,7 +114,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: user.editingCell ? "#6366F1" : "#22C55E",
+              background: user.editingCell ? "var(--color-primary)" : "var(--color-success)",
               border: "2px solid var(--color-surface)",
             }}
           />
@@ -127,7 +127,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: "var(--color-surface-overlay)",
+            background: "var(--color-bg-secondary)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -159,7 +159,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             zIndex: 1000,
             fontSize: "var(--dg-fs-caption)",
             fontWeight: 600,
-            color: "var(--color-text)",
+            color: "var(--color-text-primary)",
             whiteSpace: "nowrap",
             pointerEvents: "none",
           }}

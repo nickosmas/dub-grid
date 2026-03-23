@@ -1,35 +1,39 @@
+/* ── Color swatches — 24px circles matching the real SettingsPage color picker ── */
 const COLOR_SWATCHES = [
+  { bg: "#FED7AA", text: "#9A3412" },
+  { bg: "#E9D5FF", text: "#6B21A8" },
+  { bg: "#FECDD3", text: "#9F1239" },
+  { bg: "#FDE68A", text: "#92400E" },
   { bg: "#DBEAFE", text: "#1E40AF" },
-  { bg: "#DCFCE7", text: "#166534" },
-  { bg: "#FEF3C7", text: "#92400E" },
-  { bg: "#EDE9FE", text: "#6D28D9" },
-  { bg: "#FEE2E2", text: "#991B1B" },
-  { bg: "#CCFBF1", text: "#0E7490" },
+  { bg: "#E5F0FF", text: "#1A3A7A" },
   { bg: "#FCE7F3", text: "#9D174D" },
-  { bg: "#F1F5F9", text: "#475569" },
+  { bg: "#EDF1F7", text: "#334766" },
 ];
 
+/* ── Focus areas from Calm Haven — read-only display uses neutral badge with color dot ── */
 const FOCUS_AREAS = [
-  { name: "ICU", colorIdx: 0, editing: false },
-  { name: "ER", colorIdx: 1, editing: true },
-  { name: "Rehab", colorIdx: 2, editing: false },
+  { name: "Skilled Nursing", colorIdx: 0, editing: false },
+  { name: "Sheltered Care", colorIdx: 1, editing: true },
+  { name: "Night Shift", colorIdx: 2, editing: false },
+  { name: "Visiting CSNS", colorIdx: 3, editing: false },
 ];
 
+/* ── Drag handle — SVG matching the real 6-dot grip icon ── */
 function DragHandle() {
   return (
     <svg
-      width="10"
-      height="16"
-      viewBox="0 0 10 16"
-      fill="#94A3B8"
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="var(--color-text-faint)"
       style={{ flexShrink: 0, cursor: "grab" }}
     >
-      <circle cx="3" cy="2" r="1.5" />
-      <circle cx="7" cy="2" r="1.5" />
-      <circle cx="3" cy="8" r="1.5" />
-      <circle cx="7" cy="8" r="1.5" />
-      <circle cx="3" cy="14" r="1.5" />
-      <circle cx="7" cy="14" r="1.5" />
+      <rect x="3" y="1" width="2" height="2" rx="1" />
+      <rect x="9" y="1" width="2" height="2" rx="1" />
+      <rect x="3" y="6" width="2" height="2" rx="1" />
+      <rect x="9" y="6" width="2" height="2" rx="1" />
+      <rect x="3" y="11" width="2" height="2" rx="1" />
+      <rect x="9" y="11" width="2" height="2" rx="1" />
     </svg>
   );
 }
@@ -40,9 +44,9 @@ export default function SettingsMockup() {
       style={{
         background: "#fff",
         borderRadius: 12,
-        border: "1px solid #CBD5E1",
+        border: "1px solid var(--color-border)",
         overflow: "hidden",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         maxWidth: 560,
         margin: "0 auto",
       }}
@@ -51,15 +55,15 @@ export default function SettingsMockup() {
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: "1px solid #E2E8F0",
-          fontSize: 14,
+          borderBottom: "1px solid var(--color-border-light)",
           fontWeight: 700,
-          color: "#1E293B",
+          fontSize: 14,
+          color: "var(--color-text-secondary)",
         }}
       >
         Custom Labels
       </div>
-      <div style={{ padding: "20px 20px 24px" }}>
+      <div style={{ padding: 20 }}>
         <div
           style={{
             display: "grid",
@@ -70,40 +74,42 @@ export default function SettingsMockup() {
           {[
             {
               label: "Focus Areas Label",
-              value: "Focus Areas",
-              placeholder: "e.g. Focus Areas, Departments, Units",
+              value: "Wings",
+              helper: "Focus Areas, Departments, Units",
             },
             {
               label: "Certifications Label",
               value: "Certifications",
-              placeholder: "e.g. Certifications, Designations",
+              helper: "Certifications, Designations",
             },
             {
               label: "Roles Label",
               value: "Roles",
-              placeholder: "e.g. Responsibilities, Positions",
+              helper: "Responsibilities, Positions",
             },
           ].map((field) => (
             <div key={field.label}>
+              {/* Label — matches labelStyle: 11px, 700, var(--color-text-subtle), 0.04em, uppercase */}
               <div
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: "#64748B",
-                  letterSpacing: "0.05em",
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.04em",
                   textTransform: "uppercase" as const,
-                  marginBottom: 6,
+                  marginBottom: 5,
                 }}
               >
                 {field.label}
               </div>
+              {/* Input — matches real: borderRadius 10px, padding 7px 12px, fontSize 13px */}
               <div
                 style={{
                   fontSize: 13,
-                  padding: "8px 11px",
-                  border: "1.5px solid #E2E8F0",
-                  borderRadius: 8,
-                  color: "#1E293B",
+                  padding: "7px 12px",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  color: "var(--color-text-secondary)",
                   background: "#fff",
                 }}
               >
@@ -111,32 +117,32 @@ export default function SettingsMockup() {
               </div>
               <div
                 style={{
-                  fontSize: 10,
-                  color: "#94A3B8",
+                  fontSize: 11,
+                  color: "var(--color-text-muted)",
                   marginTop: 4,
                 }}
               >
-                {field.placeholder}
+                {field.helper}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Focus Areas Section ── */}
+      {/* ── Wings Section (focus areas) ── */}
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: "1px solid #E2E8F0",
-          borderTop: "1px solid #E2E8F0",
-          fontSize: 14,
+          borderBottom: "1px solid var(--color-border-light)",
+          borderTop: "1px solid var(--color-border-light)",
           fontWeight: 700,
-          color: "#1E293B",
+          fontSize: 14,
+          color: "var(--color-text-secondary)",
         }}
       >
-        Focus Areas
+        Wings
       </div>
-      <div style={{ padding: "16px 20px 20px" }}>
+      <div style={{ padding: "0" }}>
         {FOCUS_AREAS.map((fa, idx) => {
           const swatch = COLOR_SWATCHES[fa.colorIdx];
           return (
@@ -146,53 +152,67 @@ export default function SettingsMockup() {
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "10px 0",
-                borderTop: idx > 0 ? "1px solid #F1F5F9" : undefined,
+                padding: "12px 12px",
+                borderBottom: idx < FOCUS_AREAS.length - 1 ? "1px solid var(--color-border-light)" : undefined,
               }}
             >
               <DragHandle />
 
-              {/* Preview badge */}
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  borderRadius: 20,
-                  padding: "3px 10px",
-                  background: swatch.bg,
-                  color: swatch.text,
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}
-              >
-                {fa.name}
-              </span>
-
               {fa.editing ? (
                 <>
-                  {/* Name input */}
+                  {/* Badge preview (in editing mode) */}
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      borderRadius: 20,
+                      padding: "3px 12px",
+                      background: "var(--color-bg-secondary)",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border-light)",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: swatch.bg,
+                        flexShrink: 0,
+                      }}
+                    />
+                    {fa.name}
+                  </span>
+
+                  {/* Name input — focused style */}
                   <div
                     style={{
                       fontSize: 13,
-                      padding: "6px 10px",
-                      border: "1.5px solid #93C5FD",
-                      borderRadius: 8,
-                      color: "#1E293B",
+                      fontWeight: 500,
+                      padding: "7px 12px",
+                      border: "1px solid var(--color-border-focus)",
+                      borderRadius: 10,
+                      color: "var(--color-text-secondary)",
                       background: "#fff",
                       flex: 1,
                       minWidth: 0,
-                      boxShadow: "0 0 0 3px rgba(59,130,246,0.1)",
+                      boxShadow: "0 0 0 3px rgba(56,189,248,0.15)",
                     }}
                   >
                     {fa.name}
                   </div>
 
-                  {/* Color swatches */}
+                  {/* Color swatches — 24px circles with 8px inner dot */}
                   <div
                     className="hidden sm:flex"
                     style={{
                       alignItems: "center",
-                      gap: 4,
+                      gap: 6,
                       flexShrink: 0,
                     }}
                   >
@@ -200,14 +220,14 @@ export default function SettingsMockup() {
                       <div
                         key={si}
                         style={{
-                          width: 18,
-                          height: 18,
+                          width: 24,
+                          height: 24,
                           borderRadius: "50%",
                           background: sw.bg,
                           border:
                             si === fa.colorIdx
                               ? `2px solid ${sw.text}`
-                              : "1px solid #E2E8F0",
+                              : "1px solid var(--color-border)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -217,8 +237,8 @@ export default function SettingsMockup() {
                         {si === fa.colorIdx && (
                           <div
                             style={{
-                              width: 6,
-                              height: 6,
+                              width: 8,
+                              height: 8,
                               borderRadius: "50%",
                               background: sw.text,
                             }}
@@ -229,7 +249,36 @@ export default function SettingsMockup() {
                   </div>
                 </>
               ) : (
-                <div style={{ flex: 1 }} />
+                <>
+                  {/* Read-only badge — neutral pill with color dot */}
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      borderRadius: 20,
+                      padding: "3px 12px",
+                      background: "var(--color-bg-secondary)",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border-light)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: swatch.bg,
+                        flexShrink: 0,
+                      }}
+                    />
+                    {fa.name}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                </>
               )}
             </div>
           );

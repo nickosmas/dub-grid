@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
-import { useMediaQuery, MOBILE } from "@/hooks";
+import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
+import ScrollableTabs from "@/components/ScrollableTabs";
 
 const SPAN_OPTIONS = [
   { value: "1" as const, label: "1 Week" },
@@ -47,6 +48,8 @@ interface ToolbarProps {
   coverageGapCount?: number;
   /** Toggle the coverage panel. */
   onCoverageToggle?: () => void;
+  /** Hide the 2-week option (auto-downgraded on narrow screens). */
+  hideTwoWeek?: boolean;
 }
 
 /* ── Toggle Switch ── */
@@ -57,9 +60,9 @@ function ToggleSwitch({ on }: { on: boolean }) {
         width: 32,
         height: 18,
         borderRadius: 9,
-        background: on ? "#16A34A" : "#CBD5E1",
+        background: on ? "var(--color-success)" : "var(--color-border)",
         position: "relative",
-        transition: "background 0.15s",
+        transition: "background 150ms ease",
         flexShrink: 0,
       }}
     >
@@ -68,11 +71,11 @@ function ToggleSwitch({ on }: { on: boolean }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          background: "#fff",
+          background: "var(--color-surface)",
           position: "absolute",
           top: 2,
           left: on ? 16 : 2,
-          transition: "left 0.15s",
+          transition: "left 150ms ease",
           boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
         }}
       />
@@ -133,37 +136,16 @@ function ToolsMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose, triggerRef]);
 
-  const itemStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "9px 14px",
-    fontSize: "var(--dg-fs-label)",
-    fontWeight: 500,
-    color: "var(--color-text)",
-    cursor: "pointer",
-    borderRadius: 7,
-    border: "none",
-    background: "none",
-    width: "100%",
-    textAlign: "left",
-    lineHeight: 1,
-  };
-
   return createPortal(
     <div
       ref={menuRef}
       role="menu"
+      className="dg-menu"
       style={{
         position: "fixed",
         top: pos.top,
         left: pos.left,
         transform: "translateX(-100%)",
-        background: "var(--color-bg)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 12,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)",
-        padding: 4,
         zIndex: 9999,
         minWidth: 200,
       }}
@@ -172,10 +154,8 @@ function ToolsMenu({
       {onAuditToggle && (
         <button
           role="menuitem"
-          style={itemStyle}
+          className="dg-menu-item"
           onClick={onAuditToggle}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-surface-overlay)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -190,10 +170,8 @@ function ToolsMenu({
       {onRequestsToggle && (
         <button
           role="menuitem"
-          style={itemStyle}
+          className="dg-menu-item"
           onClick={() => { onRequestsToggle(); onClose(); }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-surface-overlay)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="17 1 21 5 17 9" />
@@ -203,22 +181,7 @@ function ToolsMenu({
           </svg>
           <span style={{ flex: 1 }}>Requests</span>
           {(requestsBadgeCount ?? 0) > 0 && (
-            <span
-              style={{
-                background: "#EF4444",
-                color: "#fff",
-                fontSize: "var(--dg-fs-badge)",
-                fontWeight: 700,
-                borderRadius: 10,
-                minWidth: 18,
-                height: 18,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "0 5px",
-                lineHeight: 1,
-              }}
-            >
+            <span className="dg-notification-badge">
               {(requestsBadgeCount ?? 0) > 99 ? "99+" : requestsBadgeCount}
             </span>
           )}
@@ -229,10 +192,8 @@ function ToolsMenu({
       {onPrintOpen && (
         <button
           role="menuitem"
-          style={itemStyle}
+          className="dg-menu-item"
           onClick={() => { onPrintOpen(); onClose(); }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-surface-overlay)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="6 9 6 2 18 2 18 9" />
@@ -247,14 +208,9 @@ function ToolsMenu({
       {canEditShifts && onApplyRecurring && (
         <button
           role="menuitem"
-          style={{
-            ...itemStyle,
-            opacity: isApplyingRecurring ? 0.6 : 1,
-          }}
+          className="dg-menu-item"
           disabled={isApplyingRecurring}
           onClick={() => { onApplyRecurring(); onClose(); }}
-          onMouseEnter={(e) => { if (!isApplyingRecurring) e.currentTarget.style.background = "var(--color-surface-overlay)"; }}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -271,14 +227,9 @@ function ToolsMenu({
       {canEditShifts && onImportPrevious && (
         <button
           role="menuitem"
-          style={{
-            ...itemStyle,
-            opacity: isImportingPrevious ? 0.6 : 1,
-          }}
+          className="dg-menu-item"
           disabled={isImportingPrevious}
           onClick={() => { onImportPrevious(); onClose(); }}
-          onMouseEnter={(e) => { if (!isImportingPrevious) e.currentTarget.style.background = "var(--color-surface-overlay)"; }}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" />
@@ -317,7 +268,15 @@ export default function Toolbar({
   onRequestsToggle,
   coverageGapCount = 0,
   onCoverageToggle,
+  hideTwoWeek,
 }: ToolbarProps) {
+  const isMobile = useMediaQuery(MOBILE);
+  const isTablet = useMediaQuery(TABLET);
+
+  const spanOptions = (hideTwoWeek || isMobile)
+    ? SPAN_OPTIONS.filter((o) => o.value !== "2")
+    : SPAN_OPTIONS;
+
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
       return `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
@@ -336,141 +295,88 @@ export default function Toolbar({
   const toolsBtnRef = useRef<HTMLButtonElement>(null);
   const toggleTools = useCallback(() => setToolsOpen((p) => !p), []);
   const closeTools = useCallback(() => setToolsOpen(false), []);
-  const isMobile = useMediaQuery(MOBILE);
 
   /* ── Mobile Toolbar ─────────────────────────────────────── */
   if (isMobile) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}>
-        {/* Row 1: Week navigation + Tools */}
+        {/* Row 1: Time navigation — where in time */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={onPrev}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              width: 44,
+              height: 44,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+            title="Previous period"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-body-sm)",
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              whiteSpace: "nowrap",
+              textAlign: "center",
+              flex: 1,
+              userSelect: "none",
+            }}
+          >
+            {weekLabel}
+          </span>
+          <button
+            onClick={onNext}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              width: 44,
+              height: 44,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+            title="Next period"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+          <button
+            onClick={onToday}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              height: 44,
+              padding: "0 14px",
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 600,
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+          >
+            Today
+          </button>
+        </div>
+
+        {/* Row 2: View controls — how to view */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div className="dg-segment" style={{ flex: 1 }}>
-            <button
-              className="dg-segment-btn"
-              onClick={onPrev}
-              style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
-              title="Previous period"
-            >
-              ‹
-            </button>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "0 8px",
-                borderLeft: "1px solid var(--color-border)",
-                borderRight: "1px solid var(--color-border)",
-                flex: 1,
-                justifyContent: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 600,
-                  color: "var(--color-text-secondary)",
-                  whiteSpace: "nowrap",
-                  textAlign: "center",
-                }}
-              >
-                {weekLabel}
-              </span>
-            </div>
-            <button
-              className="dg-segment-btn"
-              onClick={onToday}
-              style={{ fontSize: "var(--dg-fs-caption)" }}
-            >
-              Today
-            </button>
-            <button
-              className="dg-segment-btn"
-              onClick={onNext}
-              style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
-              title="Next period"
-            >
-              ›
-            </button>
-          </div>
           <CustomSelect
             value={String(spanWeeks)}
-            options={SPAN_OPTIONS}
+            options={spanOptions}
             onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
             fontSize="var(--dg-fs-caption)"
           />
-          <button
-            ref={toolsBtnRef}
-            onClick={toggleTools}
-            aria-expanded={toolsOpen}
-            aria-haspopup="menu"
-            className="dg-btn dg-btn-ghost"
-            style={{
-              border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
-              borderRadius: 10,
-              padding: "7px 12px",
-              background: toolsOpen ? "var(--color-primary-light)" : undefined,
-              color: toolsOpen ? "var(--color-primary)" : undefined,
-              flexShrink: 0,
-              position: "relative",
-            }}
-            title="Tools"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="4" y1="21" x2="4" y2="14" />
-              <line x1="4" y1="10" x2="4" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12" y2="3" />
-              <line x1="20" y1="21" x2="20" y2="16" />
-              <line x1="20" y1="12" x2="20" y2="3" />
-              <line x1="1" y1="14" x2="7" y2="14" />
-              <line x1="9" y1="8" x2="15" y2="8" />
-              <line x1="17" y1="16" x2="23" y2="16" />
-            </svg>
-            Tools
-            {requestsBadgeCount > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  right: -6,
-                  background: "#EF4444",
-                  color: "#fff",
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  borderRadius: 10,
-                  minWidth: 18,
-                  height: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 5px",
-                  lineHeight: 1,
-                }}
-              >
-                {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
-              </span>
-            )}
-          </button>
-          {toolsOpen && (
-            <ToolsMenu
-              triggerRef={toolsBtnRef}
-              onClose={closeTools}
-              showAudit={showAudit}
-              onAuditToggle={onAuditToggle}
-              onPrintOpen={onPrintOpen}
-              canEditShifts={canEditShifts}
-              onApplyRecurring={onApplyRecurring}
-              isApplyingRecurring={isApplyingRecurring}
-              onImportPrevious={onImportPrevious}
-              isImportingPrevious={isImportingPrevious}
-              requestsBadgeCount={requestsBadgeCount}
-              onRequestsToggle={onRequestsToggle}
-            />
-          )}
-        </div>
-
-        {/* Row 2: Search */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1 }}>
             <svg
               width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -497,7 +403,7 @@ export default function Toolbar({
                 className="dg-btn-ghost"
                 style={{
                   position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                  padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 6,
+                  padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 8,
                 }}
                 title="Clear search"
               >
@@ -505,6 +411,58 @@ export default function Toolbar({
               </button>
             )}
           </div>
+          <button
+            ref={toolsBtnRef}
+            onClick={toggleTools}
+            aria-expanded={toolsOpen}
+            aria-haspopup="menu"
+            className="dg-btn dg-btn-ghost"
+            style={{
+              border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+              borderRadius: 10,
+              height: 44,
+              padding: "0 12px",
+              background: toolsOpen ? "rgba(58, 125, 224, 0.08)" : undefined,
+              color: toolsOpen ? "var(--color-primary)" : undefined,
+              flexShrink: 0,
+              position: "relative",
+            }}
+            title="Tools"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+            Tools
+            {requestsBadgeCount > 0 && (
+              <span className="dg-notification-badge dg-notification-badge--absolute">
+                {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
+              </span>
+            )}
+          </button>
+          {toolsOpen && (
+            <ToolsMenu
+              triggerRef={toolsBtnRef}
+              onClose={closeTools}
+              showAudit={showAudit}
+              onAuditToggle={onAuditToggle}
+              onPrintOpen={onPrintOpen}
+              canEditShifts={canEditShifts}
+              onApplyRecurring={onApplyRecurring}
+              isApplyingRecurring={isApplyingRecurring}
+              onImportPrevious={onImportPrevious}
+              isImportingPrevious={isImportingPrevious}
+              requestsBadgeCount={requestsBadgeCount}
+              onRequestsToggle={onRequestsToggle}
+            />
+          )}
         </div>
       </div>
     );
@@ -517,31 +475,34 @@ export default function Toolbar({
         display: "flex",
         alignItems: "center",
         gap: 12,
+        rowGap: 8,
         flexWrap: "wrap",
         paddingBottom: 12,
       }}
     >
-      {/* ── LEFT ZONE: Contextual controls ── */}
-
-      {/* Week navigation */}
-      <div className="dg-segment">
-        <button
-          className="dg-segment-btn"
-          onClick={onPrev}
-          style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
-          title="Previous period"
-        >
-          ‹
-        </button>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "0 10px",
-            borderLeft: "1px solid var(--color-border)",
-            borderRight: "1px solid var(--color-border)",
-          }}
-        >
+      {/* ── NAV ZONE: Time navigation + span (stays as one unit) ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Chevrons + date label */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={onPrev}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              width: "var(--dg-toolbar-h)",
+              height: "var(--dg-toolbar-h)",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+            title="Previous period"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
           <span
             style={{
               fontSize: "var(--dg-fs-label)",
@@ -550,87 +511,129 @@ export default function Toolbar({
               whiteSpace: "nowrap",
               minWidth: 120,
               textAlign: "center",
+              userSelect: "none",
             }}
           >
             {weekLabel}
           </span>
+          <button
+            onClick={onNext}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              width: "var(--dg-toolbar-h)",
+              height: "var(--dg-toolbar-h)",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+            title="Next period"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
         </div>
+
+        {/* Today button */}
         <button
-          className="dg-segment-btn"
           onClick={onToday}
-          style={{ fontSize: "var(--dg-fs-caption)" }}
+          className="dg-btn dg-btn-secondary"
+          style={{
+            height: "var(--dg-toolbar-h)",
+            padding: "0 14px",
+            fontSize: "var(--dg-fs-caption)",
+            fontWeight: 600,
+            borderRadius: 10,
+          }}
         >
           Today
         </button>
-        <button
-          className="dg-segment-btn"
-          onClick={onNext}
-          style={{ padding: "7px 10px", fontSize: "var(--dg-fs-body)", lineHeight: 1 }}
-          title="Next period"
-        >
-          ›
-        </button>
-      </div>
 
-      {/* Span selector: 1 Week / 2 Weeks / Month */}
-      <CustomSelect
-        value={String(spanWeeks)}
-        options={SPAN_OPTIONS}
-        onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
-      />
-
-      {/* Focus area filter */}
-      {focusAreaOptions.length > 1 && (
-        <div className="dg-segment">
-          {focusAreaOptions.map((w) => (
-            <button
-              key={w.id ?? "all"}
-              onClick={() => onFocusAreaChange(w.id)}
-              className={`dg-segment-btn${activeFocusArea === w.id ? " active" : ""}`}
-            >
-              {w.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Staff search */}
-      <div style={{ position: "relative" }}>
-        <svg
-          width="13" height="13" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          style={{
-            position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-            color: "var(--color-text-faint)", pointerEvents: "none",
-          }}
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Find staff…"
-          value={staffSearch}
-          onChange={(e) => onStaffSearchChange(e.target.value)}
-          className="dg-input"
-          style={{ paddingLeft: 30, width: 160, borderRadius: 10 }}
+        {/* Span selector */}
+        <CustomSelect
+          value={String(spanWeeks)}
+          options={spanOptions}
+          onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
         />
-        {staffSearch && (
-          <button
-            onClick={() => onStaffSearchChange("")}
-            className="dg-btn-ghost"
-            style={{
-              position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-              padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 6,
-            }}
-            title="Clear search"
-          >
-            ×
-          </button>
-        )}
       </div>
 
-      {/* ── RIGHT ZONE: Presence + Tools ── */}
+      {/* ── FILTER ZONE: Focus areas + search (wraps to row 2 on tablet) ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          ...(isTablet ? { order: 3, flexBasis: "100%" } : {}),
+        }}
+      >
+        {/* Focus area filter */}
+        {focusAreaOptions.length > 1 && (
+          <ScrollableTabs
+            className="dg-span-tabs dg-span-tabs--light"
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            {focusAreaOptions.map((w, i) => {
+              const isActive = activeFocusArea === w.id;
+              const prevActive = i > 0 && activeFocusArea === focusAreaOptions[i - 1].id;
+              const showDivider = i > 0 && !isActive && !prevActive;
+              return (
+                <Fragment key={w.id ?? "all"}>
+                  {i > 0 && (
+                    <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                  )}
+                  <button
+                    onClick={() => onFocusAreaChange(w.id)}
+                    className={`dg-span-tab${isActive ? " active" : ""}`}
+                  >
+                    {w.name}
+                  </button>
+                </Fragment>
+              );
+            })}
+          </ScrollableTabs>
+        )}
+
+        {/* Staff search */}
+        <div style={{ position: "relative" }}>
+          <svg
+            width="13" height="13" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{
+              position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
+              color: "var(--color-text-faint)", pointerEvents: "none",
+            }}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Find staff…"
+            value={staffSearch}
+            onChange={(e) => onStaffSearchChange(e.target.value)}
+            className="dg-input"
+            style={{ paddingLeft: 30, width: isTablet ? 180 : 160, borderRadius: 10 }}
+          />
+          {staffSearch && (
+            <button
+              onClick={() => onStaffSearchChange("")}
+              className="dg-btn-ghost"
+              style={{
+                position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 8,
+              }}
+              title="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── RIGHT ZONE: Presence + Coverage + Tools ── */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         {presenceSlot}
 
@@ -642,8 +645,10 @@ export default function Toolbar({
             style={{
               border: "1px solid var(--color-border)",
               borderRadius: 10,
-              padding: "7px 12px",
+              height: "var(--dg-toolbar-h)",
+              padding: "0 12px",
               position: "relative",
+              color: coverageGapCount > 0 ? "var(--color-danger)" : undefined,
             }}
             title="Coverage"
           >
@@ -652,32 +657,14 @@ export default function Toolbar({
             </svg>
             Coverage
             {coverageGapCount > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  right: -6,
-                  background: "#EF4444",
-                  color: "#fff",
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  borderRadius: 10,
-                  minWidth: 18,
-                  height: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 5px",
-                  lineHeight: 1,
-                }}
-              >
+              <span className="dg-notification-badge dg-notification-badge--absolute">
                 {coverageGapCount > 99 ? "99+" : coverageGapCount}
               </span>
             )}
           </button>
         )}
 
-        {/* Tools dropdown — far right */}
+        {/* Tools dropdown */}
         <button
           ref={toolsBtnRef}
           onClick={toggleTools}
@@ -687,8 +674,9 @@ export default function Toolbar({
           style={{
             border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
             borderRadius: 10,
-            padding: "7px 12px",
-            background: toolsOpen ? "var(--color-primary-light)" : undefined,
+            height: "var(--dg-toolbar-h)",
+            padding: "0 12px",
+            background: toolsOpen ? "rgba(58, 125, 224, 0.08)" : undefined,
             color: toolsOpen ? "var(--color-primary)" : undefined,
             position: "relative",
           }}
@@ -707,25 +695,7 @@ export default function Toolbar({
           </svg>
           Tools
           {requestsBadgeCount > 0 && (
-            <span
-              style={{
-                position: "absolute",
-                top: -6,
-                right: -6,
-                background: "#EF4444",
-                color: "#fff",
-                fontSize: "var(--dg-fs-badge)",
-                fontWeight: 700,
-                borderRadius: 10,
-                minWidth: 18,
-                height: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "0 5px",
-                lineHeight: 1,
-              }}
-            >
+            <span className="dg-notification-badge dg-notification-badge--absolute">
               {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
             </span>
           )}

@@ -49,6 +49,7 @@ export default function Modal({ title, onClose, children, style }: ModalProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.stopPropagation();
         handleClose();
         return;
       }

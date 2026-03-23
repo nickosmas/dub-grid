@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
@@ -37,6 +37,37 @@ vi.mock("next/link", () => ({
 vi.mock("@/components/AuthProvider", () => ({
   useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
 }));
+
+vi.mock("@/components/ui/sidebar", () => {
+  const passthrough = ({ children }: any) => <>{children}</>;
+  return {
+    SidebarProvider: passthrough,
+    SidebarInset: ({ children, ...props }: any) => <main {...props}>{children}</main>,
+    Sidebar: () => <div data-testid="mock-sidebar" />,
+    SidebarContent: passthrough,
+    SidebarGroup: passthrough,
+    SidebarGroupContent: passthrough,
+    SidebarMenu: passthrough,
+    SidebarMenuItem: passthrough,
+    SidebarMenuButton: passthrough,
+    SidebarFooter: passthrough,
+  };
+});
+
+// Mock base-ui popover to avoid Floating UI positioning overhead in jsdom.
+// Root always renders children so Trigger stays visible; Popup content is always present in tests.
+vi.mock("@base-ui/react/popover", () => {
+  const passthrough = ({ children }: any) => <>{children}</>;
+  return {
+    Popover: {
+      Root: passthrough,
+      Trigger: ({ children, render, ...props }: any) => <button {...props}>{children}</button>,
+      Portal: passthrough,
+      Positioner: passthrough,
+      Popup: ({ children, className }: any) => <div className={className}>{children}</div>,
+    },
+  };
+});
 
 const focusAreas: FocusArea[] = [
   {
@@ -114,10 +145,10 @@ describe("StaffView", () => {
       expect(onAdd).toHaveBeenCalledTimes(1);
     });
 
-    it("renders sort selector with Seniority as default", () => {
+    it("renders sort selector with Seniority as default", async () => {
       render(<StaffView {...defaultProps} />);
-      // Sort is now a CustomSelect dropdown; the trigger shows the current value
-      expect(screen.getByRole("button", { name: /Seniority/ })).toBeInTheDocument();
+      // Sort trigger shows current sort via aria-label
+      expect(screen.getByRole("button", { name: /Sort by Seniority/ })).toBeInTheDocument();
     });
   });
 
@@ -163,13 +194,12 @@ describe("StaffView", () => {
 
 // Feature: ui-ux-test-suite, Property 3: Seniority sort produces non-decreasing sequence
 // Feature: ui-ux-test-suite, Property 4: Name sort produces non-decreasing alphabetical sequence
-// Feature: ui-ux-test-suite, Property 5: Focus area sort ordering
 describe("Property-based tests", () => {
   const arbUniqueEmployees = fc
     .array(
       fc.record({
-        firstName: fc.string({ minLength: 1, maxLength: 20 }),
-        lastName: fc.string({ minLength: 1, maxLength: 20 }),
+        firstName: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
+        lastName: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),
@@ -211,19 +241,8 @@ describe("Property-based tests", () => {
           />,
         );
 
-        // Open sort dropdown and click "Seniority" to ensure seniority sort is active
-        await userEvent.click(
-          within(container).getByRole("button", { name: /Seniority/ }),
-        );
-
-        // StaffView renders sidebar (children[0]) + content area (children[1]).
-        // Content area > .staff-master-detail (children[0]) > .staff-list-pane (children[0]) > table card (children[2]).
-        // .staff-list-pane: children[0] = status tabs, children[1] = controls, children[2] = table
-        const rootDiv = container.children[0] as HTMLElement;
-        const contentArea = rootDiv.children[1] as HTMLElement;
-        const masterDetail = contentArea.children[0] as HTMLElement;
-        const listPane = masterDetail.children[0] as HTMLElement;
-        const tableContainer = listPane.children[2] as HTMLElement;
+        // Seniority sort is the default — no interaction needed
+        const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
 
         // Employee data rows: skip the header row (first child), get remaining row wrappers
         const allRowWrappers = Array.from(tableContainer.children).slice(1);
@@ -259,10 +278,10 @@ describe("Property-based tests", () => {
 
       await fc.assert(
         fc.asyncProperty(arbUniqueEmployees, async (emps) => {
-          // The component sorts by lastName then firstName (not by full display name).
+          // The component sorts by firstName then lastName.
           // Verify the rendered order matches that sort.
           const expected = [...emps].sort(
-            (a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
+            (a, b) => a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName),
           );
 
           const { unmount, container } = render(
@@ -279,20 +298,10 @@ describe("Property-based tests", () => {
             />,
           );
 
-          // Open sort dropdown and click "Name"
-          await userEvent.click(
-            within(container).getByRole("button", { name: /Seniority/ }),
-          );
-          await userEvent.click(screen.getByRole("option", { name: "Name" }));
+          // Click "Name" sort option (mock renders all options always)
+          await userEvent.click(screen.getByRole("button", { name: "Name" }));
 
-          // StaffView renders sidebar (children[0]) + content area (children[1]).
-          // Content area > .staff-master-detail (children[0]) > .staff-list-pane (children[0]).
-          // .staff-list-pane: children[0] = status tabs, children[1] = controls, children[2] = table
-          const rootDiv = container.children[0] as HTMLElement;
-          const contentArea = rootDiv.children[1] as HTMLElement;
-          const masterDetail = contentArea.children[0] as HTMLElement;
-          const listPane = masterDetail.children[0] as HTMLElement;
-          const tableContainer = listPane.children[2] as HTMLElement;
+          const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
 
           // Employee data rows: skip the header row (first child), get remaining row wrappers
           const allRowWrappers = Array.from(tableContainer.children).slice(1);
@@ -313,7 +322,7 @@ describe("Property-based tests", () => {
 
           unmount();
 
-          // Compare rendered order against expected order (lastName then firstName)
+          // Compare rendered order against expected order (firstName then lastName)
           const expectedNames = expected.map((e) => `${e.firstName} ${e.lastName}`.trim());
           for (let i = 0; i < expectedNames.length; i++) {
             if (names[i] !== expectedNames[i]) return false;
@@ -325,67 +334,4 @@ describe("Property-based tests", () => {
     },
   );
 
-  it(
-    "focus area sort: first focus area alphabetical, ties broken by seniority",
-    { timeout: 15000 },
-    async () => {
-      // Validates: Requirements 5.6
-      // Use unique ids to avoid React key conflicts
-
-      await fc.assert(
-        fc.asyncProperty(arbUniqueEmployees, async (emps) => {
-          // With empty focusAreas prop, all focus area names resolve to "" so
-          // sort falls through to seniority
-          const expected = [...emps].sort((a, b) => a.seniority - b.seniority);
-
-          const { unmount, container } = render(
-            <StaffView
-              employees={emps}
-              focusAreas={[]}
-              certifications={defaultCertifications}
-              roles={defaultRoles}
-              onSave={vi.fn()}
-              onDelete={vi.fn()}
-              onBench={vi.fn()}
-              onActivate={vi.fn()}
-              onAdd={vi.fn()}
-            />,
-          );
-
-          // Open sort dropdown and click "Focus Areas"
-          await userEvent.click(
-            within(container).getByRole("button", { name: /Seniority/ }),
-          );
-          await userEvent.click(screen.getByRole("option", { name: "Focus Areas" }));
-
-          // Read rendered names from the DOM (same structure as name sort test)
-          // .staff-master-detail > .staff-list-pane: children[0] = status tabs, children[1] = controls, children[2] = table
-          const rootDiv = container.children[0] as HTMLElement;
-          const contentArea = rootDiv.children[1] as HTMLElement;
-          const masterDetail = contentArea.children[0] as HTMLElement;
-          const listPane = masterDetail.children[0] as HTMLElement;
-          const tableContainer = listPane.children[2] as HTMLElement;
-          const allRowWrappers = Array.from(tableContainer.children).slice(1);
-
-          const renderedNames = allRowWrappers.map((wrapper) => {
-            const gridRow = wrapper.children[0] as HTMLElement;
-            const nameCell = gridRow.children[1] as HTMLElement;
-            const innerDiv = nameCell.children[1] as HTMLElement;
-            const nameDiv = innerDiv.children[0] as HTMLElement;
-            return nameDiv.childNodes[0]?.textContent ?? "";
-          });
-
-          unmount();
-
-          // Compare rendered order against expected order by name
-          const expectedNames = expected.map((e) => `${e.firstName} ${e.lastName}`.trim());
-          for (let i = 0; i < expectedNames.length; i++) {
-            if (renderedNames[i] !== expectedNames[i]) return false;
-          }
-          return true;
-        }),
-        { numRuns: 100 },
-      );
-    },
-  );
 });

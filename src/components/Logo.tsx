@@ -1,6 +1,6 @@
 export function DubGridLogo({
   size = 48,
-  color = "#1B3A2D",
+  color = "#0357CA",
 }: {
   size?: number;
   color?: string;
@@ -39,7 +39,7 @@ export function DubGridLogo({
  */
 export function AnimatedDubGridLogo({
   size = 48,
-  color = "#1B3A2D",
+  color = "#0357CA",
 }: {
   size?: number;
   color?: string;

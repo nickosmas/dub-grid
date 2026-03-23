@@ -46,14 +46,7 @@ function StaffPageContent() {
   }
 
   return (
-    <div
-      style={{
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "var(--color-bg)",
-        minHeight: "100vh",
-        color: "var(--color-text-primary)",
-      }}
-    >
+    <>
       <ProgressBar loading={isLoading} />
 
       {!isLoading && (
@@ -94,7 +87,7 @@ function StaffPageContent() {
           )}
         </>
       )}
-    </div>
+    </>
   );
 }
 

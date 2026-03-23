@@ -10,14 +10,14 @@ export default function GridmasterLoading() {
         justifyContent: "center",
         flexDirection: "column",
         gap: 12,
-        background: "#0F172A",
+        background: "var(--color-dark)",
       }}
     >
       <AnimatedDubGridLogo size={48} color="#94A3B8" />
       <span
         style={{
           fontSize: "var(--dg-fs-label)",
-          color: "#64748B",
+          color: "var(--color-text-subtle)",
           fontWeight: 500,
         }}
       >

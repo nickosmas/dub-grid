@@ -15,7 +15,7 @@ export default function OpenGraphImage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f8faf9",
+          background: "#F8FAFC",
           gap: 48,
         }}
       >
@@ -31,7 +31,7 @@ export default function OpenGraphImage() {
             style={{
               fontSize: 72,
               fontWeight: 700,
-              color: "#1B3A2D",
+              color: "#0357CA",
               letterSpacing: -2,
             }}
           >
@@ -41,7 +41,7 @@ export default function OpenGraphImage() {
             style={{
               fontSize: 28,
               fontWeight: 400,
-              color: "#4a6b5a",
+              color: "#475569",
             }}
           >
             Smart staff scheduling for care facilities

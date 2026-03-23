@@ -119,11 +119,11 @@ const MINUTES = ["00","05","10","15","20","25","30","35","40","45","50","55"];
 const triggerStyle: React.CSSProperties = {
   padding: "6px 8px",
   border: "1.5px solid var(--color-border)",
-  borderRadius: 6,
-  fontSize: 12,
+  borderRadius: 8,
+  fontSize: "var(--dg-fs-caption)",
   fontWeight: 600,
   fontFamily: "inherit",
-  background: "#fff",
+  background: "var(--color-surface)",
   textAlign: "center",
   cursor: "pointer",
   outline: "none",
@@ -141,7 +141,7 @@ const dropdownStyle: React.CSSProperties = {
   top: "calc(100% + 4px)",
   left: "50%",
   transform: "translateX(-50%)",
-  background: "#fff",
+  background: "var(--color-surface)",
   border: "1.5px solid var(--color-border)",
   borderRadius: 8,
   boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
@@ -154,7 +154,7 @@ const dropdownStyle: React.CSSProperties = {
 
 const optionStyle: React.CSSProperties = {
   padding: "8px 14px",
-  fontSize: 12,
+  fontSize: "var(--dg-fs-caption)",
   fontWeight: 500,
   fontFamily: "inherit",
   cursor: "pointer",
@@ -211,11 +211,11 @@ function TimeDropdown({
               onClick={() => { onChange(opt.value); close(); }}
               style={{
                 ...optionStyle,
-                background: opt.value === value ? "var(--color-accent-bg)" : "transparent",
-                color: opt.value === value ? "#4338CA" : "var(--color-text)",
+                background: opt.value === value ? "var(--color-info-bg)" : "transparent",
+                color: opt.value === value ? "var(--color-accent-text)" : "var(--color-text-primary)",
                 fontWeight: opt.value === value ? 700 : 500,
               }}
-              onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "#F8FAFC"); }}
+              onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "var(--color-bg)"); }}
               onMouseLeave={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "transparent"); }}
             >
               {opt.label}
@@ -279,9 +279,9 @@ function PillTimeEditor({
       <button
         onClick={() => setExpanded(true)}
         style={{
-          display: "flex", alignItems: "center", gap: 5, fontSize: 11,
+          display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
           color: "var(--color-text-subtle)", background: "none",
-          border: "1px dashed var(--color-border)", borderRadius: 7,
+          border: "1px dashed var(--color-border)", borderRadius: 8,
           padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
           width: "100%", justifyContent: "center", marginTop: 8,
         }}
@@ -296,7 +296,7 @@ function PillTimeEditor({
   }
 
   return (
-    <div style={{ background: "#F8FAFC", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
+    <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
         <button
@@ -309,7 +309,7 @@ function PillTimeEditor({
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
         <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>START</span>
         <TimeDropdown value={s.hour} options={hourOptions} onChange={(v) => updateStart(v, s.minute, s.period)} width={50} placeholder="--" />
-        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
+        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>:</span>
         <TimeDropdown value={s.minute} options={minuteOptions} onChange={(v) => updateStart(s.hour, v, s.period)} width={50} />
         <TimeDropdown value={s.period} options={periodOptions} onChange={(v) => updateStart(s.hour, s.minute, v as "AM" | "PM")} width={54} />
       </div>
@@ -318,7 +318,7 @@ function PillTimeEditor({
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>END</span>
         <TimeDropdown value={e.hour} options={hourOptions} onChange={(v) => updateEnd(v, e.minute, e.period)} width={50} placeholder="--" />
-        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: 12 }}>:</span>
+        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>:</span>
         <TimeDropdown value={e.minute} options={minuteOptions} onChange={(v) => updateEnd(e.hour, v, e.period)} width={50} />
         <TimeDropdown value={e.period} options={periodOptions} onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")} width={54} />
       </div>
@@ -441,9 +441,9 @@ export default function ShiftEditPanel({
     }
     return (
       shiftCodes.find((st) => st.label === label) ?? {
-        color: "#F8FAFC",
-        border: "#CBD5E1",
-        text: "#475569",
+        color: "var(--color-bg)",
+        border: "var(--color-border)",
+        text: "var(--color-text-muted)",
       }
     );
   }
@@ -531,8 +531,8 @@ export default function ShiftEditPanel({
                 fontSize: "var(--dg-fs-badge)",
                 fontWeight: 800,
                 letterSpacing: "0.05em",
-                background: isCellNew ? "#16A34A" : "#D97706",
-                color: "#fff",
+                background: isCellNew ? "var(--color-success-text)" : "var(--color-warning)",
+                color: "var(--color-text-inverse)",
                 borderRadius: 4,
                 padding: "3px 8px",
                 lineHeight: 1,
@@ -547,7 +547,7 @@ export default function ShiftEditPanel({
             {label}
           </span>
           {(fullName || faName) && (
-            <span style={{ fontSize: 11, color: s.text, opacity: 0.7, lineHeight: 1 }}>
+            <span style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1 }}>
               {fullName}{fullName && faName ? " · " : ""}{faName}
             </span>
           )}
@@ -598,8 +598,8 @@ export default function ShiftEditPanel({
                     fontSize: "var(--dg-fs-badge)",
                     fontWeight: 800,
                     letterSpacing: "0.05em",
-                    background: isNewPill ? "#16A34A" : "#D97706",
-                    color: "#fff",
+                    background: isNewPill ? "var(--color-success-text)" : "var(--color-warning)",
+                    color: "var(--color-text-inverse)",
                     borderRadius: 4,
                     padding: "3px 8px",
                     lineHeight: 1,
@@ -650,7 +650,7 @@ export default function ShiftEditPanel({
                       border: "none",
                       background: "rgba(0,0,0,0.12)",
                       color: s.text,
-                      fontSize: 15,
+                      fontSize: "var(--dg-fs-body)",
                       lineHeight: 1,
                       cursor: "pointer",
                       display: "flex",
@@ -666,7 +666,7 @@ export default function ShiftEditPanel({
                 {renderNoteDots(pillNoteTypes, "left")}
               </div>
               {/* Card body: default time, per-pill custom time editor, + indicators */}
-              <div style={{ padding: "10px 12px", background: "#fff", borderRadius: "0 0 10px 10px" }}>
+              <div style={{ padding: "10px 12px", background: "var(--color-surface)", borderRadius: "0 0 10px 10px" }}>
                 {/* Default time info */}
                 {(defaultStart || defaultEnd) && (
                   <div
@@ -674,7 +674,7 @@ export default function ShiftEditPanel({
                       display: "flex",
                       alignItems: "center",
                       gap: 6,
-                      fontSize: 11,
+                      fontSize: "var(--dg-fs-footnote)",
                       color: "var(--color-text-subtle)",
                     }}
                   >
@@ -740,9 +740,9 @@ export default function ShiftEditPanel({
                 padding: "4px 10px",
                 border: `1.5px solid ${isActive ? color : "var(--color-border)"}`,
                 borderRadius: 20,
-                background: isActive ? `${color}18` : "#fff",
+                background: isActive ? `${color}18` : "var(--color-surface)",
                 cursor: "pointer",
-                fontSize: 11,
+                fontSize: "var(--dg-fs-footnote)",
                 fontWeight: isActive ? 600 : 400,
                 color: isActive ? color : "var(--color-text-subtle)",
                 fontFamily: "inherit",
@@ -785,7 +785,7 @@ export default function ShiftEditPanel({
                   padding: "10px 12px",
                   border: `1.5px solid ${isActive ? color : "var(--color-border)"}`,
                   borderRadius: 8,
-                  background: isActive ? `${color}18` : "#fff",
+                  background: isActive ? `${color}18` : "var(--color-surface)",
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "border-color 150ms ease, background 150ms ease",
@@ -804,7 +804,7 @@ export default function ShiftEditPanel({
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? color : "var(--color-text-secondary)" }}>
+                  <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: isActive ? color : "var(--color-text-secondary)" }}>
                     {name}
                   </div>
                   <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-subtle)", marginTop: 1 }}>
@@ -850,7 +850,7 @@ export default function ShiftEditPanel({
             alignItems: "center",
             gap: 12,
             flexShrink: 0,
-            background: "#fff",
+            background: "var(--color-surface)",
           }}
         >
           {isMobile && (
@@ -879,7 +879,7 @@ export default function ShiftEditPanel({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontSize: 15,
+                fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
                 color: "var(--color-text-secondary)",
               }}
@@ -888,7 +888,7 @@ export default function ShiftEditPanel({
             </div>
             <div
               style={{
-                fontSize: 12,
+                fontSize: "var(--dg-fs-caption)",
                 color: "var(--color-text-subtle)",
                 marginTop: 2,
               }}
@@ -916,7 +916,7 @@ export default function ShiftEditPanel({
               style={{
                 border: "1px solid var(--color-border)",
                 padding: "4px 8px",
-                fontSize: 16,
+                fontSize: "var(--dg-fs-body)",
                 lineHeight: 1,
               }}
               title="Close"
@@ -969,7 +969,7 @@ export default function ShiftEditPanel({
                     border: "1px solid var(--color-border)",
                     borderRadius: 8,
                     padding: "12px",
-                    fontSize: 13,
+                    fontSize: "var(--dg-fs-label)",
                     color: "var(--color-text-muted)",
                     marginBottom: 16,
                   }}
@@ -985,7 +985,7 @@ export default function ShiftEditPanel({
                     marginBottom: 16,
                     padding: "10px 12px",
                     background: "var(--color-warning-bg)",
-                    border: "1px solid #FCD34D",
+                    border: "1px solid var(--color-warning-border)",
                     borderRadius: 8,
                   }}
                 >
@@ -1002,14 +1002,14 @@ export default function ShiftEditPanel({
                     <button
                       onClick={() => setSeriesScope("this")}
                       className={`dg-segment-btn${seriesScope === "this" ? " active" : ""}`}
-                      style={{ flex: 1, fontSize: 11 }}
+                      style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
                     >
                       This shift
                     </button>
                     <button
                       onClick={() => setSeriesScope("all")}
                       className={`dg-segment-btn${seriesScope === "all" ? " active" : ""}`}
-                      style={{ flex: 1, fontSize: 11 }}
+                      style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
                     >
                       All in series
                     </button>
@@ -1030,7 +1030,7 @@ export default function ShiftEditPanel({
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 6,
-                      fontSize: 12,
+                      fontSize: "var(--dg-fs-caption)",
                       padding: "9px 12px",
                     }}
                   >
@@ -1064,7 +1064,7 @@ export default function ShiftEditPanel({
                     marginTop: 20,
                     paddingTop: 12,
                     borderTop: "1px solid var(--color-border)",
-                    fontSize: 11,
+                    fontSize: "var(--dg-fs-footnote)",
                     color: "var(--color-text-subtle)",
                     display: "flex",
                     flexDirection: "column",
@@ -1100,7 +1100,7 @@ export default function ShiftEditPanel({
                     className="dg-btn dg-btn-danger"
                     style={{
                       width: "100%",
-                      fontSize: 12,
+                      fontSize: "var(--dg-fs-caption)",
                       padding: "9px 12px",
                     }}
                   >
@@ -1133,7 +1133,7 @@ export default function ShiftEditPanel({
                     className="dg-btn dg-btn-ghost"
                     style={{
                       width: "100%",
-                      fontSize: 12,
+                      fontSize: "var(--dg-fs-caption)",
                       padding: "9px 12px",
                       border: "1px dashed var(--color-border)",
                       display: "flex",
@@ -1174,7 +1174,7 @@ export default function ShiftEditPanel({
                 >
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: "var(--dg-fs-footnote)",
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
@@ -1190,9 +1190,9 @@ export default function ShiftEditPanel({
                       className="dg-btn dg-btn-ghost"
                       style={{
                         width: "100%",
-                        fontSize: 12,
+                        fontSize: "var(--dg-fs-caption)",
                         padding: "9px 12px",
-                        border: "1px solid #93C5FD",
+                        border: "1px solid var(--color-info-border)",
                         borderRadius: 8,
                         color: "var(--color-link)",
                         display: "flex",
@@ -1216,9 +1216,9 @@ export default function ShiftEditPanel({
                       className="dg-btn dg-btn-ghost"
                       style={{
                         width: "100%",
-                        fontSize: 12,
+                        fontSize: "var(--dg-fs-caption)",
                         padding: "9px 12px",
-                        border: "1px solid #A5B4FC",
+                        border: "1px solid var(--color-info-border)",
                         borderRadius: 8,
                         color: "var(--color-accent-text)",
                         display: "flex",
@@ -1245,7 +1245,7 @@ export default function ShiftEditPanel({
                     padding: "10px 12px",
                     background: "var(--color-warning-bg)",
                     borderRadius: 8,
-                    fontSize: 12,
+                    fontSize: "var(--dg-fs-caption)",
                     color: "var(--color-warning-text)",
                     textAlign: "center",
                   }}
@@ -1263,7 +1263,7 @@ export default function ShiftEditPanel({
                   onClick={() => setShowPicker(false)}
                   className="dg-btn dg-btn-ghost"
                   style={{
-                    fontSize: 12,
+                    fontSize: "var(--dg-fs-caption)",
                     padding: "5px 10px",
                     marginBottom: 12,
                     display: "flex",
@@ -1316,7 +1316,7 @@ export default function ShiftEditPanel({
               borderTop: "1px solid var(--color-border)",
               display: "flex",
               gap: 8,
-              background: "#fff",
+              background: "var(--color-surface)",
             }}
           >
             <button
@@ -1324,7 +1324,7 @@ export default function ShiftEditPanel({
               className="dg-btn dg-btn-ghost"
               style={{
                 flex: 1,
-                fontSize: 12,
+                fontSize: "var(--dg-fs-caption)",
                 padding: "9px 12px",
                 border: "1px solid var(--color-border)",
               }}
@@ -1334,7 +1334,7 @@ export default function ShiftEditPanel({
             <button
               onClick={onClose}
               className="dg-btn dg-btn-primary"
-              style={{ flex: 1, fontSize: 12, padding: "9px 12px" }}
+              style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
             >
               Confirm
             </button>

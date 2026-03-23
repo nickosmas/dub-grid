@@ -35,7 +35,7 @@ export default function DroppableCell({
         ...style,
         ...(isOver && !disabled
           ? {
-              outline: "2px solid #6366F1",
+              outline: "2px solid var(--color-primary)",
               outlineOffset: -2,
             }
           : undefined),

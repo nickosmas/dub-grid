@@ -112,7 +112,7 @@ function DayPopover({
       ref={menuRef}
       style={{
         ...menuStyle,
-        background: "#fff",
+        background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
         borderRadius: 12,
         boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
@@ -126,7 +126,7 @@ function DayPopover({
         padding: "10px 14px",
         borderBottom: "1px solid var(--color-border-light)",
       }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
         </span>
       </div>
@@ -134,18 +134,18 @@ function DayPopover({
       {/* Employee breakdown */}
       <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}>
         {focusAreaSections.length === 0 ? (
-          <div style={{ fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", padding: "8px 0" }}>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", textAlign: "center", padding: "8px 0" }}>
             No shifts scheduled
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {focusAreaSections.map((focusArea) => {
               const workers = byFocusArea.get(focusArea)!;
-              const wc = focusAreaColorMap[focusArea] ?? { bg: "#F1F5F9", text: "#475569" };
+              const wc = focusAreaColorMap[focusArea] ?? { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" };
               return (
                 <div key={focusArea}>
                   <div style={{
-                    fontSize: 11,
+                    fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 700,
                     color: wc.text,
                     background: wc.bg,
@@ -163,7 +163,7 @@ function DayPopover({
                           border: dk ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}` : `1px solid ${borderColor(s.text)}`,
                           borderRadius: 4,
                           padding: dk ? "1px 5px" : "2px 6px",
-                          fontSize: 11,
+                          fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           color: s.text,
                           opacity: dk === 'deleted' ? 0.5 : 1,
@@ -172,7 +172,7 @@ function DayPopover({
                           {shift}
                         </div>
                         <span style={{
-                          fontSize: 11,
+                          fontSize: "var(--dg-fs-footnote)",
                           color: "var(--color-text-secondary)",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -347,7 +347,7 @@ export default function MonthView({
             key={d}
             style={{
               textAlign: "center",
-              fontSize: 11,
+              fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
               letterSpacing: "0.07em",
               color: "var(--color-text-subtle)",
@@ -401,9 +401,9 @@ export default function MonthView({
                 }
               }}
               style={{
-                background: isToday ? "#EFF6FF" : "#fff",
+                background: isToday ? "var(--color-info-bg)" : "var(--color-surface)",
                 border: isOpen
-                  ? "2px solid var(--color-primary, #6366F1)"
+                  ? "2px solid var(--color-primary)"
                   : isToday
                     ? "2px solid var(--color-today-text)"
                     : "1px solid var(--color-border)",
@@ -414,7 +414,7 @@ export default function MonthView({
                   ? "0 0 0 2px rgba(99, 102, 241, 0.15)"
                   : "0 1px 3px rgba(0,0,0,0.04)",
                 cursor: "pointer",
-                transition: "border-color 0.1s, box-shadow 0.1s",
+                transition: "border-color 150ms ease, box-shadow 150ms ease",
               }}
             >
               {/* Date number */}
@@ -432,9 +432,9 @@ export default function MonthView({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 13,
+                    fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
-                    color: isToday ? "#fff" : "var(--color-text-secondary)",
+                    color: isToday ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
                   }}
                 >
                   {date.getDate()}
@@ -446,7 +446,7 @@ export default function MonthView({
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {focusAreaSections.map((focusArea) => {
                     const workers = byFocusArea.get(focusArea)!;
-                    const wc = focusAreaColorMap[focusArea] ?? { bg: "#F1F5F9", text: "#475569" };
+                    const wc = focusAreaColorMap[focusArea] ?? { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" };
                     return (
                       <div
                         key={focusArea}
@@ -459,7 +459,7 @@ export default function MonthView({
                       >
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
                             color: wc.text,
                             whiteSpace: "nowrap",
@@ -471,7 +471,7 @@ export default function MonthView({
                         </span>
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 700,
                             background: wc.bg,
                             color: wc.text,

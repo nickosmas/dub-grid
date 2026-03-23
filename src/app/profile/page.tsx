@@ -22,12 +22,12 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-  gridmaster:  { bg: "#EFF6FF", text: "#2563EB" },
-  super_admin: { bg: "#F0FDF4", text: "#15803D" },
-  admin:       { bg: "#EFF6FF", text: "#3B82F6" },
-  scheduler:   { bg: "#EFF6FF", text: "#3B82F6" },
-  supervisor:  { bg: "#EFF6FF", text: "#3B82F6" },
-  user:        { bg: "var(--color-surface-overlay)", text: "var(--color-text-muted)" },
+  gridmaster:  { bg: "var(--color-info-bg)", text: "var(--color-brand)" },
+  super_admin: { bg: "var(--color-success-bg)", text: "var(--color-success-text)" },
+  admin:       { bg: "var(--color-info-bg)", text: "var(--color-info)" },
+  scheduler:   { bg: "var(--color-info-bg)", text: "var(--color-info)" },
+  supervisor:  { bg: "var(--color-info-bg)", text: "var(--color-info)" },
+  user:        { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" },
 };
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -68,7 +68,7 @@ function ProfilePageContent() {
   const name = [firstName, lastName].filter(Boolean).join(" ") || null;
 
   const initials = name
-    ? name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+    ? name.split(" ").filter(Boolean).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : (user?.email?.[0] ?? "?").toUpperCase();
 
   const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.user;
@@ -85,7 +85,7 @@ function ProfilePageContent() {
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       {/* Minimal top bar */}
       <div style={{
-        background: "#fff",
+        background: "var(--color-surface)",
         borderBottom: "1px solid var(--color-border)",
         padding: "0 24px",
         height: 56,
@@ -98,7 +98,7 @@ function ProfilePageContent() {
         boxShadow: "var(--shadow-raised)",
       }}>
         <button
-          onClick={() => router.back()}
+          onClick={() => window.history.length > 1 ? router.back() : router.push("/schedule")}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -119,7 +119,7 @@ function ProfilePageContent() {
           </svg>
           Back
         </button>
-        <span style={{ color: "var(--color-border)", fontSize: 16, fontWeight: 300, userSelect: "none" }}>|</span>
+        <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-body)", fontWeight: 300, userSelect: "none" }}>|</span>
         <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Profile</span>
       </div>
 
@@ -129,7 +129,7 @@ function ProfilePageContent() {
 
           {/* Avatar + name card */}
           <div style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: 14,
             padding: "28px 28px",
@@ -142,13 +142,13 @@ function ProfilePageContent() {
               width: 60,
               height: 60,
               borderRadius: "50%",
-              background: "var(--color-accent-gradient)",
+              background: "var(--color-brand)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: "var(--dg-fs-card-title)",
               fontWeight: 700,
-              color: "#fff",
+              color: "var(--color-text-inverse)",
               flexShrink: 0,
             }}>
               {isLoading ? "" : initials}
@@ -173,7 +173,7 @@ function ProfilePageContent() {
 
           {/* Details card */}
           <div style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: 14,
             boxShadow: "var(--shadow-raised)",

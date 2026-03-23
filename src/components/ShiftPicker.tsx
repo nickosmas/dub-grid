@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { ShiftCode, FocusArea } from "@/types";
 import { isEmployeeQualified } from "@/lib/schedule-logic";
+import ScrollableTabs from "@/components/ScrollableTabs";
 
 interface ShiftPickerProps {
   shiftCodes: ShiftCode[];
@@ -224,7 +225,7 @@ export default function ShiftPicker({
     fontSize: "var(--dg-fs-badge)",
     fontWeight: 600,
     color: "var(--color-text-faint)",
-    background: "var(--color-surface-overlay)",
+    background: "var(--color-bg-secondary)",
     padding: "1px 6px",
     borderRadius: 10,
   };
@@ -237,46 +238,29 @@ export default function ShiftPicker({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Tabs */}
+      {/* Tabs — stretch to fill when few, horizontal scroll when many */}
       {allPickerAreas.length > 1 && (
-        <div style={{
-          display: "flex",
-          borderBottom: "2px solid var(--color-border)",
-          marginBottom: 0,
-          marginLeft: -24,
-          marginRight: -24,
-          paddingLeft: 24,
-          paddingRight: 24,
-          gap: 0,
-        }}>
-          {allPickerAreas.map((fa) => {
+        <ScrollableTabs className="dg-span-tabs dg-span-tabs--light">
+          {allPickerAreas.map((fa, i) => {
             const isActive = pickerTab === fa.id;
+            const prevActive = i > 0 && pickerTab === allPickerAreas[i - 1].id;
+            const showDivider = i > 0 && !isActive && !prevActive;
             return (
-              <button
-                key={fa.id}
-                onClick={() => setPickerTab(fa.id)}
-                style={{
-                  flex: 1,
-                  padding: "9px 8px",
-                  border: "none",
-                  borderBottom: isActive ? "2.5px solid var(--color-primary)" : "2.5px solid transparent",
-                  background: isActive ? "var(--color-primary-light, rgba(59,130,246,0.08))" : "none",
-                  color: isActive ? "var(--color-primary)" : "var(--color-text-subtle)",
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: isActive ? 700 : 500,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: "color 100ms ease, background 100ms ease",
-                  marginBottom: -2,
-                  whiteSpace: "nowrap",
-                  borderRadius: isActive ? "6px 6px 0 0" : 0,
-                }}
-              >
-                {fa.name}
-              </button>
+              <Fragment key={fa.id}>
+                {i > 0 && (
+                  <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                )}
+                <button
+                  onClick={() => setPickerTab(fa.id)}
+                  className={`dg-span-tab${isActive ? " active" : ""}`}
+                  style={{ flex: "1 0 auto", textAlign: "center", whiteSpace: "nowrap" }}
+                >
+                  {fa.name}
+                </button>
+              </Fragment>
             );
           })}
-        </div>
+        </ScrollableTabs>
       )}
 
       {/* Shifts */}

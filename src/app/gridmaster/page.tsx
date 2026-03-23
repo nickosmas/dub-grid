@@ -54,14 +54,14 @@ function SidebarLink({
         width: "100%",
         padding: "7px 12px",
         background: active
-          ? "var(--color-surface-overlay)"
+          ? "var(--color-bg-secondary)"
           : hovered
             ? "var(--color-border-light)"
             : "transparent",
         border: "none",
-        borderRadius: 7,
+        borderRadius: 8,
         cursor: "pointer",
-        fontSize: 13,
+        fontSize: "var(--dg-fs-label)",
         fontWeight: active ? 600 : 500,
         color: active
           ? "var(--color-text-primary)"
@@ -71,7 +71,7 @@ function SidebarLink({
         opacity: dimmed ? 0.5 : 1,
         textAlign: "left",
         fontFamily: "inherit",
-        transition: "background 120ms ease, color 120ms ease",
+        transition: "background 150ms ease, color 150ms ease",
         position: "relative",
       }}
     >
@@ -91,7 +91,7 @@ function SidebarLink({
       {badge !== undefined && (
         <span
           style={{
-            fontSize: 11,
+            fontSize: "var(--dg-fs-footnote)",
             fontWeight: 600,
             color: "var(--color-text-subtle)",
             flexShrink: 0,
@@ -180,11 +180,11 @@ function OrgSearchCombobox({
         {selectedOrg && (
           <span
             style={{
-              fontSize: 12,
+              fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              background: "var(--color-surface-overlay)",
+              background: "var(--color-bg-secondary)",
               border: "1px solid var(--color-border)",
-              borderRadius: 6,
+              borderRadius: 8,
               padding: "3px 10px",
               color: "var(--color-text-primary)",
               whiteSpace: "nowrap",
@@ -204,7 +204,7 @@ function OrgSearchCombobox({
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); } }}
           className="dg-input"
-          style={{ width: "100%", maxWidth: 280, fontSize: 13 }}
+          style={{ width: "100%", maxWidth: 280, fontSize: "var(--dg-fs-label)" }}
         />
       </div>
 
@@ -215,7 +215,7 @@ function OrgSearchCombobox({
             top: "calc(100% + 6px)",
             left: 0,
             width: 380,
-            background: "#fff",
+            background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: 10,
             boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
@@ -226,7 +226,7 @@ function OrgSearchCombobox({
         >
           <div style={{
             padding: "8px 14px",
-            fontSize: 11,
+            fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
             color: "var(--color-text-subtle)",
             textTransform: "uppercase",
@@ -237,7 +237,7 @@ function OrgSearchCombobox({
           </div>
           <div style={{ maxHeight: 400, overflowY: "auto" }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: "20px 14px", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
+              <div style={{ padding: "20px 14px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", textAlign: "center" }}>
                 No matching organizations
               </div>
             ) : (
@@ -254,35 +254,35 @@ function OrgSearchCombobox({
                       alignItems: "center",
                       width: "100%",
                       padding: "8px 14px",
-                      background: isActive ? "var(--color-surface-overlay)" : "transparent",
+                      background: isActive ? "var(--color-bg-secondary)" : "transparent",
                       border: "none",
                       borderBottom: "1px solid var(--color-border-light)",
                       cursor: "pointer",
                       fontFamily: "inherit",
                       textAlign: "left",
                       opacity: isArchived ? 0.5 : 1,
-                      transition: "background 80ms ease",
+                      transition: "background 150ms ease",
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-surface-overlay)"; }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-secondary)"; }}
                     onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {c.name}
                       </div>
                       {c.slug && (
-                        <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace", marginTop: 1 }}>
+                        <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace", marginTop: 1 }}>
                           {c.slug}
                         </div>
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 10 }}>
                       {isArchived && (
-                        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-surface-overlay)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>
+                        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-bg-secondary)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>
                           Archived
                         </span>
                       )}
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-surface-overlay)", padding: "1px 8px", borderRadius: 4 }}>
+                      <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-bg-secondary)", padding: "1px 8px", borderRadius: 4 }}>
                         {empCount}
                       </span>
                     </div>
@@ -352,7 +352,7 @@ export default function GridmasterPage() {
   if (permLoading || (isGridmaster && loading)) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center" }}>
-        <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>Loading…</span>
+        <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>Loading…</span>
       </div>
     );
   }
@@ -405,7 +405,7 @@ export default function GridmasterPage() {
       <header
         style={{
           height: 56,
-          background: "#fff",
+          background: "var(--color-surface)",
           borderBottom: "1px solid var(--color-border)",
           display: "flex",
           alignItems: "center",
@@ -416,7 +416,7 @@ export default function GridmasterPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexShrink: 0 }}>
           <DubGridLogo size={28} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <span style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" }}>
             Gridmaster
           </span>
           {!isMobile && (
@@ -426,7 +426,7 @@ export default function GridmasterPage() {
                 fontWeight: 600,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
-                color: "#fff",
+                color: "var(--color-text-inverse)",
                 background: "var(--color-text-primary)",
                 padding: "2px 8px",
                 borderRadius: 4,
@@ -448,7 +448,7 @@ export default function GridmasterPage() {
           <button
             onClick={signOutLocal}
             className="dg-btn dg-btn-ghost"
-            style={{ fontSize: 13 }}
+            style={{ fontSize: "var(--dg-fs-label)" }}
           >
             Sign out
           </button>
@@ -494,7 +494,7 @@ export default function GridmasterPage() {
             style={{
               width: 220,
               flexShrink: 0,
-              background: "#fff",
+              background: "var(--color-surface)",
               borderRight: "1px solid var(--color-border)",
               display: "flex",
               flexDirection: "column",
@@ -514,7 +514,7 @@ export default function GridmasterPage() {
               <div
                 style={{
                   padding: "8px 12px 4px",
-                  fontSize: 11,
+                  fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
                   color: "var(--color-text-subtle)",
                   textTransform: "uppercase",
@@ -548,7 +548,7 @@ export default function GridmasterPage() {
               <div
                 style={{
                   padding: "8px 12px 4px",
-                  fontSize: 11,
+                  fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
                   color: "var(--color-text-subtle)",
                   textTransform: "uppercase",
@@ -570,7 +570,7 @@ export default function GridmasterPage() {
               <div
                 style={{
                   padding: "8px 12px 4px",
-                  fontSize: 11,
+                  fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
                   color: "var(--color-text-subtle)",
                   textTransform: "uppercase",
@@ -598,7 +598,7 @@ export default function GridmasterPage() {
                 background: "var(--color-danger-bg)",
                 color: "var(--color-danger)",
                 borderRadius: 10,
-                fontSize: 13,
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: 20,
               }}
@@ -649,10 +649,10 @@ export default function GridmasterPage() {
                   border: "none",
                   cursor: "pointer",
                   fontFamily: "inherit",
-                  fontSize: 13,
+                  fontSize: "var(--dg-fs-label)",
                   color: "var(--color-text-muted)",
                   padding: "0 0 12px",
-                  transition: "color 100ms ease",
+                  transition: "color 150ms ease",
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}

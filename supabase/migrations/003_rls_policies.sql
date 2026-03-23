@@ -297,16 +297,16 @@ CREATE POLICY "members_select_notes"
 
 CREATE POLICY "admin_insert_notes"
   ON public.schedule_notes FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canEditNotes'));
 
 CREATE POLICY "admin_update_notes"
   ON public.schedule_notes FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canEditNotes'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_notes"
   ON public.schedule_notes FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canEditNotes'));
 
 
 -- ── schedule_draft_sessions ───────────────────────────────────────────────────
@@ -388,7 +388,7 @@ CREATE POLICY "members_select_shifts"
 CREATE POLICY "admin_insert_shifts"
   ON public.shifts FOR INSERT TO authenticated
   WITH CHECK (
-    public.caller_org_role() IN ('admin', 'super_admin')
+    public.check_admin_permission('canEditShifts')
     AND EXISTS (
       SELECT 1 FROM public.employees e
       WHERE e.id = emp_id
@@ -401,7 +401,7 @@ CREATE POLICY "admin_insert_shifts"
 CREATE POLICY "admin_update_shifts"
   ON public.shifts FOR UPDATE TO authenticated
   USING (
-    public.caller_org_role() IN ('admin', 'super_admin')
+    public.check_admin_permission('canEditShifts')
     AND EXISTS (
       SELECT 1 FROM public.employees e
       WHERE e.id = shifts.emp_id
@@ -409,12 +409,19 @@ CREATE POLICY "admin_update_shifts"
         AND e.status IN ('active', 'benched')
         AND e.archived_at IS NULL
     )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.employees e
+      WHERE e.id = emp_id
+        AND e.org_id = public.caller_org_id()
+    )
   );
 
 CREATE POLICY "admin_delete_shifts"
   ON public.shifts FOR DELETE TO authenticated
   USING (
-    public.caller_org_role() IN ('admin', 'super_admin')
+    public.check_admin_permission('canEditShifts')
     AND EXISTS (
       SELECT 1 FROM public.employees e
       WHERE e.id = shifts.emp_id AND e.org_id = public.caller_org_id()
@@ -428,56 +435,64 @@ CREATE POLICY "admin_delete_shifts"
 
 -- ── recurring_shifts ────────────────────────────────────────────────────────────
 
+CREATE POLICY "gridmaster_all_recurring_shifts"
+  ON public.recurring_shifts FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
 CREATE POLICY "recurring_shifts_select"
   ON public.recurring_shifts FOR SELECT TO authenticated
-  USING (public.is_gridmaster() OR org_id = public.caller_org_id());
+  USING (org_id = public.caller_org_id());
 
 CREATE POLICY "recurring_shifts_insert"
   ON public.recurring_shifts FOR INSERT TO authenticated
   WITH CHECK (
-    public.is_gridmaster()
-    OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageRecurringShifts')
   );
 
 CREATE POLICY "recurring_shifts_update"
   ON public.recurring_shifts FOR UPDATE TO authenticated
   USING (
-    public.is_gridmaster()
-    OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageRecurringShifts')
   );
 
 CREATE POLICY "recurring_shifts_delete"
   ON public.recurring_shifts FOR DELETE TO authenticated
   USING (
-    public.is_gridmaster()
-    OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageRecurringShifts')
   );
 
 -- ── shift_series ──────────────────────────────────────────────────────────────
 
+CREATE POLICY "gridmaster_all_shift_series"
+  ON public.shift_series FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
 CREATE POLICY "shift_series_select"
   ON public.shift_series FOR SELECT TO authenticated
-  USING (public.is_gridmaster() OR org_id = public.caller_org_id());
+  USING (org_id = public.caller_org_id());
 
 CREATE POLICY "shift_series_insert"
   ON public.shift_series FOR INSERT TO authenticated
   WITH CHECK (
-    public.is_gridmaster()
-    OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageShiftSeries')
   );
 
 CREATE POLICY "shift_series_update"
   ON public.shift_series FOR UPDATE TO authenticated
   USING (
-    public.is_gridmaster()
-    OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageShiftSeries')
   );
 
 CREATE POLICY "shift_series_delete"
   ON public.shift_series FOR DELETE TO authenticated
   USING (
-    public.is_gridmaster()
-    OR (org_id = public.caller_org_id() AND public.caller_org_role()::TEXT IN ('admin', 'super_admin'))
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageShiftSeries')
   );
 
 

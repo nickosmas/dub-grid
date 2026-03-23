@@ -220,11 +220,11 @@ describe("EditEmployeePanel", () => {
   // Cancel
   // -------------------------------------------------------------------------
   describe("Cancel", () => {
-    it("clicking Cancel calls onCancel when no changes made", async () => {
+    it("clicking Close calls onCancel when no changes made", async () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
       renderPanel({ onCancel });
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Close" }));
       expect(onCancel).toHaveBeenCalledOnce();
     });
   });

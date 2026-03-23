@@ -4,8 +4,8 @@
  */
 
 export const COLORS = {
-  light: "#1B3A2D",
-  dark: "#e8f0eb",
+  light: "#0357CA",
+  dark: "#F1F5F9",
 } as const;
 
 export type LogoTheme = keyof typeof COLORS;

@@ -10,8 +10,50 @@ import { supabase } from "@/lib/supabase";
 import MobileNavSheet from "@/components/MobileNavSheet";
 
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
-  { id: "schedule", href: "/schedule", label: "Schedule" },
-  { id: "staff", href: "/staff", label: "Staff" },
+  {
+    id: "schedule",
+    href: "/schedule",
+    label: "Schedule",
+    icon: (
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    ),
+  },
+  {
+    id: "staff",
+    href: "/staff",
+    label: "Staff",
+    icon: (
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
   {
     id: "settings",
     href: "/settings",
@@ -80,7 +122,7 @@ function HamburgerIcon({ open }: { open: boolean }) {
       stroke="var(--color-text-primary)"
       strokeWidth="1.8"
       strokeLinecap="round"
-      style={{ transition: "transform 200ms ease" }}
+      style={{ transition: "transform 150ms ease" }}
     >
       {open ? (
         <>
@@ -186,7 +228,7 @@ export default function Header({ orgName }: HeaderProps) {
       <>
         <div
           style={{
-            background: "#fff",
+            background: "var(--color-surface)",
             padding: "0 12px",
             display: "flex",
             alignItems: "center",
@@ -200,13 +242,13 @@ export default function Header({ orgName }: HeaderProps) {
             <DubGridLogo size={26} />
             {orgName && (
               <>
-                <span style={{ color: "var(--color-border)", fontSize: 16, fontWeight: 300, userSelect: "none", flexShrink: 0 }}>
+                <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-body)", fontWeight: 300, userSelect: "none", flexShrink: 0 }}>
                   |
                 </span>
                 <span
                   style={{
                     color: "var(--color-text-muted)",
-                    fontSize: 13,
+                    fontSize: "var(--dg-fs-label)",
                     fontWeight: 500,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -266,7 +308,7 @@ export default function Header({ orgName }: HeaderProps) {
   return (
     <div
       style={{
-        background: "#fff",
+        background: "var(--color-surface)",
         padding: isTablet ? "0 16px" : "0 24px",
         display: "flex",
         alignItems: "center",
@@ -281,13 +323,13 @@ export default function Header({ orgName }: HeaderProps) {
         <DubGridWordmark fontSize={18} color="var(--color-text-primary)" />
         {orgName && (
           <>
-            <span style={{ color: "var(--color-border)", fontSize: 18, fontWeight: 300, userSelect: "none" }}>
+            <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-title)", fontWeight: 300, userSelect: "none" }}>
               |
             </span>
             <span
               style={{
                 color: "var(--color-text-muted)",
-                fontSize: 13,
+                fontSize: "var(--dg-fs-label)",
                 fontWeight: 500,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -338,7 +380,7 @@ export default function Header({ orgName }: HeaderProps) {
               color: "var(--color-link)",
               borderRadius: 8,
               padding: "5px 14px",
-              fontSize: 13,
+              fontSize: "var(--dg-fs-label)",
               cursor: "pointer",
               fontWeight: 600,
               marginLeft: 8,
@@ -347,7 +389,7 @@ export default function Header({ orgName }: HeaderProps) {
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "var(--color-info-bg)";
-              e.currentTarget.style.borderColor = "#BFDBFE";
+              e.currentTarget.style.borderColor = "var(--color-info-border)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
@@ -372,7 +414,7 @@ export default function Header({ orgName }: HeaderProps) {
             display: "inline-flex",
             alignItems: "center",
             gap: 8,
-            background: menuOpen ? "var(--color-surface-overlay)" : "transparent",
+            background: menuOpen ? "var(--color-bg-secondary)" : "transparent",
             border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
             borderRadius: 8,
             padding: "4px 8px 4px 4px",
@@ -382,7 +424,7 @@ export default function Header({ orgName }: HeaderProps) {
           }}
           onMouseEnter={(e) => {
             if (!menuOpen) {
-              e.currentTarget.style.background = "var(--color-surface-overlay)";
+              e.currentTarget.style.background = "var(--color-bg-secondary)";
               e.currentTarget.style.borderColor = "var(--color-border)";
             }
           }}
@@ -397,13 +439,13 @@ export default function Header({ orgName }: HeaderProps) {
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: "var(--color-accent-gradient)",
+            background: "var(--color-brand)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
-            color: "#fff",
+            color: "var(--color-text-inverse)",
             flexShrink: 0,
           }}>
             {initials}
@@ -422,36 +464,18 @@ export default function Header({ orgName }: HeaderProps) {
         </button>
 
         {menuOpen && (
-          <div style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            boxShadow: "var(--shadow-float)",
-            minWidth: 160,
-            zIndex: 200,
-            overflow: "hidden",
-          }}>
+          <div
+            className="dg-menu"
+            style={{
+              position: "absolute",
+              top: "calc(100% + 6px)",
+              right: 0,
+              zIndex: 200,
+            }}
+          >
             <button
+              className="dg-menu-item"
               onClick={() => { setMenuOpen(false); router.push("/profile"); }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "9px 14px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 13,
-                color: "var(--color-text-primary)",
-                fontFamily: "inherit",
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-surface-overlay)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -459,25 +483,10 @@ export default function Header({ orgName }: HeaderProps) {
               </svg>
               Profile
             </button>
-            <div style={{ height: 1, background: "var(--color-border)" }} />
+            <div className="dg-menu-divider" />
             <button
+              className="dg-menu-item dg-menu-item--danger"
               onClick={() => { setMenuOpen(false); handleSignOut(); }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "9px 14px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 13,
-                color: "var(--color-danger)",
-                fontFamily: "inherit",
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

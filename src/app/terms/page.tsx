@@ -10,9 +10,9 @@ export default function TermsOfServicePage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#fff",
+        background: "var(--color-surface)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        color: "#111827",
+        color: "var(--color-text-primary)",
         padding: "48px 24px 80px",
       }}
     >
@@ -22,7 +22,7 @@ export default function TermsOfServicePage() {
           style={{
             display: "inline-block",
             marginBottom: "32px",
-            color: "#6B7280",
+            color: "var(--color-text-subtle)",
             fontSize: "var(--dg-fs-body-sm)",
             textDecoration: "none",
           }}
@@ -39,7 +39,7 @@ export default function TermsOfServicePage() {
         >
           Terms of Service
         </h1>
-        <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "#6B7280", marginBottom: "40px" }}>
+        <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-subtle)", marginBottom: "40px" }}>
           Last updated: March 2026
         </p>
 
@@ -49,12 +49,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             1. Acceptance of Terms
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             By accessing or using DubGrid (&ldquo;the Service&rdquo;), you
             agree to be bound by these Terms of Service (&ldquo;Terms&rdquo;).
             If you are using the Service on behalf of an organization, you
@@ -70,12 +70,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             2. Description of the Service
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             DubGrid is a multi-tenant web application for staff scheduling in
             care facilities. The Service allows organizations to manage
             employee rosters, create and edit shift schedules (including
@@ -98,12 +98,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             3. Accounts and Access
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151", marginBottom: "16px" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginBottom: "16px" }}>
             You must create an account (or accept an organization invitation)
             to use the Service. You are responsible for maintaining the
             confidentiality of your login credentials and for all activity
@@ -123,12 +123,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             4. Acceptable Use
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151", marginBottom: "16px" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginBottom: "16px" }}>
             You agree to use the Service only for lawful purposes and in
             accordance with these Terms. You must not:
           </p>
@@ -136,7 +136,7 @@ export default function TermsOfServicePage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "#374151",
+              color: "var(--color-text-secondary)",
               paddingLeft: "24px",
             }}
           >
@@ -180,12 +180,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             5. Roles and Responsibilities
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             Organization administrators and schedulers are responsible for
             managing their organization&apos;s roster, schedules, focus areas,
             shift types, and user invitations. Supervisors may have limited
@@ -206,12 +206,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             6. Intellectual Property
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             The Service, including its software, design, text, graphics, and
             layout (excluding content you or your organization submit), is
             owned by DubGrid or its licensors and is protected by
@@ -231,12 +231,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             7. Disclaimer of Warranties
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS
             AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
             IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF
@@ -255,12 +255,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             8. Limitation of Liability
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             TO THE MAXIMUM EXTENT PERMITTED BY LAW, DUBGRID AND ITS
             AFFILIATES, OFFICERS, EMPLOYEES, AND AGENTS SHALL NOT BE LIABLE
             FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE
@@ -281,12 +281,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             9. Termination
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             We may suspend or terminate your access to the Service, or your
             organization&apos;s access, for violation of these Terms, for
             non-payment (if applicable), or for any other reason we deem
@@ -305,12 +305,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             10. Changes to the Service and Terms
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             We may modify the Service or these Terms from time to time. We
             will post updated Terms on this page and update the &ldquo;Last
             updated&rdquo; date. Material changes may be communicated via the
@@ -327,12 +327,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             11. Governing Law and Disputes
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             These Terms are governed by the laws of the jurisdiction in which
             DubGrid operates, without regard to conflict of law principles.
             Any dispute arising out of or relating to these Terms or the
@@ -348,12 +348,12 @@ export default function TermsOfServicePage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "#1F2937",
+              color: "var(--color-text-secondary)",
             }}
           >
             12. Contact
           </h2>
-          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "#374151" }}>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             For questions about these Terms of Service, please contact us at
             the email or address provided on the DubGrid website or in your
             organization&apos;s account materials.

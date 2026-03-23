@@ -139,7 +139,7 @@ function PrintSection({
         style={{
           fontSize: "1.3em",
           fontWeight: 700,
-          color: "#1E293B",
+          color: "#1A2640",
           marginBottom: "0.5em",
           paddingLeft: "0.3em",
           breakAfter: "avoid",
@@ -151,15 +151,15 @@ function PrintSection({
       <div
         style={{
           background: "#fff",
-          border: "1px solid #CBD5E1",
+          border: "1px solid #9EB4D4",
           borderRadius: 12,
           overflow: "hidden",
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
         {/* Header row */}
-        <div style={{ ...rowStyle, borderBottom: "2px solid #0F172A" }}>
-          <div style={{ padding: "0.5em 0.8em", fontWeight: 700, fontSize: "0.85em", color:"#64748B", letterSpacing: "0.08em", borderRight: "1px solid #E2E8F0", background: "#F8FAFC" }}>
+        <div style={{ ...rowStyle, borderBottom: "2px solid #0F1724" }}>
+          <div style={{ padding: "0.5em 0.8em", fontWeight: 700, fontSize: "0.85em", color:"#4D6080", letterSpacing: "0.08em", borderRight: "1px solid #C8D6EC", background: "#F5F7FA" }}>
             STAFF NAME
           </div>
           {dates.map((date, i) => {
@@ -170,13 +170,13 @@ function PrintSection({
                 style={{
                   textAlign: "center",
                   padding: "0.4em 0",
-                  borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #E2E8F0",
+                  borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
                 }}
               >
                 <div style={{ fontSize: "0.8em", fontWeight: 600, color:"#94A3B8", letterSpacing: "0.05em" }}>
                   {DAY_LABELS[date.getDay()]}
                 </div>
-                <div style={{ fontSize: "1.2em", fontWeight: 700, color: "#1E293B", lineHeight: 1.2, marginTop: "0.05em" }}>
+                <div style={{ fontSize: "1.2em", fontWeight: 700, color: "#1A2640", lineHeight: 1.2, marginTop: "0.05em" }}>
                   {date.getDate()}
                 </div>
               </div>
@@ -210,8 +210,8 @@ function PrintSection({
                   gap: "0.4em",
                   minWidth: 0,
                   height: cellH,
-                  borderTop: ri > 0 ? "1px solid #E2E8F0" : undefined,
-                  borderRight: "1px solid #E2E8F0",
+                  borderTop: ri > 0 ? "1px solid #C8D6EC" : undefined,
+                  borderRight: "1px solid #C8D6EC",
                 }}
               >
                 <div style={{ minWidth: 0 }}>
@@ -219,7 +219,7 @@ function PrintSection({
                     <span
                       style={{
                         fontWeight: 600,
-                        color: "#1E293B",
+                        color: "#1A2640",
                         whiteSpace: "normal",
                         overflowWrap: "break-word",
                         lineHeight: 1.05,
@@ -232,7 +232,7 @@ function PrintSection({
                     </span>
                   </div>
                   {emp.roleIds.length > 0 && (
-                    <div style={{ fontSize: "0.8em", color:"#64748B", marginTop: "0.1em", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: "0.8em", color:"#4D6080", marginTop: "0.1em", whiteSpace: "nowrap" }}>
                       {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
                     </div>
                   )}
@@ -272,9 +272,9 @@ function PrintSection({
                       alignItems: "center",
                       justifyContent: "center",
                       position: "relative",
-                      borderTop: ri > 0 && !isSplit ? "1px solid #E2E8F0" : undefined,
-                      boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #E2E8F0" : undefined,
-                      borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #E2E8F0",
+                      borderTop: ri > 0 && !isSplit ? "1px solid #C8D6EC" : undefined,
+                      boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #C8D6EC" : undefined,
+                      borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
                     }}
                   >
                     {shiftCode && shiftCode !== "OFF" ? (
@@ -432,7 +432,7 @@ function PrintSection({
                         style={{
                           width: "1.2em",
                           height: "0.18em",
-                          background: shiftCode === "OFF" ? "#CBD5E1" : "#E2E8F0",
+                          background: shiftCode === "OFF" ? "#9EB4D4" : "#C8D6EC",
                           borderRadius: 2,
                         }}
                       />
@@ -485,7 +485,7 @@ function TallyRow({
         display: "grid",
         gridTemplateColumns: gridTemplate,
         background: bgColor,
-        borderTop: isFirst ? "2px solid #0F172A" : undefined,
+        borderTop: isFirst ? "2px solid #0F1724" : undefined,
       }}
     >
       <div
@@ -493,13 +493,13 @@ function TallyRow({
           padding: "0.3em 0.8em",
           fontSize: "0.8em",
           fontWeight: 700,
-          color: "#1E293B",
+          color: "#1A2640",
           letterSpacing: "0.04em",
           display: "flex",
           alignItems: "center",
           height,
-          borderRight: "1px solid #CBD5E1",
-          borderTop: !isFirst ? "1px solid #CBD5E1" : undefined,
+          borderRight: "1px solid #9EB4D4",
+          borderTop: !isFirst ? "1px solid #9EB4D4" : undefined,
         }}
       >
         {label}
@@ -513,11 +513,11 @@ function TallyRow({
             style={{
               textAlign: "center",
               padding: "0.2em 0.2em",
-              borderLeft: isSplit ? "2px solid #0F172A" : "1px solid #CBD5E1",
-              borderTop: !isFirst ? "1px solid #CBD5E1" : undefined,
+              borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #9EB4D4",
+              borderTop: !isFirst ? "1px solid #9EB4D4" : undefined,
               fontSize: "0.8em",
               fontWeight: 700,
-              color: entries.length > 0 ? "#1E293B" : "#94A3B8",
+              color: entries.length > 0 ? "#1A2640" : "#94A3B8",
               display: "flex",
               flexDirection: "row",
               alignItems: "center",
@@ -683,8 +683,8 @@ export default function PrintScheduleView({
           alignItems: "center",
           gap: 12,
           padding: "12px 20px",
-          borderBottom: "1px solid #E2E8F0",
-          background: "#F8FAFC",
+          borderBottom: "1px solid #C8D6EC",
+          background: "#F5F7FA",
           flexShrink: 0,
         }}
       >
@@ -697,19 +697,19 @@ export default function PrintScheduleView({
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, lineHeight: 1 }}>
-            <DubGridLogo size={32} color="#0F172A" />
-            <DubGridWordmark fontSize={20} color="#0F172A" />
+            <DubGridLogo size={32} color="#0F1724" />
+            <DubGridWordmark fontSize={20} color="#0F1724" />
           </div>
           {orgName && (
             <>
-              <span style={{ color:"#94A3B8", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", lineHeight: 1 }}>
+              <span style={{ color:"#94A3B8", fontSize: "var(--dg-fs-heading)", fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+              <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "#0F1724", lineHeight: 1 }}>
                 {orgName}
               </span>
             </>
           )}
-          <span style={{ color:"#94A3B8", fontSize: 20, fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color:"#475569", lineHeight: 1 }}>
+          <span style={{ color:"#94A3B8", fontSize: "var(--dg-fs-heading)", fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+          <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color:"#334766", lineHeight: 1 }}>
             {dateRangeLabel}
           </span>
         </div>
@@ -723,8 +723,8 @@ export default function PrintScheduleView({
         >
           <span
             style={{
-              fontSize: 12,
-              color:"#64748B",
+              fontSize: "var(--dg-fs-caption)",
+              color:"#4D6080",
             }}
           >
             {fontSize <= 7 ? "Small" : fontSize >= 9 ? "Large" : "Medium"} · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} · {selectedWings.length === focusAreas.length ? `All ${focusAreaLabel.toLowerCase()}` : selectedWings.join(", ")}
@@ -760,7 +760,7 @@ export default function PrintScheduleView({
           flex: 1,
           overflow: "auto",
           padding: "24px",
-          background: "#CBD5E1",
+          background: "#9EB4D4",
         }}
       >
         {/* Paper simulation on screen */}
@@ -785,15 +785,15 @@ export default function PrintScheduleView({
               justifyContent: "space-between",
               marginBottom: "1.2em",
               paddingBottom: "0.6em",
-              borderBottom: "2px solid #0F172A",
+              borderBottom: "2px solid #0F1724",
             }}
           >
             <div>
               {/* Logo + Wordmark + Org Name in one line */}
               <div style={{ display: "flex", alignItems: "center", gap: "0.6em", marginBottom: "0.7em" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5em", lineHeight: 1 }}>
-                  <DubGridLogo size={24} color="#0F172A" />
-                  <DubGridWordmark fontSize={16} color="#0F172A" />
+                  <DubGridLogo size={24} color="#0F1724" />
+                  <DubGridWordmark fontSize={16} color="#0F1724" />
                 </div>
                 
                 {orgName && (
@@ -803,7 +803,7 @@ export default function PrintScheduleView({
                       style={{
                         fontSize: "1.4em",
                         fontWeight: 800,
-                        color: "#0F172A",
+                        color: "#0F1724",
                         lineHeight: 1,
                       }}
                     >
@@ -817,7 +817,7 @@ export default function PrintScheduleView({
                 style={{
                   fontSize: "1.1em",
                   fontWeight: 600,
-                  color:"#475569",
+                  color:"#334766",
                 }}
               >
                 Schedule — {dateRangeLabel}
@@ -826,7 +826,7 @@ export default function PrintScheduleView({
             <div
               style={{
                 fontSize: "0.9em",
-                color:"#64748B",
+                color:"#4D6080",
                 textAlign: "right",
               }}
             >
@@ -878,14 +878,14 @@ export default function PrintScheduleView({
               style={{
                 marginTop: "1.5em",
                 paddingTop: "0.8em",
-                borderTop: "1px solid #E2E8F0",
+                borderTop: "1px solid #C8D6EC",
               }}
             >
               <div
                 style={{
                   fontSize: "1em",
                   fontWeight: 700,
-                  color: "#1E293B",
+                  color: "#1A2640",
                   marginBottom: "0.7em",
                 }}
               >
@@ -919,7 +919,7 @@ export default function PrintScheduleView({
                     >
                       {s.label}
                     </span>
-                    <span style={{ fontSize: "0.9em", color:"#475569" }}>
+                    <span style={{ fontSize: "0.9em", color:"#334766" }}>
                       {s.name}
                     </span>
                   </div>

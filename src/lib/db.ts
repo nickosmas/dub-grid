@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { arraysEqual } from "@/lib/utils";
-import { MAX_SERIES_OCCURRENCES, MS_PER_DAY } from "@/lib/constants";
+import { arraysEqual, formatDateKey, iterateDateRange } from "@/lib/utils";
+import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { parseHost } from "@/lib/subdomain";
 
 import {
@@ -489,6 +489,7 @@ export async function fetchOrganizationUsers(orgId: string): Promise<Organizatio
     platformRole: (row.platform_role as string) as import("@/types").PlatformRole,
     adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
     createdAt: row.created_at as string,
+    lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
   }));
 }
 
@@ -969,13 +970,46 @@ export async function upsertShiftTimes(
 
 export async function deleteShift(empId: string, date: string): Promise<void> {
   // Soft delete: set draft_is_delete so the publish RPC knows to clear it.
+  // Uses update (not upsert) to avoid creating orphaned rows when no shift exists.
   const { error } = await supabase
     .from("shifts")
-    .upsert(
-      { emp_id: empId, date, draft_shift_code_ids: [], draft_is_delete: true },
-      { onConflict: "emp_id,date" },
-    );
+    .update({ draft_shift_code_ids: [], draft_is_delete: true })
+    .eq("emp_id", empId)
+    .eq("date", date);
   if (error) throw error;
+}
+
+/**
+ * Atomically moves a shift from one employee+date to another.
+ * Uses a SECURITY DEFINER RPC with advisory locks to prevent partial failures.
+ */
+export async function moveShift(
+  orgId: string,
+  sourceEmpId: string,
+  sourceDate: string,
+  targetEmpId: string,
+  targetDate: string,
+  shiftCodeIds: number[],
+  expectedVersion?: number,
+): Promise<void> {
+  const { error } = await supabase.rpc("move_shift", {
+    p_org_id: orgId,
+    p_source_emp_id: sourceEmpId,
+    p_source_date: sourceDate,
+    p_target_emp_id: targetEmpId,
+    p_target_date: targetDate,
+    p_shift_code_ids: shiftCodeIds,
+    p_expected_version: expectedVersion ?? null,
+  });
+  if (error) {
+    if (error.message?.includes("Optimistic lock failed")) {
+      throw new OptimisticLockError(
+        `${sourceEmpId}:${sourceDate}`,
+        expectedVersion ?? 0,
+      );
+    }
+    throw error;
+  }
 }
 
 export async function publishSchedule(
@@ -1474,82 +1508,25 @@ export async function deleteRecurringShift(empId: string, dayOfWeek: number): Pr
 
 /**
  * Applies recurring shift templates to a date range as drafts.
- * Only fills slots where no shift currently exists (uses ignoreDuplicates).
- * Returns keys of newly created shifts.
+ * Delegates to the `apply_recurring_schedules` SECURITY DEFINER RPC which:
+ * - Checks canApplyRecurringSchedule permission
+ * - Uses DST-safe PostgreSQL DATE arithmetic
+ * - Reads fresh recurring_shifts + shifts from DB (no stale client data)
+ * - Picks most recent template per employee via effectiveFrom DESC
+ * - Skips archived shift codes
  */
 export async function applyRecurringSchedules(
   orgId: string,
   startDate: Date,
   endDate: Date,
-  recurringShifts: RecurringShift[],
-  existingShifts: ShiftMap,
 ): Promise<{ empId: string; date: string; label: string; shiftCodeId: number }[]> {
-  // Group recurring shifts by employee
-  const byEmp: Record<string, RecurringShift[]> = {};
-  for (const rs of recurringShifts) {
-    if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
-    byEmp[rs.empId].push(rs);
-  }
-
-  const toInsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; draft_is_delete: boolean; org_id: string; from_recurring: boolean }[] = [];
-  const generated: { empId: string; date: string; label: string; shiftCodeId: number }[] = [];
-
-  const current = new Date(startDate);
-  current.setHours(0, 0, 0, 0);
-  const end = new Date(endDate);
-  end.setHours(0, 0, 0, 0);
-
-  while (current <= end) {
-    const y = current.getFullYear();
-    const m = String(current.getMonth() + 1).padStart(2, '0');
-    const d = String(current.getDate()).padStart(2, '0');
-    const dateKey = `${y}-${m}-${d}`;
-    const dayOfWeek = current.getDay();
-
-    for (const [empId, shifts] of Object.entries(byEmp)) {
-      const mapKey = `${empId}_${dateKey}`;
-      // Skip if a shift already exists for this slot
-      if (existingShifts[mapKey]) continue;
-
-      const effective_from_cmp = new Date(current);
-      // Find the best matching recurring shift for this day-of-week:
-      // 1. Prefer a template whose effectiveFrom <= this date (and not expired)
-      // 2. Fall back to the earliest template for this day-of-week (covers days
-      //    before the template was created, so the full pay period gets filled)
-      const candidates = shifts.filter(rs => rs.dayOfWeek === dayOfWeek);
-      let regular = candidates.find(rs => {
-        const from = new Date(rs.effectiveFrom + 'T00:00:00');
-        const until = rs.effectiveUntil ? new Date(rs.effectiveUntil + 'T00:00:00') : null;
-        return from <= effective_from_cmp && (!until || until >= effective_from_cmp);
-      });
-      if (!regular && candidates.length > 0) {
-        // Fall back to the template with the earliest effectiveFrom
-        regular = candidates.reduce((earliest, rs) =>
-          rs.effectiveFrom < earliest.effectiveFrom ? rs : earliest
-        );
-        // Still respect effectiveUntil — don't apply expired templates
-        if (regular.effectiveUntil && new Date(regular.effectiveUntil + 'T00:00:00') < effective_from_cmp) {
-          regular = undefined;
-        }
-      }
-
-      if (regular) {
-        toInsert.push({ emp_id: empId, date: dateKey, draft_shift_code_ids: [regular.shiftCodeId], draft_is_delete: false, org_id: orgId, from_recurring: true });
-        generated.push({ empId, date: dateKey, label: regular.shiftLabel, shiftCodeId: regular.shiftCodeId });
-      }
-    }
-
-    current.setDate(current.getDate() + 1);
-  }
-
-  if (toInsert.length > 0) {
-    const { error } = await supabase
-      .from("shifts")
-      .upsert(toInsert, { onConflict: "emp_id,date", ignoreDuplicates: true });
-    if (error) throw new Error(error.message);
-  }
-
-  return generated;
+  const { data, error } = await supabase.rpc("apply_recurring_schedules", {
+    p_org_id: orgId,
+    p_start_date: formatDateKey(startDate),
+    p_end_date: formatDateKey(endDate),
+  });
+  if (error) throw new Error(error.message);
+  return (data?.shifts ?? []) as { empId: string; date: string; label: string; shiftCodeId: number }[];
 }
 
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
@@ -1665,37 +1642,34 @@ function generateSeriesDates(
 ): string[] {
   const dates: string[] = [];
   const start = new Date(startDate + 'T00:00:00');
-  const end = endDate ? new Date(endDate + 'T00:00:00') : null;
   const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
 
-  const current = new Date(start);
+  // Compute an upper-bound end date for iteration if none specified
+  const maxEnd = endDate
+    ? new Date(endDate + 'T00:00:00')
+    : new Date(start.getFullYear(), start.getMonth() + 7, start.getDate()); // ~7 months
+  const startDayOfWeek = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())).getUTCDay();
 
-  while (dates.length < cap) {
-    const y = current.getFullYear();
-    const mo = String(current.getMonth() + 1).padStart(2, '0');
-    const d = String(current.getDate()).padStart(2, '0');
-    const dateKey = `${y}-${mo}-${d}`;
-
-    if (end && current > end) break;
-
-    const dayOfWeek = current.getDay();
+  // DST-safe iteration using UTC arithmetic
+  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
+    if (dates.length >= cap) break;
 
     let include = false;
     const dayMatch = (daysOfWeek === null || daysOfWeek.length === 0)
-      ? dayOfWeek === start.getDay()
+      ? dayOfWeek === startDayOfWeek
       : daysOfWeek.includes(dayOfWeek);
+
     if (frequency === 'daily') {
       include = true;
     } else if (frequency === 'weekly') {
       include = dayMatch;
     } else if (frequency === 'biweekly') {
-      const diffDays = Math.floor((current.getTime() - start.getTime()) / MS_PER_DAY);
-      const weekNum = Math.floor(diffDays / 7);
+      // dayIndex is a reliable day counter (immune to DST)
+      const weekNum = Math.floor(dayIndex / 7);
       include = weekNum % 2 === 0 && dayMatch;
     }
 
     if (include) dates.push(dateKey);
-    current.setDate(current.getDate() + 1);
   }
 
   return dates;

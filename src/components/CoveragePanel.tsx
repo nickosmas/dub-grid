@@ -62,7 +62,7 @@ export default function CoveragePanel({
         right: 0,
         width: panelWidth,
         height: "100vh",
-        background: "#fff",
+        background: "var(--color-surface)",
         boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
         zIndex: 100,
         display: "flex",
@@ -156,14 +156,14 @@ export default function CoveragePanel({
                 width: 48,
                 height: 48,
                 borderRadius: "50%",
-                background: "#F0FDF4",
+                background: "var(--color-success-bg)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 margin: "0 auto 12px",
               }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-success-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
@@ -186,9 +186,9 @@ export default function CoveragePanel({
                     alignItems: "center",
                     gap: 6,
                     padding: "4px 10px",
-                    borderRadius: 6,
-                    background: fa?.colorBg ?? "#F1F5F9",
-                    color: fa?.colorText ?? "#475569",
+                    borderRadius: 8,
+                    background: fa?.colorBg ?? "var(--color-bg-secondary)",
+                    color: fa?.colorText ?? "var(--color-text-muted)",
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 700,
                     marginBottom: 8,
@@ -221,7 +221,7 @@ export default function CoveragePanel({
                           {formatDate(gap.date)}
                         </span>
                       </div>
-                      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "#DC2626", marginTop: 4 }}>
+                      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-danger-dark)", marginTop: 4 }}>
                         {gap.status.actual}/{gap.status.required} staff
                       </div>
                     </div>

@@ -86,11 +86,11 @@ export async function POST(req: NextRequest) {
   const acceptUrl = `${siteUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 
   const inviterLine = inviterName
-    ? `<p style="color:#475569;font-size:16px;line-height:1.6;margin:0 0 24px;">
+    ? `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
         <strong>${escapeHtml(inviterName)}</strong> has invited you to join
         <strong>${escapeHtml(orgName)}</strong> on DubGrid.
       </p>`
-    : `<p style="color:#475569;font-size:16px;line-height:1.6;margin:0 0 24px;">
+    : `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
         You've been invited to join <strong>${escapeHtml(orgName)}</strong> on DubGrid.
       </p>`;
 
@@ -98,25 +98,25 @@ export async function POST(req: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#F8FAFC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<body style="margin:0;padding:0;background:#F7F8F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:560px;margin:40px auto;padding:0 20px;">
     <!-- Header -->
-    <div style="background:linear-gradient(135deg,#1B3A2D 0%,#2D5A47 100%);border-radius:16px 16px 0 0;padding:32px;text-align:center;">
+    <div style="background:#0357CA;border-radius:16px 16px 0 0;padding:32px;text-align:center;">
       <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.02em;">DubGrid</h1>
     </div>
     <!-- Body -->
     <div style="background:#fff;padding:40px 32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
-      <h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">
+      <h2 style="color:#111410;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">
         You're Invited
       </h2>
       ${inviterLine}
-      <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 32px;">
+      <p style="color:#3E433B;font-size:15px;line-height:1.6;margin:0 0 32px;">
         Click the button below to set your password and accept your invitation.
       </p>
       <!-- CTA -->
       <div style="text-align:center;margin:0 0 32px;">
         <a href="${acceptUrl}"
-           style="display:inline-block;padding:14px 40px;background:#1B3A2D;color:#fff;text-decoration:none;border-radius:12px;font-size:16px;font-weight:700;box-shadow:0 4px 12px rgba(27,58,45,0.15);">
+           style="display:inline-block;padding:14px 40px;background:#0357CA;color:#fff;text-decoration:none;border-radius:12px;font-size:16px;font-weight:700;box-shadow:0 4px 12px rgba(3,87,202,0.2);">
           Accept Invitation
         </a>
       </div>
@@ -124,11 +124,11 @@ export async function POST(req: NextRequest) {
       <p style="color:#94A3B8;font-size:13px;line-height:1.6;margin:0 0 8px;">
         If the button doesn't work, copy and paste this link into your browser:
       </p>
-      <p style="color:#64748B;font-size:13px;line-height:1.6;margin:0 0 24px;word-break:break-all;">
+      <p style="color:#5A5F57;font-size:13px;line-height:1.6;margin:0 0 24px;word-break:break-all;">
         ${acceptUrl}
       </p>
       <!-- Expiry notice -->
-      <div style="border-top:1px solid #E2E8F0;padding-top:20px;">
+      <div style="border-top:1px solid #D0DBD4;padding-top:20px;">
         <p style="color:#94A3B8;font-size:13px;margin:0;">
           This invitation expires in 72 hours. If you didn't expect this email, you can safely ignore it.
         </p>

@@ -132,7 +132,7 @@ export default function InviteEmployeeModal({
       style={{ maxWidth: 480 }}
     >
       {mode === "loading" ? (
-        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--color-text-muted, #64748B)", fontSize: 14 }}>
+        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--color-text-muted, #4D6080)", fontSize: "var(--dg-fs-body-sm)" }}>
           Checking for existing users...
         </div>
       ) : mode === "link" && matchedUser ? (
@@ -141,15 +141,15 @@ export default function InviteEmployeeModal({
           <div
             style={{
               padding: "16px",
-              background: "#EFF6FF",
+              background: "var(--color-info-bg)",
               borderRadius: 8,
-              border: "1px solid #BFDBFE",
+              border: "1px solid var(--color-info-border)",
             }}
           >
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1E40AF" }}>
+            <p style={{ margin: 0, fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-info-text)" }}>
               Existing user found
             </p>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#1D4ED8" }}>
+            <p style={{ margin: "8px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-info-text)" }}>
               <strong>{userName}</strong> ({matchedUser.email}) is already a member of this
               organization as <strong>{matchedUser.orgRole.replace("_", " ")}</strong>.
               You can link them directly — no invitation needed.
@@ -181,10 +181,10 @@ export default function InviteEmployeeModal({
           <div
             style={{
               padding: "12px 16px",
-              background: "var(--color-bg-hover, #F8FAFC)",
+              background: "var(--color-bg-hover, #F5F7FA)",
               borderRadius: 8,
-              fontSize: 14,
-              color: "var(--color-text-secondary, #475569)",
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--color-text-secondary, #334766)",
             }}
           >
             Sending an invitation to <strong>{getEmployeeDisplayName(employee)}</strong>. They will
@@ -240,11 +240,11 @@ function ErrorBanner({ message }: { message: string }) {
   return (
     <p
       style={{
-        color: "#DC2626",
-        fontSize: 14,
+        color: "var(--color-danger-dark)",
+        fontSize: "var(--dg-fs-body-sm)",
         margin: 0,
         padding: "8px 12px",
-        background: "#FEF2F2",
+        background: "var(--color-danger-bg)",
         borderRadius: 8,
       }}
     >
@@ -255,19 +255,19 @@ function ErrorBanner({ message }: { message: string }) {
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: 13,
+  fontSize: "var(--dg-fs-label)",
   fontWeight: 600,
-  color: "var(--color-text-secondary, #475569)",
+  color: "var(--color-text-secondary, #334766)",
   marginBottom: 6,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: "1px solid var(--color-border, #E2E8F0)",
+  border: "1px solid var(--color-border, #C8D6EC)",
   borderRadius: 8,
-  fontSize: 14,
-  color: "var(--color-text-primary, #0F172A)",
+  fontSize: "var(--dg-fs-body-sm)",
+  color: "var(--color-text-primary, #0F1724)",
   background: "var(--color-bg, #fff)",
   outline: "none",
   boxSizing: "border-box",

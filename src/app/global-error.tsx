@@ -22,18 +22,18 @@ export default function GlobalError({
             padding: 24,
           }}
         >
-          <p style={{ fontSize: 18, color: "#475569" }}>
+          <p style={{ fontSize: "var(--dg-fs-title)", color: "var(--color-text-muted)" }}>
             Something went wrong. Please refresh the page.
           </p>
           <button
             onClick={reset}
             style={{
               padding: "10px 20px",
-              background: "#1B3A2D",
-              color: "#fff",
+              background: "var(--color-brand)",
+              color: "var(--color-text-inverse)",
               border: "none",
               borderRadius: 8,
-              fontSize: 14,
+              fontSize: "var(--dg-fs-body-sm)",
               fontWeight: 600,
               cursor: "pointer",
             }}
