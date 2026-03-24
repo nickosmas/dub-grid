@@ -33,9 +33,9 @@ sequenceDiagram
     SupaAuth->>JWTHook: event { user_id, claims }
     JWTHook->>DB: Check jwt_refresh_locks for active lock
     alt Lock exists (role change in progress)
-        JWTHook-->>SupaAuth: HTTP 403 — "Session locked"
-        SupaAuth-->>LoginPage: Error: session locked
-        LoginPage-->>User: "Please try again in a few seconds"
+        JWTHook-->>SupaAuth: HTTP 403 — "Your session has expired. Please sign in again."
+        SupaAuth-->>LoginPage: Error: session expired
+        LoginPage-->>User: "Your session has expired. Please sign in again."
     else No lock
         JWTHook->>DB: SELECT platform_role, org_role, org_id, org_slug<br/>FROM profiles JOIN organization_memberships JOIN organizations
         DB-->>JWTHook: { platform_role, org_role, org_id, org_slug }
@@ -53,7 +53,6 @@ sequenceDiagram
         SupaAuth-->>LoginPage: List of user's org memberships
         LoginPage->>SupaAuth: RPC switch_org(target_org_id)
         SupaAuth->>DB: UPDATE profiles SET org_id = target_org_id
-        DB->>DB: INSERT jwt_refresh_locks (2s lock)
         LoginPage->>SupaAuth: refreshSession()
         SupaAuth->>JWTHook: Re-issue token with new org context
         JWTHook-->>SupaAuth: Fresh JWT with correct org claims
@@ -411,10 +410,21 @@ erDiagram
         shift_request_status status
         uuid requester_emp_id FK "→ employees"
         date requester_shift_date
+        bigint_arr requester_shift_code_ids "→ shift_codes[]"
+        bigint requester_focus_area_id FK "→ focus_areas"
+        time requester_custom_start_time
+        time requester_custom_end_time
         uuid target_emp_id FK "→ employees (swap)"
         date target_shift_date
+        bigint_arr target_shift_code_ids "→ shift_codes[]"
+        bigint target_focus_area_id FK "→ focus_areas"
+        time target_custom_start_time
+        time target_custom_end_time
         uuid admin_user_id FK "→ auth.users"
+        text admin_note
         timestamptz expires_at "72h default"
+        timestamptz resolved_at
+        uuid idempotency_key UK
     }
 
     invitations {
@@ -470,6 +480,13 @@ erDiagram
         date end_date
     }
 
+    recurring_shifts_draft_sessions {
+        uuid id PK
+        uuid org_id FK,UK "→ organizations (one per org)"
+        uuid saved_by FK "→ auth.users"
+        jsonb draft_data
+    }
+
     publish_history {
         uuid id PK
         uuid org_id FK "→ organizations"
@@ -499,6 +516,7 @@ erDiagram
     organizations ||--o{ invitations : "sends invites"
     organizations ||--o{ shift_requests : "has requests"
     organizations ||--o| schedule_draft_sessions : "has draft"
+    organizations ||--o| recurring_shifts_draft_sessions : "has recurring draft"
     organizations ||--o{ publish_history : "has publishes"
     organizations ||--o| impersonation_sessions : "target org"
 
@@ -566,7 +584,6 @@ flowchart TD
         direction TB
         MEMBERSHIPS["User can belong to<br/>multiple organizations"]
         SWITCH["switch_org(target_org_id)<br/>RPC function"]
-        LOCK["Insert jwt_refresh_lock<br/>(2-second window)"]
         REFRESH["refreshSession()<br/>Get new JWT with<br/>new org context"]
         NEWDOMAIN["Redirect to<br/>new-org.dubgrid.com"]
     end
@@ -595,8 +612,7 @@ flowchart TD
     TABLES --> ZERO
 
     MEMBERSHIPS --> SWITCH
-    SWITCH --> LOCK
-    LOCK --> REFRESH
+    SWITCH --> REFRESH
     REFRESH --> NEWDOMAIN
 
     style Parse fill:#f0fdf4,stroke:#16a34a
@@ -641,7 +657,7 @@ sequenceDiagram
 
     alt Lock is active (within 5s window)
         Hook->>Lock: DELETE expired locks (cleanup)
-        Hook-->>Target: HTTP 403 — "Session locked after role change"
+        Hook-->>Target: HTTP 403 — "Your session has expired. Please sign in again."
         Target->>Target: Auth error → redirect to /login
         Target->>Hook: User re-authenticates (signInWithPassword)
         Hook->>DB: Resolve fresh claims (new role = admin)

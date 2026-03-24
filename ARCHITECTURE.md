@@ -106,7 +106,7 @@ User (0) ───────── org_role = 'user'
 
 ### Admin Permission Model
 
-Instead of fixed role-based capabilities, admins have 17 individually configurable permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins toggle these per user via the AdminPermissionsEditor component.
+Instead of fixed role-based capabilities, admins have 16 individually configurable permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins toggle these per user via the AdminPermissionsEditor component.
 
 This design allows organizations to create specialized admin roles (e.g., "Schedule Manager" who can edit shifts but not manage employees) without requiring new database roles.
 

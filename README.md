@@ -6,13 +6,13 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 
 - **Schedule Grid** — 1-week, 2-week, and month views with drag-and-drop shift management
 - **Multi-Tenant** — Subdomain-based org isolation (e.g., `acme.dubgrid.com`)
-- **RBAC** — Four-tier role hierarchy (Gridmaster > Super Admin > Admin > User) with 17 granular admin permissions
+- **RBAC** — Four-tier role hierarchy (Gridmaster > Super Admin > Admin > User) with 16 granular admin permissions
 - **Draft/Publish Workflow** — All edits are drafts until published; discard or recover across sessions
 - **Recurring Shifts** — Day-of-week templates and repeating series (daily, weekly, biweekly)
 - **Real-Time Collaboration** — Live sync via Supabase Realtime with cell locks and presence indicators
 - **Dashboard Analytics** — KPI cards, coverage charts, shift breakdowns, activity feeds with expandable detail views
 - **Staff Management** — Full employee lifecycle (add, edit, bench, terminate) with certifications, roles, and focus areas
-- **Staff Detail Pages** — Tabbed views per employee: Overview, Schedule, Activity, Reports
+- **Staff Detail Pages** — Tabbed views per employee: Overview, Schedule, Activity
 - **Coverage Tracking** — Define minimum staffing requirements; visualize coverage status per section
 - **Shift Requests** — Pickup and swap request workflow with admin approval
 - **Gridmaster Portal** — Platform-wide org management, user impersonation, audit logs, permission configuration
@@ -92,7 +92,7 @@ src/
 │   ├── schedule/           # Schedule grid
 │   ├── staff/              # Staff roster + staff/[id] detail
 │   ├── settings/           # Organization configuration
-│   ├── gridmaster/         # Platform admin portal
+│   ├── gridmaster/         # Gridmaster portal
 │   ├── login/              # Authentication
 │   ├── accept-invite/      # Invitation acceptance
 │   ├── profile/            # User profile
@@ -152,11 +152,10 @@ Key configuration:
 
 ## Documentation
 
-- [PRD.md](PRD.md) — Product requirements and feature status
-- [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md) — Security architecture and race condition mitigations
-- [ARCHITECTURE.md](ARCHITECTURE.md) — System design and architectural decisions
-- [CLAUDE.md](CLAUDE.md) — Development workflow rules and best practices
-
-## License
-
-See [LICENSE](LICENSE) for details.
+| Document | Description |
+| -------- | ----------- |
+| [PRD.md](PRD.md) | Product requirements, feature specs, and implementation status |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, layered architecture, and technical decisions |
+| [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md) | Four-tier role hierarchy, 16 admin permissions, race condition mitigations |
+| [SYSTEM_FLOWCHARTS.md](SYSTEM_FLOWCHARTS.md) | Mermaid-based diagrams for auth, JWT hook, org validation, and request flows |
+| [CLAUDE.md](CLAUDE.md) | Development workflow rules, React/Next.js/security best practices |

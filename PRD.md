@@ -263,7 +263,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-38 | Staff Detail Overview   | Should   | ✅     | Full employee profile page with personal info, certifications, focus areas, and status.                                |
 | FR-39 | Staff Schedule Tab      | Should   | ✅     | Historical schedule view for an individual employee with date range filtering.                                          |
 | FR-40 | Staff Activity Tab      | Should   | ✅     | Employee activity timeline showing status changes, role changes, and events.                                            |
-| FR-41 | Staff Reports Tab       | Should   | ✅     | Hours reports, shift distribution charts, day-of-week patterns, and focus area distribution.                           |
+| FR-41 | Staff Reports Tab       | Should   | ❌     | Hours reports, shift distribution charts, day-of-week patterns, and focus area distribution. Not yet implemented.      |
 
 ### 7.9 Shift Requests
 
@@ -303,7 +303,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | `profiles`                  | id (FK auth.users), org_id, platform_role (enum), version, role_locked                               |
 | `organization_memberships`  | user_id, org_id, org_role (enum), admin_permissions (JSONB), joined_at                               |
 | `employees`                 | id, org_id, name, status (active/benched/terminated), certifications[], roles[], focus_areas[], phone, email, seniority_rank, user_id (FK auth.users, nullable) |
-| `shifts`                    | id, employee_id, org_id, date, shift_code_ids[], status (draft/published), version (optimistic lock), idempotency_key, custom_start_time, custom_end_time |
+| `shifts`                    | emp_id, date (composite PK), org_id, draft_shift_code_ids[], published_shift_code_ids[], draft_is_delete, version (optimistic lock), series_id, from_recurring, custom_start_time, custom_end_time, focus_area_id |
 | `focus_areas`               | id, org_id, name, color, display_order, break_duration_minutes                                       |
 | `shift_codes`               | id, org_id, code, label, bg_color, text_color, border_color, default_start_time, default_end_time, is_off_day, certification_id, category_id |
 | `shift_categories`          | id, org_id, name, time_window_start, time_window_end, display_order                                 |
@@ -311,7 +311,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | `indicator_types`           | id, org_id, name, color, icon                                                                        |
 | `certifications`            | id, org_id, name, abbreviation                                                                       |
 | `organization_roles`        | id, org_id, name, abbreviation                                                                       |
-| `recurring_shifts`          | id, org_id, employee_id, shift_code_id, days_of_week, focus_area_id                                 |
+| `recurring_shifts`          | id, org_id, emp_id, shift_code_id, day_of_week (0-6), effective_from, effective_until                |
 | `shift_series`              | id, org_id, employee_id, shift_code_id, recurrence (daily/weekly/biweekly), start_date, end_date, max_occurrences |
 | `coverage_requirements`     | id, org_id, focus_area_id, shift_code_id, day_of_week, min_staff                                    |
 | `shift_requests`            | id, org_id, type (pickup/swap), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, shift dates, shift codes |
@@ -362,9 +362,9 @@ Edge middleware (`middleware.ts`) enforces:
 | `/onboarding`            | Authenticated   | New user onboarding                                        |
 | `/dashboard`             | Authenticated   | Organization dashboard with analytics                      |
 | `/schedule`              | Authenticated   | Main schedule grid                                         |
-| `/schedules`             | Authenticated   | Schedule management/history                                |
+| `/schedules`             | Authenticated   | Redirect alias to `/schedule`                              |
 | `/staff`                 | Admin+          | Staff roster management                                    |
-| `/staff/[id]`            | Admin+          | Individual staff member detail (tabs: Overview, Schedule, Activity, Reports) |
+| `/staff/[id]`            | Admin+          | Individual staff member detail (tabs: Overview, Schedule, Activity)          |
 | `/settings`              | Admin+          | Organization configuration                                 |
 | `/profile`               | Authenticated   | User profile settings                                      |
 | `/gridmaster`            | Gridmaster      | Platform command center                                    |
@@ -404,7 +404,7 @@ AppShell.tsx (root layout — sidebar, header, navigation)
 │
 ├── DashboardView.tsx (organization dashboard)
 │   ├── StatCardsRow.tsx (KPI cards)
-│   ├── DonutChart.tsx (coverage by section)
+│   ├── CoverageBySectionCard.tsx (coverage by section donut chart)
 │   ├── OpenShiftsCard.tsx
 │   ├── StaffHoursCard.tsx
 │   ├── ShiftBreakdownCard.tsx
@@ -435,7 +435,7 @@ AppShell.tsx (root layout — sidebar, header, navigation)
 │   ├── OverviewTab.tsx (profile, certs, focus areas)
 │   ├── ScheduleTab.tsx (historical schedule)
 │   ├── ActivityTab.tsx (timeline)
-│   └── ReportsTab.tsx (hours, distributions, charts)
+│   └── (ReportsTab planned — not yet implemented)
 │
 ├── SettingsPage.tsx (org configuration)
 │
@@ -504,11 +504,11 @@ gridmaster/page.tsx
 
 - Full-page employee profile view at `/staff/[id]`
 - Header: avatar, name, status badge, certifications
-- Tabs: Overview, Schedule, Activity, Reports
+- Tabs: Overview, Schedule, Activity
 - Overview: personal info, focus areas, roles, certifications
 - Schedule: historical shift view with date range picker
 - Activity: status change timeline, events
-- Reports: hours charts, shift distribution, day-of-week patterns, focus area distribution
+- Reports tab planned but not yet implemented
 
 ### 10.6 Print View
 
@@ -590,7 +590,7 @@ These items were open questions in previous PRD versions and have been resolved 
 | Cross-staff counting?            | Employees belong to multiple focus areas. Shift entries are per-employee per-date.            |
 | Authentication & RBAC?           | Fully implemented. Four-tier role hierarchy with granular admin permissions. JWT-based claims. |
 | Dashboard analytics?             | Implemented with stat cards, charts, coverage tracking, and expandable detail views.          |
-| Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity, Reports.                                 |
+| Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity. Reports tab planned.                     |
 | Shift requests?                  | Pickup and swap requests implemented with admin approval workflow.                            |
 | Coverage tracking?               | Coverage requirements and status visualization implemented.                                   |
 
