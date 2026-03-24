@@ -44,16 +44,6 @@ export default function ShiftBreakdownCard({
                     : "none",
               }}
             >
-              {/* Focus area dot + name */}
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: fa.colorBg,
-                  flexShrink: 0,
-                }}
-              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{

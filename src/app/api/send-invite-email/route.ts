@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { decodeJwt } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
 
@@ -38,6 +39,24 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return NextResponse.json(
       { success: false, error: "Unauthenticated" },
+      { status: 401 },
+    );
+  }
+
+  // ── Authorization check — only super_admin / gridmaster can send invites ──
+  try {
+    const claims = decodeJwt(session.access_token);
+    const isGridmaster = claims.platform_role === "gridmaster";
+    const isSuperAdmin = claims.org_role === "super_admin";
+    if (!isGridmaster && !isSuperAdmin) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 403 },
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid session" },
       { status: 401 },
     );
   }

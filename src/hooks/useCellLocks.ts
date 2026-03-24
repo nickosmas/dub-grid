@@ -103,15 +103,18 @@ export function useCellLocks(
       const channel = channelRef.current;
       const user = currentUserRef.current;
       if (!channel || !user) return;
+
+      if (channel.state !== 'joined') return;
+
       // Presence for consistency (slower, server round-trip)
-      void channel.track({
+      channel.track({
         editingCell: cellKey,
         userId: user.id,
         userName: user.name,
         canEdit: canEditRef.current,
       });
       // Broadcast for instant delivery to other clients
-      void channel.send({
+      channel.send({
         type: 'broadcast',
         event: 'cell_locked',
         payload: { cellKey, userId: user.id, userName: user.name },
@@ -124,13 +127,16 @@ export function useCellLocks(
     const channel = channelRef.current;
     const user = currentUserRef.current;
     if (!channel || !user) return;
-    void channel.track({
+
+    if (channel.state !== 'joined') return;
+
+    channel.track({
       editingCell: null,
       userId: user.id,
       userName: user.name,
       canEdit: canEditRef.current,
     });
-    void channel.send({
+    channel.send({
       type: 'broadcast',
       event: 'cell_unlocked',
       payload: { userId: user.id },

@@ -660,7 +660,13 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 return;
               }
 
-              await supabase.auth.refreshSession();
+              const { error: refreshError } = await supabase.auth.refreshSession();
+              if (refreshError) {
+                await supabase.auth.signOut({ scope: "local" });
+                toast.error("Failed to switch workspace. Please sign in again.");
+                setLoading(false);
+                return;
+              }
             } else {
               await supabase.auth.signOut({ scope: "local" });
               toast.error("Your account is not associated with this workspace.");

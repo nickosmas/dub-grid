@@ -178,12 +178,19 @@ function SchedulerContent() {
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Refs for values used by the realtime channel — reading from refs avoids
+  // tearing down & recreating the channel when these change.
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const canEditShiftsRef = useRef(canEditShifts);
+  canEditShiftsRef.current = canEditShifts;
+
   // ── Shared refetch helper (eliminates 4x duplication) ──────────────────────
   const refetchScheduleData = useCallback(async () => {
     if (!org) return;
     const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
     const [shiftData, noteRows] = await Promise.all([
-      db.fetchShifts(org.id, canEditShifts, cMap),
+      db.fetchShifts(org.id, canEditShiftsRef.current, cMap),
       db.fetchScheduleNotes(org.id),
     ]);
     const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
@@ -196,7 +203,7 @@ function SchedulerContent() {
     }
     setShifts(shiftData);
     setNotes(noteMap);
-  }, [org, canEditShifts]);
+  }, [org]);
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
@@ -419,8 +426,21 @@ function SchedulerContent() {
 
   const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser, canEditShifts);
 
+  // Refs for realtime callbacks — allows the channel effect to depend only on
+  // [org] while still calling the latest versions of these functions.
+  const syncPresenceRef = useRef(syncPresence);
+  syncPresenceRef.current = syncPresence;
+  const handleLockBroadcastRef = useRef(handleLockBroadcast);
+  handleLockBroadcastRef.current = handleLockBroadcast;
+  const handleUnlockBroadcastRef = useRef(handleUnlockBroadcast);
+  handleUnlockBroadcastRef.current = handleUnlockBroadcast;
+  const refetchScheduleDataRef = useRef(refetchScheduleData);
+  refetchScheduleDataRef.current = refetchScheduleData;
+
   // Subscribe to real-time schedule broadcasts so other tabs/users see
   // published and draft changes immediately without a manual refresh.
+  // Depends only on [org] — all callbacks read from refs so the channel
+  // is never torn down due to permission/user/callback reference changes.
   useEffect(() => {
     if (!org) return;
 
@@ -428,7 +448,7 @@ function SchedulerContent() {
       .channel(`schedule:${org.id}`)
       .on('broadcast', { event: 'schedule_published' }, async () => {
         try {
-          await refetchScheduleData();
+          await refetchScheduleDataRef.current();
           const history = await db.fetchLatestPublishHistory(org.id);
           setPublishHistory(history);
         } catch (err) {
@@ -436,20 +456,17 @@ function SchedulerContent() {
         }
       })
       .on('broadcast', { event: 'drafts_discarded' }, async () => {
-        // Immediate refetch — a super_admin discarded all drafts
         try {
-          await refetchScheduleData();
+          await refetchScheduleDataRef.current();
         } catch (err) {
           console.error('Failed to sync drafts discard:', err);
         }
       })
       .on('broadcast', { event: 'draft_changed' }, (msg: { payload?: Record<string, unknown> }) => {
-        // Skip our own broadcasts
-        if (msg.payload?.senderId === currentUser?.id) return;
+        if (msg.payload?.senderId === currentUserRef.current?.id) return;
 
         const p = msg.payload;
         if (p?.shifts) {
-          // Optimistic: apply shift changes directly without DB round-trip
           const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
           setShifts(prev => {
             const next = { ...prev };
@@ -461,32 +478,35 @@ function SchedulerContent() {
           });
         }
         if (p?.notes) {
-          // Optimistic: apply note changes directly
           const noteUpdates = p.notes as Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>;
           setNotes(prev => ({ ...prev, ...noteUpdates }));
         }
-        // Always schedule a background refetch for consistency
         if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
         draftChangedDebounceRef.current = setTimeout(async () => {
           try {
-            await refetchScheduleData();
+            await refetchScheduleDataRef.current();
           } catch (err) {
             console.error('Failed to sync draft change:', err);
           }
         }, p?.shifts || p?.notes ? 2000 : 150);
       })
       .on('broadcast', { event: 'cell_locked' }, (msg: { payload?: { cellKey: string; userId: string; userName: string } }) => {
-        if (msg.payload) handleLockBroadcast(msg.payload);
+        if (msg.payload) handleLockBroadcastRef.current(msg.payload);
       })
       .on('broadcast', { event: 'cell_unlocked' }, (msg: { payload?: { userId: string } }) => {
-        if (msg.payload) handleUnlockBroadcast(msg.payload);
+        if (msg.payload) handleUnlockBroadcastRef.current(msg.payload);
       })
-      .on('presence', { event: 'sync' }, syncPresence)
-      .on('presence', { event: 'join' }, syncPresence)
-      .on('presence', { event: 'leave' }, syncPresence)
-      .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED' && currentUser && canEditShifts) {
-          await channel.track({ editingCell: null, userId: currentUser.id, userName: currentUser.name, canEdit: true });
+      .on('presence', { event: 'sync' }, () => syncPresenceRef.current())
+      .on('presence', { event: 'join' }, () => syncPresenceRef.current())
+      .on('presence', { event: 'leave' }, () => syncPresenceRef.current())
+      .subscribe(async (status: string, err?: Error) => {
+        if (status === 'SUBSCRIBED') {
+          const user = currentUserRef.current;
+          if (user && canEditShiftsRef.current) {
+            await channel.track({ editingCell: null, userId: user.id, userName: user.name, canEdit: true });
+          }
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] Channel error:', err?.message ?? 'unknown');
         }
       });
 
@@ -497,23 +517,56 @@ function SchedulerContent() {
       if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [org, canEditShifts, currentUser, syncPresence, handleLockBroadcast, handleUnlockBroadcast, refetchScheduleData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org]);
+
+  // Track presence once currentUser and canEditShifts are both available.
+  // Handles the case where the channel subscribes before user profile loads.
+  useEffect(() => {
+    const channel = realtimeChannelRef.current;
+    if (!channel || !currentUser || !canEditShifts) return;
+    if (channel.state !== 'joined') return;
+
+    channel.track({
+      editingCell: null,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      canEdit: true,
+    });
+  }, [currentUser, canEditShifts]);
 
   // Refetch when the tab regains focus — catches any missed broadcasts
   // (e.g. browser throttled WebSocket while tab was backgrounded).
+  // Also re-tracks presence to recover from server-side expiry.
   useEffect(() => {
     if (!org) return;
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refetchScheduleData().catch((err) => {
-          console.error("Tab refetch failed:", err);
-          toast.error("Failed to refresh schedule — try reloading the page");
-        });
+      if (document.visibilityState !== 'visible') return;
+
+      const channel = realtimeChannelRef.current;
+
+      // Re-track presence if the channel is healthy
+      if (channel && channel.state === 'joined') {
+        const user = currentUserRef.current;
+        if (user && canEditShiftsRef.current) {
+          channel.track({
+            editingCell: null,
+            userId: user.id,
+            userName: user.name,
+            canEdit: true,
+          });
+        }
       }
+
+      // Always refetch to catch any missed broadcasts
+      refetchScheduleDataRef.current().catch((err) => {
+        console.error("Tab refetch failed:", err);
+        toast.error("Failed to refresh schedule — try reloading the page");
+      });
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [org, refetchScheduleData]);
+  }, [org]);
 
   // Re-fetch with scheduler visibility once permissions resolve, so editors
   // see draft data even if the initial load ran before permissions were ready.
@@ -810,12 +863,16 @@ function SchedulerContent() {
   );
 
   const broadcastDraftChanged = useCallback((payload?: Record<string, unknown>) => {
-    realtimeChannelRef.current?.send({
+    const channel = realtimeChannelRef.current;
+    if (!channel) return;
+    channel.send({
       type: 'broadcast',
       event: 'draft_changed',
-      payload: { ...payload, senderId: currentUser?.id },
+      payload: { ...payload, senderId: currentUserRef.current?.id },
+    }).then((status: string) => {
+      if (status !== 'ok') console.warn('[Realtime] draft_changed send status:', status);
     });
-  }, [currentUser]);
+  }, []);
 
   const setShift = useCallback(
     (empId: string, date: Date, label: string, shiftCodeIds: number[]) => {
@@ -850,7 +907,7 @@ function SchedulerContent() {
             publishedShiftCodeIds: ex.publishedShiftCodeIds,
             publishedLabel: ex.publishedLabel ?? '',
             createdBy: ex.createdBy ?? null,
-            updatedBy: currentUser?.id ?? null,
+            updatedBy: currentUserRef.current?.id ?? null,
           };
           setShifts((prev) => ({ ...prev, [key]: deleteValue }));
           db.deleteShift(empId, dateKey).catch((err) => {
@@ -897,7 +954,7 @@ function SchedulerContent() {
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
-    [org?.id, canEditShifts, shiftCodeMap, broadcastDraftChanged, currentUser],
+    [org?.id, canEditShifts, shiftCodeMap, broadcastDraftChanged],
   );
 
   const getShiftStyle = useCallback(
@@ -1619,12 +1676,13 @@ function SchedulerContent() {
   }, [org, weekStart, monthStart, spanWeeks, refetchScheduleData]);
 
   const handleCancelChanges = useCallback(async (discardAll = false) => {
-    if (!org || !currentUser) return;
+    const user = currentUserRef.current;
+    if (!org || !user) return;
     setCancelingMode(discardAll ? 'all' : 'mine');
     try {
-      await db.discardScheduleDrafts(org.id, discardAll ? undefined : currentUser.id);
+      await db.discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
 
-      await refetchScheduleData();
+      await refetchScheduleDataRef.current();
       unlockCell();
       setEditPanel(null);
       setShowDiffOverlay(false);
@@ -1645,7 +1703,7 @@ function SchedulerContent() {
     } finally {
       setCancelingMode(null);
     }
-  }, [org, currentUser, broadcastDraftChanged, refetchScheduleData]);
+  }, [org, broadcastDraftChanged, unlockCell]);
 
   // ── Loading / error states ───────────────────────────────────────────────────
 

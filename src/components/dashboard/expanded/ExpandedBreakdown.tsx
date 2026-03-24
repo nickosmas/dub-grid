@@ -52,15 +52,6 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
     <div style={cardStyle}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <span
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: "50%",
-            background: fa.colorBg,
-            flexShrink: 0,
-          }}
-        />
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", flex: 1 }}>
           {fa.focusAreaName}
         </span>

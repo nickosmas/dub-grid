@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import type {
   Employee,
   ShiftMap,
@@ -10,13 +10,14 @@ import type {
   ShiftRequest,
   RecurringShift,
 } from "@/types";
-import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle } from "@/lib/styles";
 import { fmt12h } from "@/lib/utils";
-import {
-  computeEmployeeHoursHistory,
-  computeOvertimeSummary,
-} from "@/lib/staff-detail-stats";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
+import { DAY_LABELS } from "@/lib/constants";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { CalendarClock, History, Clock } from "lucide-react";
 
 interface ScheduleTabProps {
   employee: Employee;
@@ -30,29 +31,17 @@ interface ScheduleTabProps {
   recurringShifts: RecurringShift[];
 }
 
-const WEEK_COUNT = 12;
-
 export function ScheduleTab({
   employee,
   shifts,
   shiftCodeById,
-  shiftCodes,
-  focusAreas,
   categoryById,
   focusAreaById,
   shiftRequests,
+  recurringShifts,
 }: ScheduleTabProps) {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
-
-  const hoursHistory = useMemo(
-    () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById, focusAreaById),
-    [employee.id, shifts, shiftCodeById, categoryById, focusAreaById],
-  );
-
-  const otSummary = useMemo(() => computeOvertimeSummary(hoursHistory), [hoursHistory]);
-
-  const maxHours = useMemo(() => Math.max(...hoursHistory.map(w => w.totalHours), 1), [hoursHistory]);
 
   const shiftEntries = useMemo(() => {
     return Object.entries(shifts)
@@ -68,295 +57,255 @@ export function ScheduleTab({
   const totalPages = Math.ceil(shiftEntries.length / PAGE_SIZE);
   const pageEntries = shiftEntries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const totalShifts = shiftEntries.length;
-  const avgWeeklyHours = hoursHistory.length > 0
-    ? Math.round((hoursHistory.reduce((s, w) => s + w.totalHours, 0) / hoursHistory.length) * 10) / 10
-    : 0;
+  // Group page entries by month
+  const groupedEntries = useMemo(() => {
+    const groups: { month: string; entries: typeof pageEntries }[] = [];
+    let currentMonth = "";
+    for (const entry of pageEntries) {
+      const date = new Date(entry.dateKey + "T00:00:00");
+      const month = date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
+      if (month !== currentMonth) {
+        currentMonth = month;
+        groups.push({ month, entries: [] });
+      }
+      groups[groups.length - 1].entries.push(entry);
+    }
+    return groups;
+  }, [pageEntries]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Summary Stats — 4-col grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        <StatCard
-          label="Avg Weekly Hours"
-          value={`${avgWeeklyHours}h`}
-          dotColor="var(--color-info)"
-          progress={Math.min((avgWeeklyHours / 40) * 100, 100)}
-          progressColor="var(--color-info)"
-        />
-        <StatCard
-          label="Total Shifts"
-          value={String(totalShifts)}
-          dotColor="var(--color-primary)"
-          progress={Math.min((totalShifts / 60) * 100, 100)}
-          progressColor="var(--color-primary)"
-        />
-        <StatCard
-          label="OT Weeks"
-          value={String(otSummary.weeksWithOT)}
-          dotColor={otSummary.weeksWithOT > 0 ? "var(--color-danger)" : "var(--color-border)"}
-          progress={Math.min((otSummary.weeksWithOT / WEEK_COUNT) * 100, 100)}
-          progressColor="var(--color-danger)"
-        />
-        <StatCard
-          label="Total OT Hours"
-          value={`${otSummary.totalOTHours}h`}
-          dotColor={otSummary.totalOTHours > 0 ? "var(--color-danger)" : "var(--color-border)"}
-          progress={Math.min((otSummary.totalOTHours / 20) * 100, 100)}
-          progressColor="var(--color-danger)"
-        />
-      </div>
-
-      {/* Weekly Hours Bar Chart */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>Weekly Hours (Last {WEEK_COUNT} Weeks)</div>
-        <div style={{ ...sectionBodyStyle, padding: "16px 20px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {hoursHistory.map((week) => (
-              <div key={week.weekStart} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 60, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textAlign: "right", flexShrink: 0, fontWeight: 500 }}>
-                  {week.weekLabel}
-                </span>
-                <div style={{ flex: 1, height: 20, background: "var(--color-bg-secondary)", borderRadius: 4, overflow: "hidden", position: "relative" }}>
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${Math.min((week.totalHours / maxHours) * 100, 100)}%`,
-                      background: week.isOvertime
-                        ? "linear-gradient(90deg, var(--color-info) 0%, var(--color-danger) 100%)"
-                        : "var(--color-info)",
-                      borderRadius: 4,
-                      transition: "width 300ms ease",
-                    }}
-                  />
-                  {maxHours > 40 && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        bottom: 0,
-                        left: `${(40 / maxHours) * 100}%`,
-                        width: 1,
-                        background: "var(--color-danger)",
-                        opacity: 0.4,
-                      }}
-                    />
-                  )}
-                </div>
-                <span style={{ width: 44, fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: week.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)", textAlign: "right", flexShrink: 0 }}>
-                  {week.totalHours}h
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Shift History Table */}
-      <div style={sectionStyle}>
-        <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Shift History</span>
-          <span style={{ fontWeight: 500, color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)" }}>
-            {totalShifts} shift{totalShifts !== 1 ? "s" : ""}
-          </span>
-        </div>
-        {shiftEntries.length === 0 ? (
-          <div style={{ ...sectionBodyStyle, color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)", textAlign: "center", padding: "32px 20px" }}>
-            No shifts found
-          </div>
-        ) : (
-          <>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Shift</th>
-                  <th style={thStyle}>Time</th>
-                  <th style={thStyle}>Hours</th>
-                  <th style={thStyle}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageEntries.map((entry) => {
-                  const hours = computeShiftDurationHours(
-                    entry.shiftCodeIds,
-                    shiftCodeById,
-                    entry.customStartTime,
-                    entry.customEndTime,
-                    categoryById,
-                    focusAreaById,
-                  );
-                  const date = new Date(entry.dateKey + "T00:00:00");
-                  const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
-
+    <div className="flex flex-col gap-4">
+      {/* Recurring Schedule */}
+      <Card className="shadow-sm">
+        <CardHeader className="border-b pb-3">
+          <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-muted-foreground" />
+            Recurring Schedule
+            <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{recurringShifts.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recurringShifts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CalendarClock className="w-7 h-7 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No recurring shifts configured</p>
+            </div>
+          ) : (
+            <div>
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {DAY_LABELS.map((day, i) => {
+                  const rs = recurringShifts.find(r => r.dayOfWeek === i);
                   return (
-                    <tr key={entry.dateKey} className="dg-table-row">
-                      <td style={tdStyle}>
-                        <span style={{ fontWeight: 600 }}>{dayName}</span>{" "}
-                        <span style={{ color: "var(--color-text-muted)" }}>{entry.dateKey}</span>
-                      </td>
-                      <td style={tdStyle}>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          {entry.shiftCodeIds.map((id) => {
-                            const sc = shiftCodeById.get(id);
-                            return sc ? (
-                              <span
-                                key={id}
-                                style={{
-                                  display: "inline-block",
-                                  padding: "1px 8px",
-                                  borderRadius: 6,
-                                  background: sc.color,
-                                  color: sc.text,
-                                  border: `1px solid ${sc.border}`,
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {sc.label}
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-                      </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                        {entry.customStartTime && entry.customEndTime
-                          ? `${fmt12h(entry.customStartTime)} – ${fmt12h(entry.customEndTime)}`
-                          : "—"}
-                      </td>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>
-                        {hours > 0 ? `${Math.round(hours * 10) / 10}h` : "—"}
-                      </td>
-                      <td style={tdStyle}>
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-badge)",
-                            fontWeight: 600,
-                            padding: "2px 8px",
-                            borderRadius: 10,
-                            background: entry.isDraft ? "var(--color-warning-bg)" : "var(--color-success-bg)",
-                            color: entry.isDraft ? "var(--color-warning-text)" : "var(--color-success-text)",
-                          }}
-                        >
-                          {entry.isDraft ? "Draft" : "Published"}
-                        </span>
-                      </td>
-                    </tr>
+                    <div
+                      key={day}
+                      className={`flex flex-col items-center justify-center py-2.5 rounded-lg border ${
+                        rs ? 'bg-muted/50 border-border' : 'bg-transparent border-transparent'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{day}</span>
+                      <span className={`text-[11px] mt-1 font-semibold truncate max-w-full px-0.5 ${
+                        rs ? 'text-foreground' : 'text-muted-foreground/30'
+                      }`}>
+                        {rs ? rs.shiftLabel : "—"}
+                      </span>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--color-border-light)" }}>
-                <button
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ padding: "4px 12px", fontSize: "var(--dg-fs-caption)", opacity: page === 0 ? 0.5 : 1 }}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", alignSelf: "center" }}>
-                  Page {page + 1} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ padding: "4px 12px", fontSize: "var(--dg-fs-caption)", opacity: page >= totalPages - 1 ? 0.5 : 1 }}
-                >
-                  Next
-                </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+              {recurringShifts.some(rs => rs.effectiveUntil) && (
+                <p className="text-[10px] text-muted-foreground mt-3 text-center">
+                  {recurringShifts
+                    .filter(rs => rs.effectiveUntil)
+                    .map(rs => `${DAY_LABELS[rs.dayOfWeek]}: until ${rs.effectiveUntil}`)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Shift History */}
+      <Card className="shadow-sm">
+        <CardHeader className="border-b pb-3">
+          <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
+            <History className="w-4 h-4 text-muted-foreground" />
+            Shift History
+            <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{shiftEntries.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {shiftEntries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <History className="w-7 h-7 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No shifts found</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Shift</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Hours</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedEntries.map((group) => (
+                      <Fragment key={`month-${group.month}`}>
+                        <TableRow>
+                          <TableCell colSpan={5} className="bg-muted/30 py-1.5 px-4">
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.05em]">
+                              {group.month}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                        {group.entries.map((entry) => {
+                          const hours = computeShiftDurationHours(
+                            entry.shiftCodeIds,
+                            shiftCodeById,
+                            entry.customStartTime,
+                            entry.customEndTime,
+                            categoryById,
+                            focusAreaById,
+                          );
+                          const date = new Date(entry.dateKey + "T00:00:00");
+                          const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
+
+                          return (
+                            <TableRow key={entry.dateKey}>
+                              <TableCell>
+                                <span className="font-semibold text-foreground mr-1.5">{dayName}</span>
+                                <span className="text-muted-foreground">{entry.dateKey}</span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  {entry.shiftCodeIds.map((id) => {
+                                    const sc = shiftCodeById.get(id);
+                                    return sc ? (
+                                      <Badge
+                                        key={id}
+                                        variant="outline"
+                                        style={{
+                                          backgroundColor: sc.color,
+                                          color: sc.text,
+                                          borderColor: sc.border,
+                                        }}
+                                        className="px-1.5 py-0 h-5 text-[10px]"
+                                      >
+                                        {sc.label}
+                                      </Badge>
+                                    ) : null;
+                                  })}
+                                  {entry.fromRecurring && (
+                                    <span className="text-muted-foreground text-[11px]" title="From recurring schedule">↻</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-[13px] text-muted-foreground">
+                                {entry.customStartTime && entry.customEndTime
+                                  ? `${fmt12h(entry.customStartTime)} – ${fmt12h(entry.customEndTime)}`
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="font-semibold text-foreground text-[13px]">
+                                {hours > 0 ? `${Math.round(hours * 10) / 10}h` : "—"}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`text-[12px] font-semibold ${entry.isDraft ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  {entry.isDraft ? "Draft" : "Published"}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                  <span className="text-[12px] text-muted-foreground">
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Shift Requests */}
       {shiftRequests.length > 0 && (
-        <div style={sectionStyle}>
-          <div style={sectionHeaderStyle}>
-            Shift Requests
-            <span style={{ fontWeight: 500, color: "var(--color-text-faint)", marginLeft: 8, fontSize: "var(--dg-fs-caption)" }}>
-              {shiftRequests.length}
-            </span>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Date</th>
-                <th style={thStyle}>Shift</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shiftRequests.map((req) => (
-                <tr key={req.id} className="dg-table-row">
-                  <td style={{ ...tdStyle, textTransform: "capitalize" }}>{req.type}</td>
-                  <td style={tdStyle}>{req.requesterShiftDate}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{req.requesterShiftLabel}</td>
-                  <td style={tdStyle}>
-                    <span
-                      style={{
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: req.status === "approved" ? "var(--color-success-bg)"
-                          : req.status === "rejected" ? "var(--color-danger-bg)"
-                          : "var(--color-warning-bg)",
-                        color: req.status === "approved" ? "var(--color-success-text)"
-                          : req.status === "rejected" ? "var(--color-danger-text)"
-                          : "var(--color-warning-text)",
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {req.status.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td style={{ ...tdStyle, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>
-                    {new Date(req.createdAt).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              Shift Requests
+              <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{shiftRequests.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Shift</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shiftRequests.map((req) => (
+                    <TableRow key={req.id}>
+                      <TableCell className="capitalize font-medium text-[13px]">{req.type}</TableCell>
+                      <TableCell className="text-[13px]">{req.requesterShiftDate}</TableCell>
+                      <TableCell className="font-semibold text-[13px]">{req.requesterShiftLabel}</TableCell>
+                      <TableCell>
+                        <span className={`text-[12px] font-semibold capitalize ${
+                          req.status === 'approved' ? 'text-emerald-600' :
+                          req.status === 'rejected' ? 'text-rose-600' :
+                          'text-amber-600'
+                        }`}>
+                          {req.status.replace("_", " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-[13px] text-muted-foreground">
+                        {new Date(req.createdAt).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  dotColor,
-  progress,
-  progressColor,
-}: {
-  label: string;
-  value: string;
-  dotColor: string;
-  progress: number;
-  progressColor: string;
-}) {
-  return (
-    <div className="staff-stat">
-      <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-        {label}
-      </div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: dotColor === "var(--color-danger)" ? "var(--color-danger)" : "var(--color-text-primary)", lineHeight: 1, letterSpacing: "-0.02em" }}>
-        {value}
-      </div>
-      <div style={{ height: 4, background: "var(--color-border)", borderRadius: 2, overflow: "hidden" }}>
-        <div style={{ height: 4, borderRadius: 2, width: `${Math.min(100, Math.max(0, progress))}%`, background: progressColor, transition: "width 0.4s ease" }} />
-      </div>
     </div>
   );
 }

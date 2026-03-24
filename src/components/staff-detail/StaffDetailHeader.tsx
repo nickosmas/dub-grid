@@ -1,17 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarBadge } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { ChevronLeft } from "lucide-react";
 import type { Employee, FocusArea, NamedItem, Organization, Invitation } from "@/types";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { getInitials, getEmployeeDisplayName, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
 
 interface StaffDetailHeaderProps {
   employee: Employee;
@@ -29,258 +25,125 @@ export function StaffDetailHeader({
   focusAreas,
   certifications,
   orgRoles,
-  org,
-  canManageEmployees,
   thisWeekHours,
   pendingInvite,
 }: StaffDetailHeaderProps) {
-  const hue = hashCode(employee.id) % 360;
   const displayName = getEmployeeDisplayName(employee);
   const certAbbr = getCertAbbr(employee.certificationId, certifications);
   const roleAbbrs = getRoleAbbrs(employee.roleIds, orgRoles);
 
   const statusConfig = {
-    active: { bg: "var(--color-success-bg)", text: "var(--color-success-text)", dot: "var(--color-success)", label: "Active" },
-    benched: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", dot: "var(--color-warning)", label: "Benched" },
-    terminated: { bg: "var(--color-danger-bg)", text: "var(--color-danger-text)", dot: "var(--color-danger)", label: "Terminated" },
-  }[employee.status];
+    active: { dot: "bg-emerald-500", label: "Active" },
+    benched: { dot: "bg-amber-500", label: "Benched" },
+    terminated: { dot: "bg-rose-500", label: "Terminated" },
+  }[employee.status] ?? { dot: "bg-muted-foreground", label: employee.status };
 
-  // Account link indicator
-  const accountIndicator = employee.userId
-    ? { color: "var(--color-success)", title: "Linked to user account" }
+  // Account indicator color for AvatarBadge
+  const accountBadgeColor = employee.userId
+    ? "bg-emerald-500"
     : pendingInvite
-    ? { color: "var(--color-warning)", title: `Invitation pending — sent to ${pendingInvite.email}` }
+    ? "bg-amber-500"
     : null;
 
   return (
-    <div>
+    <div className="flex flex-col mb-4">
       {/* Back link */}
       <Link
         href="/staff"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: "var(--dg-fs-body-sm)",
-          fontWeight: 600,
-          color: "var(--color-text-muted)",
-          textDecoration: "none",
-          marginBottom: 20,
-          transition: "color 150ms ease",
-        }}
+        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors mb-5 w-fit"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
+        <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
         Staff
       </Link>
 
       {/* Hero card */}
-      <div className="staff-hero">
-        {/* Colored gradient accent */}
-        <div
-          className="staff-hero-gradient"
-          style={{ background: `linear-gradient(180deg, hsl(${hue}, 60%, 96%) 0%, var(--color-surface) 100%)` }}
-        />
+      <Card className="shadow-sm">
+        <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
+          <div className="flex items-start gap-4 sm:gap-5">
+            {/* Avatar */}
+            <Avatar className="h-14 w-14 shrink-0">
+              <AvatarFallback className="text-lg font-bold bg-muted text-muted-foreground">
+                {getInitials(displayName)}
+              </AvatarFallback>
+              {accountBadgeColor && (
+                <AvatarBadge className={`${accountBadgeColor} size-3.5`} />
+              )}
+            </Avatar>
 
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            padding: "28px 32px",
-            display: "flex",
-            alignItems: "center",
-            gap: 24,
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Avatar */}
-          <div
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              background: `hsl(${hue}, 65%, 94%)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 26,
-              fontWeight: 800,
-              color: `hsl(${hue}, 60%, 38%)`,
-              flexShrink: 0,
-              border: `2px solid hsl(${hue}, 55%, 86%)`,
-              boxShadow: `0 0 0 4px hsl(${hue}, 50%, 96%)`,
-            }}
-          >
-            {getInitials(displayName)}
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              {/* Name + status */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="font-bold text-xl sm:text-2xl text-foreground tracking-tight m-0 leading-none">
+                  {displayName}
+                </h1>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot} shrink-0`} />
+                  {statusConfig.label}
+                </span>
+              </div>
+
+              {/* Contact */}
+              <div className="flex gap-4 mt-2 flex-wrap text-[13px] text-muted-foreground font-medium">
+                {employee.email && <span>{employee.email}</span>}
+                {employee.phone && <span>{employee.phone}</span>}
+                <span>Seniority #{employee.seniority}</span>
+              </div>
+            </div>
+
+            {/* This week hours */}
+            {thisWeekHours && (
+              <div className="text-right shrink-0 pt-1">
+                <div className={`text-2xl font-bold tracking-tight leading-none ${thisWeekHours.isOvertime ? 'text-destructive' : 'text-foreground'}`}>
+                  {thisWeekHours.totalHours}h
+                </div>
+                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">
+                  This Week
+                </div>
+                {thisWeekHours.isOvertime && (
+                  <div className="text-[11px] font-bold text-destructive mt-0.5">
+                    +{thisWeekHours.overtimeHours}h OT
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Info */}
-          <div style={{ flex: 1, minWidth: 200 }}>
-            {/* Name row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h1
-                style={{
-                  fontWeight: 700,
-                  fontSize: "var(--dg-fs-section-title)",
-                  color: "var(--color-text-primary)",
-                  letterSpacing: "-0.02em",
-                  margin: 0,
-                }}
-              >
-                {displayName}
-              </h1>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  padding: "3px 10px",
-                  borderRadius: 20,
-                  background: statusConfig.bg,
-                  color: statusConfig.text,
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusConfig.dot }} />
-                {statusConfig.label}
-              </span>
-              {accountIndicator && (
-                <span
-                  title={accountIndicator.title}
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: accountIndicator.color,
-                    boxShadow: `0 0 0 2px ${accountIndicator.color}33`,
-                    flexShrink: 0,
-                    cursor: "help",
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Contact info row */}
-            <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-              {employee.email && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="22,7 12,13 2,7" /></svg>
-                  {employee.email}
-                </span>
-              )}
-              {employee.phone && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
-                  {employee.phone}
-                </span>
-              )}
-              <span>Seniority #{employee.seniority}</span>
-            </div>
-
-            {/* Badges row */}
-            <div style={{ display: "flex", gap: 5, marginTop: 10, flexWrap: "wrap" }}>
+      {/* Tags */}
+      {(employee.focusAreaIds.length > 0 || certAbbr || roleAbbrs.length > 0) && (
+        <Card className="shadow-sm mt-3">
+          <CardContent className="px-5 py-4">
+            <div className="flex gap-1.5 flex-wrap">
               {employee.focusAreaIds.map((faId) => {
                 const fa = focusAreas.find((f) => f.id === faId);
                 if (!fa) return null;
                 return (
-                  <span
+                  <Badge
                     key={faId}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      background: fa.colorBg,
-                      color: fa.colorText,
-                      fontSize: "var(--dg-fs-badge)",
-                      fontWeight: 600,
-                      borderRadius: 20,
-                      padding: "2px 10px",
-                    }}
+                    variant="outline"
+                    className="border-transparent px-2"
+                    style={{ background: fa.colorBg, color: fa.colorText }}
                   >
                     {fa.name}
-                  </span>
+                  </Badge>
                 );
               })}
               {certAbbr && (
-                <span
-                  style={{
-                    background: "var(--color-border-light)",
-                    color: "var(--color-text-muted)",
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 600,
-                    borderRadius: 20,
-                    padding: "2px 10px",
-                  }}
-                >
+                <Badge variant="secondary" className="px-2 font-semibold text-muted-foreground">
                   {certAbbr}
-                </span>
+                </Badge>
               )}
               {roleAbbrs.map((abbr) => (
-                <span
-                  key={abbr}
-                  style={{
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-secondary)",
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 600,
-                    borderRadius: 20,
-                    padding: "2px 10px",
-                    border: "1px solid var(--color-border-light)",
-                  }}
-                >
+                <Badge key={abbr} variant="outline" className="px-2 font-semibold text-secondary-foreground">
                   {abbr}
-                </span>
+                </Badge>
               ))}
             </div>
-          </div>
-
-          {/* This week stat (right side) */}
-          {thisWeekHours && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                padding: "12px 20px",
-                borderRadius: 10,
-                background: "var(--color-bg-secondary)",
-                border: "1px solid var(--color-border-light)",
-                flexShrink: 0,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 600,
-                  color: "var(--color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                This Week
-              </span>
-              <span
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: thisWeekHours.isOvertime ? "var(--color-danger)" : "var(--color-text-primary)",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.2,
-                  marginTop: 2,
-                }}
-              >
-                {thisWeekHours.totalHours}h
-              </span>
-              {thisWeekHours.isOvertime && (
-                <span style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", fontWeight: 600, marginTop: 2 }}>
-                  +{thisWeekHours.overtimeHours}h OT
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
