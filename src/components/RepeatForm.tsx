@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { SeriesFrequency, ShiftCode } from "@/types";
+import { SeriesFrequency, ShiftCode, AbsenceType } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { iterateDateRange } from "@/lib/utils";
@@ -23,6 +23,8 @@ interface RepeatFormProps {
     maxOccurrences: number | null,
   ) => void;
   onBack: () => void;
+  /** When set, the form is creating a repeating off day instead of a shift. */
+  absenceType?: AbsenceType;
 }
 
 type EndType = 'never' | 'on_date' | 'after_n';
@@ -82,7 +84,9 @@ export default function RepeatForm({
   shiftCodes,
   onConfirm,
   onBack,
+  absenceType,
 }: RepeatFormProps) {
+  const isAbsence = absenceType != null;
   const [frequency, setFrequency] = useState<SeriesFrequency>('weekly');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([startDate.getDay()]);
   const todayStr = formatLocalDate(new Date());
@@ -180,15 +184,15 @@ export default function RepeatForm({
         Back
       </button>
 
-      {/* Shift badge */}
+      {/* Badge */}
       <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={sectionLabelStyle}>Repeating Shift</span>
-        {shiftCode && (
+        <span style={sectionLabelStyle}>{isAbsence ? "Repeating Off Day" : "Repeating Shift"}</span>
+        {(isAbsence ? absenceType : shiftCode) && (
           <span
             style={{
-              background: shiftCode.color,
-              color: shiftCode.text,
-              border: `1px solid ${shiftCode.border}`,
+              background: isAbsence ? absenceType!.color : shiftCode!.color,
+              color: isAbsence ? absenceType!.text : shiftCode!.text,
+              border: `1px solid ${isAbsence ? absenceType!.border : shiftCode!.border}`,
               borderRadius: 8,
               padding: "1px 7px",
               fontSize: "var(--dg-fs-footnote)",
@@ -339,7 +343,7 @@ export default function RepeatForm({
           }}
         >
           <div style={{ fontWeight: 600 }}>
-            {preview.total} shift{preview.total === 1 ? '' : 's'} will be created
+            {preview.total} {isAbsence ? "off day" : "shift"}{preview.total === 1 ? '' : 's'} will be created
             {endType === 'never' && (
               <span style={{ fontWeight: 400, color: "var(--color-text-subtle)" }}> (6-month max)</span>
             )}
@@ -351,7 +355,7 @@ export default function RepeatForm({
           )}
           {preview.overwrites > 0 && (
             <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
-              {preview.overwrites} existing shift{preview.overwrites === 1 ? '' : 's'} will be overwritten.
+              {preview.overwrites} existing {isAbsence ? "entry" : "shift"}{preview.overwrites === 1 ? '' : 's'} will be overwritten.
             </div>
           )}
         </div>
@@ -368,7 +372,7 @@ export default function RepeatForm({
           className="dg-btn dg-btn-primary"
           style={{ flex: 1, opacity: canConfirm ? 1 : 0.5 }}
         >
-          Create Repeating Shift
+          {isAbsence ? "Create Repeating Off Day" : "Create Repeating Shift"}
         </button>
       </div>
     </div>

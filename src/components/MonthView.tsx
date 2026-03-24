@@ -12,6 +12,7 @@ interface MonthViewProps {
   filteredEmployees: Employee[];
   shiftForKey: (empId: string, date: Date) => string | null;
   shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  isAbsenceForKey?: (empId: string, date: Date) => boolean;
   getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
   today: Date;
   focusAreas: FocusArea[];
@@ -199,6 +200,7 @@ export default function MonthView({
   filteredEmployees,
   shiftForKey,
   shiftCodeIdsForKey,
+  isAbsenceForKey,
   getShiftStyle,
   today,
   focusAreas,
@@ -274,7 +276,10 @@ export default function MonthView({
 
       filteredEmployees.forEach((emp) => {
         const combinedLabel = shiftForKey(emp.id, date);
-        if (!combinedLabel || combinedLabel === "X" || combinedLabel === "OFF") return;
+        if (!combinedLabel || combinedLabel === "OFF") return;
+
+        // Skip absence entries (off, sick, vacation, etc.) — they don't count in staffing tallies
+        if (isAbsenceForKey?.(emp.id, date)) return;
 
         const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
         const empHomeFas = focusAreas.filter(fa => emp.focusAreaIds.includes(fa.id));
@@ -282,9 +287,6 @@ export default function MonthView({
         shiftLabels.forEach((label, li) => {
           const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
           const style = codeEntry ?? getShiftStyle(label, empHomeFas[0]?.name);
-
-          // Skip off-day codes entirely
-          if (style.isOffDay) return;
 
           if (style.categoryId != null) {
             categoryCounts.set(style.categoryId, (categoryCounts.get(style.categoryId) ?? 0) + 1);
@@ -327,7 +329,7 @@ export default function MonthView({
       map.set(dateKey, { date, dateKey, isToday, categoryCounts, byFocusArea, activeCats, focusAreaSections });
     }
     return map;
-  }, [cells, todayKey, filteredEmployees, shiftForKey, shiftCodeIdsForKey, getShiftStyle, focusAreas, shiftCodeById, shiftCategories, focusAreaNames, activeFocusArea, draftKindForKey, categoryMap]);
+  }, [cells, todayKey, filteredEmployees, shiftForKey, shiftCodeIdsForKey, isAbsenceForKey, getShiftStyle, focusAreas, shiftCodeById, shiftCategories, focusAreaNames, activeFocusArea, draftKindForKey, categoryMap]);
 
   const popoverData = popoverDateKey ? dayDataMap.get(popoverDateKey) : null;
 

@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement } from "@/types";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType } from "@/types";
 import * as db from "@/lib/db";
 import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
@@ -94,6 +94,8 @@ interface SettingsPageProps {
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
   canManageCoverageRequirements: boolean;
+  absenceTypes: AbsenceType[];
+  onAbsenceTypesChange: (types: AbsenceType[]) => void;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -230,6 +232,14 @@ function OrganizationDetailsSettings({
     form.phone !== organization.phone ||
     (form.employeeCount || "") !== (organization.employeeCount?.toString() ?? "") ||
     form.timezone !== (organization.timezone ?? "");
+
+  // Warn before navigating away with unsaved changes
+  useEffect(() => {
+    if (!isModified) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isModified]);
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) return;
@@ -374,6 +384,14 @@ function OrganizationLabelsSettings({
     form.focusAreaLabel !== organization.focusAreaLabel ||
     form.certificationLabel !== organization.certificationLabel ||
     form.roleLabel !== organization.roleLabel;
+
+  // Warn before navigating away with unsaved changes
+  useEffect(() => {
+    if (!isModified) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isModified]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -932,7 +950,6 @@ function ShiftCodeRow({
   certifications,
   certificationLabel,
   focusAreaLabel = "Focus Area",
-  isOffDayRow,
   hideFocusAreaSelect,
   onSaved,
   onDeleted,
@@ -945,7 +962,6 @@ function ShiftCodeRow({
   certifications: NamedItem[];
   certificationLabel: string;
   focusAreaLabel?: string;
-  isOffDayRow?: boolean;
   hideFocusAreaSelect?: boolean;
   onSaved: (s: ShiftCode, prevId: number) => void;
   onDeleted: (id: number) => void;
@@ -959,9 +975,12 @@ function ShiftCodeRow({
     border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
     text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
     categoryId: st.categoryId ?? null as number | null,
-    isOffDay: st.isOffDay ?? isOffDayRow ?? false,
     focusAreaId: st.focusAreaId ?? null as number | null,
     requiredCertificationIds: st.requiredCertificationIds ?? [],
+    defaultStartTime: st.defaultStartTime ?? null as string | null,
+    defaultEndTime: st.defaultEndTime ?? null as string | null,
+    defaultDurationHours: st.defaultDurationHours ?? null as number | null,
+    defaultDurationMinutes: st.defaultDurationMinutes ?? null as number | null,
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -985,11 +1004,14 @@ function ShiftCodeRow({
       border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
       text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
       categoryId: st.categoryId ?? null,
-      isOffDay: st.isOffDay ?? isOffDayRow ?? false,
       focusAreaId: st.focusAreaId ?? null,
       requiredCertificationIds: st.requiredCertificationIds ?? [],
+      defaultStartTime: st.defaultStartTime ?? null,
+      defaultEndTime: st.defaultEndTime ?? null,
+      defaultDurationHours: st.defaultDurationHours ?? null,
+      defaultDurationMinutes: st.defaultDurationMinutes ?? null,
     });
-  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.isOffDay, st.focusAreaId, certIdsKey, isOffDayRow]);
+  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes]);
 
   const isDirty = st.isNew ||
     form.label !== st.label ||
@@ -998,9 +1020,12 @@ function ShiftCodeRow({
     form.border !== (st.border === "transparent" ? TRANSPARENT_BORDER : st.border) ||
     form.text !== (st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text) ||
     form.categoryId !== (st.categoryId ?? null) ||
-    form.isOffDay !== (st.isOffDay ?? isOffDayRow ?? false) ||
     form.focusAreaId !== (st.focusAreaId ?? null) ||
-    JSON.stringify(form.requiredCertificationIds) !== JSON.stringify(st.requiredCertificationIds ?? []);
+    JSON.stringify(form.requiredCertificationIds) !== JSON.stringify(st.requiredCertificationIds ?? []) ||
+    form.defaultStartTime !== (st.defaultStartTime ?? null) ||
+    form.defaultEndTime !== (st.defaultEndTime ?? null) ||
+    form.defaultDurationHours !== (st.defaultDurationHours ?? null) ||
+    form.defaultDurationMinutes !== (st.defaultDurationMinutes ?? null);
 
   const canSave = isDirty && !!form.label.trim() && !!form.name.trim();
 
@@ -1019,10 +1044,13 @@ function ShiftCodeRow({
         text: form.text,
         categoryId: form.categoryId,
         isGeneral: form.focusAreaId == null,
-        isOffDay: form.isOffDay,
         focusAreaId: form.focusAreaId,
         sortOrder: st.sortOrder,
         requiredCertificationIds: form.requiredCertificationIds,
+        defaultStartTime: form.defaultStartTime,
+        defaultEndTime: form.defaultEndTime,
+        defaultDurationHours: form.defaultDurationHours,
+        defaultDurationMinutes: form.defaultDurationMinutes,
       });
       onSaved(saved, st.id);
       setExpanded(false);
@@ -1197,8 +1225,7 @@ function ShiftCodeRow({
           )}
 
           {/* Shift Category */}
-          {!form.isOffDay && (
-            <div>
+          <div>
               <label style={labelStyle}>SHIFT CATEGORY</label>
               <CustomSelect
                 value={form.categoryId != null ? String(form.categoryId) : ""}
@@ -1216,7 +1243,102 @@ function ShiftCodeRow({
                 disabled={!canManageShiftCodes}
               />
             </div>
-          )}
+
+          {/* Default Times vs Duration — mutually exclusive, duration only for general codes */}
+          {(() => {
+            const hasTimes = form.defaultStartTime != null || form.defaultEndTime != null;
+            const hasDuration = form.defaultDurationHours != null || form.defaultDurationMinutes != null;
+            const isGeneral = form.focusAreaId == null;
+            const showTimes = !isGeneral || !hasDuration;
+            const showDuration = isGeneral && !hasTimes;
+
+            return (
+              <>
+                {showTimes ? (
+                  <div>
+                    <label style={labelStyle}>CUSTOM TIMES</label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                      <TimeInput12h
+                        value={form.defaultStartTime}
+                        onChange={(v) => setForm((p) => ({ ...p, defaultStartTime: v }))}
+                        disabled={!canManageShiftCodes}
+                      />
+                      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>to</span>
+                      <TimeInput12h
+                        value={form.defaultEndTime}
+                        onChange={(v) => setForm((p) => ({ ...p, defaultEndTime: v }))}
+                        disabled={!canManageShiftCodes}
+                      />
+                    </div>
+                    {isGeneral && !hasTimes && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
+                        style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
+                        disabled={!canManageShiftCodes}
+                      >
+                        Set duration instead
+                      </button>
+                    )}
+                    {isGeneral && hasTimes && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
+                        style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
+                        disabled={!canManageShiftCodes}
+                      >
+                        Use duration instead
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+
+                {showDuration && hasDuration ? (
+                  <div>
+                    <label style={labelStyle}>DEFAULT DURATION</label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={23}
+                        value={form.defaultDurationHours ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value === "" ? null : Math.max(0, Math.min(23, Number(e.target.value)));
+                          setForm((p) => ({ ...p, defaultDurationHours: v }));
+                        }}
+                        placeholder="0"
+                        style={{ ...inputStyle, width: 64, textAlign: "center" }}
+                        disabled={!canManageShiftCodes}
+                      />
+                      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>h</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={form.defaultDurationMinutes ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value === "" ? null : Math.max(0, Math.min(59, Number(e.target.value)));
+                          setForm((p) => ({ ...p, defaultDurationMinutes: v }));
+                        }}
+                        placeholder="0"
+                        style={{ ...inputStyle, width: 64, textAlign: "center" }}
+                        disabled={!canManageShiftCodes}
+                      />
+                      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>m</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
+                      style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
+                      disabled={!canManageShiftCodes}
+                    >
+                      Set actual times instead
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
 
           {/* Colors */}
           <div>
@@ -1229,7 +1351,7 @@ function ShiftCodeRow({
           </div>
 
           {/* Required Certifications — only for recurring shifts */}
-          {!form.isOffDay && certifications.length > 0 && (
+          {certifications.length > 0 && (
             <div>
               <label style={labelStyle}>
                 REQUIRED {certificationLabel.toUpperCase()} (leave all unchecked = any qualification)
@@ -1316,7 +1438,27 @@ function ShiftCodeRow({
               {saving ? "Saving…" : "Save"}
             </button>
             <button
-              onClick={() => st.isNew ? onDeleted(st.id) : setExpanded(false)}
+              onClick={() => {
+                if (st.isNew) {
+                  onDeleted(st.id);
+                } else {
+                  setForm({
+                    label: st.label,
+                    name: st.name,
+                    color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
+                    border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
+                    text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
+                    categoryId: st.categoryId ?? null,
+                    focusAreaId: st.focusAreaId ?? null,
+                    requiredCertificationIds: st.requiredCertificationIds ?? [],
+                    defaultStartTime: st.defaultStartTime ?? null,
+                    defaultEndTime: st.defaultEndTime ?? null,
+                    defaultDurationHours: st.defaultDurationHours ?? null,
+                    defaultDurationMinutes: st.defaultDurationMinutes ?? null,
+                  });
+                  setExpanded(false);
+                }
+              }}
               style={{
                 background: "var(--color-border-light)",
                 border: "none",
@@ -1366,6 +1508,257 @@ function ShiftCodeRow({
   );
 }
 
+// ── Absence Type Row ─────────────────────────────────────────────────────────
+function AbsenceTypeRow({
+  at,
+  orgId,
+  onSaved,
+  onDeleted,
+  canEdit,
+  allAbsenceTypes,
+}: {
+  at: AbsenceType & { isNew?: boolean };
+  orgId: string;
+  onSaved: (saved: AbsenceType, prevId: number) => void;
+  onDeleted: (id: number) => void;
+  canEdit: boolean;
+  allAbsenceTypes: (AbsenceType & { isNew?: boolean })[];
+}) {
+  const isMobile = useMediaQuery(MOBILE);
+  const resolveForm = useCallback((src: AbsenceType) => ({
+    label: src.label,
+    name: src.name,
+    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
+    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
+    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
+  }), []);
+  const [form, setForm] = useState(() => resolveForm(at));
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [expanded, setExpanded] = useState(!!at.isNew);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // M3: Re-sync form when parent prop changes (e.g., concurrent update)
+  useEffect(() => {
+    if (!at.isNew) setForm(resolveForm(at));
+  }, [at.id, at.label, at.name, at.color, at.border, at.text, at.isNew, resolveForm]);
+
+  const isDirty = at.isNew ||
+    form.label !== at.label ||
+    form.name !== at.name ||
+    form.color !== (at.color === "transparent" ? PREDEFINED_COLORS[0].bg : at.color) ||
+    form.border !== (at.border === "transparent" ? TRANSPARENT_BORDER : at.border) ||
+    form.text !== (at.text === "transparent" ? PREDEFINED_COLORS[0].text : at.text);
+
+  // M2: Duplicate label check
+  const trimmedLabel = form.label.trim().toUpperCase();
+  const isDuplicateLabel = trimmedLabel !== "" && allAbsenceTypes.some(
+    (other) => other.id !== at.id && other.label.trim().toUpperCase() === trimmedLabel,
+  );
+
+  const canSave = isDirty && !!form.label.trim() && !!form.name.trim() && !isDuplicateLabel;
+
+  const handleSave = useCallback(async () => {
+    if (!form.label.trim() || !form.name.trim()) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const saved = await db.upsertAbsenceType({
+        id: at.isNew ? undefined : at.id,
+        orgId,
+        label: form.label.trim(),
+        name: form.name.trim(),
+        color: form.color,
+        border: form.border,
+        text: form.text,
+        sortOrder: at.sortOrder,
+      });
+      onSaved(saved, at.id);
+      setExpanded(false);
+      toast.success("Off day type saved");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "Unknown error";
+      console.error("Save absence type error:", msg, err);
+      setSaveError(msg);
+      toast.error("Failed to save off day type");
+    } finally {
+      setSaving(false);
+    }
+  }, [form, at, orgId, onSaved]);
+
+  const handleDelete = useCallback(async () => {
+    if (at.isNew) { onDeleted(at.id); return; }
+    setDeleting(true);
+    try {
+      await db.deleteAbsenceType(at.id);
+      onDeleted(at.id);
+      toast.success("Off day type deleted");
+    } catch (err) {
+      toast.error("Failed to delete off day type");
+      console.error(err);
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }, [at, onDeleted]);
+
+  return (
+    <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <span style={{ display: "inline-block", minWidth: 44, padding: "3px 8px", background: form.color, border: `1px solid ${borderColor(form.text)}`, color: form.text, borderRadius: 8, fontSize: "var(--dg-fs-caption)", fontWeight: 700, textAlign: "center" }}>
+          {form.label || "…"}
+        </span>
+        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)", flex: 1 }}>
+          {form.name || "—"}
+        </span>
+        <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>▾</span>
+      </div>
+
+      {expanded && (
+        <div style={{ background: "var(--color-bg)", borderTop: "1px solid var(--color-border-light)", padding: 16, display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: 10 }}>
+            <div>
+              <label style={labelStyle}>CODE / LABEL</label>
+              <input value={form.label} onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))} placeholder="e.g. X" maxLength={6} style={inputStyle} disabled={!canEdit} />
+            </div>
+            <div>
+              <label style={labelStyle}>FULL NAME</label>
+              <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sick Leave" maxLength={50} style={inputStyle} disabled={!canEdit} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>COLOR PRESET</label>
+            <PresetColorPicker valueBg={form.color} onChange={c => setForm(p => ({ ...p, color: c.bg, text: c.text, border: TRANSPARENT_BORDER }))} disabled={!canEdit} />
+          </div>
+          {isDuplicateLabel && (
+            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: "0 0 4px" }}>
+              A type with label &ldquo;{form.label.trim()}&rdquo; already exists.
+            </p>
+          )}
+          {saveError && (
+            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: "0 0 8px" }}>
+              <strong>Error:</strong> {saveError}
+            </p>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} style={{ background: canSave && canEdit ? "var(--color-brand)" : "var(--color-border-light)", border: "none", color: canSave && canEdit ? "var(--color-text-inverse)" : "var(--color-text-muted)", borderRadius: 8, padding: "8px 18px", fontSize: "var(--dg-fs-label)", fontWeight: 700, cursor: canSave && canEdit ? "pointer" : "default", opacity: canSave && canEdit ? 1 : 0.6 }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} style={{ background: "var(--color-border-light)", border: "none", borderRadius: 8, color: "var(--color-text-muted)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", cursor: "pointer" }}>
+              Cancel
+            </button>
+            <div style={{ flex: 1 }} />
+            {canEdit && !at.isNew && (
+              <button onClick={() => setShowDeleteConfirm(true)} disabled={deleting} style={{ background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer" }}>
+                {deleting ? "…" : "Delete"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Off Day Type?"
+          message={<>Delete <strong>{form.label}</strong>? This type will be removed from future schedules.</>}
+          confirmLabel="Delete"
+          variant="danger"
+          isLoading={deleting}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Absence Types Settings ───────────────────────────────────────────────────
+function AbsenceTypesSettings({
+  absenceTypes,
+  orgId,
+  onChange,
+  canManageShiftCodes,
+}: {
+  absenceTypes: AbsenceType[];
+  orgId: string;
+  onChange: (types: AbsenceType[]) => void;
+  canManageShiftCodes: boolean;
+}) {
+  const [local, setLocal] = useState<(AbsenceType & { isNew?: boolean })[]>(absenceTypes);
+  const nextTmpId = useRef(-1);
+
+  useEffect(() => {
+    setLocal((prev) => {
+      const newItems = prev.filter((s) => (s as { isNew?: boolean }).isNew);
+      return [...absenceTypes, ...newItems];
+    });
+  }, [absenceTypes]);
+
+  const handleAdd = () => {
+    const tmp: AbsenceType & { isNew: boolean } = {
+      id: nextTmpId.current--,
+      orgId,
+      label: "",
+      name: "",
+      color: "#EEEFEC",
+      border: "#9EB4D4",
+      text: "#3E433B",
+      sortOrder: local.length,
+      isNew: true,
+    };
+    setLocal((prev) => [...prev, tmp]);
+  };
+
+  const handleSaved = (saved: AbsenceType, prevId: number) => {
+    const updated = local.map((s) => (s.id === prevId ? saved : s));
+    setLocal(updated);
+    onChange(updated.filter(s => !(s as { isNew?: boolean }).isNew));
+  };
+
+  const handleDeleted = (id: number) => {
+    const updated = local.filter((s) => s.id !== id);
+    setLocal(updated);
+    onChange(updated.filter(s => !(s as { isNew?: boolean }).isNew));
+  };
+
+  return (
+    <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+        Off Days
+      </div>
+      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
+        Off days (scheduled off, sick leave, vacation) do not count toward shift totals.
+      </p>
+      {local.length > 0 ? (
+        <div style={{ padding: "0 16px" }}>
+          {local.map((at) => (
+            <AbsenceTypeRow key={at.id} at={at} orgId={orgId} onSaved={handleSaved} onDeleted={handleDeleted} canEdit={canManageShiftCodes} allAbsenceTypes={local} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ border: "1px dashed var(--color-border)", borderRadius: 10, padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, margin: "12px 16px" }}>
+          <span>No off day types yet</span>
+          {canManageShiftCodes && (
+            <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+              + Add Off Day Type
+            </button>
+          )}
+        </div>
+      )}
+      {local.length > 0 && canManageShiftCodes && (
+        <div style={{ padding: "8px 16px 12px" }}>
+          <button onClick={handleAdd} style={{ background: "none", border: "none", color: "var(--color-text-muted)", padding: "6px 0", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            + Add Off Day Type
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Shift Codes Settings ──────────────────────────────────────────────────────
 function ShiftCodesSettings({
   shiftCodes,
@@ -1377,6 +1770,8 @@ function ShiftCodesSettings({
   focusAreaLabel,
   onChange,
   canManageShiftCodes,
+  absenceTypes,
+  onAbsenceTypesChange,
 }: {
   shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
@@ -1387,6 +1782,8 @@ function ShiftCodesSettings({
   focusAreaLabel: string;
   onChange: (types: ShiftCode[]) => void;
   canManageShiftCodes: boolean;
+  absenceTypes: AbsenceType[];
+  onAbsenceTypesChange: (types: AbsenceType[]) => void;
 }) {
   const [local, setLocal] =
     useState<(ShiftCode & { isNew?: boolean })[]>(shiftCodes);
@@ -1402,16 +1799,15 @@ function ShiftCodesSettings({
     });
   }, [shiftCodes]);
 
-  const handleAdd = (focusAreaId: number | null, isOffDay = false) => {
+  const handleAdd = (focusAreaId: number | null) => {
     const tmp: ShiftCode & { isNew: boolean } = {
       id: nextTmpId.current--,
       orgId: orgId,
       label: "",
       name: "",
-      color: isOffDay ? "#EEEFEC" : "#F7F8F5",
+      color: "#F7F8F5",
       border: "#9EB4D4",
       text:"#3E433B",
-      isOffDay,
       focusAreaId: focusAreaId,
       sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
       isNew: true,
@@ -1442,7 +1838,7 @@ function ShiftCodesSettings({
     fontFamily: "inherit",
   };
 
-  const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], isOffDaySection = false, hideAreaSelect = false) =>
+  const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], hideAreaSelect = false) =>
     codes.map((st) => (
       <ShiftCodeRow
         key={st.id}
@@ -1453,7 +1849,6 @@ function ShiftCodesSettings({
         certifications={certifications}
         certificationLabel={certificationLabel}
         focusAreaLabel={focusAreaLabel}
-        isOffDayRow={isOffDaySection}
         hideFocusAreaSelect={hideAreaSelect}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
@@ -1488,7 +1883,7 @@ function ShiftCodesSettings({
       {/* Per-focus-area sections */}
       {focusAreas.map((focusArea) => {
         const areaCodes = local.filter(
-          (s) => !s.isOffDay && s.focusAreaId === focusArea.id,
+          (s) => s.focusAreaId === focusArea.id,
         );
         return (
           <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
@@ -1498,7 +1893,7 @@ function ShiftCodesSettings({
             </div>
             {areaCodes.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
-                {renderRows(areaCodes, false, true)}
+                {renderRows(areaCodes, true)}
               </div>
             ) : (
               <div style={{
@@ -1529,7 +1924,7 @@ function ShiftCodesSettings({
       {/* General / cross-area codes */}
       {(() => {
         const generalCodes = local.filter(
-          (s) => !s.isOffDay && s.focusAreaId == null,
+          (s) => s.focusAreaId == null,
         );
         return (
           <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
@@ -1538,7 +1933,7 @@ function ShiftCodesSettings({
             </div>
             {generalCodes.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
-                {renderRows(generalCodes, false, true)}
+                {renderRows(generalCodes, true)}
               </div>
             ) : (
               <div style={{
@@ -1566,46 +1961,13 @@ function ShiftCodesSettings({
         );
       })()}
 
-      {/* Off Days */}
-      {(() => {
-        const offDayCodes = local.filter((s) => s.isOffDay);
-        return (
-          <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              Off Days
-            </div>
-            <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
-              Off days (scheduled off, sick leave, vacation) do not count toward shift totals.
-            </p>
-            {offDayCodes.length > 0 ? (
-              <div style={{ padding: "0 16px" }}>
-                {renderRows(offDayCodes, true, true)}
-              </div>
-            ) : (
-              <div style={{
-                border: "1px dashed var(--color-border)", borderRadius: 10,
-                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                margin: "12px 16px",
-              }}>
-                <span>No off day codes yet</span>
-                {canManageShiftCodes && (
-                  <button onClick={() => handleAdd(null, true)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
-                    + Add Off Day Code
-                  </button>
-                )}
-              </div>
-            )}
-            {offDayCodes.length > 0 && canManageShiftCodes && (
-              <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(null, true)} style={addBtnStyle}>
-                  + Add Off Day Code
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* Off Days (Absence Types) */}
+      <AbsenceTypesSettings
+        absenceTypes={absenceTypes}
+        orgId={orgId}
+        onChange={onAbsenceTypesChange}
+        canManageShiftCodes={canManageShiftCodes}
+      />
     </div>
   );
 }
@@ -2631,44 +2993,6 @@ function ShiftCategoriesSettings({
         );
       })}
 
-      {/* Global / cross-area categories */}
-      {(() => {
-        const globalCats = local.filter((c) => c.focusAreaId == null);
-        if (globalCats.length === 0 && !canManageShiftCodes) return null;
-        return (
-          <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              Global / Cross-Area
-            </div>
-            {globalCats.length > 0 ? (
-              <div style={{ padding: "0 16px" }}>
-                {globalCats.map(renderCategoryRow)}
-              </div>
-            ) : (
-              <div style={{
-                border: "1px dashed var(--color-border)", borderRadius: 10,
-                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                margin: "12px 16px",
-              }}>
-                <span>No global categories yet</span>
-                {canManageShiftCodes && (
-                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
-                    + Add Global Category
-                  </button>
-                )}
-              </div>
-            )}
-            {globalCats.length > 0 && canManageShiftCodes && (
-              <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(null)} style={addBtnStyle}>
-                  + Add Global Category
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {confirmDeleteId !== null && (() => {
         const cat = local.find(c => c.id === confirmDeleteId);
@@ -2783,7 +3107,6 @@ function CoverageRequirementsSettings({
       return shiftCodes.filter(
         (sc) =>
           !sc.archivedAt &&
-          !sc.isOffDay &&
           sc.categoryId === categoryId &&
           sc.focusAreaId === focusAreaId,
       );
@@ -3731,6 +4054,8 @@ export default function SettingsPage({
   coverageRequirements,
   onCoverageRequirementsChange,
   canManageCoverageRequirements,
+  absenceTypes,
+  onAbsenceTypesChange,
 }: SettingsPageProps) {
   const pathname = usePathname();
   const VALID_SECTIONS = ["organization", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "impersonation"];
@@ -3767,7 +4092,7 @@ export default function SettingsPage({
   const orgLinks = canManageOrg ? [
     { id: "organization", label: "Organization", icon: iconBuilding },
     { id: "shift-categories", label: "Shift Categories", icon: iconTag },
-    { id: "shift-codes", label: "Shift Codes", icon: iconCalendar },
+    { id: "shift-codes", label: "Schedule Codes", icon: iconCalendar },
     { id: "coverage", label: "Coverage", icon: iconCoverage },
     { id: "indicators", label: "Indicators", icon: iconIndicator },
     { id: "staff-config", label: "Designations", icon: iconDesignations },
@@ -3914,6 +4239,8 @@ export default function SettingsPage({
               focusAreaLabel={focusAreaLabel}
               onChange={onShiftCodesChange}
               canManageShiftCodes={canManageShiftCodes}
+              absenceTypes={absenceTypes}
+              onAbsenceTypesChange={onAbsenceTypesChange}
             />
           </div>
         )}

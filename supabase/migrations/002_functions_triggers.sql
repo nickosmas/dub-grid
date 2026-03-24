@@ -352,6 +352,10 @@ CREATE TRIGGER trigger_shift_codes_audit
   BEFORE INSERT OR UPDATE ON public.shift_codes
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
+CREATE TRIGGER trigger_absence_types_audit
+  BEFORE INSERT OR UPDATE ON public.absence_types
+  FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
+
 CREATE TRIGGER trigger_shifts_audit
   BEFORE INSERT OR UPDATE ON public.shifts
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
@@ -705,20 +709,33 @@ BEGIN
   -- Advisory lock prevents concurrent publishes for same org
   PERFORM pg_advisory_xact_lock(hashtext('publish_schedule_' || p_org_id::TEXT));
 
-  -- Capture shift changes BEFORE applying them
+  -- Capture shift changes BEFORE applying them (includes absence type + custom time changes)
   FOR r IN
     SELECT s.emp_id, s.date,
            s.published_shift_code_ids AS old_ids,
            s.draft_shift_code_ids AS new_ids,
+           s.published_absence_type_id AS old_absence_type_id,
+           s.draft_absence_type_id AS new_absence_type_id,
            s.draft_is_delete,
            s.updated_by
     FROM public.shifts s
     WHERE s.org_id = p_org_id
       AND s.date >= p_start_date AND s.date <= p_end_date
       AND (
-        (s.draft_is_delete = TRUE AND array_length(s.published_shift_code_ids, 1) IS NOT NULL)
+        (s.draft_is_delete = TRUE AND (
+          array_length(s.published_shift_code_ids, 1) IS NOT NULL
+          OR s.published_absence_type_id IS NOT NULL
+        ))
         OR (array_length(s.draft_shift_code_ids, 1) IS NOT NULL
             AND s.draft_shift_code_ids IS DISTINCT FROM s.published_shift_code_ids)
+        OR (s.draft_absence_type_id IS NOT NULL
+            AND s.draft_absence_type_id IS DISTINCT FROM s.published_absence_type_id)
+        OR (s.draft_absence_type_id IS NULL AND s.published_absence_type_id IS NOT NULL
+            AND s.draft_is_delete = FALSE AND array_length(s.draft_shift_code_ids, 1) IS NOT NULL)
+        OR (s.draft_custom_start_time IS DISTINCT FROM s.published_custom_start_time
+            AND s.draft_custom_start_time IS NOT NULL)
+        OR (s.draft_custom_end_time IS DISTINCT FROM s.published_custom_end_time
+            AND s.draft_custom_end_time IS NOT NULL)
       )
   LOOP
     v_change_count := v_change_count + 1;
@@ -727,11 +744,13 @@ BEGIN
       'date', r.date,
       'kind', CASE
         WHEN r.draft_is_delete THEN 'deleted'
-        WHEN array_length(r.old_ids, 1) IS NULL THEN 'new'
+        WHEN array_length(r.old_ids, 1) IS NULL AND r.old_absence_type_id IS NULL THEN 'new'
         ELSE 'modified'
       END,
       'from', COALESCE(to_jsonb(r.old_ids), '[]'::JSONB),
       'to', CASE WHEN r.draft_is_delete THEN '[]'::JSONB ELSE COALESCE(to_jsonb(r.new_ids), '[]'::JSONB) END,
+      'fromAbsenceTypeId', r.old_absence_type_id,
+      'toAbsenceTypeId', CASE WHEN r.draft_is_delete THEN NULL ELSE r.new_absence_type_id END,
       'updatedBy', r.updated_by
     ));
   END LOOP;
@@ -749,17 +768,26 @@ BEGIN
   VALUES (p_org_id, auth.uid(), p_start_date, p_end_date, v_change_count, v_changes)
   RETURNING id INTO v_history_id;
 
-  -- Promote drafts → published
+  -- Promote drafts → published (shift codes, absence types, and custom times)
   UPDATE public.shifts
   SET published_shift_code_ids = draft_shift_code_ids,
+      published_absence_type_id = draft_absence_type_id,
+      published_custom_start_time = COALESCE(draft_custom_start_time, published_custom_start_time),
+      published_custom_end_time = COALESCE(draft_custom_end_time, published_custom_end_time),
       draft_shift_code_ids = '{}',
+      draft_absence_type_id = NULL,
+      draft_custom_start_time = NULL,
+      draft_custom_end_time = NULL,
       draft_is_delete = FALSE,
       updated_at = NOW(),
       updated_by = auth.uid()
   WHERE org_id = p_org_id
     AND date >= p_start_date AND date <= p_end_date
     AND draft_is_delete = FALSE
-    AND array_length(draft_shift_code_ids, 1) IS NOT NULL;
+    AND (array_length(draft_shift_code_ids, 1) IS NOT NULL
+         OR draft_absence_type_id IS NOT NULL
+         OR draft_custom_start_time IS NOT NULL
+         OR draft_custom_end_time IS NOT NULL);
 
   -- Handle draft-deletes
   DELETE FROM public.shifts
@@ -767,12 +795,14 @@ BEGIN
     AND date >= p_start_date AND date <= p_end_date
     AND draft_is_delete = TRUE;
 
-  -- Clean up empty rows
+  -- Clean up empty rows (no shift codes, no absence types, not a draft-delete)
   DELETE FROM public.shifts
   WHERE org_id = p_org_id
     AND date >= p_start_date AND date <= p_end_date
     AND (published_shift_code_ids IS NULL OR array_length(published_shift_code_ids, 1) IS NULL)
     AND (draft_shift_code_ids IS NULL OR array_length(draft_shift_code_ids, 1) IS NULL)
+    AND published_absence_type_id IS NULL
+    AND draft_absence_type_id IS NULL
     AND draft_is_delete = FALSE;
 
   -- Notes: draft → published
@@ -869,37 +899,46 @@ BEGIN
     RAISE EXCEPTION 'Source shift not found';
   END IF;
 
+  -- Reject moving absence-type shifts (off days) — they are non-transferable
+  IF v_source_shift.draft_absence_type_id IS NOT NULL
+     OR v_source_shift.published_absence_type_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Cannot move absence-type shifts (off days)';
+  END IF;
+
   -- Optimistic lock check
   IF p_expected_version IS NOT NULL AND v_source_shift.version != p_expected_version THEN
     RAISE EXCEPTION 'Optimistic lock failed: expected version %, found %',
       p_expected_version, v_source_shift.version;
   END IF;
 
-  -- Create at target (upsert)
+  -- Create at target (upsert) — custom times go to draft columns
   INSERT INTO public.shifts (
     emp_id, date, org_id, draft_shift_code_ids, draft_is_delete,
-    custom_start_time, custom_end_time, focus_area_id,
+    draft_custom_start_time, draft_custom_end_time, focus_area_id,
     created_by, updated_by
   ) VALUES (
     p_target_emp_id, p_target_date, p_org_id, p_shift_code_ids, false,
-    v_source_shift.custom_start_time, v_source_shift.custom_end_time,
+    COALESCE(v_source_shift.draft_custom_start_time, v_source_shift.published_custom_start_time),
+    COALESCE(v_source_shift.draft_custom_end_time, v_source_shift.published_custom_end_time),
     v_source_shift.focus_area_id,
     auth.uid(), auth.uid()
   )
   ON CONFLICT (emp_id, date) DO UPDATE SET
-    draft_shift_code_ids = EXCLUDED.draft_shift_code_ids,
-    draft_is_delete      = false,
-    custom_start_time    = EXCLUDED.custom_start_time,
-    custom_end_time      = EXCLUDED.custom_end_time,
-    focus_area_id        = EXCLUDED.focus_area_id,
-    updated_by           = auth.uid(),
-    version              = shifts.version + 1;
+    draft_shift_code_ids     = EXCLUDED.draft_shift_code_ids,
+    draft_is_delete          = false,
+    draft_custom_start_time  = EXCLUDED.draft_custom_start_time,
+    draft_custom_end_time    = EXCLUDED.draft_custom_end_time,
+    focus_area_id            = EXCLUDED.focus_area_id,
+    updated_by               = auth.uid(),
+    version                  = shifts.version + 1;
 
   -- Delete source: soft-delete if published, hard-delete if draft-only
-  IF v_source_shift.published_shift_code_ids IS NOT NULL
-     AND array_length(v_source_shift.published_shift_code_ids, 1) > 0 THEN
+  IF (v_source_shift.published_shift_code_ids IS NOT NULL
+      AND array_length(v_source_shift.published_shift_code_ids, 1) > 0)
+     OR v_source_shift.published_absence_type_id IS NOT NULL THEN
     UPDATE public.shifts
-    SET draft_shift_code_ids = '{}', draft_is_delete = true,
+    SET draft_shift_code_ids = '{}', draft_absence_type_id = NULL,
+        draft_is_delete = true,
         updated_by = auth.uid(), version = version + 1
     WHERE emp_id = p_source_emp_id AND date = p_source_date;
   ELSE
@@ -1599,8 +1638,8 @@ BEGIN
   END IF;
 
   -- Validate requester owns a published shift on this date
-  SELECT emp_id, date, published_shift_code_ids, focus_area_id,
-         custom_start_time, custom_end_time
+  SELECT emp_id, date, published_shift_code_ids, published_absence_type_id,
+         focus_area_id, published_custom_start_time, published_custom_end_time
   INTO v_requester_shift
   FROM public.shifts
   WHERE emp_id = p_requester_emp_id AND date = p_requester_shift_date AND org_id = p_org_id;
@@ -1609,12 +1648,8 @@ BEGIN
     RAISE EXCEPTION 'No published shift found for this employee on this date';
   END IF;
 
-  -- Check no off-day codes (can't avail an off day)
-  IF EXISTS (
-    SELECT 1 FROM public.shift_codes
-    WHERE id = ANY(v_requester_shift.published_shift_code_ids)
-      AND is_off_day = TRUE
-  ) THEN
+  -- Check not an absence (can't avail an off day)
+  IF v_requester_shift.published_absence_type_id IS NOT NULL THEN
     RAISE EXCEPTION 'Cannot create a request for an off-day shift';
   END IF;
 
@@ -1658,8 +1693,8 @@ BEGIN
     END IF;
 
     -- Validate target owns a published shift on the target date
-    SELECT emp_id, date, published_shift_code_ids, focus_area_id,
-           custom_start_time, custom_end_time
+    SELECT emp_id, date, published_shift_code_ids, published_absence_type_id,
+           focus_area_id, published_custom_start_time, published_custom_end_time
     INTO v_target_shift
     FROM public.shifts
     WHERE emp_id = p_target_emp_id AND date = p_target_shift_date AND org_id = p_org_id;
@@ -1668,12 +1703,8 @@ BEGIN
       RAISE EXCEPTION 'Target employee has no published shift on the specified date';
     END IF;
 
-    -- Check target shift has no off-day codes
-    IF EXISTS (
-      SELECT 1 FROM public.shift_codes
-      WHERE id = ANY(v_target_shift.published_shift_code_ids)
-        AND is_off_day = TRUE
-    ) THEN
+    -- Check target shift is not an absence
+    IF v_target_shift.published_absence_type_id IS NOT NULL THEN
       RAISE EXCEPTION 'Cannot swap with an off-day shift';
     END IF;
 
@@ -1703,12 +1734,12 @@ BEGIN
     ) VALUES (
       p_org_id, p_type, 'open',
       p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
-      v_requester_shift.focus_area_id, v_requester_shift.custom_start_time, v_requester_shift.custom_end_time,
+      v_requester_shift.focus_area_id, v_requester_shift.published_custom_start_time, v_requester_shift.published_custom_end_time,
       p_target_emp_id, p_target_shift_date,
       v_target_shift.published_shift_code_ids,
       v_target_shift.focus_area_id,
-      v_target_shift.custom_start_time,
-      v_target_shift.custom_end_time,
+      v_target_shift.published_custom_start_time,
+      v_target_shift.published_custom_end_time,
       p_idempotency_key
     ) RETURNING id INTO v_request_id;
   ELSE
@@ -1721,7 +1752,7 @@ BEGIN
     ) VALUES (
       p_org_id, p_type, 'open',
       p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
-      v_requester_shift.focus_area_id, v_requester_shift.custom_start_time, v_requester_shift.custom_end_time,
+      v_requester_shift.focus_area_id, v_requester_shift.published_custom_start_time, v_requester_shift.published_custom_end_time,
       NULL, NULL,
       p_idempotency_key
     ) RETURNING id INTO v_request_id;
@@ -2070,7 +2101,7 @@ BEGIN
     INSERT INTO public.shifts (
       emp_id, date, org_id, user_id,
       published_shift_code_ids, draft_shift_code_ids,
-      focus_area_id, custom_start_time, custom_end_time,
+      focus_area_id, published_custom_start_time, published_custom_end_time,
       created_by, updated_by
     )
     SELECT
@@ -2082,17 +2113,17 @@ BEGIN
     WHERE e.id = v_request.target_emp_id
     ON CONFLICT (emp_id, date) DO UPDATE SET
       published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
-      custom_start_time = CASE
-        WHEN shifts.custom_start_time IS NOT NULL AND EXCLUDED.custom_start_time IS NOT NULL
-          THEN shifts.custom_start_time || '|' || EXCLUDED.custom_start_time
-        WHEN EXCLUDED.custom_start_time IS NOT NULL THEN EXCLUDED.custom_start_time
-        ELSE shifts.custom_start_time
+      published_custom_start_time = CASE
+        WHEN shifts.published_custom_start_time IS NOT NULL AND EXCLUDED.published_custom_start_time IS NOT NULL
+          THEN shifts.published_custom_start_time || '|' || EXCLUDED.published_custom_start_time
+        WHEN EXCLUDED.published_custom_start_time IS NOT NULL THEN EXCLUDED.published_custom_start_time
+        ELSE shifts.published_custom_start_time
       END,
-      custom_end_time = CASE
-        WHEN shifts.custom_end_time IS NOT NULL AND EXCLUDED.custom_end_time IS NOT NULL
-          THEN shifts.custom_end_time || '|' || EXCLUDED.custom_end_time
-        WHEN EXCLUDED.custom_end_time IS NOT NULL THEN EXCLUDED.custom_end_time
-        ELSE shifts.custom_end_time
+      published_custom_end_time = CASE
+        WHEN shifts.published_custom_end_time IS NOT NULL AND EXCLUDED.published_custom_end_time IS NOT NULL
+          THEN shifts.published_custom_end_time || '|' || EXCLUDED.published_custom_end_time
+        WHEN EXCLUDED.published_custom_end_time IS NOT NULL THEN EXCLUDED.published_custom_end_time
+        ELSE shifts.published_custom_end_time
       END,
       focus_area_id = CASE
         WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
@@ -2155,7 +2186,7 @@ BEGIN
     INSERT INTO public.shifts (
       emp_id, date, org_id, user_id,
       published_shift_code_ids, draft_shift_code_ids,
-      focus_area_id, custom_start_time, custom_end_time,
+      focus_area_id, published_custom_start_time, published_custom_end_time,
       created_by, updated_by
     )
     SELECT
@@ -2167,17 +2198,17 @@ BEGIN
     ON CONFLICT (emp_id, date) DO UPDATE SET
       published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
       -- Merge pipe-delimited custom times (each segment maps to a shift code)
-      custom_start_time = CASE
-        WHEN shifts.custom_start_time IS NOT NULL AND EXCLUDED.custom_start_time IS NOT NULL
-          THEN shifts.custom_start_time || '|' || EXCLUDED.custom_start_time
-        WHEN EXCLUDED.custom_start_time IS NOT NULL THEN EXCLUDED.custom_start_time
-        ELSE shifts.custom_start_time
+      published_custom_start_time = CASE
+        WHEN shifts.published_custom_start_time IS NOT NULL AND EXCLUDED.published_custom_start_time IS NOT NULL
+          THEN shifts.published_custom_start_time || '|' || EXCLUDED.published_custom_start_time
+        WHEN EXCLUDED.published_custom_start_time IS NOT NULL THEN EXCLUDED.published_custom_start_time
+        ELSE shifts.published_custom_start_time
       END,
-      custom_end_time = CASE
-        WHEN shifts.custom_end_time IS NOT NULL AND EXCLUDED.custom_end_time IS NOT NULL
-          THEN shifts.custom_end_time || '|' || EXCLUDED.custom_end_time
-        WHEN EXCLUDED.custom_end_time IS NOT NULL THEN EXCLUDED.custom_end_time
-        ELSE shifts.custom_end_time
+      published_custom_end_time = CASE
+        WHEN shifts.published_custom_end_time IS NOT NULL AND EXCLUDED.published_custom_end_time IS NOT NULL
+          THEN shifts.published_custom_end_time || '|' || EXCLUDED.published_custom_end_time
+        WHEN EXCLUDED.published_custom_end_time IS NOT NULL THEN EXCLUDED.published_custom_end_time
+        ELSE shifts.published_custom_end_time
       END,
       -- Keep existing focus area (double shift spans areas; NULL if they differ)
       focus_area_id = CASE
@@ -2196,7 +2227,7 @@ BEGIN
     INSERT INTO public.shifts (
       emp_id, date, org_id, user_id,
       published_shift_code_ids, draft_shift_code_ids,
-      focus_area_id, custom_start_time, custom_end_time,
+      focus_area_id, published_custom_start_time, published_custom_end_time,
       created_by, updated_by
     )
     SELECT
@@ -2207,17 +2238,17 @@ BEGIN
     FROM public.employees e WHERE e.id = v_request.requester_emp_id
     ON CONFLICT (emp_id, date) DO UPDATE SET
       published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
-      custom_start_time = CASE
-        WHEN shifts.custom_start_time IS NOT NULL AND EXCLUDED.custom_start_time IS NOT NULL
-          THEN shifts.custom_start_time || '|' || EXCLUDED.custom_start_time
-        WHEN EXCLUDED.custom_start_time IS NOT NULL THEN EXCLUDED.custom_start_time
-        ELSE shifts.custom_start_time
+      published_custom_start_time = CASE
+        WHEN shifts.published_custom_start_time IS NOT NULL AND EXCLUDED.published_custom_start_time IS NOT NULL
+          THEN shifts.published_custom_start_time || '|' || EXCLUDED.published_custom_start_time
+        WHEN EXCLUDED.published_custom_start_time IS NOT NULL THEN EXCLUDED.published_custom_start_time
+        ELSE shifts.published_custom_start_time
       END,
-      custom_end_time = CASE
-        WHEN shifts.custom_end_time IS NOT NULL AND EXCLUDED.custom_end_time IS NOT NULL
-          THEN shifts.custom_end_time || '|' || EXCLUDED.custom_end_time
-        WHEN EXCLUDED.custom_end_time IS NOT NULL THEN EXCLUDED.custom_end_time
-        ELSE shifts.custom_end_time
+      published_custom_end_time = CASE
+        WHEN shifts.published_custom_end_time IS NOT NULL AND EXCLUDED.published_custom_end_time IS NOT NULL
+          THEN shifts.published_custom_end_time || '|' || EXCLUDED.published_custom_end_time
+        WHEN EXCLUDED.published_custom_end_time IS NOT NULL THEN EXCLUDED.published_custom_end_time
+        ELSE shifts.published_custom_end_time
       END,
       focus_area_id = CASE
         WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id

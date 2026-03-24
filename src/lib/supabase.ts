@@ -13,6 +13,12 @@ export function validateConfig(): void {
   }
 }
 
+// Fail fast if env vars are missing — surfaces the problem immediately on first import
+// rather than silently passing empty strings to createBrowserClient.
+if (typeof window !== "undefined") {
+  validateConfig();
+}
+
 let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
 export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {

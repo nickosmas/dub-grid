@@ -12,6 +12,7 @@ import type {
   Employee,
   FocusArea,
   ShiftCode,
+  AbsenceType,
   NamedItem,
   IndicatorType,
   AdminPermissions,
@@ -133,6 +134,7 @@ export default function OrganizationDetail({
   const [certifications, setCertifications] = useState<NamedItem[] | null>(null);
   const [orgRoles, setOrgRoles] = useState<NamedItem[] | null>(null);
   const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[] | null>(null);
+  const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
 
@@ -148,6 +150,7 @@ export default function OrganizationDetail({
     setCertifications(null);
     setOrgRoles(null);
     setIndicatorTypes(null);
+    setAbsenceTypes(null);
     setTabError(null);
   }, [organization.id]);
 
@@ -176,12 +179,13 @@ export default function OrganizationDetail({
           }
         }
         if (tab === "config" && focusAreas === null) {
-          const [fa, sc, certs, roles, ind] = await Promise.all([
+          const [fa, sc, certs, roles, ind, abs] = await Promise.all([
             db.fetchFocusAreas(organization.id, true),
             db.fetchShiftCodes(organization.id, true),
             db.fetchCertifications(organization.id, true),
             db.fetchOrganizationRoles(organization.id, true),
             db.fetchIndicatorTypes(organization.id, true),
+            db.fetchAbsenceTypes(organization.id, true),
           ]);
           if (!cancelled) {
             setFocusAreas(fa);
@@ -189,6 +193,7 @@ export default function OrganizationDetail({
             setCertifications(certs);
             setOrgRoles(roles);
             setIndicatorTypes(ind);
+            setAbsenceTypes(abs);
           }
         }
       } catch (err: any) {
@@ -317,6 +322,7 @@ export default function OrganizationDetail({
         <ConfigTab
           focusAreas={focusAreas!}
           shiftCodes={shiftCodes!}
+          absenceTypes={absenceTypes!}
           certifications={certifications!}
           orgRoles={orgRoles!}
           indicatorTypes={indicatorTypes!}
@@ -900,6 +906,7 @@ function EmployeesTab({
 function ConfigTab({
   focusAreas,
   shiftCodes,
+  absenceTypes,
   certifications,
   orgRoles,
   indicatorTypes,
@@ -907,6 +914,7 @@ function ConfigTab({
 }: {
   focusAreas: FocusArea[];
   shiftCodes: ShiftCode[];
+  absenceTypes: AbsenceType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   indicatorTypes: IndicatorType[];
@@ -916,6 +924,8 @@ function ConfigTab({
   const archivedFocusAreas = focusAreas.filter((fa) => fa.archivedAt);
   const activeShiftCodes = shiftCodes.filter((sc) => !sc.archivedAt);
   const archivedShiftCodes = shiftCodes.filter((sc) => sc.archivedAt);
+  const activeAbsenceTypes = absenceTypes.filter((at) => !at.archivedAt);
+  const archivedAbsenceTypes = absenceTypes.filter((at) => at.archivedAt);
   const activeCerts = certifications.filter((c) => !c.archivedAt);
   const activeRoles = orgRoles.filter((r) => !r.archivedAt);
   const activeIndicators = indicatorTypes.filter((i) => !i.archivedAt);
@@ -1028,9 +1038,7 @@ function ConfigTab({
                         {sc.name}
                       </td>
                       <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>
-                        {sc.isOffDay ? (
-                          <span style={{ color: "var(--color-text-muted)", fontWeight: 600 }}>Off Day</span>
-                        ) : sc.isGeneral ? (
+                        {sc.isGeneral ? (
                           <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>General</span>
                         ) : (
                           <span style={{ color: "var(--color-text-subtle)" }}>Shift</span>
@@ -1048,6 +1056,90 @@ function ConfigTab({
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Absence Types */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          Absence Types ({activeAbsenceTypes.length})
+          {archivedAbsenceTypes.length > 0 && (
+            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
+              +{archivedAbsenceTypes.length} archived
+            </span>
+          )}
+        </div>
+        <div style={{ ...sectionBodyStyle, padding: activeAbsenceTypes.length > 0 ? 0 : sectionBodyStyle.padding }}>
+          {activeAbsenceTypes.length === 0 ? (
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Label", "Name", "Color"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        color: "var(--color-text-subtle)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        textAlign: "left",
+                        whiteSpace: "nowrap",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {activeAbsenceTypes.map((at) => (
+                  <tr key={at.id}>
+                    <td style={{ padding: "8px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: 32,
+                          height: 26,
+                          padding: "0 8px",
+                          borderRadius: 8,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 700,
+                          background: at.color,
+                          color: at.text,
+                          border: `1.5px solid ${at.border}`,
+                        }}
+                      >
+                        {at.label}
+                      </span>
+                    </td>
+                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      {at.name}
+                    </td>
+                    <td style={{ padding: "8px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 20,
+                          height: 20,
+                          borderRadius: 4,
+                          background: at.color,
+                          border: `1px solid ${at.border}`,
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

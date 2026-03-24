@@ -15,6 +15,20 @@ export function useLogout() {
     clearOrgDataCache();
     clearEmployeeCache();
     clearPermsCache();
+
+    // Clean up any active impersonation sessions for this user
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        await supabase
+          .from("impersonation_sessions")
+          .delete()
+          .eq("impersonator_id", session.user.id);
+      }
+    } catch {
+      // Best-effort cleanup — don't block logout
+    }
+
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;
     sessionStorage.removeItem("dg_user_name");

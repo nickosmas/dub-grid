@@ -18,9 +18,9 @@ function SettingsPageContent() {
     canManageCoverageRequirements,
   } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, shiftCategories, indicatorTypes,
+    org, focusAreas, shiftCodes, absenceTypes, shiftCategories, indicatorTypes,
     certifications, orgRoles, coverageRequirements, loading, loadError,
-    setOrg, setFocusAreas, handleShiftCodesChange, setShiftCategories,
+    setOrg, setFocusAreas, handleShiftCodesChange, handleAbsenceTypesChange, setShiftCategories,
     setIndicatorTypes, handleCertificationsChange, setOrgRoles, setCoverageRequirements,
   } = useOrganizationData();
   const isLoading = loading || !org;
@@ -71,6 +71,8 @@ function SettingsPageContent() {
           coverageRequirements={coverageRequirements}
           onCoverageRequirementsChange={setCoverageRequirements}
           canManageCoverageRequirements={canManageCoverageRequirements}
+          absenceTypes={absenceTypes}
+          onAbsenceTypesChange={handleAbsenceTypesChange}
         />
       )}
     </div>

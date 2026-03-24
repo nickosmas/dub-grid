@@ -128,15 +128,12 @@ function parseShiftKey(key: string): { empId: string; dateKey: string } {
   return { empId: key.substring(0, idx), dateKey: key.substring(idx + 1) };
 }
 
-/** Returns true if at least one shift code is a non-off-day work shift. */
+/** Returns true if at least one shift code is a work shift (all codes are work shifts now). */
 function hasWorkShift(
   shiftCodeIds: number[],
   shiftCodeById: Map<number, ShiftCode>,
 ): boolean {
-  return shiftCodeIds.some((id) => {
-    const sc = shiftCodeById.get(id);
-    return sc && !sc.isOffDay;
-  });
+  return shiftCodeIds.some((id) => shiftCodeById.has(id));
 }
 
 // ─── Date Helpers ───────────────────────────────────────
@@ -219,10 +216,10 @@ export function computeShiftDurationHours(
 ): number {
   if (customStartTime && customEndTime) {
     let hours = durationHoursFromTimes(customStartTime, customEndTime);
-    // Deduct break from the first non-off-day code
+    // Deduct break from the first code
     for (const codeId of shiftCodeIds) {
       const sc = shiftCodeById.get(codeId);
-      if (sc && !sc.isOffDay) {
+      if (sc) {
         hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
         break;
       }
@@ -232,9 +229,23 @@ export function computeShiftDurationHours(
   let total = 0;
   for (const codeId of shiftCodeIds) {
     const sc = shiftCodeById.get(codeId);
-    if (!sc || sc.isOffDay) continue;
+    if (!sc) continue;
     if (sc.defaultStartTime && sc.defaultEndTime) {
+      // Level 2: shift code custom times
       let hours = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
+      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+      total += hours;
+    } else if (categoryById && sc.categoryId != null) {
+      // Level 1: fall back to shift category times
+      const cat = categoryById.get(sc.categoryId);
+      if (cat?.startTime && cat?.endTime) {
+        let hours = durationHoursFromTimes(cat.startTime, cat.endTime);
+        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+        total += hours;
+      }
+    } else if (sc.defaultDurationHours != null || sc.defaultDurationMinutes != null) {
+      // General codes: use duration
+      let hours = (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
       hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
       total += hours;
     }
@@ -516,9 +527,7 @@ export function computeCoverageBySection(
         const shift = shifts[`${emp.id}_${dateKey}`];
         if (
           shift &&
-          shift.shiftCodeIds.some(
-            (id) => !shiftCodeById.get(id)?.isOffDay && faCodes.has(id),
-          )
+          shift.shiftCodeIds.some((id) => faCodes.has(id))
         ) {
           staffCount++;
         }
@@ -591,7 +600,7 @@ export function computeOpenShifts(
     for (const codeId of requiredCodeIds) {
       if (!faCodes.has(codeId)) continue;
       const sc = shiftCodeById.get(codeId);
-      if (!sc || sc.isOffDay) continue;
+      if (!sc) continue;
 
       for (const date of weekDates) {
         const req = resolveRequirement(
@@ -672,7 +681,7 @@ export function computeShiftBreakdown(
     // Count the first non-off shift code, grouped by the shift code's focus area
     for (const codeId of entry.shiftCodeIds) {
       const sc = shiftCodeById.get(codeId);
-      if (sc && !sc.isOffDay) {
+      if (sc) {
         // Use the shift code's focus area; fall back to the employee's
         const faId = sc.focusAreaId ?? emp?.focusAreaIds[0] ?? -1;
         if (!faCounts.has(faId)) faCounts.set(faId, new Map());

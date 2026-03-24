@@ -170,6 +170,7 @@ export default function CustomSelect<T extends string | number>({
         ...menuStyle,
         overflowY: "auto",
         overflowX: "hidden",
+        scrollbarWidth: "none",
       }}
     >
       {options.map((opt, idx) => {

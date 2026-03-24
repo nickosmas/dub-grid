@@ -27,6 +27,7 @@ import type {
   AuditLogEntry,
   ShiftRequest,
 } from "@/types";
+import { supabase } from "@/lib/supabase";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ScheduleTab } from "./tabs/ScheduleTab";
@@ -43,10 +44,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     org,
     focusAreas,
     shiftCodes,
+    absenceTypes,
     shiftCategories,
     certifications,
     orgRoles,
     shiftCodeMap,
+    absenceTypeMap,
     loading: orgLoading,
   } = useOrganizationData();
 
@@ -79,6 +82,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return map;
   }, [focusAreas]);
 
+  const absenceTypeById = useMemo(() => {
+    const map = new Map<number, (typeof absenceTypes)[number]>();
+    for (const at of absenceTypes) map.set(at.id, at);
+    return map;
+  }, [absenceTypes]);
+
   // Fetch employee data once we have orgId
   useEffect(() => {
     if (!orgId || orgLoading) return;
@@ -100,7 +109,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
         // Fetch the rest in parallel
         const [empShifts, recShifts, empInvitations, empRequests] = await Promise.all([
-          fetchEmployeeShifts(employeeId, orgId, shiftCodeMap),
+          fetchEmployeeShifts(employeeId, orgId, shiftCodeMap, absenceTypeMap),
           fetchRecurringShifts(orgId, employeeId, shiftCodeMap),
           fetchEmployeeInvitations(orgId, employeeId),
           fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
@@ -130,7 +139,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     })();
 
     return () => { cancelled = true; };
-  }, [employeeId, orgId, orgLoading, shiftCodeMap, perms.isGridmaster]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeId, orgId, orgLoading, shiftCodeMap, absenceTypeMap, perms.isGridmaster]);
 
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
@@ -146,6 +156,39 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       focusAreaById,
     );
   }, [employee, shifts, shiftCodeById, categoryById, focusAreaById]);
+
+  // Batch-fetch profile names for shift audit display (who created/edited each shift)
+  const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    const ids = new Set<string>();
+    for (const entry of Object.values(shifts)) {
+      if (entry.createdBy) ids.add(entry.createdBy);
+      if (entry.updatedBy) ids.add(entry.updatedBy);
+    }
+    if (ids.size === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", Array.from(ids));
+        if (cancelled) return;
+        const map = new Map<string, string>();
+        for (const row of data ?? []) {
+          const first = row.first_name?.trim() || "";
+          const last = row.last_name?.trim() || "";
+          const name = [first, last].filter(Boolean).join(" ");
+          if (name) map.set(row.id, name);
+        }
+        setAuditNames(map);
+      } catch {
+        // Non-critical — audit names are informational
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [shifts]);
 
   const pendingInvite = useMemo(() => {
     return invitations.find(i => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date()) ?? null;
@@ -216,10 +259,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 employee={employee}
                 shifts={shifts}
                 shiftCodeById={shiftCodeById}
-                shiftCodes={shiftCodes}
                 focusAreas={focusAreas}
                 categoryById={categoryById}
                 focusAreaById={focusAreaById}
+                absenceTypeById={absenceTypeById}
+                auditNames={auditNames}
                 shiftRequests={shiftRequests}
                 recurringShifts={recurringShifts}
               />

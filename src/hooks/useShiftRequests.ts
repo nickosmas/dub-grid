@@ -27,6 +27,8 @@ export interface ShiftRequestsData {
   /** Count of actionable items (swap proposals for me + pending approvals for admins). */
   badgeCount: number;
   loading: boolean;
+  /** Error message from the last fetch attempt, or null if successful. */
+  error: string | null;
   /** Refetch all requests. */
   refetch: () => Promise<void>;
   /** Create a new pickup or swap request. */
@@ -63,6 +65,7 @@ export function useShiftRequests(
 ): ShiftRequestsData {
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const orgIdRef = useRef(orgId);
   orgIdRef.current = orgId;
 
@@ -73,6 +76,7 @@ export function useShiftRequests(
       return;
     }
     try {
+      setError(null);
       const data = await db.fetchShiftRequests(orgId, shiftCodeMap, {
         status: [
           "open",
@@ -83,11 +87,11 @@ export function useShiftRequests(
         setRequests(data);
       }
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : JSON.stringify(err);
+      const msg = errMsg(err, "Failed to fetch shift requests");
       console.error("Failed to fetch shift requests:", msg);
+      if (orgIdRef.current === orgId) {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -266,6 +270,7 @@ export function useShiftRequests(
     pendingApproval,
     badgeCount,
     loading,
+    error,
     refetch: fetchRequests,
     create,
     claim,

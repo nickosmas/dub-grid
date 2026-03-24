@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, Fragment } from "react";
-import { ShiftCode, FocusArea } from "@/types";
+import { ShiftCode, AbsenceType, FocusArea } from "@/types";
 import { isEmployeeQualified } from "@/lib/schedule-logic";
 import ScrollableTabs from "@/components/ScrollableTabs";
 
 interface ShiftPickerProps {
   shiftCodes: ShiftCode[];
+  absenceTypes?: AbsenceType[];
   focusAreas: FocusArea[];
   currentShiftCodeIds?: number[];
+  currentAbsenceTypeId?: number | null;
   onSelect: (label: string, shiftCodeIds: number[]) => void;
+  onAbsenceSelect?: (absenceType: AbsenceType) => void;
   empFocusAreaIds?: number[];
   empCertificationId?: number | null;
   initialTab?: number | null;
@@ -36,9 +39,12 @@ function fmt12h(time24: string | null | undefined): string {
 
 export default function ShiftPicker({
   shiftCodes,
+  absenceTypes = [],
   focusAreas,
   currentShiftCodeIds = [],
+  currentAbsenceTypeId,
   onSelect,
+  onAbsenceSelect,
   empFocusAreaIds = [],
   empCertificationId = null,
   initialTab = null,
@@ -81,8 +87,7 @@ export default function ShiftPicker({
     ),
   ];
 
-  const generalNonOffShifts = shiftCodes.filter((st) => st.isGeneral && !st.isOffDay && isQualified(st));
-  const offDayShifts = shiftCodes.filter((st) => st.isOffDay && isQualified(st));
+  const generalNonOffShifts = shiftCodes.filter((st) => st.isGeneral && isQualified(st));
 
   function renderShiftButton(s: ShiftCode) {
     const isActive = currentShiftCodeIds.includes(s.id);
@@ -179,16 +184,6 @@ export default function ShiftPicker({
           }}
         >
           {s.label}
-          {s.isOffDay && (
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-              <line x1="10" y1="14" x2="14" y2="18" />
-              <line x1="14" y1="14" x2="10" y2="18" />
-            </svg>
-          )}
         </div>
 
         <div
@@ -293,7 +288,7 @@ export default function ShiftPicker({
           </div>
         )}
 
-        {offDayShifts.length > 0 && (
+        {absenceTypes.length > 0 && (
           <div>
             <div style={sectionHeading}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
@@ -303,16 +298,92 @@ export default function ShiftPicker({
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
               Off Days
-              <span style={countPill}>{offDayShifts.length}</span>
+              <span style={countPill}>{absenceTypes.length}</span>
               <div style={headingLine} />
             </div>
-            <div role="group" aria-label="Off day shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              {offDayShifts.map((s) => renderShiftButton(s))}
+            <div role="group" aria-label="Off day options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              {absenceTypes.map((at) => {
+                const isActive = currentAbsenceTypeId === at.id;
+                return (
+                  <button
+                    key={at.id}
+                    onClick={() => {
+                      onAbsenceSelect?.(at);
+                      if (closeOnSelect && !multiSelect) onClose?.();
+                    }}
+                    aria-pressed={isActive}
+                    aria-label={`${at.label} - ${at.name}`}
+                    style={{
+                      background: isActive ? at.color : `${at.color}40`,
+                      border: `1.5px solid ${isActive ? at.border : at.text}`,
+                      borderRadius: 8,
+                      padding: "6px 8px 4px",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease",
+                      position: "relative",
+                      boxShadow: isActive ? "inset 0 1px 3px rgba(0,0,0,0.1)" : "none",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = `${at.color}70`;
+                        e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = `${at.color}40`;
+                        e.currentTarget.style.boxShadow = "none";
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }
+                    }}
+                  >
+                    {isActive && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 6,
+                          right: 6,
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          background: at.text,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        fontSize: "var(--dg-fs-caption)",
+                        color: at.text,
+                        opacity: isActive ? 1 : 0.75,
+                        transition: "opacity 150ms ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 3,
+                      }}
+                    >
+                      {at.label}
+                    </div>
+                    <div style={{ fontSize: "var(--dg-fs-micro)", color: "var(--color-text-subtle)", marginTop: 1 }}>
+                      {at.name}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {areaShifts.length === 0 && generalNonOffShifts.length === 0 && offDayShifts.length === 0 && (
+        {areaShifts.length === 0 && generalNonOffShifts.length === 0 && absenceTypes.length === 0 && (
           <div
             style={{
               padding: "24px 16px",

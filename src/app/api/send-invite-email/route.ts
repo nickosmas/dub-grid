@@ -63,8 +63,10 @@ export async function POST(req: NextRequest) {
 
   // ── Config check ────────────────────────────────────────────────────
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail =
-    process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  if (!process.env.RESEND_FROM_EMAIL) {
+    console.warn("[send-invite-email] RESEND_FROM_EMAIL not set — using test domain (onboarding@resend.dev)");
+  }
 
   if (!apiKey) {
     return NextResponse.json(
@@ -101,6 +103,9 @@ export async function POST(req: NextRequest) {
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : null) ||
     "http://localhost:3000";
+  if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_VERCEL_URL) {
+    console.warn("[send-invite-email] No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links");
+  }
 
   const acceptUrl = `${siteUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 

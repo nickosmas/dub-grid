@@ -40,6 +40,7 @@ import {
   EditModalState,
   ShiftMap,
   ShiftCode,
+  AbsenceType,
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
@@ -56,6 +57,7 @@ function SchedulerContent() {
   const {
     org, focusAreas, shiftCodes, allShiftCodesRef, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,
+    absenceTypes, allAbsenceTypesRef, absenceTypeMap, handleAbsenceTypesChange,
     coverageRequirements,
     loading: orgLoading, loadError,
   } = useOrganizationData();
@@ -190,7 +192,7 @@ function SchedulerContent() {
     if (!org) return;
     const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
     const [shiftData, noteRows] = await Promise.all([
-      db.fetchShifts(org.id, canEditShiftsRef.current, cMap),
+      db.fetchShifts(org.id, canEditShiftsRef.current, cMap, absenceTypeMap),
       db.fetchScheduleNotes(org.id),
     ]);
     const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
@@ -246,7 +248,7 @@ function SchedulerContent() {
 
         // Critical fetches in parallel — unblock grid render ASAP
         const [shiftData, noteRows, recShifts, latestPublish] = await Promise.all([
-          db.fetchShifts(orgId, canEditShifts, codeMap),
+          db.fetchShifts(orgId, canEditShifts, codeMap, absenceTypeMap),
           db.fetchScheduleNotes(orgId),
           db.fetchRecurringShifts(orgId, undefined, codeMap),
           db.fetchLatestPublishHistory(orgId).catch(() => null),
@@ -580,7 +582,7 @@ function SchedulerContent() {
     (async () => {
       try {
         const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-        const draftShifts = await db.fetchShifts(org.id, true, cMap);
+        const draftShifts = await db.fetchShifts(org.id, true, cMap, absenceTypeMap);
         setShifts(draftShifts);
       } catch (err) {
         console.error("Draft check failed:", err);
@@ -659,6 +661,31 @@ function SchedulerContent() {
     (empId: string, date: Date): number[] =>
       shifts[`${empId}_${formatDateKey(date)}`]?.shiftCodeIds ?? [],
     [shifts],
+  );
+
+  const isAbsenceForKey = useCallback(
+    (empId: string, date: Date): boolean => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) return false;
+      return entry.absenceTypeId != null || entry.publishedAbsenceTypeId != null;
+    },
+    [shifts],
+  );
+
+  const absenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) return null;
+      return entry.absenceTypeId ?? entry.publishedAbsenceTypeId ?? null;
+    },
+    [shifts],
+  );
+
+  /** Full AbsenceType object map for grid cell styling (includes archived for historical cells) */
+  const absenceTypeObjectMap = useMemo(
+    () => new Map(allAbsenceTypesRef.current.map((at) => [at.id, at])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [absenceTypes],
   );
 
   /** Returns time ranges for an employee's shift. Prefers custom times, falls back to category times. */
@@ -825,7 +852,7 @@ function SchedulerContent() {
       if (!entry || entry.shiftCodeIds.length === 0) return false;
       return entry.shiftCodeIds.some(codeId => {
         const sc = shiftCodes.find(c => c.id === codeId);
-        return sc != null && !sc.isOffDay && sc.categoryId != null;
+        return sc != null && sc.categoryId != null;
       });
     },
     [shifts, shiftCodes],
@@ -839,7 +866,20 @@ function SchedulerContent() {
       setShifts((prev) => {
         const existing = prev[key];
         if (!existing) return prev;
-        return { ...prev, [key]: { ...existing, customStartTime: start, customEndTime: end } };
+        // Compute draftKind: if published content exists, this is a 'modified' draft
+        const hasPublished = (existing.publishedShiftCodeIds?.length ?? 0) > 0
+          || existing.publishedAbsenceTypeId != null;
+        const draftKind = hasPublished ? 'modified' as const : existing.draftKind;
+        return {
+          ...prev,
+          [key]: {
+            ...existing,
+            customStartTime: start,
+            customEndTime: end,
+            isDraft: true,
+            draftKind: draftKind || 'modified',
+          },
+        };
       });
       db.upsertShiftTimes(editPanel.empId, dateKey, start, end, org.id).catch((err) => {
         toast.error("Failed to save shift times");
@@ -870,7 +910,7 @@ function SchedulerContent() {
       event: 'draft_changed',
       payload: { ...payload, senderId: currentUserRef.current?.id },
     }).then((status: string) => {
-      if (status !== 'ok') console.warn('[Realtime] draft_changed send status:', status);
+      if (status !== 'ok' && process.env.NODE_ENV === 'development') console.warn('[Realtime] draft_changed send status:', status);
     });
   }, []);
 
@@ -890,21 +930,28 @@ function SchedulerContent() {
 
       const handleConflict = async () => {
         toast.error("Shift was modified by another user — refreshing");
-        const freshShifts = await db.fetchShifts(orgId, canEditShifts, shiftCodeMap);
+        const freshShifts = await db.fetchShifts(orgId, canEditShifts, shiftCodeMap, absenceTypeMap);
         setShifts(freshShifts);
       };
 
       if (label === "OFF" || shiftCodeIds.length === 0) {
         const ex = shiftsRef.current[key];
-        // Nothing to delete — cell is already empty
-        if (!ex || (ex.shiftCodeIds.length === 0 && !ex.publishedShiftCodeIds?.length)) return;
+        // Nothing to delete — cell is already empty (no shift codes AND no absence type)
+        const hasContent = ex && (
+          ex.shiftCodeIds.length > 0 ||
+          ex.publishedShiftCodeIds?.length ||
+          ex.absenceTypeId != null ||
+          ex.publishedAbsenceTypeId != null
+        );
+        if (!hasContent) return;
 
-        if (ex.publishedShiftCodeIds?.length) {
-          // Published shift being deleted → mark as draft-deleted
+        if (ex.publishedShiftCodeIds?.length || ex.publishedAbsenceTypeId != null) {
+          // Published shift/absence being deleted → mark as draft-deleted
           const deleteValue = {
             label: "OFF", shiftCodeIds: [] as number[], isDraft: true, isDelete: true,
             draftKind: 'deleted' as const,
             publishedShiftCodeIds: ex.publishedShiftCodeIds,
+            publishedAbsenceTypeId: ex.publishedAbsenceTypeId,
             publishedLabel: ex.publishedLabel ?? '',
             createdBy: ex.createdBy ?? null,
             updatedBy: currentUserRef.current?.id ?? null,
@@ -1040,7 +1087,7 @@ function SchedulerContent() {
         try {
           await db.updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
           const prevShifts = shifts;
-          const shiftData = await db.fetchShifts(org!.id, canEditShifts, shiftCodeMap);
+          const shiftData = await db.fetchShifts(org!.id, canEditShifts, shiftCodeMap, absenceTypeMap);
           setShifts(shiftData);
           const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
           for (const [k, v] of Object.entries(shiftData)) {
@@ -1068,7 +1115,7 @@ function SchedulerContent() {
     try {
       const prevShifts = shifts;
       const deletedCount = await db.deleteShiftSeries(pendingSeriesDelete.seriesId);
-      const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap);
+      const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap);
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
       // Detect removed shifts
@@ -1121,7 +1168,7 @@ function SchedulerContent() {
           maxOccurrences,
         );
         const prevShifts = shifts;
-        const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap);
+        const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap);
         setShifts(shiftData);
         // Broadcast new/changed shifts to other editors
         const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
@@ -1450,7 +1497,7 @@ function SchedulerContent() {
         const sourceShift = shifts[sourceKey];
         if (
           sourceShift &&
-          sourceShift.shiftCodeIds.length > 0 &&
+          (sourceShift.shiftCodeIds.length > 0 || sourceShift.absenceTypeId != null) &&
           !sourceShift.isDelete &&
           !shifts[targetKey]
         ) {
@@ -1495,7 +1542,7 @@ function SchedulerContent() {
 
           if (
             sourceShift &&
-            sourceShift.shiftCodeIds.length > 0 &&
+            (sourceShift.shiftCodeIds.length > 0 || sourceShift.absenceTypeId != null) &&
             !sourceShift.isDelete &&
             !shifts[targetKey]
           ) {
@@ -1503,6 +1550,7 @@ function SchedulerContent() {
             shiftUpdates[targetKey] = {
               label: sourceShift.label,
               shiftCodeIds: sourceShift.shiftCodeIds,
+              absenceTypeId: sourceShift.absenceTypeId,
               isDraft: true,
               draftKind: 'new',
               publishedShiftCodeIds: [],
@@ -1518,6 +1566,8 @@ function SchedulerContent() {
                 org.id,
                 sourceShift.customStartTime,
                 sourceShift.customEndTime,
+                undefined,
+                sourceShift.absenceTypeId,
               )
             );
           }
@@ -1977,6 +2027,8 @@ function SchedulerContent() {
               onCellHover={handleCellHover}
               onCellContextMenu={handleCellContextMenu}
               coverageRequirements={coverageRequirements}
+              absenceTypeMap={absenceTypeObjectMap}
+              absenceTypeIdForKey={absenceTypeIdForKey}
             />
             <DragOverlay dropAnimation={null}>
               {activeDrag && (
@@ -2061,6 +2113,7 @@ function SchedulerContent() {
             filteredEmployees={filteredEmployees}
             shiftForKey={shiftForKey}
             shiftCodeIdsForKey={shiftCodeIdsForKey}
+            isAbsenceForKey={isAbsenceForKey}
             getShiftStyle={getShiftStyle}
             today={today}
             focusAreas={focusAreas}
@@ -2079,6 +2132,7 @@ function SchedulerContent() {
           currentShift={shiftForKey(editPanel.empId, editPanel.date)}
           currentShiftCodeIds={shiftCodeIdsForKey(editPanel.empId, editPanel.date)}
           shiftCodes={shiftCodes}
+          shiftCategories={shiftCategories}
           focusAreas={focusAreas}
           certifications={certifications}
           indicatorTypes={indicatorTypes}
@@ -2118,6 +2172,43 @@ function SchedulerContent() {
             });
             setEditPanel(null);
             unlockCell();
+          } : undefined}
+          absenceTypes={absenceTypes}
+          currentAbsenceTypeId={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.absenceTypeId}
+          onAbsenceSelect={canEditShifts ? async (absenceType: AbsenceType) => {
+            const dateKey = formatDateKey(editPanel.date);
+            const key = `${editPanel.empId}_${dateKey}`;
+            const existing = shiftsRef.current[key];
+            const version = existing?.version;
+            try {
+              await db.upsertShift(editPanel.empId, dateKey, [], org?.id ?? null, null, null, version, absenceType.id);
+              setShifts((prev) => ({
+                ...prev,
+                [key]: {
+                  ...prev[key],
+                  label: absenceType.label,
+                  shiftCodeIds: [],
+                  absenceTypeId: absenceType.id,
+                  isDraft: true,
+                  draftKind: (existing?.publishedShiftCodeIds?.length ? 'modified' : 'new') as DraftKind,
+                  publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
+                  publishedLabel: existing?.publishedLabel ?? '',
+                },
+              }));
+              broadcastDraftChanged({ shifts: { [key]: {
+                label: absenceType.label,
+                shiftCodeIds: [],
+                absenceTypeId: absenceType.id,
+                isDraft: true,
+                draftKind: (existing?.publishedShiftCodeIds?.length || existing?.publishedAbsenceTypeId != null ? 'modified' : 'new') as DraftKind,
+                publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
+                publishedLabel: existing?.publishedLabel ?? '',
+                publishedAbsenceTypeId: existing?.publishedAbsenceTypeId ?? null,
+              } } });
+            } catch (err) {
+              toast.error("Failed to save absence");
+              console.error(err);
+            }
           } : undefined}
         />
       )}

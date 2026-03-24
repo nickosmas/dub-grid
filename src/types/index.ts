@@ -121,8 +121,6 @@ export interface ShiftCode {
   /** FK to shift_categories.id — determines which tally bucket this shift counts toward */
   categoryId?: number | null;
   isGeneral?: boolean;
-  /** True if this is an off-day code (Off, Sick, Vacation, etc.) */
-  isOffDay?: boolean;
   /** Focus area this code belongs to. null = global (no focus area association). */
   focusAreaId?: number | null;
   sortOrder: number;
@@ -132,7 +130,27 @@ export interface ShiftCode {
   defaultStartTime?: string | null;
   /** Default end time for this shift code, e.g. "15:30" */
   defaultEndTime?: string | null;
+  /** Default duration hours (used when no fixed start/end times, e.g. general codes). */
+  defaultDurationHours?: number | null;
+  /** Default duration minutes (0-59, combined with hours for total duration). */
+  defaultDurationMinutes?: number | null;
   /** Non-null when the shift code has been archived (soft-deleted). */
+  archivedAt?: string | null;
+}
+
+/**
+ * An absence type: off-day definitions (Off, Sick, Vacation, etc.).
+ * Separate from shift codes — an absence is the absence of a shift, not a type of shift.
+ */
+export interface AbsenceType {
+  id: number;
+  orgId: string;
+  label: string;    // "X", "V", "S"
+  name: string;     // "Off", "Vacation", "Sick"
+  color: string;
+  border: string;
+  text: string;
+  sortOrder: number;
   archivedAt?: string | null;
 }
 
@@ -168,6 +186,8 @@ export interface PublishChange {
   kind: 'new' | 'modified' | 'deleted';
   from: number[];
   to: number[];
+  fromAbsenceTypeId?: number | null;
+  toAbsenceTypeId?: number | null;
   updatedBy?: string | null;
 }
 
@@ -194,8 +214,18 @@ export type ShiftMap = Record<string, {
   publishedLabel: string;
   seriesId?: string | null;
   fromRecurring?: boolean;
+  /** Effective custom start time (draft for schedulers, published for staff). */
   customStartTime?: string | null;
+  /** Effective custom end time (draft for schedulers, published for staff). */
   customEndTime?: string | null;
+  /** Published custom start time (used for diff display). */
+  publishedCustomStartTime?: string | null;
+  /** Published custom end time (used for diff display). */
+  publishedCustomEndTime?: string | null;
+  /** Draft absence type ID (mutually exclusive with shiftCodeIds). */
+  absenceTypeId?: number | null;
+  /** Published absence type ID. */
+  publishedAbsenceTypeId?: number | null;
   /** Optimistic lock version. undefined for new (not-yet-persisted) shifts. */
   version?: number;
   /** UUID of the user who created this shift. */

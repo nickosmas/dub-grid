@@ -18,6 +18,7 @@ ALTER TABLE public.certifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.absence_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.indicator_types ENABLE ROW LEVEL SECURITY;
@@ -282,6 +283,30 @@ CREATE POLICY "admin_update_shift_codes"
 
 CREATE POLICY "admin_delete_shift_codes"
   ON public.shift_codes FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+
+
+-- ── absence_types ──────────────────────────────────────────────────────────────
+
+CREATE POLICY "gridmaster_all_absence_types"
+  ON public.absence_types FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_absence_types"
+  ON public.absence_types FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_absence_types"
+  ON public.absence_types FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+
+CREATE POLICY "admin_update_absence_types"
+  ON public.absence_types FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_absence_types"
+  ON public.absence_types FOR DELETE TO authenticated
   USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
 
 
@@ -652,3 +677,5 @@ CREATE POLICY "shift_requests_insert"
 CREATE POLICY "shift_requests_update"
   ON public.shift_requests FOR UPDATE TO authenticated
   USING (FALSE);
+
+
