@@ -167,7 +167,7 @@ CREATE TYPE org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE platform_role AS ENUM ('gridmaster', 'none');
 
 -- One membership per user per org
--- (enforced by PRIMARY KEY on organization_memberships)
+-- (enforced by UNIQUE constraint on (user_id, org_id) in organization_memberships)
 
 -- Enforce role hierarchy via RLS + SECURITY DEFINER RPCs
 -- (see Sections 3 and 4)
