@@ -61,6 +61,7 @@ describe("rowToFocusArea", () => {
       color_bg: "#ff0000",
       color_text: "#ffffff",
       sort_order: 3,
+      break_minutes: null,
       archived_at: null,
     };
 
@@ -72,6 +73,7 @@ describe("rowToFocusArea", () => {
     expect(result.colorBg).toBe("#ff0000");
     expect(result.colorText).toBe("#ffffff");
     expect(result.sortOrder).toBe(3);
+    expect(result.breakMinutes).toBeNull();
     expect(result.archivedAt).toBeNull();
   });
 
@@ -83,6 +85,7 @@ describe("rowToFocusArea", () => {
       color_bg: "#ccc",
       color_text: "#000",
       sort_order: 4,
+      break_minutes: null,
       archived_at: "2026-03-10T12:00:00Z",
     };
 

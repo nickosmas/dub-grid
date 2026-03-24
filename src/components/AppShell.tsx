@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import { useOrganizationData } from "@/hooks";
 
-const APP_ROUTES = ["/schedule", "/staff", "/settings"];
+const APP_ROUTES = ["/dashboard", "/schedule", "/staff", "/settings"];
 
 function isAppRoute(pathname: string): boolean {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));

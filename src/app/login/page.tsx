@@ -671,7 +671,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         }
       }
 
-      window.location.replace("/schedule");
+      window.location.replace("/dashboard");
 
       setTimeout(() => {
         setLoading(false);

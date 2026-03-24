@@ -73,6 +73,7 @@ export interface DbFocusArea {
   color_bg: string;
   color_text: string;
   sort_order: number;
+  break_minutes: number | null;
   archived_at: string | null;
 }
 
@@ -85,6 +86,7 @@ interface DbShiftCategory {
   end_time: string | null;
   sort_order: number;
   focus_area_id: number | null;
+  break_minutes: number | null;
   archived_at: string | null;
 }
 
@@ -213,6 +215,7 @@ export function rowToFocusArea(row: DbFocusArea): FocusArea {
     colorBg: row.color_bg,
     colorText: row.color_text,
     sortOrder: row.sort_order,
+    breakMinutes: row.break_minutes ?? null,
     archivedAt: row.archived_at ?? null,
   };
 }
@@ -227,6 +230,7 @@ function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
     endTime: row.end_time ?? null,
     sortOrder: row.sort_order,
     focusAreaId: row.focus_area_id ?? null,
+    breakMinutes: row.break_minutes ?? null,
     archivedAt: row.archived_at ?? null,
   };
 }
@@ -542,6 +546,7 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
     color_bg: focusArea.colorBg,
     color_text: focusArea.colorText,
     sort_order: focusArea.sortOrder,
+    break_minutes: focusArea.breakMinutes ?? null,
   };
   if (focusArea.id) {
     const { data, error } = await supabase
@@ -620,6 +625,7 @@ export async function upsertShiftCategory(
     end_time: cat.endTime ?? null,
     sort_order: cat.sortOrder,
     focus_area_id: cat.focusAreaId ?? null,
+    break_minutes: cat.breakMinutes ?? null,
   };
   if (cat.id) {
     const { data, error } = await supabase
@@ -828,6 +834,139 @@ export async function activateEmployee(empId: string): Promise<void> {
     })
     .eq("id", empId);
   if (error) throw error;
+}
+
+// ── Single Employee Fetch ──────────────────────────────────────────────────────
+
+export async function fetchEmployeeById(
+  empId: string,
+  orgId: string,
+): Promise<Employee | null> {
+  const { data, error } = await supabase
+    .from("employees")
+    .select("*")
+    .eq("id", empId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return rowToEmployee(data as DbEmployee);
+}
+
+// ── Employee Shifts (date-range scoped) ──────────────────────────────────────
+
+export async function fetchEmployeeShifts(
+  empId: string,
+  orgId: string,
+  shiftCodeMap: Map<number, string>,
+  startDate?: string,
+  endDate?: string,
+): Promise<ShiftMap> {
+  let query = supabase
+    .from("shifts")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, version, series_id, from_recurring, custom_start_time, custom_end_time, created_by, updated_by, created_at, updated_at")
+    .eq("emp_id", empId);
+  if (startDate) query = query.gte("date", startDate);
+  if (endDate) query = query.lte("date", endDate);
+  query = query.order("date", { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const map: ShiftMap = {};
+  for (const row of data as DbShift[]) {
+    const draftIds = row.draft_shift_code_ids ?? [];
+    const pubIds = row.published_shift_code_ids ?? [];
+    const hasDraft = draftIds.length > 0 || row.draft_is_delete;
+    const effectiveIds = hasDraft ? draftIds : pubIds;
+    const isDraft = hasDraft && !arraysEqual(draftIds, pubIds);
+
+    let draftKind: DraftKind = null;
+    if (isDraft) {
+      if (row.draft_is_delete && pubIds.length > 0) draftKind = 'deleted';
+      else if (pubIds.length === 0) draftKind = 'new';
+      else draftKind = 'modified';
+    }
+
+    const publishedLabel = pubIds.length > 0 ? pubIds.map(id => shiftCodeMap.get(id) ?? '?').join('/') : '';
+
+    if (effectiveIds.length > 0 || row.draft_is_delete) {
+      map[`${row.emp_id}_${row.date}`] = {
+        label: row.draft_is_delete ? "OFF" : effectiveIds.map(id => shiftCodeMap.get(id) ?? '?').join('/'),
+        shiftCodeIds: effectiveIds,
+        isDraft,
+        isDelete: row.draft_is_delete,
+        draftKind,
+        publishedShiftCodeIds: pubIds,
+        publishedLabel,
+        seriesId: row.series_id ?? null,
+        fromRecurring: row.from_recurring ?? false,
+        customStartTime: row.custom_start_time ?? null,
+        customEndTime: row.custom_end_time ?? null,
+        version: row.version,
+        createdBy: row.created_by ?? null,
+        updatedBy: row.updated_by ?? null,
+        createdAt: row.created_at ?? null,
+        updatedAt: row.updated_at ?? null,
+      };
+    }
+  }
+  return map;
+}
+
+// ── Employee Role Change History ──────────────────────────────────────────────
+
+export async function fetchEmployeeRoleHistory(
+  userId: string,
+): Promise<import("@/types").AuditLogEntry[]> {
+  const { data, error } = await supabase.rpc("get_audit_log", {
+    p_org_id: null,
+    p_limit: 100,
+    p_offset: 0,
+  });
+  if (error) throw error;
+  return (data ?? [])
+    .filter((row: any) => row.target_user_id === userId)
+    .map((row: any) => ({
+      id: row.id as string,
+      targetUserId: row.target_user_id as string,
+      targetEmail: (row.target_email as string | null) ?? null,
+      changedById: row.changed_by_id as string,
+      changedByEmail: (row.changed_by_email as string | null) ?? null,
+      fromRole: row.from_role as string,
+      toRole: row.to_role as string,
+      createdAt: row.created_at as string,
+      orgId: (row.org_id as string | null) ?? null,
+      orgName: (row.org_name as string | null) ?? null,
+    }));
+}
+
+// ── Employee Invitations ─────────────────────────────────────────────────────
+
+export async function fetchEmployeeInvitations(
+  orgId: string,
+  employeeId: string,
+): Promise<Invitation[]> {
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("employee_id", employeeId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    orgId: row.org_id as string,
+    invitedBy: (row.invited_by as string) ?? null,
+    email: row.email as string,
+    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
+    token: row.token as string,
+    expiresAt: row.expires_at as string,
+    acceptedAt: (row.accepted_at as string) ?? null,
+    revokedAt: (row.revoked_at as string) ?? null,
+    createdAt: row.created_at as string,
+    employeeId: (row.employee_id as string) ?? null,
+  }));
 }
 
 // ── Shifts ────────────────────────────────────────────────────────────────────

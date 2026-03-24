@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
@@ -154,7 +155,20 @@ export function StaffTableRow({
                 transition: "color 150ms ease",
               }}
             >
-              {getEmployeeDisplayName(emp)}
+              <Link
+                href={`/staff/${emp.id}`}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  color: "inherit",
+                  textDecoration: "none",
+                  borderBottom: "1px solid transparent",
+                  transition: "border-color 150ms ease",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "var(--color-info)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "transparent"; }}
+              >
+                {getEmployeeDisplayName(emp)}
+              </Link>
               {emp.userId && currentUser && emp.userId === currentUser.id && (
                 <span
                   style={{

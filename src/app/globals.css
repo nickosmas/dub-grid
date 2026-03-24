@@ -985,6 +985,65 @@ textarea {
   }
 }
 
+/* ── Staff Detail Tab Styles ──────────────────────────── */
+.staff-detail-tab[data-selected] {
+  color: var(--color-info-text) !important;
+  border-bottom-color: var(--color-info) !important;
+}
+.staff-detail-tab:hover:not([data-selected]) {
+  color: var(--color-text-secondary) !important;
+  background: var(--color-bg-secondary);
+  border-radius: 6px 6px 0 0;
+}
+
+/* ── Staff Detail Hero ──────────────────────────────────── */
+.staff-hero {
+  background: var(--color-surface);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  box-shadow: var(--shadow-raised);
+  position: relative;
+}
+.staff-hero-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  pointer-events: none;
+}
+
+/* ── Staff Detail Grids ─────────────────────────────────── */
+.staff-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.staff-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+@media (max-width: 767px) {
+  .staff-grid-3,
+  .staff-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Staff Stat Widget ──────────────────────────────────── */
+.staff-stat {
+  background: var(--color-surface);
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ── Grid Cell Styles ──────────────────────────────────── */
 .dg-grid-cell {
   display: flex;

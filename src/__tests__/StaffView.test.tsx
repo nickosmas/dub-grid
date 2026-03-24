@@ -28,6 +28,8 @@ vi.mock("@/components/EditEmployeePanel", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/staff",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock("next/link", () => ({
@@ -156,17 +158,18 @@ describe("StaffView", () => {
     it("clicking an employee row expands the inline editor", async () => {
       render(<StaffView {...defaultProps} />);
       expect(screen.queryByTestId("edit-panel")).not.toBeInTheDocument();
-      await userEvent.click(screen.getByText("Alice Smith"));
+      // Click the avatar initials (part of the row, not the name link)
+      await userEvent.click(screen.getByText("AS"));
       expect(screen.getByTestId("edit-panel")).toBeInTheDocument();
     });
 
     it("clicking the same expanded row again collapses the editor", async () => {
       render(<StaffView {...defaultProps} />);
-      await userEvent.click(screen.getByText("Alice Smith"));
+      // Click the avatar initials to expand
+      await userEvent.click(screen.getByText("AS"));
       expect(screen.getByTestId("edit-panel")).toBeInTheDocument();
-      // Name appears in both the table row and the detail panel header;
-      // click the first one (the table row) to collapse
-      await userEvent.click(screen.getAllByText("Alice Smith")[0]);
+      // Click the avatar initials again to collapse
+      await userEvent.click(screen.getAllByText("AS")[0]);
       expect(screen.queryByTestId("edit-panel")).not.toBeInTheDocument();
     });
   });

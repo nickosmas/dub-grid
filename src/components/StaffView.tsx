@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
@@ -1495,10 +1495,11 @@ export default function StaffView({
   orgName,
 }: StaffViewProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
   const VALID_SECTIONS: StaffSection[] = ["members", "recurring-schedule", "focus-areas", "certifications", "roles"];
-  const sectionFromPath = pathname.split("/")[2] as StaffSection | undefined;
-  const activeSection: StaffSection = sectionFromPath && VALID_SECTIONS.includes(sectionFromPath) ? sectionFromPath : "members";
+  const sectionParam = searchParams.get("section") as StaffSection | null;
+  const activeSection: StaffSection = sectionParam && VALID_SECTIONS.includes(sectionParam) ? sectionParam : "members";
 
   const iconUsers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   const iconCalendar = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
@@ -1535,7 +1536,7 @@ export default function StaffView({
         id: link.id,
         label: link.label,
         icon: link.icon,
-        href: link.id === "members" ? "/staff" : `/staff/${link.id}`,
+        href: link.id === "members" ? "/staff" : `/staff?section=${link.id}`,
         active: activeSection === link.id,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1559,7 +1560,7 @@ export default function StaffView({
                   {links.map((link) => (
                     <SidebarMenuItem key={link.id}>
                       <SidebarMenuButton
-                        render={<Link href={link.id === "members" ? "/staff" : `/staff/${link.id}`} replace />}
+                        render={<Link href={link.id === "members" ? "/staff" : `/staff?section=${link.id}`} replace />}
                         isActive={activeSection === link.id}
                         tooltip={link.label}
                         className="h-9 data-[active=true]:bg-[var(--color-info-bg)] data-[active=true]:text-[var(--color-brand)] hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
