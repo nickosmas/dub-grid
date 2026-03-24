@@ -121,19 +121,25 @@ CREATE TABLE public.organization_memberships (
 
 ```sql
 CREATE TABLE public.role_change_log (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  target_user_id  UUID NOT NULL REFERENCES auth.users(id),
-  changed_by_id   UUID NOT NULL REFERENCES auth.users(id),
-  org_id          UUID REFERENCES organizations(id),
-  from_role       TEXT NOT NULL,
-  to_role         TEXT NOT NULL,
-  idempotency_key TEXT UNIQUE NOT NULL,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  target_user_id     UUID NOT NULL,
+  changed_by_id      UUID,
+  from_role          TEXT NOT NULL,
+  to_role            TEXT NOT NULL,
+  idempotency_key    TEXT NOT NULL UNIQUE,
+  change_type        TEXT NOT NULL DEFAULT 'role_change',
+  permissions_before JSONB,
+  permissions_after  JSONB,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT valid_change_type CHECK (change_type IN ('role_change', 'permission_change'))
 );
 
 CREATE INDEX ON role_change_log (idempotency_key);
 CREATE INDEX ON role_change_log (target_user_id, created_at DESC);
 ```
+
+> **Note:** The `role_change_log` table does not have an `org_id` column. The org context is derived from the target user's profile at query time. The `change_type` and `permissions_before`/`permissions_after` columns support logging both role changes and admin permission changes.
 
 #### jwt_refresh_locks (Prevents Stale JWT Race)
 
@@ -185,61 +191,98 @@ This section enumerates every race condition that can occur in an RBAC system of
 
 ```sql
 -- Supabase RPC: change_user_role()
--- Runs inside a single serializable transaction
+-- Uses advisory lock + idempotency key for race-condition safety
 CREATE OR REPLACE FUNCTION change_user_role(
   p_target_user_id  UUID,
-  p_new_role        org_role,
+  p_new_role        TEXT,
   p_changed_by_id   UUID,
-  p_org_id          UUID,
   p_idempotency_key TEXT
 ) RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = 'public'
+AS $$
 DECLARE
-  v_old_role   org_role;
-  v_caller_role org_role;
+  v_old_role          TEXT;
+  v_target_org_id     UUID;
+  v_caller_platform_role TEXT;
+  v_caller_org_role   TEXT;
+  v_caller_org_id     UUID;
 BEGIN
-  -- 1. Idempotency check (prevents duplicate network retries)
+  -- 0. Verify caller identity matches auth.uid()
+  IF p_changed_by_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Caller identity mismatch';
+  END IF;
+
+  -- 1. Advisory lock prevents concurrent role changes for same user
+  PERFORM pg_advisory_xact_lock(hashtext('change_role_' || p_target_user_id::TEXT));
+
+  -- 2. Idempotency check (prevents duplicate network retries)
   IF EXISTS (
     SELECT 1 FROM role_change_log WHERE idempotency_key = p_idempotency_key
   ) THEN
     RETURN jsonb_build_object('status', 'already_applied');
   END IF;
 
-  -- 2. Lock the target row (prevents concurrent promotions)
-  SELECT org_role INTO v_old_role
-    FROM organization_memberships
-   WHERE user_id = p_target_user_id AND org_id = p_org_id
-     FOR UPDATE;
+  -- 3. Derive target user's org from their profile (not passed as param)
+  SELECT org_id INTO v_target_org_id
+  FROM profiles WHERE id = p_target_user_id;
 
-  -- 3. Verify caller has permission to make this change
-  SELECT org_role INTO v_caller_role
-    FROM organization_memberships
-   WHERE user_id = p_changed_by_id AND org_id = p_org_id;
-
-  IF v_caller_role = 'admin' THEN
-    RAISE EXCEPTION 'admin cannot change roles — super_admin only';
+  IF v_target_org_id IS NULL THEN
+    RAISE EXCEPTION 'Target user not found or has no active organization';
   END IF;
 
-  -- 4. Apply the role change
+  -- 4. Lock the target row (prevents concurrent promotions)
+  SELECT org_role::TEXT INTO v_old_role
+  FROM organization_memberships
+  WHERE user_id = p_target_user_id AND org_id = v_target_org_id
+  FOR UPDATE;
+
+  -- 5. Verify caller permissions (platform_role + org_role checks)
+  SELECT p.platform_role::TEXT, p.org_id
+  INTO v_caller_platform_role, v_caller_org_id
+  FROM profiles p WHERE p.id = auth.uid();
+
+  SELECT cm.org_role::TEXT INTO v_caller_org_role
+  FROM organization_memberships cm
+  WHERE cm.user_id = auth.uid() AND cm.org_id = v_caller_org_id;
+
+  -- Non-gridmaster must be admin+ and in same org
+  IF v_caller_platform_role <> 'gridmaster'
+     AND COALESCE(v_caller_org_role, 'user') NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'Unauthorized: only admins and gridmasters can change roles';
+  END IF;
+
+  IF v_caller_platform_role <> 'gridmaster'
+     AND (v_caller_org_id IS NULL OR v_caller_org_id <> v_target_org_id) THEN
+    RAISE EXCEPTION 'Unauthorized: cannot change roles for users outside your organization';
+  END IF;
+
+  -- Admin cannot promote to admin/super_admin/gridmaster
+  IF COALESCE(v_caller_org_role, 'user') = 'admin'
+     AND p_new_role IN ('gridmaster', 'admin', 'super_admin') THEN
+    RAISE EXCEPTION 'admin cannot promote to admin, super_admin, or gridmaster';
+  END IF;
+
+  -- 6. Apply the role change
   UPDATE organization_memberships
-     SET org_role = p_new_role,
-         admin_permissions = CASE
-           WHEN p_new_role = 'admin' THEN COALESCE(admin_permissions, '{}')
-           ELSE NULL  -- clear permissions when demoting to user
-         END
-   WHERE user_id = p_target_user_id AND org_id = p_org_id;
+  SET org_role = p_new_role::org_role
+  WHERE user_id = p_target_user_id AND org_id = v_target_org_id;
 
-  -- 5. Write audit log
+  UPDATE profiles
+  SET version = version + 1, updated_at = NOW()
+  WHERE id = p_target_user_id;
+
+  -- 7. Write audit log (no org_id column — derived at query time)
   INSERT INTO role_change_log
-    (target_user_id, changed_by_id, org_id, from_role, to_role, idempotency_key)
+    (target_user_id, changed_by_id, from_role, to_role, idempotency_key)
   VALUES
-    (p_target_user_id, p_changed_by_id, p_org_id, v_old_role::TEXT, p_new_role::TEXT, p_idempotency_key);
+    (p_target_user_id, p_changed_by_id, v_old_role, p_new_role, p_idempotency_key);
 
-  -- 6. Write JWT refresh lock (blocks new token issuance for 5s)
+  -- 8. Write JWT refresh lock (blocks new token issuance for 5s)
   INSERT INTO jwt_refresh_locks (user_id, locked_until, reason)
     VALUES (p_target_user_id, NOW() + INTERVAL '5 seconds', 'role_change')
   ON CONFLICT (user_id) DO UPDATE
-    SET locked_until = NOW() + INTERVAL '5 seconds';
+    SET locked_until = NOW() + INTERVAL '5 seconds', reason = 'role_change';
 
   RETURN jsonb_build_object(
     'status', 'success',
@@ -267,22 +310,31 @@ $$;
 | Mitigation | Optimistic locking via version column + client-side idempotency key. Supabase unique constraint on `(org_id, idempotency_key)` prevents duplicate insertion.                                                  |
 
 ```sql
--- shifts table with optimistic lock
+-- shifts table with optimistic lock (composite PK on emp_id + date)
 CREATE TABLE public.shifts (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id           UUID NOT NULL REFERENCES organizations(id),
-  employee_id      INTEGER NOT NULL REFERENCES employees(id),
-  date             DATE NOT NULL,
-  shift_code_ids   INTEGER[] NOT NULL DEFAULT '{}',
-  status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
-  version          BIGINT NOT NULL DEFAULT 0,
-  idempotency_key  TEXT,
-  created_by       UUID REFERENCES auth.users(id),
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT no_duplicate_submission UNIQUE (org_id, idempotency_key)
+  emp_id                   UUID NOT NULL,
+  date                     DATE NOT NULL,
+  org_id                   UUID,
+  user_id                  UUID,
+  version                  BIGINT NOT NULL DEFAULT 0,
+  series_id                UUID,
+  from_recurring           BOOLEAN NOT NULL DEFAULT false,
+  custom_start_time        TIME,
+  custom_end_time          TIME,
+  draft_shift_code_ids     BIGINT[] NOT NULL DEFAULT '{}',
+  published_shift_code_ids BIGINT[] NOT NULL DEFAULT '{}',
+  draft_is_delete          BOOLEAN NOT NULL DEFAULT false,
+  focus_area_id            BIGINT,
+  created_by               UUID,
+  updated_by               UUID,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  PRIMARY KEY (emp_id, date)
 );
 ```
+
+> **Note:** Draft/publish status is tracked via separate `draft_shift_code_ids` and `published_shift_code_ids` arrays rather than a single status column. `draft_is_delete` marks shifts staged for deletion.
 
 ### 3.4 Race Condition: Optimistic Lock Violation on Update
 
@@ -446,11 +498,14 @@ CREATE POLICY "audit_insert" ON role_change_log FOR INSERT
     OR is_gridmaster()
   );
 
--- Super admins can read their own org's log; gridmaster reads all
+-- Super admins can read logs for users in their org (via profiles join); gridmaster reads all
 CREATE POLICY "audit_select" ON role_change_log FOR SELECT
   USING (
     is_gridmaster()
-    OR org_id = caller_org_id()
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = target_user_id AND org_id = caller_org_id()
+    )
   );
 
 -- No UPDATE or DELETE policies = physically impossible to alter audit trail
@@ -826,7 +881,7 @@ The Gridmaster dashboard provides global platform oversight without routing thro
 | User Impersonation      | Create `impersonation_sessions` row, receive scoped JWT                      | UNIQUE constraint prevents collision            |
 | Org Creation            | Create new organizations with slug validation                                | UNIQUE slug constraint                          |
 | Org Deactivation        | Set `organizations.is_active = false` in transaction                         | `SELECT FOR UPDATE` prevents concurrent toggles |
-| Global Audit Log Viewer | SELECT from `role_change_log` with no org_id filter                          | Append-only table — no mutation risk            |
+| Global Audit Log Viewer | SELECT from `role_change_log` (all orgs visible to gridmaster)               | Append-only table — no mutation risk            |
 | Admin Permission Config | Configure per-admin permissions via AdminPermissionsEditor                   | Optimistic locking on membership row            |
 
 ### 8.2 Impersonation Flow
@@ -941,20 +996,20 @@ In Supabase Dashboard → Authentication → Providers → Email: set "Enable em
 
 ```sql
 CREATE TABLE public.invitations (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id           UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  invited_by       UUID REFERENCES auth.users(id),
-  email            TEXT NOT NULL,
-  employee_id      INTEGER REFERENCES employees(id),     -- links to existing employee record
-  role_to_assign   org_role NOT NULL DEFAULT 'user',
-  token            UUID NOT NULL DEFAULT gen_random_uuid(),
-  expires_at       TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '72 hours',
-  accepted_at      TIMESTAMPTZ,
-  revoked_at       TIMESTAMPTZ,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT one_pending_invite UNIQUE (org_id, email)
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id         UUID NOT NULL,
+  invited_by     UUID,
+  email          TEXT NOT NULL,
+  employee_id    UUID,                                    -- links to existing employee record
+  role_to_assign org_role NOT NULL DEFAULT 'user',
+  token          UUID NOT NULL DEFAULT gen_random_uuid(),
+  expires_at     TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '72 hours',
+  accepted_at    TIMESTAMPTZ,
+  revoked_at     TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Only one pending (non-accepted, non-revoked) invitation per email per org
 CREATE INDEX ON invitations (token);
 CREATE INDEX ON invitations (org_id, email);
 
