@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDate, getCertName, formatRelativeTime } from "@/lib/utils";
-import { EditModalState, ShiftCode, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind } from "@/types";
+import { EditModalState, ShiftCode, ShiftCategory, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind } from "@/types";
 import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm from "./RepeatForm";
@@ -13,6 +13,8 @@ interface ShiftEditPanelProps {
   currentShift: string | null;
   currentShiftCodeIds?: number[];
   shiftCodes: ShiftCode[];
+  /** Shift categories — used to compute time bounds for custom time validation. */
+  shiftCategories?: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   onSelect: (label: string, shiftCodeIds: number[], seriesScope?: SeriesScope) => void;
   onClose: () => void;
@@ -61,6 +63,12 @@ interface ShiftEditPanelProps {
   onMakeAvailable?: () => void;
   /** Callback to open the swap proposal modal. */
   onProposeSwap?: () => void;
+  /** Available absence types for off-day selection. */
+  absenceTypes?: AbsenceType[];
+  /** Called when user selects an absence type (off day). */
+  onAbsenceSelect?: (absenceType: AbsenceType) => void;
+  /** Currently active absence type ID on this cell. */
+  currentAbsenceTypeId?: number | null;
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
@@ -143,23 +151,26 @@ const dropdownStyle: React.CSSProperties = {
   transform: "translateX(-50%)",
   background: "var(--color-surface)",
   border: "1.5px solid var(--color-border)",
-  borderRadius: 8,
+  borderRadius: 10,
   boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
   zIndex: 100,
   maxHeight: 180,
   overflowY: "auto",
   overflowX: "hidden",
   minWidth: 52,
+  padding: 4,
+  scrollbarWidth: "none",
 };
 
 const optionStyle: React.CSSProperties = {
-  padding: "8px 14px",
+  padding: "9px 14px",
   fontSize: "var(--dg-fs-caption)",
   fontWeight: 500,
   fontFamily: "inherit",
   cursor: "pointer",
   textAlign: "center",
   whiteSpace: "nowrap",
+  borderRadius: 8,
 };
 
 function TimeDropdown({
@@ -211,11 +222,11 @@ function TimeDropdown({
               onClick={() => { onChange(opt.value); close(); }}
               style={{
                 ...optionStyle,
-                background: opt.value === value ? "var(--color-info-bg)" : "transparent",
-                color: opt.value === value ? "var(--color-accent-text)" : "var(--color-text-primary)",
+                background: opt.value === value ? "var(--color-border-light)" : "transparent",
+                color: opt.value === value ? "var(--color-text-primary)" : "var(--color-text-primary)",
                 fontWeight: opt.value === value ? 700 : 500,
               }}
-              onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "var(--color-bg)"); }}
+              onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "var(--color-bg-secondary)"); }}
               onMouseLeave={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "transparent"); }}
             >
               {opt.label}
@@ -237,11 +248,27 @@ const periodOptions = [
   { value: "PM", label: "PM" },
 ];
 
+/** Subtract one hour from HH:MM string, clamped to 00:00. */
+function subtractOneHour(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const newH = Math.max(0, h - 1);
+  return `${String(newH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Add one hour to HH:MM string, clamped to 23:59. */
+function addOneHour(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const newH = Math.min(23, h + 1);
+  return `${String(newH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 function PillTimeEditor({
   customStart,
   customEnd,
   defaultStart,
   defaultEnd,
+  minTime,
+  maxTime,
   onSave,
   onRemove,
 }: {
@@ -249,29 +276,59 @@ function PillTimeEditor({
   customEnd: string | null;
   defaultStart: string | null;
   defaultEnd: string | null;
+  /** Earliest allowed start time (HH:MM). */
+  minTime?: string | null;
+  /** Latest allowed end time (HH:MM). */
+  maxTime?: string | null;
   onSave: (start: string | null, end: string | null) => void;
   onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(!!(customStart || customEnd));
-  const s = parseTo12h(customStart);
-  const e = parseTo12h(customEnd);
 
-  // Validate start < end when both are set
-  const hasTimeError = !!(customStart && customEnd && customStart >= customEnd);
+  // Local state for intermediate edits (needed because an individual dropdown change
+  // may create a temporarily invalid state while the user adjusts other fields).
+  // Pre-populate with defaults when no custom times exist so the user starts from a known value.
+  const [localStart, setLocalStart] = useState<string | null>(customStart ?? defaultStart);
+  const [localEnd, setLocalEnd] = useState<string | null>(customEnd ?? defaultEnd);
+
+  // Re-sync local state when parent props change (e.g. after undo or external update)
+  const prevStartRef = useRef(customStart);
+  const prevEndRef = useRef(customEnd);
+  if (customStart !== prevStartRef.current || customEnd !== prevEndRef.current) {
+    prevStartRef.current = customStart;
+    prevEndRef.current = customEnd;
+    setLocalStart(customStart ?? defaultStart);
+    setLocalEnd(customEnd ?? defaultEnd);
+  }
+
+  const s = parseTo12h(localStart);
+  const e = parseTo12h(localEnd);
+
+  // Validation
+  const hasTimeError = !!(localStart && localEnd && localStart >= localEnd);
+  const isStartTooEarly = !!(minTime && localStart && localStart < minTime);
+  const isEndTooLate = !!(maxTime && localEnd && localEnd > maxTime);
+  const hasBoundsError = isStartTooEarly || isEndTooLate;
+
+  // Auto-save: when a dropdown changes and the result is valid, persist immediately
+  function tryAutoSave(newStart: string | null, newEnd: string | null) {
+    const orderOk = !(newStart && newEnd && newStart >= newEnd);
+    const startOk = !(minTime && newStart && newStart < minTime);
+    const endOk = !(maxTime && newEnd && newEnd > maxTime);
+    if (orderOk && startOk && endOk) {
+      onSave(newStart, newEnd);
+    }
+  }
 
   function updateStart(hour: string, minute: string, period: "AM" | "PM") {
     const newStart = to24h(hour, minute, period);
-    if (newStart && customEnd && newStart >= customEnd) {
-      // Still save to show the error — user can fix end time next
-    }
-    onSave(newStart, customEnd);
+    setLocalStart(newStart);
+    tryAutoSave(newStart, localEnd);
   }
   function updateEnd(hour: string, minute: string, period: "AM" | "PM") {
     const newEnd = to24h(hour, minute, period);
-    if (customStart && newEnd && customStart >= newEnd) {
-      // Still save to show the error — user can fix start time next
-    }
-    onSave(customStart, newEnd);
+    setLocalEnd(newEnd);
+    tryAutoSave(localStart, newEnd);
   }
 
   if (!expanded) {
@@ -300,8 +357,8 @@ function PillTimeEditor({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
         <button
-          onClick={() => { setExpanded(false); onRemove(); }}
-          style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-subtle)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+          onClick={() => { onRemove(); setExpanded(false); }}
+          style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontWeight: 600 }}
         >Remove</button>
       </div>
 
@@ -323,9 +380,20 @@ function PillTimeEditor({
         <TimeDropdown value={e.period} options={periodOptions} onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")} width={54} />
       </div>
 
+      {/* Validation errors */}
       {hasTimeError && (
         <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
           Start time must be before end time
+        </div>
+      )}
+      {isStartTooEarly && minTime && (
+        <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
+          Start cannot be before {fmt12h(minTime)}
+        </div>
+      )}
+      {isEndTooLate && maxTime && (
+        <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
+          End cannot be after {fmt12h(maxTime)}
         </div>
       )}
     </div>
@@ -338,6 +406,7 @@ export default function ShiftEditPanel({
   currentShift,
   currentShiftCodeIds = [],
   shiftCodes,
+  shiftCategories = [],
   indicatorTypes = [],
   onSelect,
   onClose,
@@ -360,18 +429,25 @@ export default function ShiftEditPanel({
   hasActiveRequest = false,
   onMakeAvailable,
   onProposeSwap,
+  absenceTypes = [],
+  onAbsenceSelect,
+  currentAbsenceTypeId,
 }: ShiftEditPanelProps) {
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
 
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
+  const isAbsence = currentAbsenceTypeId != null;
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
   const [showRepeatForm, setShowRepeatForm] = useState(false);
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
   const [initialShiftCodeIds] = useState(() => [...currentShiftCodeIds]);
+  const [initialAbsenceTypeId] = useState(() => currentAbsenceTypeId ?? null);
+  const [initialCustomStartTime] = useState(() => customStartTime ?? null);
+  const [initialCustomEndTime] = useState(() => customEndTime ?? null);
   const [initialNotesByFocusArea] = useState<Record<number, number[]>>(() => {
     if (!getActiveIndicatorIds) return {};
     const focusAreaIds = new Set<number>(modal.empFocusAreaIds);
@@ -386,7 +462,9 @@ export default function ShiftEditPanel({
   });
 
   // Derive whether any edits have been made since panel opened
-  const hasShiftEdit = currentShift !== initialShift;
+  const hasShiftEdit = currentShift !== initialShift || (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId;
+  const hasTimeEdit = (customStartTime ?? null) !== initialCustomStartTime
+    || (customEndTime ?? null) !== initialCustomEndTime;
   const hasNoteEdit = (() => {
     if (!getActiveIndicatorIds) return false;
     for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
@@ -396,12 +474,25 @@ export default function ShiftEditPanel({
     }
     return false;
   })();
-  const hasEdits = hasShiftEdit || hasNoteEdit;
+  const hasEdits = hasShiftEdit || hasNoteEdit || hasTimeEdit;
 
   function handleUndo() {
-    // Revert shift if it changed
-    if (currentShift !== initialShift) {
+    // Revert absence type if it changed
+    if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId) {
+      if (initialAbsenceTypeId != null) {
+        const at = absenceTypes.find(a => a.id === initialAbsenceTypeId);
+        if (at) onAbsenceSelect?.(at);
+      } else {
+        // Was a shift code before, revert to it
+        onSelect(initialShift ?? "OFF", initialShiftCodeIds);
+      }
+    } else if (currentShift !== initialShift) {
+      // Revert shift if it changed (non-absence case)
       onSelect(initialShift ?? "OFF", initialShiftCodeIds);
+    }
+    // Revert custom times if changed
+    if (hasTimeEdit && onCustomTimeChange) {
+      onCustomTimeChange(initialCustomStartTime, initialCustomEndTime);
     }
     // Revert notes for each focus area
     if (getActiveIndicatorIds) {
@@ -417,6 +508,40 @@ export default function ShiftEditPanel({
       }
     }
     // Do NOT close — panel stays open after undo
+  }
+
+  // Resolve effective default times: shift code custom times → category times
+  function resolveDefaultTimes(shiftCode: ShiftCode | undefined): { start: string | null; end: string | null } {
+    if (shiftCode?.defaultStartTime && shiftCode?.defaultEndTime) {
+      return { start: shiftCode.defaultStartTime, end: shiftCode.defaultEndTime };
+    }
+    if (shiftCode?.categoryId && shiftCategories.length > 0) {
+      const cat = shiftCategories.find(c => c.id === shiftCode.categoryId);
+      if (cat?.startTime && cat?.endTime) {
+        return { start: cat.startTime, end: cat.endTime };
+      }
+    }
+    return { start: null, end: null };
+  }
+
+  // Compute custom-time bounds from the shift code's category (±1hr buffer)
+  function getTimeBounds(shiftCode: ShiftCode | undefined): { minTime: string | null; maxTime: string | null } {
+    let windowStart: string | null = null;
+    let windowEnd: string | null = null;
+
+    if (shiftCode?.categoryId && shiftCategories.length > 0) {
+      const cat = shiftCategories.find(c => c.id === shiftCode.categoryId);
+      windowStart = cat?.startTime ?? null;
+      windowEnd = cat?.endTime ?? null;
+    }
+    // Fallback to code defaults if category has no times
+    if (!windowStart) windowStart = shiftCode?.defaultStartTime ?? null;
+    if (!windowEnd) windowEnd = shiftCode?.defaultEndTime ?? null;
+
+    return {
+      minTime: windowStart ? subtractOneHour(windowStart) : null,
+      maxTime: windowEnd ? addOneHour(windowEnd) : null,
+    };
   }
 
   // When shift is cleared externally, return to picker
@@ -494,6 +619,61 @@ export default function ShiftEditPanel({
   function renderCurrentShiftPill() {
     if (!hasActiveShift || currentLabels.length === 0) return null;
     const noteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab) : [];
+
+    // Absence type pill — use absence type colors directly
+    if (isAbsence) {
+      const at = absenceTypes.find(a => a.id === currentAbsenceTypeId);
+      if (!at) return null;
+      const isCellNew = draftKind === 'new';
+      const isCellModified = draftKind === 'modified';
+      return (
+        <div
+          style={{
+            background: at.color,
+            border: isCellNew
+              ? `2px dashed ${darkenColor(at.color, 0.35)}`
+              : `1.5px solid ${at.border === 'transparent' ? darkenColor(at.color, 0.25) : at.border}`,
+            borderRadius: 10,
+            height: 72,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+            marginBottom: 16,
+            gap: 2,
+          }}
+        >
+          {(isCellNew || isCellModified) && (
+            <span
+              style={{
+                position: "absolute",
+                top: -10,
+                left: 12,
+                fontSize: "var(--dg-fs-badge)",
+                fontWeight: 800,
+                letterSpacing: "0.05em",
+                background: isCellNew ? "var(--color-success-text)" : "var(--color-warning)",
+                color: "var(--color-text-inverse)",
+                borderRadius: 4,
+                padding: "3px 8px",
+                lineHeight: 1,
+                pointerEvents: "none",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+              }}
+            >
+              {isCellNew ? "NEW" : "EDITED"}
+            </span>
+          )}
+          <span style={{ fontWeight: 800, fontSize: "var(--dg-fs-card-title)", color: at.text, lineHeight: 1 }}>
+            {at.label}
+          </span>
+          <span style={{ fontSize: "var(--dg-fs-footnote)", color: at.text, opacity: 0.7, lineHeight: 1 }}>
+            {at.name}
+          </span>
+        </div>
+      );
+    }
 
     if (currentLabels.length === 1) {
       const label = currentLabels[0];
@@ -574,8 +754,7 @@ export default function ShiftEditPanel({
           const faName = shiftCode?.focusAreaId != null
             ? focusAreas.find(fa => fa.id === shiftCode.focusAreaId)?.name
             : undefined;
-          const defaultStart = shiftCode?.defaultStartTime ?? null;
-          const defaultEnd = shiftCode?.defaultEndTime ?? null;
+          const { start: defaultStart, end: defaultEnd } = resolveDefaultTimes(shiftCode);
           return (
             <div
               key={label + i}
@@ -696,6 +875,8 @@ export default function ShiftEditPanel({
                       customEnd={pillEnds[i]}
                       defaultStart={defaultStart}
                       defaultEnd={defaultEnd}
+                      minTime={getTimeBounds(shiftCode).minTime}
+                      maxTime={getTimeBounds(shiftCode).maxTime}
                       onSave={(start, end) => {
                         const newStarts = [...pillStarts];
                         const newEnds = [...pillEnds];
@@ -939,6 +1120,7 @@ export default function ShiftEditPanel({
               shiftCodes={shiftCodes}
               onConfirm={onRepeatConfirm}
               onBack={() => setShowRepeatForm(false)}
+              absenceType={isAbsence ? absenceTypes?.find(at => at.id === currentAbsenceTypeId) : undefined}
             />
           ) : inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
@@ -946,16 +1128,21 @@ export default function ShiftEditPanel({
               {/* Current shift displayed prominently */}
               {renderCurrentShiftPill()}
 
-              {/* Custom time override — single-shift only (multi-shift has per-pill editors) */}
-              {hasActiveShift && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
-                const matchedCode = shiftCodes.find(st => st.label === currentLabels[0]);
+              {/* Custom time override — single-shift only (multi-shift has per-pill editors); hidden for absence types */}
+              {hasActiveShift && !currentAbsenceTypeId && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
+                const matchedCode = currentShiftCodeIds[0] != null
+                  ? shiftCodes.find(st => st.id === currentShiftCodeIds[0])
+                  : shiftCodes.find(st => st.label === currentLabels[0]);
+                const defaults = resolveDefaultTimes(matchedCode);
                 return (
                   <div style={{ marginBottom: 16 }}>
                     <PillTimeEditor
                       customStart={customStartTime ?? null}
                       customEnd={customEndTime ?? null}
-                      defaultStart={matchedCode?.defaultStartTime ?? null}
-                      defaultEnd={matchedCode?.defaultEndTime ?? null}
+                      defaultStart={defaults.start}
+                      defaultEnd={defaults.end}
+                      minTime={getTimeBounds(matchedCode).minTime}
+                      maxTime={getTimeBounds(matchedCode).maxTime}
                       onSave={(start, end) => onCustomTimeChange(start, end)}
                       onRemove={() => onCustomTimeChange(null, null)}
                     />
@@ -996,7 +1183,7 @@ export default function ShiftEditPanel({
                       color: "var(--color-warning-text)",
                     }}
                   >
-                    Repeating shift — edit scope
+                    {isAbsence ? "Repeating — edit scope" : "Repeating shift — edit scope"}
                   </div>
                   <div className="dg-segment" style={{ display: "flex" }}>
                     <button
@@ -1004,7 +1191,7 @@ export default function ShiftEditPanel({
                       className={`dg-segment-btn${seriesScope === "this" ? " active" : ""}`}
                       style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
                     >
-                      This shift
+                      {isAbsence ? "This only" : "This shift"}
                     </button>
                     <button
                       onClick={() => setSeriesScope("all")}
@@ -1049,13 +1236,13 @@ export default function ShiftEditPanel({
                       <polyline points="7 23 3 19 7 15" />
                       <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                     </svg>
-                    Make this a repeating shift…
+                    {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
                   </button>
                 </div>
               )}
 
-              {/* Notes / Indicators — single shift only; multi-shift shows inline per pill */}
-              {currentLabels.length <= 1 && renderNotesSection()}
+              {/* Notes / Indicators — single shift only; multi-shift shows inline per pill; hidden for absences */}
+              {currentLabels.length <= 1 && !isAbsence && renderNotesSection()}
 
               {/* Audit metadata footer — admin+ only */}
               {auditInfo && (auditInfo.createdByName || auditInfo.updatedByName) && (
@@ -1120,13 +1307,17 @@ export default function ShiftEditPanel({
                       <path d="M14 11v6" />
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                     </svg>
-                    {currentLabels.length > 1 ? "Remove all shifts" : "Remove shift"}
+                    {isAbsence
+                      ? "Remove off day"
+                      : currentLabels.length > 1
+                        ? "Remove all shifts"
+                        : "Remove shift"}
                   </button>
                 </div>
               )}
 
-              {/* Add another shift — hidden when at max (2) */}
-              {allowShiftEdits && currentLabels.length < 2 && (
+              {/* Add another shift — hidden when at max (2) or when absence type is active */}
+              {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (
                 <div style={{ marginTop: 8 }}>
                   <button
                     onClick={() => setShowPicker(true)}
@@ -1291,11 +1482,17 @@ export default function ShiftEditPanel({
               {/* Shift Picker Component */}
               <ShiftPicker
                 shiftCodes={shiftCodes}
+                absenceTypes={absenceTypes}
                 focusAreas={focusAreas}
                 currentShiftCodeIds={currentShiftCodeIds}
+                currentAbsenceTypeId={currentAbsenceTypeId}
                 onSelect={(label, ids) => {
                   onSelect(label, ids, seriesId ? seriesScope : undefined);
                   if (label !== "OFF") setShowPicker(false);
+                }}
+                onAbsenceSelect={(at) => {
+                  onAbsenceSelect?.(at);
+                  setShowPicker(false);
                 }}
                 empFocusAreaIds={modal.empFocusAreaIds}
                 empCertificationId={modal.empCertificationId}
@@ -1346,16 +1543,20 @@ export default function ShiftEditPanel({
       {pendingDelete && (
         <ConfirmDialog
           title={
-            pendingDelete.type === "all" && currentLabels.length > 1
-              ? "Remove All Shifts?"
-              : "Remove Shift?"
+            isAbsence
+              ? "Remove Off Day?"
+              : pendingDelete.type === "all" && currentLabels.length > 1
+                ? "Remove All Shifts?"
+                : "Remove Shift?"
           }
           message={
-            pendingDelete.type === "pill"
-              ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
-              : currentLabels.length > 1
-                ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
-                : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+            isAbsence
+              ? `Remove off day "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+              : pendingDelete.type === "pill"
+                ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                : currentLabels.length > 1
+                  ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
+                  : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
           }
           confirmLabel="Remove"
           variant="danger"

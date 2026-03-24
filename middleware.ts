@@ -126,6 +126,7 @@ export async function middleware(req: NextRequest) {
       const { payload } = await jwtVerify(session.access_token, SUPABASE_JWT_SECRET);
       claims = payload as JWTClaims;
     } else {
+      console.warn("[middleware] SUPABASE_JWT_SECRET not set — falling back to unverified JWT decode. Set SUPABASE_JWT_SECRET for production.");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
   } catch {

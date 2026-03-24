@@ -9,6 +9,7 @@ import type {
   ShiftCategory,
   ShiftRequest,
   RecurringShift,
+  AbsenceType,
 } from "@/types";
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
@@ -23,12 +24,20 @@ interface ScheduleTabProps {
   employee: Employee;
   shifts: ShiftMap;
   shiftCodeById: Map<number, ShiftCode>;
-  shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
   categoryById: Map<number, ShiftCategory>;
   focusAreaById: Map<number, FocusArea>;
+  absenceTypeById: Map<number, AbsenceType>;
+  auditNames: Map<string, string>;
   shiftRequests: ShiftRequest[];
   recurringShifts: RecurringShift[];
+}
+
+/** Format a full name as "F. LastName" for compact display. */
+function compactName(fullName: string): string {
+  const parts = fullName.split(" ").filter(Boolean);
+  if (parts.length <= 1) return fullName;
+  return `${parts[0][0]}. ${parts[parts.length - 1]}`;
 }
 
 export function ScheduleTab({
@@ -37,6 +46,8 @@ export function ScheduleTab({
   shiftCodeById,
   categoryById,
   focusAreaById,
+  absenceTypeById,
+  auditNames,
   shiftRequests,
   recurringShifts,
 }: ScheduleTabProps) {
@@ -46,7 +57,7 @@ export function ScheduleTab({
   const shiftEntries = useMemo(() => {
     return Object.entries(shifts)
       .filter(([key]) => key.startsWith(`${employee.id}_`))
-      .filter(([, entry]) => !entry.isDelete && entry.shiftCodeIds.length > 0)
+      .filter(([, entry]) => !entry.isDelete && (entry.shiftCodeIds.length > 0 || entry.absenceTypeId != null))
       .map(([key, entry]) => ({
         dateKey: key.substring(key.indexOf("_") + 1),
         ...entry,
@@ -148,23 +159,39 @@ export function ScheduleTab({
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Shift</TableHead>
+                      <TableHead>Focus Area</TableHead>
                       <TableHead>Time</TableHead>
                       <TableHead>Hours</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Edited By</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {groupedEntries.map((group) => (
                       <Fragment key={`month-${group.month}`}>
                         <TableRow>
-                          <TableCell colSpan={5} className="bg-muted/30 py-1.5 px-4">
+                          <TableCell colSpan={7} className="bg-muted/30 py-1.5 px-4">
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.05em]">
                               {group.month}
                             </span>
                           </TableCell>
                         </TableRow>
                         {group.entries.map((entry) => {
-                          const hours = computeShiftDurationHours(
+                          const isAbsence = entry.absenceTypeId != null;
+                          const absenceType = isAbsence ? absenceTypeById.get(entry.absenceTypeId!) ?? null : null;
+
+                          // Resolve each shift code with its focus area, times, and per-code draft status
+                          const pubSet = new Set(entry.publishedShiftCodeIds ?? []);
+                          const codes = !isAbsence
+                            ? entry.shiftCodeIds.map((id) => {
+                                const sc = shiftCodeById.get(id);
+                                const fa = sc?.focusAreaId != null ? focusAreaById.get(sc.focusAreaId) : null;
+                                const isCodeDraft = !pubSet.has(id);
+                                return { sc: sc ?? null, fa, isCodeDraft };
+                              })
+                            : [];
+
+                          const hours = isAbsence ? 0 : computeShiftDurationHours(
                             entry.shiftCodeIds,
                             shiftCodeById,
                             entry.customStartTime,
@@ -174,6 +201,7 @@ export function ScheduleTab({
                           );
                           const date = new Date(entry.dateKey + "T00:00:00");
                           const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
+                          const isSplit = codes.length > 1;
 
                           return (
                             <TableRow key={entry.dateKey}>
@@ -182,41 +210,121 @@ export function ScheduleTab({
                                 <span className="text-muted-foreground">{entry.dateKey}</span>
                               </TableCell>
                               <TableCell>
-                                <div className="flex flex-wrap gap-1 items-center">
-                                  {entry.shiftCodeIds.map((id) => {
-                                    const sc = shiftCodeById.get(id);
-                                    return sc ? (
+                                <div className={`flex ${isSplit ? 'flex-col' : 'flex-wrap'} gap-1`}>
+                                  {isAbsence ? (
+                                    absenceType ? (
                                       <Badge
-                                        key={id}
                                         variant="outline"
                                         style={{
-                                          backgroundColor: sc.color,
-                                          color: sc.text,
-                                          borderColor: sc.border,
+                                          backgroundColor: absenceType.color,
+                                          color: absenceType.text,
+                                          borderColor: absenceType.border,
                                         }}
-                                        className="px-1.5 py-0 h-5 text-[10px]"
+                                        className="px-1.5 py-0 h-5 text-[10px] w-fit"
                                       >
-                                        {sc.label}
+                                        {absenceType.label}
                                       </Badge>
-                                    ) : null;
-                                  })}
+                                    ) : (
+                                      <Badge variant="outline" className="px-1.5 py-0 h-5 text-[10px] w-fit text-muted-foreground">
+                                        {entry.label || "?"}
+                                      </Badge>
+                                    )
+                                  ) : (
+                                    codes.map(({ sc }, idx) =>
+                                      sc ? (
+                                        <div key={sc.id} className="flex items-center gap-1.5">
+                                          <Badge
+                                            variant="outline"
+                                            style={{
+                                              backgroundColor: sc.color,
+                                              color: sc.text,
+                                              borderColor: sc.border,
+                                            }}
+                                            className="px-1.5 py-0 h-5 text-[10px]"
+                                          >
+                                            {sc.label}
+                                          </Badge>
+                                          {isSplit && sc.name && (
+                                            <span className="text-[11px] text-muted-foreground">{sc.name}</span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <Badge key={`unknown-${idx}`} variant="outline" className="px-1.5 py-0 h-5 text-[10px] text-muted-foreground">
+                                          ?
+                                        </Badge>
+                                      ),
+                                    )
+                                  )}
                                   {entry.fromRecurring && (
                                     <span className="text-muted-foreground text-[11px]" title="From recurring schedule">↻</span>
                                   )}
                                 </div>
                               </TableCell>
                               <TableCell className="text-[13px] text-muted-foreground">
-                                {entry.customStartTime && entry.customEndTime
-                                  ? `${fmt12h(entry.customStartTime)} – ${fmt12h(entry.customEndTime)}`
-                                  : "—"}
+                                {isAbsence ? "—" : isSplit ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    {codes.map(({ fa }, idx) => (
+                                      <span key={idx}>{fa ? fa.name : "—"}</span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  codes[0]?.fa?.name ?? "—"
+                                )}
+                              </TableCell>
+                              <TableCell className="text-[13px] text-muted-foreground">
+                                {isAbsence ? "—" : isSplit ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    {codes.map(({ sc }, idx) => {
+                                      // Parse pipe-delimited custom times for split shifts
+                                      const customStarts = entry.customStartTime?.split("|") ?? [];
+                                      const customEnds = entry.customEndTime?.split("|") ?? [];
+                                      const start = customStarts[idx] || sc?.defaultStartTime;
+                                      const end = customEnds[idx] || sc?.defaultEndTime;
+                                      return (
+                                        <span key={idx}>
+                                          {start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—"}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (() => {
+                                  const sc = codes[0]?.sc;
+                                  const start = entry.customStartTime ?? sc?.defaultStartTime;
+                                  const end = entry.customEndTime ?? sc?.defaultEndTime;
+                                  return start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—";
+                                })()}
                               </TableCell>
                               <TableCell className="font-semibold text-foreground text-[13px]">
                                 {hours > 0 ? `${Math.round(hours * 10) / 10}h` : "—"}
                               </TableCell>
                               <TableCell>
-                                <span className={`text-[12px] font-semibold ${entry.isDraft ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                  {entry.isDraft ? "Draft" : "Published"}
-                                </span>
+                                {isSplit && entry.isDraft && codes.some(c => c.isCodeDraft) && codes.some(c => !c.isCodeDraft) ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    {codes.map(({ isCodeDraft }, idx) => (
+                                      <span key={idx} className={`text-[12px] font-semibold ${isCodeDraft ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                        {isCodeDraft ? "Draft" : "Published"}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className={`text-[12px] font-semibold ${entry.isDraft ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                    {entry.isDraft ? "Draft" : "Published"}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-[12px] text-muted-foreground">
+                                {(() => {
+                                  const editorId = entry.updatedBy || entry.createdBy;
+                                  if (!editorId) return "—";
+                                  const name = auditNames.get(editorId);
+                                  if (!name) return "—";
+                                  const timestamp = entry.updatedAt || entry.createdAt;
+                                  return (
+                                    <span title={timestamp ? new Date(timestamp).toLocaleString() : undefined}>
+                                      {compactName(name)}
+                                    </span>
+                                  );
+                                })()}
                               </TableCell>
                             </TableRow>
                           );

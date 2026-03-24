@@ -194,16 +194,18 @@ export function usePermissions(): Permissions {
       }
 
       // admin: fetch admin_permissions from organization_memberships.
+      // Also fetch org_role to detect role changes (e.g. downgrade) since the JWT.
       if (effectiveRole === "admin" && session.user?.id && orgId) {
         const { data } = await supabase
           .from("organization_memberships")
-          .select("admin_permissions")
+          .select("org_role, admin_permissions")
           .eq("user_id", session.user.id)
           .eq("org_id", orgId)
           .single();
 
         if (mounted) {
-          setPermsAndCache(buildPerms("admin", orgId, false, data?.admin_permissions ?? null));
+          const dbRole = data?.org_role ?? "user";
+          setPermsAndCache(buildPerms(dbRole, orgId, false, data?.admin_permissions ?? null));
         }
         return;
       }

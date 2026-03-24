@@ -703,6 +703,11 @@ textarea {
   box-shadow: var(--shadow-menu);
   padding: 4px;
   min-width: 160px;
+  scrollbar-width: none;
+}
+
+.dg-menu::-webkit-scrollbar {
+  display: none;
 }
 
 .dg-menu-item {

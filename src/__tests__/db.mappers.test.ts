@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { rowToOrganization, rowToFocusArea, rowToShiftCode } from "@/lib/db";
-import type { DbOrganization, DbFocusArea, DbShiftCode } from "@/lib/db";
+import { rowToOrganization, rowToFocusArea, rowToShiftCode, rowToAbsenceType } from "@/lib/db";
+import type { DbOrganization, DbFocusArea, DbShiftCode, DbAbsenceType } from "@/lib/db";
 
 // ── rowToOrganization ──────────────────────────────────────────────────────────
 
@@ -106,12 +106,13 @@ const baseShiftCodeRow: DbShiftCode = {
   text_color: "#333",
   category_id: null,
   is_general: false,
-  is_off_day: false,
   focus_area_id: null,
   sort_order: 0,
   required_certification_ids: [],
   default_start_time: null,
   default_end_time: null,
+  default_duration_hours: null,
+  default_duration_minutes: null,
   archived_at: null,
 };
 
@@ -126,9 +127,9 @@ describe("rowToShiftCode", () => {
     expect(result.categoryId).toBe(5);
   });
 
-  it("is_general: false maps to isGeneral: undefined", () => {
+  it("is_general: false maps to isGeneral: false", () => {
     const result = rowToShiftCode({ ...baseShiftCodeRow, is_general: false });
-    expect(result.isGeneral).toBeUndefined();
+    expect(result.isGeneral).toBe(false);
   });
 
   it("is_general: true maps to isGeneral: true", () => {
@@ -155,6 +156,26 @@ describe("rowToShiftCode", () => {
     const result = rowToShiftCode({ ...baseShiftCodeRow, archived_at: "2026-03-10T12:00:00Z" });
     expect(result.archivedAt).toBe("2026-03-10T12:00:00Z");
   });
+
+  it("default_duration_hours: null maps to defaultDurationHours: null", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_hours: null });
+    expect(result.defaultDurationHours).toBeNull();
+  });
+
+  it("default_duration_hours: 8 maps to defaultDurationHours: 8", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_hours: 8 });
+    expect(result.defaultDurationHours).toBe(8);
+  });
+
+  it("default_duration_minutes: null maps to defaultDurationMinutes: null", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_minutes: null });
+    expect(result.defaultDurationMinutes).toBeNull();
+  });
+
+  it("default_duration_minutes: 30 maps to defaultDurationMinutes: 30", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_minutes: 30 });
+    expect(result.defaultDurationMinutes).toBe(30);
+  });
 });
 
 // ── Property 9: rowToShiftCode field mapping ──────────────────────────────────
@@ -173,16 +194,17 @@ describe("rowToShiftCode — Property 9: field mapping correctness", () => {
     text_color: fc.string(),
     category_id: fc.option(fc.integer({ min: 1 }), { nil: null }),
     is_general: fc.boolean(),
-    is_off_day: fc.boolean(),
     focus_area_id: fc.option(fc.integer({ min: 1 }), { nil: null }),
     sort_order: fc.integer({ min: 0 }),
     required_certification_ids: fc.array(fc.integer({ min: 1 })),
     default_start_time: fc.option(fc.string(), { nil: null }),
     default_end_time: fc.option(fc.string(), { nil: null }),
+    default_duration_hours: fc.option(fc.integer({ min: 0, max: 23 }), { nil: null }),
+    default_duration_minutes: fc.option(fc.integer({ min: 0, max: 59 }), { nil: null }),
     archived_at: fc.option(fc.string(), { nil: null }),
   });
 
-  it("category_id passes through correctly; is_general maps to undefined/true", () => {
+  it("category_id passes through correctly; is_general preserves boolean value", () => {
     fc.assert(
       fc.property(arbDbShiftCode, (row) => {
         const result = rowToShiftCode(row);
@@ -190,17 +212,47 @@ describe("rowToShiftCode — Property 9: field mapping correctness", () => {
         // categoryId round-trips
         expect(result.categoryId).toBe(row.category_id ?? null);
 
-        // is_general: false → undefined; true → true
-        if (row.is_general === false) {
-          expect(result.isGeneral).toBeUndefined();
-        } else {
-          expect(result.isGeneral).toBe(true);
-        }
+        // is_general preserves the boolean value
+        expect(result.isGeneral).toBe(row.is_general);
 
         // focus_area_id passes through as-is
         expect(result.focusAreaId).toBe(row.focus_area_id ?? null);
       }),
     );
+  });
+});
+
+// ── rowToAbsenceType ─────────────────────────────────────────────────────────
+
+describe("rowToAbsenceType", () => {
+  const baseAbsenceTypeRow: DbAbsenceType = {
+    id: 1,
+    org_id: "org-1",
+    label: "X",
+    name: "Off",
+    color: "#E2E8F0",
+    border_color: "transparent",
+    text_color: "#1E293B",
+    sort_order: 0,
+    archived_at: null,
+  };
+
+  it("maps all fields correctly with camelCase conversion", () => {
+    const result = rowToAbsenceType(baseAbsenceTypeRow);
+    expect(result.id).toBe(1);
+    expect(result.orgId).toBe("org-1");
+    expect(result.label).toBe("X");
+    expect(result.name).toBe("Off");
+    expect(result.color).toBe("#E2E8F0");
+    expect(result.border).toBe("transparent");
+    expect(result.text).toBe("#1E293B");
+    expect(result.sortOrder).toBe(0);
+    expect(result.archivedAt).toBeNull();
+  });
+
+  it("maps archived_at timestamp to archivedAt", () => {
+    const result = rowToAbsenceType({ ...baseAbsenceTypeRow, archived_at: "2026-03-10T12:00:00Z" });
+    expect(result.archivedAt).toBe("2026-03-10T12:00:00Z");
   });
 });
 

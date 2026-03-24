@@ -7,6 +7,7 @@ import type {
   Organization,
   FocusArea,
   ShiftCode,
+  AbsenceType,
   ShiftCategory,
   IndicatorType,
   NamedItem,
@@ -22,6 +23,7 @@ interface OrgDataCache {
   org: Organization;
   focusAreas: FocusArea[];
   allShiftCodes: ShiftCode[];
+  allAbsenceTypes: AbsenceType[];
   shiftCategories: ShiftCategory[];
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
@@ -44,16 +46,20 @@ export interface OrganizationData {
   focusAreas: FocusArea[];
   shiftCodes: ShiftCode[];
   allShiftCodesRef: React.RefObject<ShiftCode[]>;
+  absenceTypes: AbsenceType[];
+  allAbsenceTypesRef: React.RefObject<AbsenceType[]>;
   shiftCategories: ShiftCategory[];
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   shiftCodeMap: Map<number, string>;
+  absenceTypeMap: Map<number, string>;
   loading: boolean;
   loadError: string | null;
   setOrg: (org: Organization) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
   handleShiftCodesChange: (codes: ShiftCode[]) => void;
+  handleAbsenceTypesChange: (types: AbsenceType[]) => void;
   setShiftCategories: (cats: ShiftCategory[]) => void;
   setIndicatorTypes: (types: IndicatorType[]) => void;
   handleCertificationsChange: (items: NamedItem[]) => Promise<void>;
@@ -70,6 +76,10 @@ export function useOrganizationData(): OrganizationData {
     () => orgDataCache?.allShiftCodes.filter((sc) => !sc.archivedAt) ?? [],
   );
   const allShiftCodesRef = useRef<ShiftCode[]>(orgDataCache?.allShiftCodes ?? []);
+  const [absenceTypes, setAbsenceTypesState] = useState<AbsenceType[]>(
+    () => orgDataCache?.allAbsenceTypes.filter((at) => !at.archivedAt) ?? [],
+  );
+  const allAbsenceTypesRef = useRef<AbsenceType[]>(orgDataCache?.allAbsenceTypes ?? []);
   const [shiftCategories, setShiftCategoriesState] = useState<ShiftCategory[]>(orgDataCache?.shiftCategories ?? []);
   const [indicatorTypes, setIndicatorTypesState] = useState<IndicatorType[]>(orgDataCache?.indicatorTypes ?? []);
   const [certifications, setCertificationsState] = useState<NamedItem[]>(orgDataCache?.certifications ?? []);
@@ -140,7 +150,7 @@ export function useOrganizationData(): OrganizationData {
         }
 
         let fetchedOrg: Organization | null;
-        let w: FocusArea[], allCodes: ShiftCode[], cats: ShiftCategory[];
+        let w: FocusArea[], allCodes: ShiftCode[], absTypes: AbsenceType[], cats: ShiftCategory[];
         let indicators: IndicatorType[], certs: NamedItem[], roles: NamedItem[];
         let covReqs: CoverageRequirement[];
 
@@ -150,6 +160,7 @@ export function useOrganizationData(): OrganizationData {
             db.fetchUserOrganization(),
             db.fetchFocusAreas(earlyOrgId),
             db.fetchShiftCodes(earlyOrgId, true),
+            db.fetchAbsenceTypes(earlyOrgId, true),
             db.fetchShiftCategories(earlyOrgId),
             db.fetchIndicatorTypes(earlyOrgId),
             db.fetchCertifications(earlyOrgId),
@@ -160,12 +171,13 @@ export function useOrganizationData(): OrganizationData {
 
           if (fetchedOrg && fetchedOrg.id === earlyOrgId) {
             // JWT orgId matches — use parallel data
-            [w, allCodes, cats, indicators, certs, roles, covReqs] = parallelData;
+            [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = parallelData;
           } else if (fetchedOrg) {
             // Rare: JWT orgId stale — refetch with correct id
-            [w, allCodes, cats, indicators, certs, roles, covReqs] = await Promise.all([
+            [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = await Promise.all([
               db.fetchFocusAreas(fetchedOrg.id),
               db.fetchShiftCodes(fetchedOrg.id, true),
+              db.fetchAbsenceTypes(fetchedOrg.id, true),
               db.fetchShiftCategories(fetchedOrg.id),
               db.fetchIndicatorTypes(fetchedOrg.id),
               db.fetchCertifications(fetchedOrg.id),
@@ -183,9 +195,10 @@ export function useOrganizationData(): OrganizationData {
             setLoadError("No organization found. Check your database setup.");
             return;
           }
-          [w, allCodes, cats, indicators, certs, roles, covReqs] = await Promise.all([
+          [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = await Promise.all([
             db.fetchFocusAreas(fetchedOrg.id),
             db.fetchShiftCodes(fetchedOrg.id, true),
+            db.fetchAbsenceTypes(fetchedOrg.id, true),
             db.fetchShiftCategories(fetchedOrg.id),
             db.fetchIndicatorTypes(fetchedOrg.id),
             db.fetchCertifications(fetchedOrg.id),
@@ -198,12 +211,15 @@ export function useOrganizationData(): OrganizationData {
 
         const activeCodes = allCodes.filter((sc) => !sc.archivedAt);
         allShiftCodesRef.current = allCodes;
+        const activeAbsTypes = absTypes.filter((at) => !at.archivedAt);
+        allAbsenceTypesRef.current = absTypes;
 
         // Update cache
         orgDataCache = {
           org: fetchedOrg,
           focusAreas: w,
           allShiftCodes: allCodes,
+          allAbsenceTypes: absTypes,
           shiftCategories: cats,
           indicatorTypes: indicators,
           certifications: certs,
@@ -216,6 +232,7 @@ export function useOrganizationData(): OrganizationData {
         setOrgState(fetchedOrg);
         setFocusAreasState(w);
         setShiftCodesState(activeCodes);
+        setAbsenceTypesState(activeAbsTypes);
         setShiftCategoriesState(cats);
         setIndicatorTypesState(indicators);
         setCertificationsState(certs);
@@ -243,6 +260,20 @@ export function useOrganizationData(): OrganizationData {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [shiftCodes],
   );
+
+  const absenceTypeMap = useMemo(
+    () => new Map(allAbsenceTypesRef.current.map((at) => [at.id, at.label])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [absenceTypes],
+  );
+
+  const handleAbsenceTypesChange = useCallback((types: AbsenceType[]) => {
+    const archivedTypes = allAbsenceTypesRef.current.filter((at) => at.archivedAt);
+    const allTypes = [...types, ...archivedTypes];
+    allAbsenceTypesRef.current = allTypes;
+    setAbsenceTypesState(types);
+    if (orgDataCache) orgDataCache.allAbsenceTypes = allTypes;
+  }, []);
 
   const handleShiftCodesChange = useCallback((codes: ShiftCode[]) => {
     const archivedCodes = allShiftCodesRef.current.filter((sc) => sc.archivedAt);
@@ -273,16 +304,20 @@ export function useOrganizationData(): OrganizationData {
     focusAreas,
     shiftCodes,
     allShiftCodesRef,
+    absenceTypes,
+    allAbsenceTypesRef,
     shiftCategories,
     indicatorTypes,
     certifications,
     orgRoles,
     shiftCodeMap,
+    absenceTypeMap,
     loading,
     loadError,
     setOrg,
     setFocusAreas,
     handleShiftCodesChange,
+    handleAbsenceTypesChange,
     setShiftCategories,
     setIndicatorTypes,
     handleCertificationsChange,

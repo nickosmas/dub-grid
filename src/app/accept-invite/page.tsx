@@ -41,6 +41,8 @@ export default function AcceptInvitePage() {
 
   function getLoginUrl(slug: string | null) {
     if (!slug) return "/login";
+    // Validate slug to prevent open redirect via crafted slug values
+    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(slug)) return "/login";
     const host = window.location.host;
     const protocol = window.location.protocol;
     if (host.startsWith(`${slug}.`)) return "/login";

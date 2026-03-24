@@ -4,7 +4,7 @@ import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { resolveRequirement, computeCoverageStatus } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType } from "@/types";
 import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
 import DroppableCell from "./DroppableCell";
@@ -77,6 +77,10 @@ interface ScheduleGridProps {
   onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
   /** Coverage requirements for inline tally status display */
   coverageRequirements?: CoverageRequirement[];
+  /** Map from absence type ID to AbsenceType for color resolution */
+  absenceTypeMap?: Map<number, AbsenceType>;
+  /** Returns the absence type ID for a given cell, or null/undefined if not an absence */
+  absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
 }
 
 
@@ -116,6 +120,8 @@ interface SectionBlockProps {
   onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
   onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
   coverageRequirements?: CoverageRequirement[];
+  absenceTypeMap?: Map<number, AbsenceType>;
+  absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -153,6 +159,8 @@ const SectionBlock = memo(function SectionBlock({
   onCellHover,
   onCellContextMenu,
   coverageRequirements,
+  absenceTypeMap,
+  absenceTypeIdForKey,
 }: SectionBlockProps) {
   const { user: currentUser } = useAuth();
   if (employees.length === 0) return null;
@@ -511,8 +519,10 @@ const SectionBlock = memo(function SectionBlock({
                   const cellLock = cellLocks?.get(`${emp.id}_${dateKey}`);
                   const isLocked = !!cellLock;
                   const auditName = showAudit ? createdByNameForKey?.(emp.id, date) ?? null : null;
+                  const cellAbsenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
+                  const cellAbsenceType = cellAbsenceTypeId != null ? absenceTypeMap?.get(cellAbsenceTypeId) ?? null : null;
 
-                  const hasDraggableShift = isCellInteractive && !isLocked && shiftCode && shiftCode !== "OFF" && draftKind !== 'deleted';
+                  const hasDraggableShift = isCellInteractive && !isLocked && shiftCode && shiftCode !== "OFF" && draftKind !== 'deleted' && !cellAbsenceType;
                   const firstStyle = hasDraggableShift ? getStyleByIdOrLabel(shiftCode.split("/")[0], cellCodeIds[0]) : null;
 
                   return (
@@ -554,17 +564,19 @@ const SectionBlock = memo(function SectionBlock({
                         onCellHover?.(emp.id, date, sectionName);
                         if (shiftCode && shiftCode !== "OFF") {
                           const rect = e.currentTarget.getBoundingClientRect();
-                          const content = shiftCode.split("/").map((l, li) => {
-                            const style = getStyleByIdOrLabel(l, cellCodeIds[li]);
-                            const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
-                            const isForeign = codeEntry?.focusAreaId != null
-                              && sectionFocusArea != null
-                              && codeEntry.focusAreaId !== sectionFocusArea.id;
-                            const homeFa = isForeign
-                              ? focusAreas.find(fa => fa.id === codeEntry!.focusAreaId)?.name
-                              : foreignLabelHomeMap.get(l);
-                            return homeFa ? `${style.name} (${homeFa})` : style.name;
-                          }).join(" / ");
+                          const content = cellAbsenceType
+                            ? cellAbsenceType.name
+                            : shiftCode.split("/").map((l, li) => {
+                                const style = getStyleByIdOrLabel(l, cellCodeIds[li]);
+                                const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                                const isForeign = codeEntry?.focusAreaId != null
+                                  && sectionFocusArea != null
+                                  && codeEntry.focusAreaId !== sectionFocusArea.id;
+                                const homeFa = isForeign
+                                  ? focusAreas.find(fa => fa.id === codeEntry!.focusAreaId)?.name
+                                  : foreignLabelHomeMap.get(l);
+                                return homeFa ? `${style.name} (${homeFa})` : style.name;
+                              }).join(" / ");
                           onTooltipChange({
                             content,
                             x: rect.left + rect.width / 2,
@@ -597,8 +609,8 @@ const SectionBlock = memo(function SectionBlock({
                             label: shiftCode,
                             shiftCodeIds: cellCodeIds,
                             focusAreaName: sectionName,
-                            pillColor: firstStyle?.color ?? "var(--color-bg)",
-                            pillText: firstStyle?.text ?? "var(--color-text-muted)",
+                            pillColor: cellAbsenceType?.color ?? firstStyle?.color ?? "var(--color-bg)",
+                            pillText: cellAbsenceType?.text ?? firstStyle?.text ?? "var(--color-text-muted)",
                           }}
                           disabled={!hasDraggableShift}
                         >
@@ -631,18 +643,22 @@ const SectionBlock = memo(function SectionBlock({
 
                           if (labels.length === 1) {
                             const label = labels[0];
-                            const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
+                            const isAbsence = cellAbsenceType != null;
+                            const style = isAbsence
+                              ? { ...getStyleByIdOrLabel(label, cellCodeIds[0]), color: cellAbsenceType!.color, text: cellAbsenceType!.text }
+                              : getStyleByIdOrLabel(label, cellCodeIds[0]);
                             const codeEntry0 = cellCodeIds[0] != null ? shiftCodeById.get(cellCodeIds[0]) : undefined;
-                            const isCross = label !== "X" && codeEntry0?.focusAreaId != null
+                            const isCross = !isAbsence && label !== "X" && codeEntry0?.focusAreaId != null
                               && sectionFocusArea != null
                               && codeEntry0.focusAreaId !== sectionFocusArea.id;
                             const crossHomeFa = isCross
                               ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
                               : undefined;
                             // Compute effective border: draft indicators use dashed border
+                            const absenceBorder = isAbsence ? `1px solid ${cellAbsenceType!.border}` : `1px solid ${borderColor(style.text)}`;
                             const effectiveBorder = draftKind
-                              ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
-                              : `1px solid ${borderColor(style.text)}`;
+                              ? getDraftBorder(draftKind, absenceBorder)
+                              : absenceBorder;
 
                              return (
                                <>
@@ -695,7 +711,9 @@ const SectionBlock = memo(function SectionBlock({
                                      {getFocusAreaInitials(crossHomeFa.name)}
                                    </span>
                                  )}
-                                 <span style={{ fontSize: "var(--dg-fs-title)", fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                                 <span style={{ fontSize: "var(--dg-fs-title)", fontWeight: 800, lineHeight: 1 }}>
+                                   {label}
+                                 </span>
                                  {customTimes && (
                                    <span style={{
                                      fontSize: "var(--dg-fs-footnote)",
@@ -1290,6 +1308,8 @@ export default function ScheduleGrid({
   onCellHover,
   onCellContextMenu,
   coverageRequirements,
+  absenceTypeMap,
+  absenceTypeIdForKey,
 }: ScheduleGridProps) {
   const { user: currentUser } = useAuth();
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
@@ -1516,6 +1536,8 @@ export default function ScheduleGrid({
             onCellHover={onCellHover}
             onCellContextMenu={onCellContextMenu}
             coverageRequirements={coverageRequirements}
+            absenceTypeMap={absenceTypeMap}
+            absenceTypeIdForKey={absenceTypeIdForKey}
           />
         );
       })}

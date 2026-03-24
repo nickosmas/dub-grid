@@ -11,6 +11,7 @@ import {
   FocusArea,
   ShiftCategory,
   ShiftCode,
+  AbsenceType,
   ScheduleNote,
   IndicatorType,
   RecurringShift,
@@ -109,12 +110,13 @@ export interface DbShiftCode {
   text_color: string;
   category_id: number | null;
   is_general: boolean;
-  is_off_day: boolean;
   focus_area_id: number | null;
   sort_order: number;
   required_certification_ids: number[];
   default_start_time: string | null;
   default_end_time: string | null;
+  default_duration_hours: number | null;
+  default_duration_minutes: number | null;
   archived_at: string | null;
 }
 
@@ -142,12 +144,16 @@ interface DbShift {
   date: string;
   draft_shift_code_ids: number[];
   published_shift_code_ids: number[];
+  draft_absence_type_id: number | null;
+  published_absence_type_id: number | null;
   draft_is_delete: boolean;
   version: number;
   series_id?: string | null;
   from_recurring?: boolean;
-  custom_start_time?: string | null;
-  custom_end_time?: string | null;
+  draft_custom_start_time?: string | null;
+  draft_custom_end_time?: string | null;
+  published_custom_start_time?: string | null;
+  published_custom_end_time?: string | null;
   created_by?: string | null;
   updated_by?: string | null;
   created_at?: string | null;
@@ -256,13 +262,42 @@ export function rowToShiftCode(row: DbShiftCode): ShiftCode {
     border: row.border_color,
     text: row.text_color,
     categoryId: row.category_id ?? null,
-    isGeneral: row.is_general || undefined,
-    isOffDay: row.is_off_day || undefined,
+    isGeneral: row.is_general ?? undefined,
     focusAreaId: row.focus_area_id ?? null,
     sortOrder: row.sort_order,
     requiredCertificationIds: row.required_certification_ids ?? [],
     defaultStartTime: row.default_start_time ?? null,
     defaultEndTime: row.default_end_time ?? null,
+    defaultDurationHours: row.default_duration_hours ?? null,
+    defaultDurationMinutes: row.default_duration_minutes ?? null,
+    archivedAt: row.archived_at ?? null,
+  };
+}
+
+// ── Absence Types ─────────────────────────────────────────────────────────────
+
+export interface DbAbsenceType {
+  id: number;
+  org_id: string;
+  label: string;
+  name: string;
+  color: string;
+  border_color: string;
+  text_color: string;
+  sort_order: number;
+  archived_at: string | null;
+}
+
+export function rowToAbsenceType(row: DbAbsenceType): AbsenceType {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    label: row.label,
+    name: row.name,
+    color: row.color,
+    border: row.border_color,
+    text: row.text_color,
+    sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
   };
 }
@@ -719,12 +754,13 @@ export async function upsertShiftCode(
     text_color: st.text,
     category_id: st.categoryId ?? null,
     is_general: st.isGeneral ?? false,
-    is_off_day: st.isOffDay ?? false,
     focus_area_id: st.focusAreaId ?? null,
     sort_order: st.sortOrder,
     required_certification_ids: st.requiredCertificationIds ?? [],
     default_start_time: st.defaultStartTime ?? null,
     default_end_time: st.defaultEndTime ?? null,
+    default_duration_hours: st.defaultDurationHours ?? null,
+    default_duration_minutes: st.defaultDurationMinutes ?? null,
   };
 
   let saved: DbShiftCode;
@@ -753,6 +789,63 @@ export async function upsertShiftCode(
 export async function deleteShiftCode(id: number): Promise<void> {
   const { error } = await supabase
     .from("shift_codes")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+// ── Absence Types ─────────────────────────────────────────────────────────────
+
+export async function fetchAbsenceTypes(orgId: string, includeArchived = false): Promise<AbsenceType[]> {
+  let query = supabase
+    .from("absence_types")
+    .select("*")
+    .eq("org_id", orgId);
+  if (!includeArchived) query = query.is("archived_at", null);
+  const { data, error } = await query.order("sort_order");
+  if (error) throw error;
+  return (data as DbAbsenceType[]).map(rowToAbsenceType);
+}
+
+export async function upsertAbsenceType(
+  at: Omit<AbsenceType, "id"> & { id?: number }
+): Promise<AbsenceType> {
+  const row = {
+    org_id: at.orgId,
+    label: at.label,
+    name: at.name,
+    color: at.color,
+    border_color: at.border,
+    text_color: at.text,
+    sort_order: at.sortOrder,
+  };
+
+  let saved: DbAbsenceType;
+  if (at.id) {
+    const { data, error } = await supabase
+      .from("absence_types")
+      .update(row)
+      .eq("id", at.id)
+      .select()
+      .single();
+    if (error) throw error;
+    saved = data as DbAbsenceType;
+  } else {
+    const { data, error } = await supabase
+      .from("absence_types")
+      .insert(row)
+      .select()
+      .single();
+    if (error) throw error;
+    saved = data as DbAbsenceType;
+  }
+
+  return rowToAbsenceType(saved);
+}
+
+export async function deleteAbsenceType(id: number): Promise<void> {
+  const { error } = await supabase
+    .from("absence_types")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
@@ -859,12 +952,13 @@ export async function fetchEmployeeShifts(
   empId: string,
   orgId: string,
   shiftCodeMap: Map<number, string>,
+  absenceTypeMap?: Map<number, string>,
   startDate?: string,
   endDate?: string,
 ): Promise<ShiftMap> {
   let query = supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, version, series_id, from_recurring, custom_start_time, custom_end_time, created_by, updated_by, created_at, updated_at")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, version, series_id, from_recurring, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, created_by, updated_by, created_at, updated_at")
     .eq("emp_id", empId);
   if (startDate) query = query.gte("date", startDate);
   if (endDate) query = query.lte("date", endDate);
@@ -873,36 +967,66 @@ export async function fetchEmployeeShifts(
   const { data, error } = await query;
   if (error) throw error;
 
+  const atMap = absenceTypeMap ?? new Map<number, string>();
   const map: ShiftMap = {};
   for (const row of data as DbShift[]) {
     const draftIds = row.draft_shift_code_ids ?? [];
     const pubIds = row.published_shift_code_ids ?? [];
-    const hasDraft = draftIds.length > 0 || row.draft_is_delete;
+    const draftAbsId = row.draft_absence_type_id ?? null;
+    const pubAbsId = row.published_absence_type_id ?? null;
+    const draftStartTime = row.draft_custom_start_time ?? null;
+    const draftEndTime = row.draft_custom_end_time ?? null;
+    const pubStartTime = row.published_custom_start_time ?? null;
+    const pubEndTime = row.published_custom_end_time ?? null;
+    const hasTimeDraft = draftStartTime != null || draftEndTime != null;
+    const hasDraft = draftIds.length > 0 || draftAbsId != null || row.draft_is_delete || hasTimeDraft;
     const effectiveIds = hasDraft ? draftIds : pubIds;
-    const isDraft = hasDraft && !arraysEqual(draftIds, pubIds);
+    const effectiveAbsId = hasDraft ? draftAbsId : pubAbsId;
+    const effectiveStartTime = draftStartTime ?? pubStartTime;
+    const effectiveEndTime = draftEndTime ?? pubEndTime;
+    const isDraft = hasDraft && (
+      !arraysEqual(draftIds, pubIds)
+      || draftAbsId !== pubAbsId
+      || draftStartTime !== pubStartTime
+      || draftEndTime !== pubEndTime
+    );
 
     let draftKind: DraftKind = null;
     if (isDraft) {
-      if (row.draft_is_delete && pubIds.length > 0) draftKind = 'deleted';
-      else if (pubIds.length === 0) draftKind = 'new';
+      if (row.draft_is_delete && (pubIds.length > 0 || pubAbsId != null)) draftKind = 'deleted';
+      else if (pubIds.length === 0 && pubAbsId == null) draftKind = 'new';
       else draftKind = 'modified';
     }
 
-    const publishedLabel = pubIds.length > 0 ? pubIds.map(id => shiftCodeMap.get(id) ?? '?').join('/') : '';
+    const publishedLabel = pubAbsId != null
+      ? (atMap.get(pubAbsId) ?? '?')
+      : pubIds.length > 0 ? pubIds.map(id => shiftCodeMap.get(id) ?? '?').join('/') : '';
 
-    if (effectiveIds.length > 0 || row.draft_is_delete) {
+    const hasContent = effectiveIds.length > 0 || effectiveAbsId != null || row.draft_is_delete;
+
+    if (hasContent) {
+      const label = row.draft_is_delete
+        ? "OFF"
+        : effectiveAbsId != null
+          ? (atMap.get(effectiveAbsId) ?? '?')
+          : effectiveIds.map(id => shiftCodeMap.get(id) ?? '?').join('/');
+
       map[`${row.emp_id}_${row.date}`] = {
-        label: row.draft_is_delete ? "OFF" : effectiveIds.map(id => shiftCodeMap.get(id) ?? '?').join('/'),
+        label,
         shiftCodeIds: effectiveIds,
         isDraft,
         isDelete: row.draft_is_delete,
         draftKind,
         publishedShiftCodeIds: pubIds,
         publishedLabel,
+        absenceTypeId: effectiveAbsId,
+        publishedAbsenceTypeId: pubAbsId,
         seriesId: row.series_id ?? null,
         fromRecurring: row.from_recurring ?? false,
-        customStartTime: row.custom_start_time ?? null,
-        customEndTime: row.custom_end_time ?? null,
+        customStartTime: effectiveStartTime,
+        customEndTime: effectiveEndTime,
+        publishedCustomStartTime: pubStartTime,
+        publishedCustomEndTime: pubEndTime,
         version: row.version,
         createdBy: row.created_by ?? null,
         updatedBy: row.updated_by ?? null,
@@ -975,52 +1099,90 @@ export async function fetchShifts(
   orgId: string,
   isScheduler: boolean,
   shiftCodeMap: Map<number, string>,
+  absenceTypeMap?: Map<number, string>,
 ): Promise<ShiftMap> {
   const { data, error } = await supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, version, series_id, from_recurring, custom_start_time, custom_end_time, created_by, updated_by, created_at, updated_at, employees!inner(org_id)")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, version, series_id, from_recurring, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, created_by, updated_by, created_at, updated_at, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (error) throw error;
+
+  const atMap = absenceTypeMap ?? new Map<number, string>();
   const map: ShiftMap = {};
   for (const row of data as DbShift[]) {
     const draftIds = row.draft_shift_code_ids ?? [];
     const pubIds = row.published_shift_code_ids ?? [];
-    const hasDraft = draftIds.length > 0 || row.draft_is_delete;
+    const draftAbsId = row.draft_absence_type_id ?? null;
+    const pubAbsId = row.published_absence_type_id ?? null;
+    const draftStartTime = row.draft_custom_start_time ?? null;
+    const draftEndTime = row.draft_custom_end_time ?? null;
+    const pubStartTime = row.published_custom_start_time ?? null;
+    const pubEndTime = row.published_custom_end_time ?? null;
+    const hasTimeDraft = draftStartTime != null || draftEndTime != null;
+    const hasDraft = draftIds.length > 0 || draftAbsId != null || row.draft_is_delete || hasTimeDraft;
 
     // Schedulers see draft preferentially. Staff only see published.
     const effectiveIds = isScheduler
       ? (hasDraft ? draftIds : pubIds)
       : pubIds;
+    const effectiveAbsId = isScheduler
+      ? (hasDraft ? draftAbsId : pubAbsId)
+      : pubAbsId;
+    const effectiveStartTime = isScheduler
+      ? (draftStartTime ?? pubStartTime)
+      : pubStartTime;
+    const effectiveEndTime = isScheduler
+      ? (draftEndTime ?? pubEndTime)
+      : pubEndTime;
 
-    const isDraft = hasDraft && !arraysEqual(draftIds, pubIds);
+    const isDraft = hasDraft && (
+      !arraysEqual(draftIds, pubIds)
+      || draftAbsId !== pubAbsId
+      || draftStartTime !== pubStartTime
+      || draftEndTime !== pubEndTime
+    );
 
     // Classify draft change type
     let draftKind: DraftKind = null;
     if (isDraft) {
-      if (row.draft_is_delete && pubIds.length > 0) {
+      if (row.draft_is_delete && (pubIds.length > 0 || pubAbsId != null)) {
         draftKind = 'deleted';
-      } else if (pubIds.length === 0) {
+      } else if (pubIds.length === 0 && pubAbsId == null) {
         draftKind = 'new';
       } else {
         draftKind = 'modified';
       }
     }
 
-    const publishedLabel = pubIds.length > 0 ? resolveCodeLabels(pubIds, shiftCodeMap) : '';
+    const publishedLabel = pubAbsId != null
+      ? (atMap.get(pubAbsId) ?? '?')
+      : pubIds.length > 0 ? resolveCodeLabels(pubIds, shiftCodeMap) : '';
 
-    if (effectiveIds.length > 0 || (isScheduler && row.draft_is_delete)) {
+    const hasContent = effectiveIds.length > 0 || effectiveAbsId != null || (isScheduler && row.draft_is_delete);
+
+    if (hasContent) {
+      const label = row.draft_is_delete && isScheduler
+        ? "OFF"
+        : effectiveAbsId != null
+          ? (atMap.get(effectiveAbsId) ?? '?')
+          : resolveCodeLabels(effectiveIds, shiftCodeMap);
+
       map[`${row.emp_id}_${row.date}`] = {
-        label: row.draft_is_delete && isScheduler ? "OFF" : resolveCodeLabels(effectiveIds, shiftCodeMap),
+        label,
         shiftCodeIds: effectiveIds,
         isDraft,
         isDelete: row.draft_is_delete,
         draftKind,
         publishedShiftCodeIds: pubIds,
         publishedLabel,
+        absenceTypeId: effectiveAbsId,
+        publishedAbsenceTypeId: pubAbsId,
         seriesId: row.series_id ?? null,
         fromRecurring: row.from_recurring ?? false,
-        customStartTime: row.custom_start_time ?? null,
-        customEndTime: row.custom_end_time ?? null,
+        customStartTime: effectiveStartTime,
+        customEndTime: effectiveEndTime,
+        publishedCustomStartTime: pubStartTime,
+        publishedCustomEndTime: pubEndTime,
         version: row.version,
         createdBy: row.created_by ?? null,
         updatedBy: row.updated_by ?? null,
@@ -1040,16 +1202,18 @@ export async function upsertShift(
   customStartTime?: string | null,
   customEndTime?: string | null,
   expectedVersion?: number,
+  absenceTypeId?: number | null,
 ): Promise<void> {
   const payload: Record<string, unknown> = {
     emp_id: empId,
     date,
-    draft_shift_code_ids: shiftCodeIds,
+    draft_shift_code_ids: absenceTypeId != null ? [] : shiftCodeIds,
+    draft_absence_type_id: absenceTypeId ?? null,
     draft_is_delete: false,
   };
   if (orgId) payload.org_id = orgId;
-  if (customStartTime !== undefined) payload.custom_start_time = customStartTime;
-  if (customEndTime !== undefined) payload.custom_end_time = customEndTime;
+  if (customStartTime !== undefined) payload.draft_custom_start_time = customStartTime;
+  if (customEndTime !== undefined) payload.draft_custom_end_time = customEndTime;
 
   if (expectedVersion !== undefined) {
     // Existing shift: use update with optimistic lock
@@ -1090,7 +1254,7 @@ export async function upsertShift(
   }
 }
 
-/** Updates only the custom start/end time for an existing shift row. */
+/** Updates only the draft custom start/end time for an existing shift row. */
 export async function upsertShiftTimes(
   empId: string,
   date: string,
@@ -1101,7 +1265,7 @@ export async function upsertShiftTimes(
   const { error } = await supabase
     .from("shifts")
     .upsert(
-      { emp_id: empId, date, org_id: orgId, custom_start_time: customStartTime, custom_end_time: customEndTime },
+      { emp_id: empId, date, org_id: orgId, draft_custom_start_time: customStartTime, draft_custom_end_time: customEndTime },
       { onConflict: "emp_id,date" },
     );
   if (error) throw error;
@@ -1112,7 +1276,7 @@ export async function deleteShift(empId: string, date: string): Promise<void> {
   // Uses update (not upsert) to avoid creating orphaned rows when no shift exists.
   const { error } = await supabase
     .from("shifts")
-    .update({ draft_shift_code_ids: [], draft_is_delete: true })
+    .update({ draft_shift_code_ids: [], draft_absence_type_id: null, draft_is_delete: true })
     .eq("emp_id", empId)
     .eq("date", date);
   if (error) throw error;
@@ -1195,7 +1359,7 @@ export async function discardScheduleDrafts(
   // 1. Fetch shifts — scoped to this user if userId provided, otherwise all org drafts
   let query = supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_is_delete, employees!inner(org_id)")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (userId) query = query.eq("updated_by", userId);
   const { data: shifts, error: fetchError } = await query;
@@ -1204,24 +1368,37 @@ export async function discardScheduleDrafts(
   if (!shifts || shifts.length === 0) return;
 
   // 2. Identify which rows need updating or deleting
-  const toUpsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; published_shift_code_ids: number[]; draft_is_delete: boolean }[] = [];
+  const toUpsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; published_shift_code_ids: number[]; draft_absence_type_id: number | null; published_absence_type_id: number | null; draft_is_delete: boolean; draft_custom_start_time: string | null; draft_custom_end_time: string | null }[] = [];
   const toDelete: { emp_id: string; date: string }[] = [];
 
-  for (const shift of shifts) {
+  for (const shift of shifts as DbShift[]) {
     const draftIds = shift.draft_shift_code_ids ?? [];
     const pubIds = shift.published_shift_code_ids ?? [];
+    const draftAbsId = shift.draft_absence_type_id ?? null;
+    const pubAbsId = shift.published_absence_type_id ?? null;
+    const draftStartTime = shift.draft_custom_start_time ?? null;
+    const draftEndTime = shift.draft_custom_end_time ?? null;
+    const pubStartTime = shift.published_custom_start_time ?? null;
+    const pubEndTime = shift.published_custom_end_time ?? null;
     const hasDraftChange = shift.draft_is_delete ||
-      (draftIds.length > 0 && !arraysEqual(draftIds, pubIds));
+      (draftIds.length > 0 && !arraysEqual(draftIds, pubIds)) ||
+      (draftAbsId != null && draftAbsId !== pubAbsId) ||
+      (draftStartTime != null && draftStartTime !== pubStartTime) ||
+      (draftEndTime != null && draftEndTime !== pubEndTime);
 
     if (hasDraftChange) {
-      if (pubIds.length > 0) {
+      if (pubIds.length > 0 || pubAbsId != null) {
         // Was edited from an existing published shift, restore the original
         toUpsert.push({
           emp_id: shift.emp_id,
           date: shift.date,
           draft_shift_code_ids: pubIds,
           published_shift_code_ids: pubIds,
+          draft_absence_type_id: pubAbsId,
+          published_absence_type_id: pubAbsId,
           draft_is_delete: false,
+          draft_custom_start_time: pubStartTime,
+          draft_custom_end_time: pubEndTime,
         });
       } else {
         // Was created as a draft but never published

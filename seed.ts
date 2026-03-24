@@ -13,12 +13,19 @@ interface ShiftCodeDef {
   color: string;
   border_color: string;
   text_color: string;
-  is_off_day: boolean;
   is_general: boolean;
   faIndex: number | null;
   catIndex: number | null;
   start?: string;
   end?: string;
+}
+
+interface AbsenceTypeDef {
+  label: string;
+  name: string;
+  color: string;
+  border_color: string;
+  text_color: string;
 }
 
 const TENANTS = [
@@ -60,19 +67,29 @@ const TENANTS = [
       { name: "Day Shift", color: "#FECDD3", start_time: "08:00", end_time: "16:00", faIndex: 2 },
       { name: "Day Shift", color: "#BBF7D0", start_time: "08:00", end_time: "16:00", faIndex: 3 },
     ],
+    absenceTypes: [
+      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
+      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
+      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
+      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
+      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
+      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
+      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
+      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
+      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
+      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
+      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+    ] as AbsenceTypeDef[],
     shiftCodes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "V", name: "Vacation", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "S", name: "Sick", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_off_day: false, is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_off_day: false, is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "N", name: "Night", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239", is_off_day: false, is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
-      { label: "D", name: "Day", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_off_day: false, is_general: false, faIndex: 1, catIndex: 3, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_off_day: false, is_general: false, faIndex: 1, catIndex: 4, start: "15:00", end: "23:00" },
-      { label: "D", name: "Day", color: "#A7F3D0", border_color: "transparent", text_color: "#065F46", is_off_day: false, is_general: false, faIndex: 2, catIndex: 5, start: "08:00", end: "16:00" },
-      { label: "D", name: "Day", color: "#BFDBFE", border_color: "transparent", text_color: "#1E40AF", is_off_day: false, is_general: false, faIndex: 3, catIndex: 6, start: "08:00", end: "16:00" },
+      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "D", name: "Day", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
+      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
+      { label: "N", name: "Night", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
+      { label: "D", name: "Day", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "07:00", end: "15:00" },
+      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 1, catIndex: 4, start: "15:00", end: "23:00" },
+      { label: "D", name: "Day", color: "#A7F3D0", border_color: "transparent", text_color: "#065F46", is_general: false, faIndex: 2, catIndex: 5, start: "08:00", end: "16:00" },
+      { label: "D", name: "Day", color: "#BFDBFE", border_color: "transparent", text_color: "#1E40AF", is_general: false, faIndex: 3, catIndex: 6, start: "08:00", end: "16:00" },
     ] as ShiftCodeDef[],
     employeeCount: 35,
     indicatorTypes: [
@@ -118,17 +135,28 @@ const TENANTS = [
       { name: "Day Shift", color: "#A5F3FC", start_time: "08:00", end_time: "16:00", faIndex: 2 },
       { name: "Clinic Hours", color: "#FDE047", start_time: "09:00", end_time: "17:00", faIndex: 3 },
     ],
+    absenceTypes: [
+      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
+      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
+      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
+      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
+      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
+      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
+      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
+      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
+      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
+      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
+      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+    ] as AbsenceTypeDef[],
     shiftCodes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "PTO", name: "Paid Time Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_off_day: false, is_general: false, faIndex: 0, catIndex: 0, start: "06:00", end: "14:00" },
-      { label: "Sw", name: "Swing", color: "#E9D5FF", border_color: "transparent", text_color: "#6B21A8", is_off_day: false, is_general: false, faIndex: 0, catIndex: 1, start: "14:00", end: "22:00" },
-      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_off_day: false, is_general: false, faIndex: 0, catIndex: 2, start: "22:00", end: "06:00" },
-      { label: "R", name: "Rehab", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_off_day: false, is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "16:30" },
-      { label: "H", name: "Hospice", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_off_day: false, is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "16:00" },
-      { label: "C", name: "Clinic", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_off_day: false, is_general: false, faIndex: 3, catIndex: 5, start: "09:00", end: "17:00" },
+      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "D", name: "Day", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 0, catIndex: 0, start: "06:00", end: "14:00" },
+      { label: "Sw", name: "Swing", color: "#E9D5FF", border_color: "transparent", text_color: "#6B21A8", is_general: false, faIndex: 0, catIndex: 1, start: "14:00", end: "22:00" },
+      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "22:00", end: "06:00" },
+      { label: "R", name: "Rehab", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "16:30" },
+      { label: "H", name: "Hospice", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "16:00" },
+      { label: "C", name: "Clinic", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "09:00", end: "17:00" },
     ] as ShiftCodeDef[],
     employeeCount: 40,
     indicatorTypes: [
@@ -174,18 +202,30 @@ const TENANTS = [
       { name: "Morning", color: "#A5F3FC", start_time: "07:00", end_time: "15:00", faIndex: 3 },
       { name: "Afternoon", color: "#BBF7D0", start_time: "15:00", end_time: "23:00", faIndex: 3 },
     ],
+    absenceTypes: [
+      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
+      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
+      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
+      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
+      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
+      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
+      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
+      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
+      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
+      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
+      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+    ] as AbsenceTypeDef[],
     shiftCodes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "M", name: "Morning", color: "#BBF7D0", border_color: "transparent", text_color: "#166534", is_off_day: false, is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_off_day: false, is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_off_day: false, is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D", is_off_day: false, is_general: false, faIndex: 1, catIndex: 3, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_off_day: false, is_general: false, faIndex: 2, catIndex: 4, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_off_day: false, is_general: false, faIndex: 2, catIndex: 5, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_off_day: false, is_general: false, faIndex: 3, catIndex: 6, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_off_day: false, is_general: false, faIndex: 3, catIndex: 7, start: "15:00", end: "23:00" },
+      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "M", name: "Morning", color: "#BBF7D0", border_color: "transparent", text_color: "#166534", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
+      { label: "A", name: "Afternoon", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
+      { label: "M", name: "Morning", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:00" },
+      { label: "A", name: "Afternoon", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D", is_general: false, faIndex: 1, catIndex: 3, start: "15:00", end: "23:00" },
+      { label: "M", name: "Morning", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 2, catIndex: 4, start: "07:00", end: "15:00" },
+      { label: "A", name: "Afternoon", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 5, start: "15:00", end: "23:00" },
+      { label: "M", name: "Morning", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 3, catIndex: 6, start: "07:00", end: "15:00" },
+      { label: "A", name: "Afternoon", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 3, catIndex: 7, start: "15:00", end: "23:00" },
     ] as ShiftCodeDef[],
     employeeCount: 32,
     indicatorTypes: [
@@ -235,18 +275,29 @@ const TENANTS = [
       { name: "ER Shift (12hr)", color: "#FED7AA", start_time: "07:00", end_time: "19:00", faIndex: 3 },
       { name: "Day Shift", color: "#A7F3D0", start_time: "08:00", end_time: "16:00", faIndex: 4 },
     ],
+    absenceTypes: [
+      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
+      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
+      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
+      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
+      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
+      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
+      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
+      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
+      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
+      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
+      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+    ] as AbsenceTypeDef[],
     shiftCodes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "CME", name: "Education", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "12D", name: "12hr Day", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_off_day: false, is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "19:00" },
-      { label: "12N", name: "12hr Night", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_off_day: false, is_general: false, faIndex: 0, catIndex: 1, start: "19:00", end: "07:00" },
-      { label: "D", name: "Day", color: "#FDE047", border_color: "transparent", text_color: "#854D0E", is_off_day: false, is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:30" },
-      { label: "E", name: "Evening", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_off_day: false, is_general: false, faIndex: 1, catIndex: 3, start: "15:30", end: "23:30" },
-      { label: "C", name: "Clinic", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_off_day: false, is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "17:00" },
-      { label: "ER", name: "ER Shift", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_off_day: false, is_general: false, faIndex: 3, catIndex: 5, start: "07:00", end: "19:00" },
-      { label: "BH", name: "Behavioral", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_off_day: false, is_general: false, faIndex: 4, catIndex: 6, start: "08:00", end: "16:00" },
+      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "12D", name: "12hr Day", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "19:00" },
+      { label: "12N", name: "12hr Night", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 0, catIndex: 1, start: "19:00", end: "07:00" },
+      { label: "D", name: "Day", color: "#FDE047", border_color: "transparent", text_color: "#854D0E", is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:30" },
+      { label: "E", name: "Evening", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "15:30", end: "23:30" },
+      { label: "C", name: "Clinic", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "17:00" },
+      { label: "ER", name: "ER Shift", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "07:00", end: "19:00" },
+      { label: "BH", name: "Behavioral", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 4, catIndex: 6, start: "08:00", end: "16:00" },
     ] as ShiftCodeDef[],
     employeeCount: 45,
     indicatorTypes: [
@@ -290,16 +341,27 @@ const TENANTS = [
       { name: "Field Visits", color: "#E9D5FF", start_time: "08:00", end_time: "17:00", faIndex: 1 },
       { name: "Support Group", color: "#E2E8F0", start_time: "10:00", end_time: "16:00", faIndex: 2 },
     ],
+    absenceTypes: [
+      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
+      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
+      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
+      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
+      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
+      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
+      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
+      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
+      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
+      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
+      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+    ] as AbsenceTypeDef[],
     shiftCodes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "B", name: "Bereavement Leave", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: true, is_general: false, faIndex: null, catIndex: null },
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_off_day: false, is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_off_day: false, is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6", is_off_day: false, is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_off_day: false, is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
-      { label: "FV", name: "Field Visit", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_off_day: false, is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "17:00" },
-      { label: "SG", name: "Support Group", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_off_day: false, is_general: false, faIndex: 2, catIndex: 4, start: "10:00", end: "16:00" },
+      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
+      { label: "D", name: "Day", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
+      { label: "E", name: "Evening", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
+      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
+      { label: "FV", name: "Field Visit", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "17:00" },
+      { label: "SG", name: "Support Group", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 2, catIndex: 4, start: "10:00", end: "16:00" },
     ] as ShiftCodeDef[],
     employeeCount: 30,
     indicatorTypes: [
@@ -464,8 +526,23 @@ async function main() {
       catIds.push(id(row.id));
     }
 
-    // 6. Shift Codes
-    interface ShiftCodeRow { id: number; label: string; is_off_day: boolean; focus_area_id: number | null }
+    // 6a. Absence Types
+    interface AbsenceTypeRow { id: number; label: string }
+    const absenceTypeRows: AbsenceTypeRow[] = [];
+    for (let i = 0; i < tenant.absenceTypes.length; i++) {
+      const at = tenant.absenceTypes[i];
+      const { rows: [row] } = await db.query(
+        `INSERT INTO public.absence_types
+           (org_id, label, name, color, border_color, text_color, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         RETURNING id, label`,
+        [orgId, at.label, at.name, at.color, at.border_color, at.text_color, i]
+      );
+      absenceTypeRows.push({ id: id(row.id), label: row.label });
+    }
+
+    // 6b. Shift Codes
+    interface ShiftCodeRow { id: number; label: string; focus_area_id: number | null }
     const shiftCodeRows: ShiftCodeRow[] = [];
     for (let i = 0; i < tenant.shiftCodes.length; i++) {
       const sc = tenant.shiftCodes[i];
@@ -473,18 +550,17 @@ async function main() {
       const catId = sc.catIndex !== null ? catIds[sc.catIndex] : null;
       const { rows: [row] } = await db.query(
         `INSERT INTO public.shift_codes
-           (org_id, label, name, color, border_color, text_color, is_off_day, is_general,
+           (org_id, label, name, color, border_color, text_color, is_general,
             sort_order, focus_area_id, category_id, default_start_time, default_end_time, required_certification_ids)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-         RETURNING id, label, is_off_day, focus_area_id`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         RETURNING id, label, focus_area_id`,
         [orgId, sc.label, sc.name, sc.color, sc.border_color, sc.text_color,
-         sc.is_off_day, sc.is_general, i, faId, catId,
+         sc.is_general, i, faId, catId,
          sc.start ?? null, sc.end ?? null, '{}']
       );
       shiftCodeRows.push({
         id: id(row.id),
         label: row.label,
-        is_off_day: row.is_off_day,
         focus_area_id: row.focus_area_id != null ? id(row.focus_area_id) : null,
       });
     }
@@ -542,17 +618,19 @@ async function main() {
     }
 
     // 9. Shifts (March 22 – April 4, 2026 — 2 weeks of data)
-    const workCodes = shiftCodeRows.filter((sc) => !sc.is_off_day);
-    const offCode = shiftCodeRows.find((sc) => sc.is_off_day);
+    const offAbsenceType = absenceTypeRows[0]; // First absence type (e.g., "Off")
     let shiftCount = 0;
 
-    // Batch insert for performance
-    const shiftValues: unknown[][] = [];
+    // Batch insert for performance — separate arrays for work shifts and absences
+    // Work shifts: [emp_id, date, org_id, code_ids, code_ids, focus_area_id, from_recurring, version]
+    const workShiftValues: unknown[][] = [];
+    // Absences: [emp_id, date, org_id, absence_type_id, absence_type_id, from_recurring, version]
+    const absenceValues: unknown[][] = [];
 
     for (const emp of employees) {
       if (emp.status === "terminated") continue;
       const primaryFaId = emp.focus_area_ids[0] ?? null;
-      const empWorkCodes = workCodes.filter(
+      const empWorkCodes = shiftCodeRows.filter(
         (sc) => sc.focus_area_id === primaryFaId || sc.focus_area_id === null
       );
       if (empWorkCodes.length === 0) continue;
@@ -566,27 +644,23 @@ async function main() {
         const rand = copycat.float(`${emp.id}-${dt}-shift`, { min: 0, max: 1 });
         if (rand > 0.92) continue; // ~8% chance of no shift
 
-        let codeId: number;
-        let faId: number | null;
-
         if (rand > 0.75 || (dow === 0 && rand > 0.4)) {
           // Off day (~25% chance, higher on Sundays)
-          codeId = offCode ? offCode.id : empWorkCodes[0].id;
-          faId = offCode ? null : primaryFaId;
+          if (offAbsenceType) {
+            absenceValues.push([emp.id, dt, orgId, offAbsenceType.id, offAbsenceType.id, false, 1]);
+          }
         } else {
           const code = empWorkCodes[i % empWorkCodes.length];
-          codeId = code.id;
-          faId = code.focus_area_id ?? primaryFaId;
+          const faId = code.focus_area_id ?? primaryFaId;
+          workShiftValues.push([emp.id, dt, orgId, [code.id], [code.id], faId, false, 1]);
         }
-
-        shiftValues.push([emp.id, dt, orgId, [codeId], [codeId], faId, false, 1]);
         shiftCount++;
       }
     }
 
-    // Batch insert shifts (50 at a time)
-    for (let i = 0; i < shiftValues.length; i += 50) {
-      const batch = shiftValues.slice(i, i + 50);
+    // Batch insert work shifts (50 at a time)
+    for (let i = 0; i < workShiftValues.length; i += 50) {
+      const batch = workShiftValues.slice(i, i + 50);
       const placeholders = batch.map((_, idx) => {
         const base = idx * 8;
         return `($${base + 1},$${base + 2},$${base + 3},$${base + 4}::integer[],$${base + 5}::integer[],$${base + 6},$${base + 7},$${base + 8})`;
@@ -595,6 +669,23 @@ async function main() {
       await db.query(
         `INSERT INTO public.shifts
            (emp_id, date, org_id, published_shift_code_ids, draft_shift_code_ids, focus_area_id, from_recurring, version)
+         VALUES ${placeholders}
+         ON CONFLICT (emp_id, date) DO NOTHING`,
+        params
+      );
+    }
+
+    // Batch insert absence shifts (50 at a time)
+    for (let i = 0; i < absenceValues.length; i += 50) {
+      const batch = absenceValues.slice(i, i + 50);
+      const placeholders = batch.map((_, idx) => {
+        const base = idx * 7;
+        return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7})`;
+      }).join(",");
+      const params = batch.flat();
+      await db.query(
+        `INSERT INTO public.shifts
+           (emp_id, date, org_id, published_absence_type_id, draft_absence_type_id, from_recurring, version)
          VALUES ${placeholders}
          ON CONFLICT (emp_id, date) DO NOTHING`,
         params

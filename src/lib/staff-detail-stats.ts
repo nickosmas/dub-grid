@@ -68,8 +68,7 @@ export function computeEmployeeHoursHistory(
         focusAreaById,
       );
       totalHours += hours;
-      // Only count non-off-day shifts
-      if (entry.shiftCodeIds.some(id => !shiftCodeById.get(id)?.isOffDay)) {
+      if (entry.shiftCodeIds.length > 0) {
         shiftCount++;
       }
     }
@@ -106,7 +105,7 @@ export function computeShiftDistribution(
 
     for (const codeId of entry.shiftCodeIds) {
       const sc = shiftCodeById.get(codeId);
-      if (sc && !sc.isOffDay) {
+      if (sc) {
         counts.set(codeId, (counts.get(codeId) ?? 0) + 1);
         total++;
         break; // count the primary code per shift
@@ -142,7 +141,6 @@ export function computeDayPattern(
   for (const [key, entry] of Object.entries(shifts)) {
     if (!key.startsWith(`${empId}_`)) continue;
     if (entry.isDelete || entry.shiftCodeIds.length === 0) continue;
-    if (!entry.shiftCodeIds.some(id => !shiftCodeById.get(id)?.isOffDay)) continue;
 
     const dateKey = key.substring(key.indexOf("_") + 1);
     const date = new Date(dateKey + "T00:00:00");
@@ -176,7 +174,7 @@ export function computeFocusAreaDistribution(
 
     for (const codeId of entry.shiftCodeIds) {
       const sc = shiftCodeById.get(codeId);
-      if (sc && !sc.isOffDay && sc.focusAreaId != null) {
+      if (sc && sc.focusAreaId != null) {
         faCounts.set(sc.focusAreaId, (faCounts.get(sc.focusAreaId) ?? 0) + 1);
         total++;
         break;
@@ -281,10 +279,15 @@ export function generateEmployeeCSV(
   for (const [key, entry] of empShifts) {
     if (entry.isDelete) continue;
     const dateKey = key.substring(key.indexOf("_") + 1);
-    const label = entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.label ?? "?").join("/");
+    const isAbsence = entry.absenceTypeId != null;
+    const label = isAbsence
+      ? entry.label
+      : entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.label ?? "?").join("/");
+    const startTime = isAbsence ? "" : (entry.customStartTime ?? entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.defaultStartTime).find(Boolean) ?? "");
+    const endTime = isAbsence ? "" : (entry.customEndTime ?? entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.defaultEndTime).find(Boolean) ?? "");
     const status = entry.isDraft ? "Draft" : "Published";
     lines.push(
-      `${dateKey},${esc(label)},${entry.customStartTime ?? ""},${entry.customEndTime ?? ""},${status}`,
+      `${dateKey},${esc(label)},${startTime},${endTime},${status}`,
     );
   }
   lines.push("");

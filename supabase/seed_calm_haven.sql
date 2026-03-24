@@ -87,51 +87,69 @@ BEGIN
   RETURNING id INTO cat_vcsn_vn;
 
 
+  -- ── Absence Types ──────────────────────────────────────────────────────────────
+
+  INSERT INTO public.absence_types
+    (org_id, label, name, color, border_color, text_color, sort_order)
+  VALUES
+    (org, 'X',    'Off',                    '#E2E8F0', 'transparent', '#1E293B', 0),
+    (org, 'V',    'Vacation',               '#A5F3FC', 'transparent', '#155E75', 1),
+    (org, 'S',    'Sick',                   '#FECDD3', 'transparent', '#9F1239', 2),
+    (org, 'PTO',  'Paid Time Off',          '#FDE68A', 'transparent', '#92400E', 3),
+    (org, 'P',    'Personal',               '#DDD6FE', 'transparent', '#5B21B6', 4),
+    (org, 'B',    'Bereavement',            '#BAE6FD', 'transparent', '#075985', 5),
+    (org, 'J',    'Jury Duty',              '#C7D2FE', 'transparent', '#3730A3', 6),
+    (org, 'H',    'Holiday',                '#BBF7D0', 'transparent', '#166534', 7),
+    (org, 'CME',  'Education / Training',   '#D9F99D', 'transparent', '#3F6212', 8),
+    (org, 'FMLA', 'Family / Medical Leave', '#FBCFE8', 'transparent', '#9D174D', 9),
+    (org, 'UX',   'Unpaid Leave',           '#FED7AA', 'transparent', '#9A3412', 10)
+  ON CONFLICT DO NOTHING;
+
   -- ── Shift Codes ───────────────────────────────────────────────────────────────
 
-  -- Global / Off-Day codes
+  -- Global codes (duration-only — no fixed start/end times)
   INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_off_day, is_general, focus_area_id, sort_order, required_certification_ids, category_id)
+    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, category_id, default_duration_hours, default_duration_minutes)
   VALUES
-    (org, 'X',   'Off',     '#E2E8F0', 'transparent', '#1E293B', true,  false, NULL, 0, '{}', NULL),
-    (org, 'Ofc', 'Office',  '#E2E8F0', 'transparent', '#1E293B', false, true,  NULL, 1, '{}', NULL),
-    (org, '0.3', 'Partial', '#E2E8F0', 'transparent', '#1E293B', false, true,  NULL, 2, '{}', NULL)
+    (org, 'Ofc', 'Office',  '#E2E8F0', 'transparent', '#1E293B', true,  NULL, 1, '{}', NULL, 8, 0),
+    (org, '0.3', 'Partial', '#E2E8F0', 'transparent', '#1E293B', true,  NULL, 2, '{}', NULL, 3, 0)
   ON CONFLICT DO NOTHING;
 
   -- Skilled Nursing codes
   INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_off_day, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
+    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
   VALUES
-    (org, 'D',   'Day',              '#FECACA', 'transparent', '#991B1B', false, false, fa_snw,  0, '{}', '07:00', '15:30', cat_snw_d),
-    (org, 'Ds',  'Day (Supervisor)', '#FED7AA', 'transparent', '#9A3412', false, false, fa_snw,  1, '{}', '07:00', '15:30', cat_snw_d),
-    (org, '(D)', 'Day Mentoring',    '#E2E8F0', 'transparent', '#1E293B', false, true,  fa_snw,  3, '{}', '07:00', '15:30', cat_snw_d),
-    (org, 'E',   'Evening',              '#FECACA', 'transparent', '#991B1B', false, false, fa_snw, 10, '{}', '15:30', '00:00', cat_snw_e),
-    (org, 'Es',  'Evening (Supervisor)', '#E9D5FF', 'transparent', '#6B21A8', false, false, fa_snw, 11, '{}', '15:30', '00:00', cat_snw_e)
+    (org, 'D',   'Day',              '#FECACA', 'transparent', '#991B1B', false, fa_snw,  0, '{}', '07:00', '15:30', cat_snw_d),
+    (org, 'Ds',  'Day (Supervisor)', '#FED7AA', 'transparent', '#9A3412', false, fa_snw,  1, '{}', '07:00', '15:30', cat_snw_d),
+    (org, '(D)', 'Day Mentoring',    '#E2E8F0', 'transparent', '#1E293B', false, fa_snw,  3, '{}', '07:00', '15:30', cat_snw_d),
+    (org, 'E',   'Evening',              '#FECACA', 'transparent', '#991B1B', false, fa_snw, 10, '{}', '15:30', '00:00', cat_snw_e),
+    (org, 'Es',  'Evening (Supervisor)', '#E9D5FF', 'transparent', '#6B21A8', false, fa_snw, 11, '{}', '15:30', '00:00', cat_snw_e)
   ON CONFLICT DO NOTHING;
 
   -- Sheltered Care codes
   INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_off_day, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
+    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
   VALUES
-    (org, 'D',   'Day',          '#FED7AA', 'transparent', '#9A3412', false, false, fa_sc, 0, '{}', '07:00', '15:30', cat_sc_d),
-    (org, 'Dcn', 'Day (CN)',     '#BFDBFE', 'transparent', '#1E40AF', false, false, fa_sc, 1, '{}', '07:00', '15:30', cat_sc_d),
-    (org, 'E',   'Evening',      '#FED7AA', 'transparent', '#9A3412', false, false, fa_sc, 2, '{}', '15:30', '00:00', cat_sc_e),
-    (org, 'Ecn', 'Evening (CN)', '#FBCFE8', 'transparent', '#9D174D', false, false, fa_sc, 3, '{}', '15:30', '00:00', cat_sc_e)
+    (org, 'D',   'Day',          '#FED7AA', 'transparent', '#9A3412', false, fa_sc, 0, '{}', '07:00', '15:30', cat_sc_d),
+    (org, 'Dcn', 'Day (CN)',     '#BFDBFE', 'transparent', '#1E40AF', false, fa_sc, 1, '{}', '07:00', '15:30', cat_sc_d),
+    (org, '(D)', 'Day Mentoring','#E2E8F0', 'transparent', '#1E293B', false, fa_sc, 2, '{}', '07:00', '15:30', cat_sc_d),
+    (org, 'E',   'Evening',      '#FED7AA', 'transparent', '#9A3412', false, fa_sc, 3, '{}', '15:30', '00:00', cat_sc_e),
+    (org, 'Ecn', 'Evening (CN)', '#FBCFE8', 'transparent', '#9D174D', false, fa_sc, 4, '{}', '15:30', '00:00', cat_sc_e)
   ON CONFLICT DO NOTHING;
 
   -- Night Shift codes
   INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_off_day, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
+    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
   VALUES
-    (org, 'N',  'Night',              '#FECACA', 'transparent', '#991B1B', false, false, fa_ns, 0, '{}', '00:00', '08:00', cat_ns_n),
-    (org, 'Ns', 'Night (Supervisor)', '#BFDBFE', 'transparent', '#1E40AF', false, false, fa_ns, 1, '{}', '00:00', '08:00', cat_ns_n)
+    (org, 'N',  'Night',              '#FECACA', 'transparent', '#991B1B', false, fa_ns, 0, '{}', '00:00', '08:00', cat_ns_n),
+    (org, 'Ns', 'Night (Supervisor)', '#BFDBFE', 'transparent', '#1E40AF', false, fa_ns, 1, '{}', '00:00', '08:00', cat_ns_n)
   ON CONFLICT DO NOTHING;
 
   -- Visiting CSNS codes
   INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_off_day, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
+    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
   VALUES
-    (org, 'VN', 'Visiting Nursing', '#FECACA', 'transparent', '#991B1B', false, false, fa_vcsn, 0, '{}', '07:00', '15:30', cat_vcsn_vn)
+    (org, 'VN', 'Visiting Nursing', '#FECACA', 'transparent', '#991B1B', false, fa_vcsn, 0, '{}', '07:00', '15:30', cat_vcsn_vn)
   ON CONFLICT DO NOTHING;
 
   RAISE NOTICE 'Calm Haven focus areas, shift categories, and shift codes seeded.';
@@ -275,7 +293,7 @@ BEGIN
 END $$;
 
 -- =============================================================================
--- Seed: shifts  (March 22 – April 4, 2026)
+-- Seed: shifts + absences  (March 22 – April 4, 2026)
 -- Organization: Calm Haven (b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90)
 -- =============================================================================
 
@@ -288,13 +306,15 @@ DECLARE
   ns   bigint;
   vc   bigint;
   -- Shift code IDs (global)
-  c_x    bigint;  -- Off
   c_ofc  bigint;  -- Office
   c_03   bigint;  -- Partial (0.3)
+  -- Absence type IDs
+  at_x   bigint;  -- Off (absence type)
   -- SNW codes
   c_d_snw    bigint;
   c_ds_snw   bigint;
-  c_fd_snw   bigint;  -- (D) mentoring
+  c_fd_snw   bigint;  -- (D) mentoring (SNW)
+  c_fd_sc    bigint;  -- (D) mentoring (SC)
   c_e_snw    bigint;
   c_es_snw   bigint;
   -- SC codes
@@ -315,14 +335,17 @@ BEGIN
   SELECT id INTO vc  FROM public.focus_areas WHERE org_id = org AND name = 'Visiting CSNS';
 
   -- Global codes
-  SELECT id INTO c_x   FROM public.shift_codes WHERE org_id = org AND label = 'X'   AND focus_area_id IS NULL;
   SELECT id INTO c_ofc FROM public.shift_codes WHERE org_id = org AND label = 'Ofc' AND focus_area_id IS NULL;
   SELECT id INTO c_03  FROM public.shift_codes WHERE org_id = org AND label = '0.3' AND focus_area_id IS NULL;
+
+  -- Absence types
+  SELECT id INTO at_x FROM public.absence_types WHERE org_id = org AND label = 'X';
 
   -- SNW codes
   SELECT id INTO c_d_snw   FROM public.shift_codes WHERE org_id = org AND label = 'D'   AND focus_area_id = snw;
   SELECT id INTO c_ds_snw  FROM public.shift_codes WHERE org_id = org AND label = 'Ds'  AND focus_area_id = snw;
   SELECT id INTO c_fd_snw  FROM public.shift_codes WHERE org_id = org AND label = '(D)' AND focus_area_id = snw;
+  SELECT id INTO c_fd_sc   FROM public.shift_codes WHERE org_id = org AND label = '(D)' AND focus_area_id = sc;
   SELECT id INTO c_e_snw   FROM public.shift_codes WHERE org_id = org AND label = 'E'   AND focus_area_id = snw;
   SELECT id INTO c_es_snw  FROM public.shift_codes WHERE org_id = org AND label = 'Es'  AND focus_area_id = snw;
 
@@ -339,21 +362,17 @@ BEGIN
   -- Visiting codes
   SELECT id INTO c_vn FROM public.shift_codes WHERE org_id = org AND label = 'VN' AND focus_area_id = vc;
 
-  -- ── Insert shifts ──────────────────────────────────────────────────────────
-  INSERT INTO public.shifts (emp_id, date, published_shift_code_ids, org_id, focus_area_id, custom_start_time, custom_end_time)
+  -- ── Insert work shifts ────────────────────────────────────────────────────
+  INSERT INTO public.shifts (emp_id, date, published_shift_code_ids, org_id, focus_area_id, published_custom_start_time, published_custom_end_time)
   SELECT e.id, v.dt::date, v.codes, org, v.fa_id, v.cstart::time, v.cend::time
   FROM (VALUES
 
     -- Margaret Sullivan ─────────────────────────────────────────────────────────────
-    ('Margaret Sullivan'::text, '2026-03-22'::date, ARRAY[c_x],   NULL::bigint, NULL::text, NULL::text),
-    ('Margaret Sullivan',       '2026-03-23', ARRAY[c_x],   NULL, NULL, NULL),
-    ('Margaret Sullivan',       '2026-03-24', ARRAY[c_ofc], NULL, NULL, NULL),
+    ('Margaret Sullivan'::text, '2026-03-24'::date, ARRAY[c_ofc], NULL::bigint, NULL::text, NULL::text),
     ('Margaret Sullivan',       '2026-03-25', ARRAY[c_ofc], NULL, NULL, NULL),
     ('Margaret Sullivan',       '2026-03-26', ARRAY[c_ofc], NULL, NULL, NULL),
     ('Margaret Sullivan',       '2026-03-27', ARRAY[c_ofc], NULL, NULL, NULL),
     ('Margaret Sullivan',       '2026-03-28', ARRAY[c_ofc], NULL, NULL, NULL),
-    ('Margaret Sullivan',       '2026-03-29', ARRAY[c_x],   NULL, NULL, NULL),
-    ('Margaret Sullivan',       '2026-03-30', ARRAY[c_x],   NULL, NULL, NULL),
     ('Margaret Sullivan',       '2026-03-31', ARRAY[c_ofc], NULL, NULL, NULL),
     ('Margaret Sullivan',       '2026-04-01', ARRAY[c_ofc], NULL, NULL, NULL),
     ('Margaret Sullivan',       '2026-04-02', ARRAY[c_ofc], NULL, NULL, NULL),
@@ -366,58 +385,36 @@ BEGIN
     ('Evelyn Hartwell', '2026-03-24', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Evelyn Hartwell', '2026-03-25', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Evelyn Hartwell', '2026-03-26', ARRAY[c_ofc],    NULL, NULL, NULL),
-    ('Evelyn Hartwell', '2026-03-27', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Evelyn Hartwell', '2026-03-28', ARRAY[c_x],      NULL, NULL, NULL),
     ('Evelyn Hartwell', '2026-03-29', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Evelyn Hartwell', '2026-03-30', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Evelyn Hartwell', '2026-03-31', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Evelyn Hartwell', '2026-04-01', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Evelyn Hartwell', '2026-04-02', ARRAY[c_ofc],    NULL, NULL, NULL),
-    ('Evelyn Hartwell', '2026-04-03', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Evelyn Hartwell', '2026-04-04', ARRAY[c_x],      NULL, NULL, NULL),
 
     -- Thomas Crawford ───────────────────────────────────────────────────────────
     ('Thomas Crawford', '2026-03-22', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Thomas Crawford', '2026-03-23', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Thomas Crawford', '2026-03-24', ARRAY[c_fd_snw], snw,  NULL, NULL),
-    ('Thomas Crawford', '2026-03-25', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Thomas Crawford', '2026-03-26', ARRAY[c_x],      NULL, NULL, NULL),
     ('Thomas Crawford', '2026-03-27', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Thomas Crawford', '2026-03-28', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Thomas Crawford', '2026-03-29', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Thomas Crawford', '2026-03-30', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Thomas Crawford', '2026-03-31', ARRAY[c_fd_snw], snw,  NULL, NULL),
-    ('Thomas Crawford', '2026-04-01', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Thomas Crawford', '2026-04-02', ARRAY[c_x],      NULL, NULL, NULL),
     ('Thomas Crawford', '2026-04-03', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Thomas Crawford', '2026-04-04', ARRAY[c_fd_snw], snw,  NULL, NULL),
 
     -- Carol Henderson ─────────────────────────────────────────────────────────
-    ('Carol Henderson', '2026-03-22', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-23', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-24', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-25', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-26', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-27', ARRAY[c_x],      NULL, NULL, NULL),
     ('Carol Henderson', '2026-03-28', ARRAY[c_ds_snw], snw,  NULL, NULL),
-    ('Carol Henderson', '2026-03-29', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-30', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-03-31', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Carol Henderson', '2026-04-01', ARRAY[c_x],      NULL, NULL, NULL),
     ('Carol Henderson', '2026-04-02', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Carol Henderson', '2026-04-03', ARRAY[c_e_snw],  snw,  '18:00', '00:00'),
     ('Carol Henderson', '2026-04-04', ARRAY[c_ds_snw], snw,  NULL, NULL),
 
     -- Diane Patterson ───────────────────────────────────────────────────────
-    ('Diane Patterson', '2026-03-22', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Diane Patterson', '2026-03-23', ARRAY[c_x],      NULL, NULL, NULL),
     ('Diane Patterson', '2026-03-24', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Diane Patterson', '2026-03-25', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Diane Patterson', '2026-03-26', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Diane Patterson', '2026-03-27', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Diane Patterson', '2026-03-28', ARRAY[c_dcn_sc], sc,   NULL, NULL),
-    ('Diane Patterson', '2026-03-29', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Diane Patterson', '2026-03-30', ARRAY[c_x],      NULL, NULL, NULL),
     ('Diane Patterson', '2026-03-31', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Diane Patterson', '2026-04-01', ARRAY[c_dcn_sc], sc,   NULL, NULL),
     ('Diane Patterson', '2026-04-02', ARRAY[c_dcn_sc], sc,   NULL, NULL),
@@ -425,15 +422,11 @@ BEGIN
     ('Diane Patterson', '2026-04-04', ARRAY[c_dcn_sc], sc,   NULL, NULL),
 
     -- Laura Marshall ─────────────────────────────────────────────────────────
-    ('Laura Marshall', '2026-03-22', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Laura Marshall', '2026-03-23', ARRAY[c_x],      NULL, NULL, NULL),
     ('Laura Marshall', '2026-03-24', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('Laura Marshall', '2026-03-25', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Laura Marshall', '2026-03-26', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Laura Marshall', '2026-03-27', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Laura Marshall', '2026-03-28', ARRAY[c_es_snw], snw,  NULL, NULL),
-    ('Laura Marshall', '2026-03-29', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Laura Marshall', '2026-03-30', ARRAY[c_x],      NULL, NULL, NULL),
     ('Laura Marshall', '2026-03-31', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('Laura Marshall', '2026-04-01', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Laura Marshall', '2026-04-02', ARRAY[c_ecn_sc], sc,   NULL, NULL),
@@ -441,32 +434,24 @@ BEGIN
     ('Laura Marshall', '2026-04-04', ARRAY[c_es_snw], snw,  NULL, NULL),
 
     -- Richard Bennett ─────────────────────────────────────────────────────────
-    ('Richard Bennett', '2026-03-22', ARRAY[c_x],      NULL, NULL, NULL),
     ('Richard Bennett', '2026-03-23', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Richard Bennett', '2026-03-24', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Richard Bennett', '2026-03-25', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Richard Bennett', '2026-03-26', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Richard Bennett', '2026-03-27', ARRAY[c_ds_snw], snw,  NULL, NULL),
-    ('Richard Bennett', '2026-03-28', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Richard Bennett', '2026-03-29', ARRAY[c_x],      NULL, NULL, NULL),
     ('Richard Bennett', '2026-03-30', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Richard Bennett', '2026-03-31', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Richard Bennett', '2026-04-01', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Richard Bennett', '2026-04-02', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Richard Bennett', '2026-04-03', ARRAY[c_ds_snw], snw,  NULL, NULL),
-    ('Richard Bennett', '2026-04-04', ARRAY[c_x],      NULL, NULL, NULL),
 
     -- Susan Fletcher ───────────────────────────────────────────────────────
     ('Susan Fletcher', '2026-03-22', ARRAY[c_d_snw],  snw,  NULL, NULL),
-    ('Susan Fletcher', '2026-03-23', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Susan Fletcher', '2026-03-24', ARRAY[c_x],      NULL, NULL, NULL),
     ('Susan Fletcher', '2026-03-25', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Susan Fletcher', '2026-03-26', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Susan Fletcher', '2026-03-27', ARRAY[c_vn],     vc,   NULL, NULL),
     ('Susan Fletcher', '2026-03-28', ARRAY[c_vn],     vc,   NULL, NULL),
     ('Susan Fletcher', '2026-03-29', ARRAY[c_ds_snw], snw,  NULL, NULL),
-    ('Susan Fletcher', '2026-03-30', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Susan Fletcher', '2026-03-31', ARRAY[c_x],      NULL, NULL, NULL),
     ('Susan Fletcher', '2026-04-01', ARRAY[c_ds_snw], snw,  NULL, NULL),
     ('Susan Fletcher', '2026-04-02', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Susan Fletcher', '2026-04-03', ARRAY[c_vn],     vc,   NULL, NULL),
@@ -479,98 +464,67 @@ BEGIN
     ('William Harper', '2026-03-25', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('William Harper', '2026-03-26', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('William Harper', '2026-03-27', ARRAY[c_es_snw], snw,  NULL, NULL),
-    ('William Harper', '2026-03-28', ARRAY[c_x],      NULL, NULL, NULL),
     ('William Harper', '2026-03-29', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('William Harper', '2026-03-30', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('William Harper', '2026-03-31', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('William Harper', '2026-04-01', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('William Harper', '2026-04-02', ARRAY[c_es_snw], snw,  NULL, NULL),
     ('William Harper', '2026-04-03', ARRAY[c_e_snw],  snw,  NULL, NULL),
-    ('William Harper', '2026-04-04', ARRAY[c_x],      NULL, NULL, NULL),
 
     -- Kenneth Crawford (Night + Evening combos) ─────────────────────────────────
     ('Kenneth Crawford', '2026-03-22', ARRAY[c_n],          ns,   NULL, NULL),
-    ('Kenneth Crawford', '2026-03-23', ARRAY[c_x],          NULL, NULL, NULL),
-    ('Kenneth Crawford', '2026-03-24', ARRAY[c_x],          NULL, NULL, NULL),
-    ('Kenneth Crawford', '2026-03-25', ARRAY[c_x],          NULL, NULL, NULL),
     ('Kenneth Crawford', '2026-03-26', ARRAY[c_e_snw, c_ns], ns,  NULL, NULL),
     ('Kenneth Crawford', '2026-03-27', ARRAY[c_ns],         ns,   NULL, NULL),
     ('Kenneth Crawford', '2026-03-28', ARRAY[c_ns],         ns,   NULL, NULL),
     ('Kenneth Crawford', '2026-03-29', ARRAY[c_n],          ns,   NULL, NULL),
-    ('Kenneth Crawford', '2026-03-30', ARRAY[c_x],          NULL, NULL, NULL),
-    ('Kenneth Crawford', '2026-03-31', ARRAY[c_x],          NULL, NULL, NULL),
-    ('Kenneth Crawford', '2026-04-01', ARRAY[c_x],          NULL, NULL, NULL),
     ('Kenneth Crawford', '2026-04-02', ARRAY[c_e_snw, c_ns], ns,  NULL, NULL),
     ('Kenneth Crawford', '2026-04-03', ARRAY[c_ns],         ns,   NULL, NULL),
     ('Kenneth Crawford', '2026-04-04', ARRAY[c_n],          ns,   NULL, NULL),
 
     -- Nancy Thornton ────────────────────────────────────────────────────────
-    ('Nancy Thornton', '2026-03-22', ARRAY[c_x],     NULL, NULL, NULL),
     ('Nancy Thornton', '2026-03-23', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nancy Thornton', '2026-03-24', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nancy Thornton', '2026-03-25', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nancy Thornton', '2026-03-26', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nancy Thornton', '2026-03-27', ARRAY[c_d_snw], snw,  NULL, NULL),
-    ('Nancy Thornton', '2026-03-28', ARRAY[c_x],     NULL, NULL, NULL),
 
     -- Kevin Donovan ───────────────────────────────────────────────────────────
-    ('Kevin Donovan', '2026-03-22', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-03-23', ARRAY[c_x],     NULL, NULL, NULL),
     ('Kevin Donovan', '2026-03-24', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Kevin Donovan', '2026-03-25', ARRAY[c_e_snw], snw,  NULL, NULL),
-    ('Kevin Donovan', '2026-03-26', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-03-27', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-03-28', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-03-29', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-03-30', ARRAY[c_x],     NULL, NULL, NULL),
     ('Kevin Donovan', '2026-03-31', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Kevin Donovan', '2026-04-01', ARRAY[c_e_snw], snw,  NULL, NULL),
-    ('Kevin Donovan', '2026-04-02', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-04-03', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Kevin Donovan', '2026-04-04', ARRAY[c_x],     NULL, NULL, NULL),
 
     -- Brian Shepherd (all SC Evening) ────────────────────────────────────────
     ('Brian Shepherd', '2026-03-22', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-23', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-24', ARRAY[c_e_sc], sc,   NULL, NULL),
-    ('Brian Shepherd', '2026-03-25', ARRAY[c_x],    NULL, NULL, NULL),
     ('Brian Shepherd', '2026-03-26', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-27', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-28', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-29', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-30', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-03-31', ARRAY[c_e_sc], sc,   NULL, NULL),
-    ('Brian Shepherd', '2026-04-01', ARRAY[c_x],    NULL, NULL, NULL),
     ('Brian Shepherd', '2026-04-02', ARRAY[c_e_sc], sc,   NULL, NULL),
     ('Brian Shepherd', '2026-04-03', ARRAY[c_e_sc], sc,   NULL, NULL),
-    ('Brian Shepherd', '2026-04-04', ARRAY[c_x],    NULL, NULL, NULL),
 
     -- Timothy Walsh ────────────────────────────────────────────────────────
     ('Timothy Walsh', '2026-03-22', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Timothy Walsh', '2026-03-23', ARRAY[c_ecn_sc], sc,   NULL, NULL),
-    ('Timothy Walsh', '2026-03-24', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Timothy Walsh', '2026-03-25', ARRAY[c_x],      NULL, NULL, NULL),
     ('Timothy Walsh', '2026-03-26', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Timothy Walsh', '2026-03-27', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Timothy Walsh', '2026-03-28', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Timothy Walsh', '2026-03-29', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Timothy Walsh', '2026-03-30', ARRAY[c_ecn_sc], sc,   NULL, NULL),
-    ('Timothy Walsh', '2026-03-31', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Timothy Walsh', '2026-04-01', ARRAY[c_x],      NULL, NULL, NULL),
     ('Timothy Walsh', '2026-04-02', ARRAY[c_ofc],    NULL, NULL, NULL),
     ('Timothy Walsh', '2026-04-03', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Timothy Walsh', '2026-04-04', ARRAY[c_e_snw],  snw,  NULL, NULL),
 
     -- Nathan "Nate" Callahan ───────────────────────────────────────────────────
-    ('Nathan "Nate" Callahan', '2026-03-22', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Nathan "Nate" Callahan', '2026-03-23', ARRAY[c_x],     NULL, NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-03-24', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-03-25', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-03-26', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-03-27', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-03-28', ARRAY[c_e_snw], snw,  NULL, NULL),
-    ('Nathan "Nate" Callahan', '2026-03-29', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Nathan "Nate" Callahan', '2026-03-30', ARRAY[c_x],     NULL, NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-03-31', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-04-01', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Nathan "Nate" Callahan', '2026-04-02', ARRAY[c_d_sc],  sc,   NULL, NULL),
@@ -582,92 +536,64 @@ BEGIN
     ('Janet Morrison', '2026-03-23', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Janet Morrison', '2026-03-24', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Janet Morrison', '2026-03-25', ARRAY[c_e_sc],   sc,   NULL, NULL),
-    ('Janet Morrison', '2026-03-26', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Janet Morrison', '2026-03-27', ARRAY[c_x],      NULL, NULL, NULL),
     ('Janet Morrison', '2026-03-28', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Janet Morrison', '2026-03-29', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Janet Morrison', '2026-03-30', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Janet Morrison', '2026-03-31', ARRAY[c_ecn_sc], sc,   NULL, NULL),
     ('Janet Morrison', '2026-04-01', ARRAY[c_e_sc],   sc,   NULL, NULL),
-    ('Janet Morrison', '2026-04-02', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Janet Morrison', '2026-04-03', ARRAY[c_x],      NULL, NULL, NULL),
     ('Janet Morrison', '2026-04-04', ARRAY[c_ecn_sc], sc,   NULL, NULL),
 
     -- Barbara Trent ─────────────────────────────────────────────────────────
     ('Barbara Trent', '2026-03-22', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-03-23', ARRAY[c_d_snw], snw,  NULL, NULL),
-    ('Barbara Trent', '2026-03-24', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Barbara Trent', '2026-03-25', ARRAY[c_x],     NULL, NULL, NULL),
     ('Barbara Trent', '2026-03-26', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-03-27', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-03-28', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-03-29', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-03-30', ARRAY[c_d_snw], snw,  NULL, NULL),
-    ('Barbara Trent', '2026-03-31', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Barbara Trent', '2026-04-01', ARRAY[c_x],     NULL, NULL, NULL),
     ('Barbara Trent', '2026-04-02', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-04-03', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Barbara Trent', '2026-04-04', ARRAY[c_e_snw], snw,  NULL, NULL),
 
     -- David Michael Spencer ────────────────────────────────────────────────────
-    ('David Michael Spencer', '2026-03-22', ARRAY[c_x],     NULL, NULL, NULL),
-    ('David Michael Spencer', '2026-03-23', ARRAY[c_x],     NULL, NULL, NULL),
     ('David Michael Spencer', '2026-03-24', ARRAY[c_vn],    vc,   NULL, NULL),
     ('David Michael Spencer', '2026-03-25', ARRAY[c_vn],    vc,   NULL, NULL),
     ('David Michael Spencer', '2026-03-26', ARRAY[c_vn],    vc,   NULL, NULL),
-    ('David Michael Spencer', '2026-03-27', ARRAY[c_x],     NULL, NULL, NULL),
-    ('David Michael Spencer', '2026-03-28', ARRAY[c_x],     NULL, NULL, NULL),
-    ('David Michael Spencer', '2026-03-29', ARRAY[c_x],     NULL, NULL, NULL),
-    ('David Michael Spencer', '2026-03-30', ARRAY[c_x],     NULL, NULL, NULL),
     ('David Michael Spencer', '2026-03-31', ARRAY[c_vn],    vc,   NULL, NULL),
     ('David Michael Spencer', '2026-04-01', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('David Michael Spencer', '2026-04-02', ARRAY[c_d_snw], snw,  NULL, NULL),
-    ('David Michael Spencer', '2026-04-03', ARRAY[c_x],     NULL, NULL, NULL),
-    ('David Michael Spencer', '2026-04-04', ARRAY[c_x],     NULL, NULL, NULL),
 
     -- Robert Garrison ──────────────────────────────────────────────────────
     ('Robert Garrison', '2026-03-22', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Robert Garrison', '2026-03-23', ARRAY[c_d_sc],  sc,   NULL, NULL),
     ('Robert Garrison', '2026-03-24', ARRAY[c_d_sc],  sc,   NULL, NULL),
-    ('Robert Garrison', '2026-03-25', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Robert Garrison', '2026-03-26', ARRAY[c_x],     NULL, NULL, NULL),
     ('Robert Garrison', '2026-03-27', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Robert Garrison', '2026-03-28', ARRAY[c_d_sc],  sc,   NULL, NULL),
     ('Robert Garrison', '2026-03-29', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Robert Garrison', '2026-03-30', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Robert Garrison', '2026-03-31', ARRAY[c_d_sc],  sc,   NULL, NULL),
-    ('Robert Garrison', '2026-04-01', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Robert Garrison', '2026-04-02', ARRAY[c_x],     NULL, NULL, NULL),
     ('Robert Garrison', '2026-04-03', ARRAY[c_d_snw], snw,  NULL, NULL),
     ('Robert Garrison', '2026-04-04', ARRAY[c_d_snw], snw,  NULL, NULL),
 
     -- Steven Whitfield ─────────────────────────────────────────────────────────
     ('Steven Whitfield', '2026-03-22', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-03-23', ARRAY[c_e_snw], snw,  NULL, NULL),
-    ('Steven Whitfield', '2026-03-24', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Steven Whitfield', '2026-03-25', ARRAY[c_x],     NULL, NULL, NULL),
     ('Steven Whitfield', '2026-03-26', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-03-27', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-03-28', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-03-29', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-03-30', ARRAY[c_e_snw], snw,  NULL, NULL),
-    ('Steven Whitfield', '2026-03-31', ARRAY[c_x],     NULL, NULL, NULL),
-    ('Steven Whitfield', '2026-04-01', ARRAY[c_x],     NULL, NULL, NULL),
     ('Steven Whitfield', '2026-04-02', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-04-03', ARRAY[c_e_snw], snw,  NULL, NULL),
     ('Steven Whitfield', '2026-04-04', ARRAY[c_e_sc],  sc,   NULL, NULL),
 
     -- Raymond Caldwell ──────────────────────────────────────────────────────
     ('Raymond Caldwell', '2026-03-22', ARRAY[c_e_snw],  snw,  NULL, NULL),
-    ('Raymond Caldwell', '2026-03-23', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Raymond Caldwell', '2026-03-24', ARRAY[c_x],      NULL, NULL, NULL),
     ('Raymond Caldwell', '2026-03-25', ARRAY[c_d_sc],   sc,   NULL, NULL),
     ('Raymond Caldwell', '2026-03-26', ARRAY[c_d_sc],   sc,   NULL, NULL),
     ('Raymond Caldwell', '2026-03-27', ARRAY[c_d_sc],   sc,   NULL, NULL),
     ('Raymond Caldwell', '2026-03-28', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Raymond Caldwell', '2026-03-29', ARRAY[c_e_snw],  snw,  NULL, NULL),
-    ('Raymond Caldwell', '2026-03-30', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Raymond Caldwell', '2026-03-31', ARRAY[c_x],      NULL, NULL, NULL),
     ('Raymond Caldwell', '2026-04-01', ARRAY[c_d_sc],   sc,   NULL, NULL),
     ('Raymond Caldwell', '2026-04-02', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Raymond Caldwell', '2026-04-03', ARRAY[c_fd_snw], snw,  NULL, NULL),
@@ -678,15 +604,11 @@ BEGIN
     ('Patricia Langford', '2026-03-23', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Patricia Langford', '2026-03-24', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Patricia Langford', '2026-03-25', ARRAY[c_e_snw],  snw,  NULL, NULL),
-    ('Patricia Langford', '2026-03-26', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Patricia Langford', '2026-03-27', ARRAY[c_x],      NULL, NULL, NULL),
     ('Patricia Langford', '2026-03-28', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Patricia Langford', '2026-03-29', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Patricia Langford', '2026-03-30', ARRAY[c_d_sc],   sc,   NULL, NULL),
     ('Patricia Langford', '2026-03-31', ARRAY[c_e_snw],  snw,  NULL, NULL),
     ('Patricia Langford', '2026-04-01', ARRAY[c_e_snw],  snw,  NULL, NULL),
-    ('Patricia Langford', '2026-04-02', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Patricia Langford', '2026-04-03', ARRAY[c_x],      NULL, NULL, NULL),
     ('Patricia Langford', '2026-04-04', ARRAY[c_fd_snw], snw,  NULL, NULL),
 
     -- Christine Prescott ────────────────────────────────────────────────────────
@@ -694,32 +616,18 @@ BEGIN
     ('Christine Prescott', '2026-03-23', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Christine Prescott', '2026-03-24', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Christine Prescott', '2026-03-25', ARRAY[c_d_snw],  snw,  NULL, NULL),
-    ('Christine Prescott', '2026-03-26', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Christine Prescott', '2026-03-27', ARRAY[c_x],      NULL, NULL, NULL),
     ('Christine Prescott', '2026-03-28', ARRAY[c_d_snw],  snw,  NULL, NULL),
     ('Christine Prescott', '2026-03-29', ARRAY[c_d_sc],   sc,   NULL, NULL),
     ('Christine Prescott', '2026-03-30', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Christine Prescott', '2026-03-31', ARRAY[c_fd_snw], snw,  NULL, NULL),
     ('Christine Prescott', '2026-04-01', ARRAY[c_e_snw],  snw,  NULL, NULL),
-    ('Christine Prescott', '2026-04-02', ARRAY[c_x],      NULL, NULL, NULL),
-    ('Christine Prescott', '2026-04-03', ARRAY[c_x],      NULL, NULL, NULL),
     ('Christine Prescott', '2026-04-04', ARRAY[c_d_sc],   sc,   NULL, NULL),
 
     -- Gloria Jennings (Activity Coordinator — all SC) ──────────────────────
-    ('Gloria Jennings', '2026-03-22', ARRAY[c_x],    NULL, NULL, NULL),
-    ('Gloria Jennings', '2026-03-23', ARRAY[c_x],    NULL, NULL, NULL),
     ('Gloria Jennings', '2026-03-24', ARRAY[c_d_sc], sc,   NULL, NULL),
-    ('Gloria Jennings', '2026-03-25', ARRAY[c_x],    NULL, NULL, NULL),
-    ('Gloria Jennings', '2026-03-26', ARRAY[c_x],    NULL, NULL, NULL),
     ('Gloria Jennings', '2026-03-27', ARRAY[c_d_sc], sc,   NULL, NULL),
-    ('Gloria Jennings', '2026-03-28', ARRAY[c_x],    NULL, NULL, NULL),
-    ('Gloria Jennings', '2026-03-29', ARRAY[c_x],    NULL, NULL, NULL),
-    ('Gloria Jennings', '2026-03-30', ARRAY[c_x],    NULL, NULL, NULL),
     ('Gloria Jennings', '2026-03-31', ARRAY[c_d_sc], sc,   NULL, NULL),
-    ('Gloria Jennings', '2026-04-01', ARRAY[c_x],    NULL, NULL, NULL),
-    ('Gloria Jennings', '2026-04-02', ARRAY[c_x],    NULL, NULL, NULL),
     ('Gloria Jennings', '2026-04-03', ARRAY[c_d_sc], sc,   NULL, NULL),
-    ('Gloria Jennings', '2026-04-04', ARRAY[c_x],    NULL, NULL, NULL),
 
     -- Donna Fowler (SC/Asst/Act/Cor — D shifts are SC) ───────────────────
     ('Donna Fowler', '2026-03-22', ARRAY[c_03],   NULL, NULL, NULL),
@@ -728,45 +636,35 @@ BEGIN
     ('Donna Fowler', '2026-03-25', ARRAY[c_d_sc], sc,   NULL, NULL),
     ('Donna Fowler', '2026-03-26', ARRAY[c_d_sc], sc,   NULL, NULL),
     ('Donna Fowler', '2026-03-27', ARRAY[c_ofc],  NULL, NULL, NULL),
-    ('Donna Fowler', '2026-03-28', ARRAY[c_x],    NULL, NULL, NULL),
     ('Donna Fowler', '2026-03-29', ARRAY[c_03],   NULL, NULL, NULL),
     ('Donna Fowler', '2026-03-30', ARRAY[c_d_sc], sc,   NULL, NULL),
     ('Donna Fowler', '2026-03-31', ARRAY[c_ofc],  NULL, NULL, NULL),
     ('Donna Fowler', '2026-04-01', ARRAY[c_d_sc], sc,   NULL, NULL),
     ('Donna Fowler', '2026-04-02', ARRAY[c_d_sc], sc,   NULL, NULL),
     ('Donna Fowler', '2026-04-03', ARRAY[c_ofc],  NULL, NULL, NULL),
-    ('Donna Fowler', '2026-04-04', ARRAY[c_x],    NULL, NULL, NULL),
 
     -- Hannah Stratton ────────────────────────────────────────────────────────
-    ('Hannah Stratton', '2026-03-22', ARRAY[c_x],  NULL, NULL, NULL),
     ('Hannah Stratton', '2026-03-23', ARRAY[c_n],  ns,   NULL, NULL),
     ('Hannah Stratton', '2026-03-24', ARRAY[c_ns], ns,   NULL, NULL),
     ('Hannah Stratton', '2026-03-25', ARRAY[c_ns], ns,   NULL, NULL),
     ('Hannah Stratton', '2026-03-26', ARRAY[c_n],  ns,   NULL, NULL),
     ('Hannah Stratton', '2026-03-27', ARRAY[c_ns], ns,   NULL, NULL),
-    ('Hannah Stratton', '2026-03-28', ARRAY[c_x],  NULL, NULL, NULL),
-    ('Hannah Stratton', '2026-03-29', ARRAY[c_x],  NULL, NULL, NULL),
     ('Hannah Stratton', '2026-03-30', ARRAY[c_n],  ns,   NULL, NULL),
     ('Hannah Stratton', '2026-03-31', ARRAY[c_ns], ns,   NULL, NULL),
     ('Hannah Stratton', '2026-04-01', ARRAY[c_ns], ns,   NULL, NULL),
     ('Hannah Stratton', '2026-04-02', ARRAY[c_n],  ns,   NULL, NULL),
     ('Hannah Stratton', '2026-04-03', ARRAY[c_n],  ns,   NULL, NULL),
-    ('Hannah Stratton', '2026-04-04', ARRAY[c_x],  NULL, NULL, NULL),
 
     -- Vincent Gallagher ─────────────────────────────────────────────────────────
     ('Vincent Gallagher', '2026-03-22', ARRAY[c_ns], ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-03-23', ARRAY[c_ns], ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-03-24', ARRAY[c_n],  ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-03-25', ARRAY[c_n],  ns,   NULL, NULL),
-    ('Vincent Gallagher', '2026-03-26', ARRAY[c_x],  NULL, NULL, NULL),
-    ('Vincent Gallagher', '2026-03-27', ARRAY[c_x],  NULL, NULL, NULL),
     ('Vincent Gallagher', '2026-03-28', ARRAY[c_n],  ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-03-29', ARRAY[c_ns], ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-03-30', ARRAY[c_ns], ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-03-31', ARRAY[c_n],  ns,   NULL, NULL),
     ('Vincent Gallagher', '2026-04-01', ARRAY[c_n],  ns,   NULL, NULL),
-    ('Vincent Gallagher', '2026-04-02', ARRAY[c_x],  NULL, NULL, NULL),
-    ('Vincent Gallagher', '2026-04-03', ARRAY[c_x],  NULL, NULL, NULL),
     ('Vincent Gallagher', '2026-04-04', ARRAY[c_ns], ns,   NULL, NULL),
 
     -- Marilyn Davenport ────────────────────────────────────────────────────────
@@ -775,22 +673,185 @@ BEGIN
     ('Marilyn Davenport', '2026-03-24', ARRAY[c_vn], vc,   NULL, NULL),
     ('Marilyn Davenport', '2026-03-25', ARRAY[c_vn], vc,   NULL, NULL),
     ('Marilyn Davenport', '2026-03-26', ARRAY[c_vn], vc,   NULL, NULL),
-    ('Marilyn Davenport', '2026-03-27', ARRAY[c_x],  NULL, NULL, NULL),
-    ('Marilyn Davenport', '2026-03-28', ARRAY[c_x],  NULL, NULL, NULL),
     ('Marilyn Davenport', '2026-03-29', ARRAY[c_vn], vc,   NULL, NULL),
     ('Marilyn Davenport', '2026-03-30', ARRAY[c_vn], vc,   NULL, NULL),
     ('Marilyn Davenport', '2026-03-31', ARRAY[c_vn], vc,   NULL, NULL),
     ('Marilyn Davenport', '2026-04-01', ARRAY[c_vn], vc,   NULL, NULL),
-    ('Marilyn Davenport', '2026-04-02', ARRAY[c_vn], vc,   NULL, NULL),
-    ('Marilyn Davenport', '2026-04-03', ARRAY[c_x],  NULL, NULL, NULL),
-    ('Marilyn Davenport', '2026-04-04', ARRAY[c_x],  NULL, NULL, NULL)
+    ('Marilyn Davenport', '2026-04-02', ARRAY[c_vn], vc,   NULL, NULL)
 
   ) AS v(emp_name, dt, codes, fa_id, cstart, cend)
   JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
   ON CONFLICT (emp_id, date) DO UPDATE SET
     published_shift_code_ids = EXCLUDED.published_shift_code_ids,
     focus_area_id = EXCLUDED.focus_area_id,
-    custom_start_time = EXCLUDED.custom_start_time,
-    custom_end_time = EXCLUDED.custom_end_time;
+    published_custom_start_time = EXCLUDED.published_custom_start_time,
+    published_custom_end_time = EXCLUDED.published_custom_end_time;
+
+  -- ── Insert absence entries ──────────────────────────────────────────────
+  INSERT INTO public.shifts (emp_id, date, published_absence_type_id, draft_absence_type_id, org_id)
+  SELECT e.id, v.dt::date, at_x, at_x, org
+  FROM (VALUES
+    -- Margaret Sullivan
+    ('Margaret Sullivan'::text, '2026-03-22'::date),
+    ('Margaret Sullivan',       '2026-03-23'),
+    ('Margaret Sullivan',       '2026-03-29'),
+    ('Margaret Sullivan',       '2026-03-30'),
+    -- Evelyn Hartwell
+    ('Evelyn Hartwell', '2026-03-27'),
+    ('Evelyn Hartwell', '2026-03-28'),
+    ('Evelyn Hartwell', '2026-04-03'),
+    ('Evelyn Hartwell', '2026-04-04'),
+    -- Thomas Crawford
+    ('Thomas Crawford', '2026-03-25'),
+    ('Thomas Crawford', '2026-03-26'),
+    ('Thomas Crawford', '2026-04-01'),
+    ('Thomas Crawford', '2026-04-02'),
+    -- Carol Henderson
+    ('Carol Henderson', '2026-03-22'),
+    ('Carol Henderson', '2026-03-23'),
+    ('Carol Henderson', '2026-03-24'),
+    ('Carol Henderson', '2026-03-25'),
+    ('Carol Henderson', '2026-03-26'),
+    ('Carol Henderson', '2026-03-27'),
+    ('Carol Henderson', '2026-03-29'),
+    ('Carol Henderson', '2026-03-30'),
+    ('Carol Henderson', '2026-03-31'),
+    ('Carol Henderson', '2026-04-01'),
+    -- Diane Patterson
+    ('Diane Patterson', '2026-03-22'),
+    ('Diane Patterson', '2026-03-23'),
+    ('Diane Patterson', '2026-03-29'),
+    ('Diane Patterson', '2026-03-30'),
+    -- Laura Marshall
+    ('Laura Marshall', '2026-03-22'),
+    ('Laura Marshall', '2026-03-23'),
+    ('Laura Marshall', '2026-03-29'),
+    ('Laura Marshall', '2026-03-30'),
+    -- Richard Bennett
+    ('Richard Bennett', '2026-03-22'),
+    ('Richard Bennett', '2026-03-28'),
+    ('Richard Bennett', '2026-03-29'),
+    ('Richard Bennett', '2026-04-04'),
+    -- Susan Fletcher
+    ('Susan Fletcher', '2026-03-23'),
+    ('Susan Fletcher', '2026-03-24'),
+    ('Susan Fletcher', '2026-03-30'),
+    ('Susan Fletcher', '2026-03-31'),
+    -- William Harper
+    ('William Harper', '2026-03-28'),
+    ('William Harper', '2026-04-04'),
+    -- Kenneth Crawford
+    ('Kenneth Crawford', '2026-03-23'),
+    ('Kenneth Crawford', '2026-03-24'),
+    ('Kenneth Crawford', '2026-03-25'),
+    ('Kenneth Crawford', '2026-03-30'),
+    ('Kenneth Crawford', '2026-03-31'),
+    ('Kenneth Crawford', '2026-04-01'),
+    -- Nancy Thornton
+    ('Nancy Thornton', '2026-03-22'),
+    ('Nancy Thornton', '2026-03-28'),
+    -- Kevin Donovan
+    ('Kevin Donovan', '2026-03-22'),
+    ('Kevin Donovan', '2026-03-23'),
+    ('Kevin Donovan', '2026-03-26'),
+    ('Kevin Donovan', '2026-03-27'),
+    ('Kevin Donovan', '2026-03-28'),
+    ('Kevin Donovan', '2026-03-29'),
+    ('Kevin Donovan', '2026-03-30'),
+    ('Kevin Donovan', '2026-04-02'),
+    ('Kevin Donovan', '2026-04-03'),
+    ('Kevin Donovan', '2026-04-04'),
+    -- Brian Shepherd
+    ('Brian Shepherd', '2026-03-25'),
+    ('Brian Shepherd', '2026-04-01'),
+    ('Brian Shepherd', '2026-04-04'),
+    -- Timothy Walsh
+    ('Timothy Walsh', '2026-03-24'),
+    ('Timothy Walsh', '2026-03-25'),
+    ('Timothy Walsh', '2026-03-31'),
+    ('Timothy Walsh', '2026-04-01'),
+    -- Nathan "Nate" Callahan
+    ('Nathan "Nate" Callahan', '2026-03-22'),
+    ('Nathan "Nate" Callahan', '2026-03-23'),
+    ('Nathan "Nate" Callahan', '2026-03-29'),
+    ('Nathan "Nate" Callahan', '2026-03-30'),
+    -- Janet Morrison
+    ('Janet Morrison', '2026-03-26'),
+    ('Janet Morrison', '2026-03-27'),
+    ('Janet Morrison', '2026-04-02'),
+    ('Janet Morrison', '2026-04-03'),
+    -- Barbara Trent
+    ('Barbara Trent', '2026-03-24'),
+    ('Barbara Trent', '2026-03-25'),
+    ('Barbara Trent', '2026-03-31'),
+    ('Barbara Trent', '2026-04-01'),
+    -- David Michael Spencer
+    ('David Michael Spencer', '2026-03-22'),
+    ('David Michael Spencer', '2026-03-23'),
+    ('David Michael Spencer', '2026-03-27'),
+    ('David Michael Spencer', '2026-03-28'),
+    ('David Michael Spencer', '2026-03-29'),
+    ('David Michael Spencer', '2026-03-30'),
+    ('David Michael Spencer', '2026-04-03'),
+    ('David Michael Spencer', '2026-04-04'),
+    -- Robert Garrison
+    ('Robert Garrison', '2026-03-25'),
+    ('Robert Garrison', '2026-03-26'),
+    ('Robert Garrison', '2026-04-01'),
+    ('Robert Garrison', '2026-04-02'),
+    -- Steven Whitfield
+    ('Steven Whitfield', '2026-03-24'),
+    ('Steven Whitfield', '2026-03-25'),
+    ('Steven Whitfield', '2026-03-31'),
+    ('Steven Whitfield', '2026-04-01'),
+    -- Raymond Caldwell
+    ('Raymond Caldwell', '2026-03-23'),
+    ('Raymond Caldwell', '2026-03-24'),
+    ('Raymond Caldwell', '2026-03-30'),
+    ('Raymond Caldwell', '2026-03-31'),
+    -- Patricia Langford
+    ('Patricia Langford', '2026-03-26'),
+    ('Patricia Langford', '2026-03-27'),
+    ('Patricia Langford', '2026-04-02'),
+    ('Patricia Langford', '2026-04-03'),
+    -- Christine Prescott
+    ('Christine Prescott', '2026-03-26'),
+    ('Christine Prescott', '2026-03-27'),
+    ('Christine Prescott', '2026-04-02'),
+    ('Christine Prescott', '2026-04-03'),
+    -- Gloria Jennings
+    ('Gloria Jennings', '2026-03-22'),
+    ('Gloria Jennings', '2026-03-23'),
+    ('Gloria Jennings', '2026-03-25'),
+    ('Gloria Jennings', '2026-03-26'),
+    ('Gloria Jennings', '2026-03-28'),
+    ('Gloria Jennings', '2026-03-29'),
+    ('Gloria Jennings', '2026-03-30'),
+    ('Gloria Jennings', '2026-04-01'),
+    ('Gloria Jennings', '2026-04-02'),
+    ('Gloria Jennings', '2026-04-04'),
+    -- Donna Fowler
+    ('Donna Fowler', '2026-03-28'),
+    ('Donna Fowler', '2026-04-04'),
+    -- Hannah Stratton
+    ('Hannah Stratton', '2026-03-22'),
+    ('Hannah Stratton', '2026-03-28'),
+    ('Hannah Stratton', '2026-03-29'),
+    ('Hannah Stratton', '2026-04-04'),
+    -- Vincent Gallagher
+    ('Vincent Gallagher', '2026-03-26'),
+    ('Vincent Gallagher', '2026-03-27'),
+    ('Vincent Gallagher', '2026-04-02'),
+    ('Vincent Gallagher', '2026-04-03'),
+    -- Marilyn Davenport
+    ('Marilyn Davenport', '2026-03-27'),
+    ('Marilyn Davenport', '2026-03-28'),
+    ('Marilyn Davenport', '2026-04-03'),
+    ('Marilyn Davenport', '2026-04-04')
+  ) AS v(emp_name, dt)
+  JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
+  ON CONFLICT (emp_id, date) DO UPDATE SET
+    published_absence_type_id = EXCLUDED.published_absence_type_id,
+    draft_absence_type_id = EXCLUDED.draft_absence_type_id;
 
 END $$;
