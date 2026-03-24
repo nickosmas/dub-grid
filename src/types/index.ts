@@ -38,6 +38,8 @@ export interface FocusArea {
   colorBg: string;
   colorText: string;
   sortOrder: number;
+  /** Default break duration in minutes for shifts in this focus area. NULL = no break. */
+  breakMinutes?: number | null;
   /** Non-null when the focus area has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
@@ -55,6 +57,8 @@ export interface ShiftCategory {
   sortOrder: number;
   /** FK to focus_areas.id. NULL = global category (for general/off-day codes). */
   focusAreaId?: number | null;
+  /** Break duration in minutes. Overrides focus area default. NULL = inherit from focus area. */
+  breakMinutes?: number | null;
   /** Non-null when the category has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
@@ -398,6 +402,45 @@ export interface UserClaims {
   email: string | null;
   orgId: string | null;
   orgSlug: string | null;
+}
+
+// ── Staff Detail / Report Types ──────────────────────────────────────────────
+
+/** Weekly hours summary for a single week in the hours history chart. */
+export interface WeeklyHoursSummary {
+  weekStart: string;
+  weekLabel: string;
+  totalHours: number;
+  shiftCount: number;
+  overtimeHours: number;
+  isOvertime: boolean;
+}
+
+/** Distribution of shift codes for a single employee. */
+export interface ShiftDistributionEntry {
+  shiftCodeId: number;
+  label: string;
+  name: string;
+  count: number;
+  percentage: number;
+  color: string;
+}
+
+/** Day-of-week work pattern entry. */
+export interface DayPatternEntry {
+  day: string;
+  dayIndex: number;
+  count: number;
+  percentage: number;
+}
+
+/** Focus area time distribution entry. */
+export interface FocusAreaDistributionEntry {
+  focusAreaId: number;
+  name: string;
+  shiftCount: number;
+  percentage: number;
+  colorBg: string;
 }
 
 // ── Gridmaster Portal Types ──────────────────────────────────────────────────

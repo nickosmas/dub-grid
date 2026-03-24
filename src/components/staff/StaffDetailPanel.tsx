@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
@@ -52,6 +54,7 @@ export function StaffDetailPanel({
   onInvite,
   onRevoke,
 }: StaffDetailPanelProps) {
+  const router = useRouter();
   const hue = hashCode(employee.id) % 360;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
@@ -166,6 +169,30 @@ export function StaffDetailPanel({
                 )}
               </div>
             )}
+            <Link
+              href={`/staff/${employee.id}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                marginTop: 12,
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                color: "var(--color-link)",
+                textDecoration: "none",
+                padding: "4px 12px",
+                borderRadius: 20,
+                background: "var(--color-info-bg)",
+                border: "1px solid var(--color-info-border)",
+                cursor: "pointer",
+                transition: "opacity 150ms ease",
+              }}
+            >
+              View full profile
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 6 15 12 9 18" />
+              </svg>
+            </Link>
           </div>
         </div>
 

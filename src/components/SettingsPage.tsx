@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement } from "@/types";
 import * as db from "@/lib/db";
-import { parseTo12h, to24h, fmt12h } from "@/lib/utils";
+import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
@@ -487,7 +487,7 @@ function FocusAreaRow({
 }: {
   focusArea: FocusArea & { isNew?: boolean };
   onDeleted: (id: number) => void;
-  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
+  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string; breakMinutes: number | null }) => void;
   canManageFocusAreas: boolean;
   isDragging: boolean;
   isDropTarget: boolean;
@@ -501,6 +501,7 @@ function FocusAreaRow({
     name: focusArea.name,
     colorBg: focusArea.colorBg,
     colorText: focusArea.colorText,
+    breakMinutes: focusArea.breakMinutes ?? null as number | null,
   });
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -561,6 +562,11 @@ function FocusAreaRow({
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
           {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
         </span>
+        {focusArea.breakMinutes != null && focusArea.breakMinutes > 0 && (
+          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+            {focusArea.breakMinutes}m break
+          </span>
+        )}
       </div>
     );
   }
@@ -664,6 +670,24 @@ function FocusAreaRow({
         />
       </div>
 
+      {/* Break Duration */}
+      <div style={{ paddingLeft: 24, marginTop: 8 }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <label style={labelStyle}>BREAK (MIN)</label>
+        <input
+          type="number"
+          min={0}
+          max={480}
+          value={form.breakMinutes ?? ""}
+          onChange={(e) => {
+            const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
+            setForm((p) => ({ ...p, breakMinutes: val }));
+          }}
+          placeholder="No break"
+          draggable={false}
+          style={{ ...inputStyle, width: 120 }}
+        />
+      </div>
+
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete Focus Area?"
@@ -702,8 +726,8 @@ function FocusAreasSettings({
   const [saving, setSaving] = useState(false);
   const nextTmpId = useRef(-1);
 
-  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })))
-    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })));
+  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText, breakMinutes: fa.breakMinutes ?? null })))
+    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText, breakMinutes: fa.breakMinutes ?? null })));
 
   // Live preview: show items in dragged order without committing
   const displayList = useMemo(() => {
@@ -739,6 +763,7 @@ function FocusAreasSettings({
             colorBg: fa.colorBg,
             colorText: fa.colorText,
             sortOrder: fa.sortOrder,
+            breakMinutes: fa.breakMinutes ?? null,
           }),
         ),
       );
@@ -767,7 +792,7 @@ function FocusAreasSettings({
     setIsEditing(true);
   };
 
-  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string }) => {
+  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string; breakMinutes: number | null }) => {
     setLocalFocusAreas((prev) =>
       prev.map((fa) => (fa.id === id ? { ...fa, ...patch } : fa)),
     );
@@ -2276,6 +2301,7 @@ function ShiftCategoriesSettings({
         endTime: cat.endTime || null,
         sortOrder: cat.sortOrder,
         focusAreaId: cat.focusAreaId ?? null,
+        breakMinutes: cat.breakMinutes ?? null,
       });
       originalRef.current.set(saved.id, saved);
       const updated = local.map((c) => (c.id === cat.id ? saved : c));
@@ -2335,7 +2361,8 @@ function ShiftCategoriesSettings({
     const isDirty = cat.isNew || !orig ||
       cat.name !== orig.name ||
       (cat.startTime ?? null) !== (orig.startTime ?? null) ||
-      (cat.endTime ?? null) !== (orig.endTime ?? null);
+      (cat.endTime ?? null) !== (orig.endTime ?? null) ||
+      (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null);
 
     if (!isEditing) {
       return (
@@ -2356,6 +2383,16 @@ function ShiftCategoriesSettings({
             {(cat.startTime || cat.endTime) && (
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
                 {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
+                {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas) && (
+                  <span style={{ marginLeft: 8, fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                    ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas)})
+                  </span>
+                )}
+                {resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas) > 0 && (
+                  <span style={{ marginLeft: 6, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
+                    incl. {resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas)}m break
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -2427,6 +2464,50 @@ function ShiftCategoriesSettings({
             />
           </div>
         </div>
+        {/* Break Duration */}
+        <div style={{ marginBottom: 10 }}>
+          <label style={labelStyle}>BREAK (MIN)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="number"
+              min={0}
+              max={480}
+              value={cat.breakMinutes ?? ""}
+              onChange={(e) => {
+                const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
+                handleChange(cat.id, "breakMinutes", val);
+              }}
+              placeholder={(() => {
+                if (!cat.focusAreaId) return "No break";
+                const fa = focusAreas.find((f) => f.id === cat.focusAreaId);
+                return fa?.breakMinutes ? `Inherits ${fa.breakMinutes}m` : "No break";
+              })()}
+              style={{ ...inputStyle, width: 140 }}
+              disabled={!canManageShiftCodes}
+            />
+            {cat.breakMinutes == null && cat.focusAreaId != null && (() => {
+              const fa = focusAreas.find((f) => f.id === cat.focusAreaId);
+              return fa?.breakMinutes ? (
+                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                  Inherits {fa.breakMinutes}m from {fa.name}
+                </span>
+              ) : null;
+            })()}
+          </div>
+        </div>
+        {calcTimeDuration(cat.startTime, cat.endTime) && (
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 10 }}>
+            {(() => {
+              const effectiveBreak = resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas);
+              const gross = calcTimeDuration(cat.startTime, cat.endTime);
+              const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas);
+              if (effectiveBreak > 0) {
+                return <>Gross: {gross} · Break: {effectiveBreak}m · Net: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{net}</span></>;
+              }
+              return <>Duration: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{gross}</span></>;
+            })()}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => handleSave(cat)}

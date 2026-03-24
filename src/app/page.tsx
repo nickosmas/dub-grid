@@ -205,7 +205,7 @@ export default function RootPage() {
               return;
             }
           }
-          window.location.replace("/schedule");
+          window.location.replace("/dashboard");
         } else {
           setReady(true);
         }

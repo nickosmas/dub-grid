@@ -231,10 +231,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
-  // Legacy /dashboard redirect → /gridmaster
-  if (pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL(pathname.replace(/^\/dashboard/, "/gridmaster"), req.url));
-  }
 
   // Inject headers - Requirement 11.5
   res.headers.set("x-dubgrid-role", effectiveRole);

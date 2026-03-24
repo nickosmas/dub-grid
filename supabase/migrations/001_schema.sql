@@ -118,12 +118,13 @@ CREATE TABLE public.focus_areas (
   name        TEXT NOT NULL,
   color_bg    TEXT NOT NULL DEFAULT '#F1F5F9',
   color_text  TEXT NOT NULL DEFAULT '#475569',
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  archived_at TIMESTAMPTZ,
-  created_by  UUID,
-  updated_by  UUID,
-  created_at  TIMESTAMPTZ DEFAULT now(),
-  updated_at  TIMESTAMPTZ DEFAULT now()
+  sort_order     INTEGER NOT NULL DEFAULT 0,
+  break_minutes  INTEGER DEFAULT NULL,
+  archived_at    TIMESTAMPTZ,
+  created_by     UUID,
+  updated_by     UUID,
+  created_at     TIMESTAMPTZ DEFAULT now(),
+  updated_at     TIMESTAMPTZ DEFAULT now()
 );
 
 ALTER TABLE ONLY public.focus_areas REPLICA IDENTITY FULL;
@@ -181,6 +182,7 @@ CREATE TABLE public.shift_categories (
   end_time      TIME,
   sort_order    INTEGER NOT NULL DEFAULT 0,
   focus_area_id BIGINT,
+  break_minutes INTEGER DEFAULT NULL,
   archived_at   TIMESTAMPTZ
 );
 
