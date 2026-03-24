@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Tabs } from "@base-ui/react/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProgressBar from "@/components/ProgressBar";
 import { useOrganizationData, usePermissions } from "@/hooks";
 import {
@@ -99,13 +99,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setEmployee(emp);
 
         // Fetch the rest in parallel
-        const [empShifts, recShifts, empInvitations, empRequests] =
-          await Promise.all([
-            fetchEmployeeShifts(employeeId, orgId, shiftCodeMap),
-            fetchRecurringShifts(orgId, employeeId, shiftCodeMap),
-            fetchEmployeeInvitations(orgId, employeeId),
-            fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
-          ]);
+        const [empShifts, recShifts, empInvitations, empRequests] = await Promise.all([
+          fetchEmployeeShifts(employeeId, orgId, shiftCodeMap),
+          fetchRecurringShifts(orgId, employeeId, shiftCodeMap),
+          fetchEmployeeInvitations(orgId, employeeId),
+          fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
+        ]);
 
         if (cancelled) return;
         setShifts(empShifts);
@@ -113,8 +112,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setInvitations(empInvitations);
         setShiftRequests(empRequests);
 
-        // Fetch role history only if employee has a linked user AND caller is gridmaster
-        // (get_audit_log RPC is restricted to gridmaster role)
         if (emp.userId && perms.isGridmaster) {
           try {
             const history = await fetchEmployeeRoleHistory(emp.userId);
@@ -135,7 +132,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return () => { cancelled = true; };
   }, [employeeId, orgId, orgLoading, shiftCodeMap, perms.isGridmaster]);
 
-  // Compute this week's hours at the page level (shared by header + overview)
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
     const weekStart = getWeekStart(new Date());
@@ -151,7 +147,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     );
   }, [employee, shifts, shiftCodeById, categoryById, focusAreaById]);
 
-  // Pending invitation (shared by header)
   const pendingInvite = useMemo(() => {
     return invitations.find(i => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date()) ?? null;
   }, [invitations]);
@@ -160,21 +155,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   if (error && !employee) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <p style={{ color: "var(--color-text-muted)", marginBottom: 16 }}>{error}</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">{error}</p>
           <button
             onClick={() => router.push("/staff")}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-              color: "var(--color-text-secondary)",
-              fontWeight: 600,
-              fontSize: "var(--dg-fs-body-sm)",
-              cursor: "pointer",
-            }}
+            className="px-5 py-2 rounded-lg border border-border bg-card text-card-foreground font-semibold text-sm cursor-pointer hover:bg-muted transition-colors"
           >
             Back to Staff
           </button>
@@ -188,13 +174,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       <ProgressBar loading={isLoading} />
 
       {!isLoading && employee && org && (
-        <div
-          style={{
-            maxWidth: 1100,
-            margin: "0 auto",
-            padding: "24px 20px 60px",
-          }}
-        >
+        <div className="max-w-[1100px] mx-auto px-5 py-6 pb-16">
           <StaffDetailHeader
             employee={employee}
             focusAreas={focusAreas}
@@ -206,58 +186,32 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             pendingInvite={pendingInvite}
           />
 
-          <Tabs.Root defaultValue="overview">
-            <Tabs.List
-              style={{
-                display: "flex",
-                gap: 0,
-                borderBottom: "2px solid var(--color-border-light)",
-                marginBottom: 24,
-                marginTop: 24,
-              }}
-            >
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList variant="line" className="w-full justify-start h-auto p-0 mb-6 mt-4 border-b border-border">
               {["overview", "schedule", "activity"].map((tab) => (
-                <Tabs.Tab
+                <TabsTrigger
                   key={tab}
                   value={tab}
-                  style={{
-                    padding: "10px 20px",
-                    fontSize: "var(--dg-fs-body-sm)",
-                    fontWeight: 600,
-                    color: "var(--color-text-muted)",
-                    background: "none",
-                    border: "none",
-                    borderBottom: "2px solid transparent",
-                    marginBottom: -2,
-                    cursor: "pointer",
-                    textTransform: "capitalize",
-                    transition: "color 150ms ease, border-color 150ms ease",
-                    whiteSpace: "nowrap",
-                  }}
-                  className="staff-detail-tab"
+                  className="px-4 py-2.5 text-[13px] font-semibold capitalize"
                 >
                   {tab}
-                </Tabs.Tab>
+                </TabsTrigger>
               ))}
-            </Tabs.List>
+            </TabsList>
 
-            <Tabs.Panel value="overview">
+            <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
               <OverviewTab
                 employee={employee}
-                focusAreas={focusAreas}
-                certifications={certifications}
-                orgRoles={orgRoles}
-                org={org}
-                recurringShifts={recurringShifts}
                 shifts={shifts}
                 shiftCodeById={shiftCodeById}
                 categoryById={categoryById}
                 focusAreaById={focusAreaById}
-                thisWeekHours={thisWeekHours}
+                certifications={certifications}
+                orgRoles={orgRoles}
               />
-            </Tabs.Panel>
+            </TabsContent>
 
-            <Tabs.Panel value="schedule">
+            <TabsContent value="schedule" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
               <ScheduleTab
                 employee={employee}
                 shifts={shifts}
@@ -269,17 +223,18 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 shiftRequests={shiftRequests}
                 recurringShifts={recurringShifts}
               />
-            </Tabs.Panel>
+            </TabsContent>
 
-            <Tabs.Panel value="activity">
+            <TabsContent value="activity" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
               <ActivityTab
                 employee={employee}
                 roleHistory={roleHistory}
                 invitations={invitations}
               />
-            </Tabs.Panel>
+            </TabsContent>
 
-          </Tabs.Root>
+
+          </Tabs>
         </div>
       )}
     </>

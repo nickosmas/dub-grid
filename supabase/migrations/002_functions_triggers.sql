@@ -121,7 +121,7 @@ BEGIN
     RETURN jsonb_build_object(
       'error', jsonb_build_object(
         'http_code', 403,
-        'message', 'Session invalidated due to role change. Please sign in again.'
+        'message', 'Your session has expired. Please sign in again.'
       )
     );
   END IF;
@@ -130,12 +130,15 @@ BEGIN
   DELETE FROM public.jwt_refresh_locks
    WHERE user_id = uid AND locked_until <= NOW();
 
-  -- Resolve user profile with org context
-  -- Archived orgs are filtered out (AND o.archived_at IS NULL)
+  -- Resolve user profile with org context.
+  -- Archived orgs are filtered out (AND o.archived_at IS NULL).
+  -- org_role is NOT coalesced — a NULL value means no membership exists,
+  -- which must result in no org claims being set (prevents read access
+  -- to an org the user has no membership for).
   SELECT
     p.org_id,
     p.platform_role::TEXT  AS platform_role,
-    COALESCE(cm.org_role::TEXT, 'user') AS org_role,
+    cm.org_role::TEXT       AS org_role,
     o.slug                 AS org_slug
   INTO user_profile
   FROM public.profiles p
@@ -146,15 +149,26 @@ BEGIN
   WHERE p.id = uid;
 
   IF FOUND THEN
-    claims := jsonb_set(claims, '{platform_role}',  to_jsonb(user_profile.platform_role));
-    claims := jsonb_set(claims, '{org_role}',       to_jsonb(user_profile.org_role));
-    IF user_profile.org_id IS NOT NULL AND user_profile.org_slug IS NOT NULL THEN
-      claims := jsonb_set(claims, '{org_id}',       to_jsonb(user_profile.org_id::TEXT));
-      claims := jsonb_set(claims, '{org_slug}',     to_jsonb(user_profile.org_slug));
+    claims := jsonb_set(claims, '{platform_role}', to_jsonb(COALESCE(user_profile.platform_role, 'none')));
+
+    IF user_profile.org_id IS NOT NULL
+       AND user_profile.org_role IS NOT NULL
+       AND user_profile.org_slug IS NOT NULL THEN
+      -- Valid membership + active org → set full org claims
+      claims := jsonb_set(claims, '{org_role}',  to_jsonb(user_profile.org_role));
+      claims := jsonb_set(claims, '{org_id}',    to_jsonb(user_profile.org_id::TEXT));
+      claims := jsonb_set(claims, '{org_slug}',  to_jsonb(user_profile.org_slug));
+    ELSE
+      -- No membership, no org, or archived org → strip org context.
+      -- Explicit removal prevents stale org_id/org_slug from persisting
+      -- if the auth server carries forward claims from the previous token.
+      claims := jsonb_set(claims, '{org_role}', '"user"');
+      claims := claims - 'org_id' - 'org_slug';
     END IF;
   ELSE
     claims := jsonb_set(claims, '{platform_role}', '"none"');
     claims := jsonb_set(claims, '{org_role}',      '"user"');
+    claims := claims - 'org_id' - 'org_slug';
   END IF;
 
   RETURN jsonb_build_object('claims', claims);
@@ -598,10 +612,10 @@ BEGIN
   SET org_id = target_org_id, updated_at = NOW()
   WHERE id = v_uid;
 
-  INSERT INTO public.jwt_refresh_locks (user_id, locked_until, reason)
-    VALUES (v_uid, NOW() + INTERVAL '2 seconds', 'org_switch')
-  ON CONFLICT (user_id) DO UPDATE
-    SET locked_until = NOW() + INTERVAL '2 seconds', reason = 'org_switch';
+  -- No jwt_refresh_lock here: the caller refreshes immediately after this RPC,
+  -- and the JWT hook reads profiles.org_id from DB so the new claims resolve
+  -- correctly. A lock would block the caller's own refreshSession() call.
+  -- Other tabs/devices pick up the new org on their next natural token refresh.
 END;
 $$;
 

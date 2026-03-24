@@ -83,7 +83,7 @@ CREATE POLICY "admin_update_organization"
   ON public.organizations FOR UPDATE TO authenticated
   USING (
     id = public.caller_org_id()
-    AND public.caller_org_role() IN ('admin', 'super_admin')
+    AND public.caller_org_role() = 'super_admin'
   )
   WITH CHECK (id = public.caller_org_id());
 
@@ -153,16 +153,16 @@ CREATE POLICY "members_select_organization_roles"
 
 CREATE POLICY "admin_insert_organization_roles"
   ON public.organization_roles FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
 
 CREATE POLICY "admin_update_organization_roles"
   ON public.organization_roles FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin')
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_organization_roles"
   ON public.organization_roles FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
 
 
 -- ── focus_areas ───────────────────────────────────────────────────────────────
@@ -177,16 +177,16 @@ CREATE POLICY "members_select_focus_areas"
 
 CREATE POLICY "admin_insert_focus_areas"
   ON public.focus_areas FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageFocusAreas'));
 
 CREATE POLICY "admin_update_focus_areas"
   ON public.focus_areas FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageFocusAreas'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_focus_areas"
   ON public.focus_areas FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageFocusAreas'));
 
 
 -- ── certifications ────────────────────────────────────────────────────────────
@@ -201,16 +201,16 @@ CREATE POLICY "members_select_certifications"
 
 CREATE POLICY "admin_insert_certifications"
   ON public.certifications FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
 
 CREATE POLICY "admin_update_certifications"
   ON public.certifications FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin')
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_certifications"
   ON public.certifications FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
 
 
 -- ── employees ─────────────────────────────────────────────────────────────────
@@ -225,16 +225,16 @@ CREATE POLICY "members_select_employees"
 
 CREATE POLICY "admin_insert_employees"
   ON public.employees FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageEmployees'));
 
 CREATE POLICY "admin_update_employees"
   ON public.employees FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageEmployees'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_employees"
   ON public.employees FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageEmployees'));
 
 
 -- ── shift_categories ──────────────────────────────────────────────────────────
@@ -249,16 +249,16 @@ CREATE POLICY "members_select_shift_categories"
 
 CREATE POLICY "admin_insert_shift_categories"
   ON public.shift_categories FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
 
 CREATE POLICY "admin_update_shift_categories"
   ON public.shift_categories FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_shift_categories"
   ON public.shift_categories FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
 
 
 -- ── shift_codes ───────────────────────────────────────────────────────────────
@@ -273,16 +273,16 @@ CREATE POLICY "members_select_shift_codes"
 
 CREATE POLICY "admin_insert_shift_codes"
   ON public.shift_codes FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
 
 CREATE POLICY "admin_update_shift_codes"
   ON public.shift_codes FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_shift_codes"
   ON public.shift_codes FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
 
 
 -- ── schedule_notes ────────────────────────────────────────────────────────────
@@ -321,16 +321,16 @@ CREATE POLICY "members_select_draft_sessions"
 
 CREATE POLICY "admin_insert_draft_sessions"
   ON public.schedule_draft_sessions FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canEditShifts'));
 
 CREATE POLICY "admin_update_draft_sessions"
   ON public.schedule_draft_sessions FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canEditShifts'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_draft_sessions"
   ON public.schedule_draft_sessions FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canEditShifts'));
 
 
 -- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
@@ -345,16 +345,16 @@ CREATE POLICY "members_select_recurring_drafts"
 
 CREATE POLICY "admin_insert_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageRecurringShifts'));
 
 CREATE POLICY "admin_update_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageRecurringShifts'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageRecurringShifts'));
 
 
 -- ── publish_history ──────────────────────────────────────────────────────────
@@ -512,11 +512,11 @@ CREATE POLICY "admins_manage_indicator_types"
   ON public.indicator_types FOR ALL TO authenticated
   USING (
     org_id = public.caller_org_id()
-    AND public.caller_org_role()::TEXT IN ('admin', 'super_admin')
+    AND public.check_admin_permission('canManageIndicatorTypes')
   )
   WITH CHECK (
     org_id = public.caller_org_id()
-    AND public.caller_org_role()::TEXT IN ('admin', 'super_admin')
+    AND public.check_admin_permission('canManageIndicatorTypes')
   );
 
 
@@ -559,7 +559,7 @@ CREATE POLICY "invitations_revoke"
 CREATE POLICY "audit_insert"
   ON public.role_change_log FOR INSERT TO authenticated
   WITH CHECK (
-    public.caller_org_role()::TEXT IN ('admin', 'super_admin')
+    public.caller_org_role() = 'super_admin'
     OR public.is_gridmaster()
   );
 
@@ -620,16 +620,16 @@ CREATE POLICY "members_select_coverage_requirements"
 
 CREATE POLICY "admin_insert_coverage_requirements"
   ON public.coverage_requirements FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
 
 CREATE POLICY "admin_update_coverage_requirements"
   ON public.coverage_requirements FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_coverage_requirements"
   ON public.coverage_requirements FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.caller_org_role() IN ('admin', 'super_admin'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
