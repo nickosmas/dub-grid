@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType } from "@/types";
-import * as db from "@/lib/db";
+import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles } from "@/lib/db";
 import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
@@ -163,6 +163,12 @@ const TIMEZONES = [
   { value: "Pacific/Auckland",    label: "NZST/NZDT — Auckland" },
 ];
 
+/** Normalize a time string to "HH:MM" for comparison (handles "HH:MM:SS" and null). */
+function normalizeTimeCompare(t: string | null | undefined): string | null {
+  if (!t) return null;
+  return t.slice(0, 5);
+}
+
 // ── 12-hour time picker ───────────────────────────────────────────────────────
 function TimeInput12h({ value, onChange, disabled }: { value: string | null | undefined; onChange: (v: string | null) => void; disabled?: boolean }) {
   const { hour, minute, period } = parseTo12h(value);
@@ -253,7 +259,7 @@ function OrganizationDetailsSettings({
         employeeCount: form.employeeCount ? Math.max(0, Math.round(parseInt(form.employeeCount))) || null : null,
         timezone: form.timezone || null,
       };
-      await db.updateOrganization(updated);
+      await updateOrganization(updated);
       onSave(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -402,7 +408,7 @@ function OrganizationLabelsSettings({
         certificationLabel: form.certificationLabel.trim() || "Certifications",
         roleLabel: form.roleLabel.trim() || "Roles",
       };
-      await db.updateOrganization(updated);
+      await updateOrganization(updated);
       onSave(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -538,7 +544,7 @@ function FocusAreaRow({
     }
     setDeleting(true);
     try {
-      await db.deleteFocusArea(focusArea.id);
+      await deleteFocusArea(focusArea.id);
       onDeleted(focusArea.id);
       toast.success("Focus area deleted");
     } catch (err) {
@@ -774,7 +780,7 @@ function FocusAreasSettings({
       const withOrder = localFocusAreas.map((fa, i) => ({ ...fa, sortOrder: i }));
       const saved = await Promise.all(
         withOrder.map((fa) =>
-          db.upsertFocusArea({
+          upsertFocusArea({
             id: fa.isNew ? undefined : fa.id,
             orgId,
             name: fa.name,
@@ -968,19 +974,27 @@ function ShiftCodeRow({
   canManageShiftCodes: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
-  const [form, setForm] = useState({
-    label: st.label,
-    name: st.name,
-    color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-    border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-    text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-    categoryId: st.categoryId ?? null as number | null,
-    focusAreaId: st.focusAreaId ?? null as number | null,
-    requiredCertificationIds: st.requiredCertificationIds ?? [],
-    defaultStartTime: st.defaultStartTime ?? null as string | null,
-    defaultEndTime: st.defaultEndTime ?? null as string | null,
-    defaultDurationHours: st.defaultDurationHours ?? null as number | null,
-    defaultDurationMinutes: st.defaultDurationMinutes ?? null as number | null,
+  const [form, setForm] = useState(() => {
+    // Normalize: if custom times match the category exactly, clear them to inherit
+    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
+    const timesMatchCategory = cat
+      && st.defaultStartTime != null && st.defaultEndTime != null
+      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
+      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
+    return {
+      label: st.label,
+      name: st.name,
+      color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
+      border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
+      text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
+      categoryId: st.categoryId ?? null as number | null,
+      focusAreaId: st.focusAreaId ?? null as number | null,
+      requiredCertificationIds: st.requiredCertificationIds ?? [],
+      defaultStartTime: timesMatchCategory ? null : (st.defaultStartTime ?? null as string | null),
+      defaultEndTime: timesMatchCategory ? null : (st.defaultEndTime ?? null as string | null),
+      defaultDurationHours: st.defaultDurationHours ?? null as number | null,
+      defaultDurationMinutes: st.defaultDurationMinutes ?? null as number | null,
+    };
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -997,6 +1011,12 @@ function ShiftCodeRow({
     if (st.id === prevStIdRef.current && certIdsKey === prevCertIdsKeyRef.current) return;
     prevStIdRef.current = st.id;
     prevCertIdsKeyRef.current = certIdsKey;
+    // Normalize: if custom times match the category, clear to inherit
+    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
+    const timesMatch = cat
+      && st.defaultStartTime != null && st.defaultEndTime != null
+      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
+      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
     setForm({
       label: st.label,
       name: st.name,
@@ -1006,12 +1026,30 @@ function ShiftCodeRow({
       categoryId: st.categoryId ?? null,
       focusAreaId: st.focusAreaId ?? null,
       requiredCertificationIds: st.requiredCertificationIds ?? [],
-      defaultStartTime: st.defaultStartTime ?? null,
-      defaultEndTime: st.defaultEndTime ?? null,
+      defaultStartTime: timesMatch ? null : (st.defaultStartTime ?? null),
+      defaultEndTime: timesMatch ? null : (st.defaultEndTime ?? null),
       defaultDurationHours: st.defaultDurationHours ?? null,
       defaultDurationMinutes: st.defaultDurationMinutes ?? null,
     });
-  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes]);
+  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
+
+  // Normalize times: if they match the category exactly, treat as null (inherit)
+  const effectiveStartTime = (() => {
+    if (form.categoryId != null && form.defaultStartTime != null) {
+      const cat = shiftCategories.find(c => c.id === form.categoryId);
+      if (cat && normalizeTimeCompare(form.defaultStartTime) === normalizeTimeCompare(cat.startTime)
+            && normalizeTimeCompare(form.defaultEndTime) === normalizeTimeCompare(cat.endTime)) return null;
+    }
+    return form.defaultStartTime;
+  })();
+  const effectiveEndTime = (() => {
+    if (form.categoryId != null && form.defaultEndTime != null) {
+      const cat = shiftCategories.find(c => c.id === form.categoryId);
+      if (cat && normalizeTimeCompare(form.defaultStartTime) === normalizeTimeCompare(cat.startTime)
+            && normalizeTimeCompare(form.defaultEndTime) === normalizeTimeCompare(cat.endTime)) return null;
+    }
+    return form.defaultEndTime;
+  })();
 
   const isDirty = st.isNew ||
     form.label !== st.label ||
@@ -1022,8 +1060,8 @@ function ShiftCodeRow({
     form.categoryId !== (st.categoryId ?? null) ||
     form.focusAreaId !== (st.focusAreaId ?? null) ||
     JSON.stringify(form.requiredCertificationIds) !== JSON.stringify(st.requiredCertificationIds ?? []) ||
-    form.defaultStartTime !== (st.defaultStartTime ?? null) ||
-    form.defaultEndTime !== (st.defaultEndTime ?? null) ||
+    effectiveStartTime !== (st.defaultStartTime ?? null) ||
+    effectiveEndTime !== (st.defaultEndTime ?? null) ||
     form.defaultDurationHours !== (st.defaultDurationHours ?? null) ||
     form.defaultDurationMinutes !== (st.defaultDurationMinutes ?? null);
 
@@ -1034,7 +1072,18 @@ function ShiftCodeRow({
     setSaving(true);
     setSaveError(null);
     try {
-      const saved = await db.upsertShiftCode({
+      // If custom times match the category's times exactly, save as null (inherit)
+      let saveStartTime = form.defaultStartTime;
+      let saveEndTime = form.defaultEndTime;
+      if (form.categoryId != null) {
+        const cat = shiftCategories.find(c => c.id === form.categoryId);
+        if (cat && normalizeTimeCompare(saveStartTime) === normalizeTimeCompare(cat.startTime)
+              && normalizeTimeCompare(saveEndTime) === normalizeTimeCompare(cat.endTime)) {
+          saveStartTime = null;
+          saveEndTime = null;
+        }
+      }
+      const saved = await upsertShiftCode({
         id: st.isNew ? undefined : st.id,
         orgId: orgId,
         label: form.label.trim(),
@@ -1047,8 +1096,8 @@ function ShiftCodeRow({
         focusAreaId: form.focusAreaId,
         sortOrder: st.sortOrder,
         requiredCertificationIds: form.requiredCertificationIds,
-        defaultStartTime: form.defaultStartTime,
-        defaultEndTime: form.defaultEndTime,
+        defaultStartTime: saveStartTime,
+        defaultEndTime: saveEndTime,
         defaultDurationHours: form.defaultDurationHours,
         defaultDurationMinutes: form.defaultDurationMinutes,
       });
@@ -1063,7 +1112,7 @@ function ShiftCodeRow({
     } finally {
       setSaving(false);
     }
-  }, [form, st, orgId, onSaved]);
+  }, [form, st, orgId, onSaved, shiftCategories]);
 
   const handleDelete = useCallback(async () => {
     if (st.isNew) {
@@ -1072,7 +1121,7 @@ function ShiftCodeRow({
     }
     setDeleting(true);
     try {
-      await db.deleteShiftCode(st.id);
+      await deleteShiftCode(st.id);
       onDeleted(st.id);
       toast.success("Shift code deleted");
     } catch (err) {
@@ -1140,6 +1189,26 @@ function ShiftCodeRow({
             {shiftCategories.find(c => c.id === form.categoryId)?.name}
           </span>
         )}
+        {(() => {
+          const effectiveStart = form.defaultStartTime
+            ?? (form.categoryId != null ? shiftCategories.find(c => c.id === form.categoryId)?.startTime : null)
+            ?? null;
+          const effectiveEnd = form.defaultEndTime
+            ?? (form.categoryId != null ? shiftCategories.find(c => c.id === form.categoryId)?.endTime : null)
+            ?? null;
+          if (!effectiveStart && !effectiveEnd) return null;
+          const isCustom = form.defaultStartTime != null || form.defaultEndTime != null;
+          return (
+            <span style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: isCustom ? "var(--color-brand)" : "var(--color-text-muted)",
+              fontWeight: isCustom ? 600 : 400,
+              whiteSpace: "nowrap",
+            }}>
+              {fmt12h(effectiveStart)} – {fmt12h(effectiveEnd)}
+            </span>
+          );
+        })()}
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
@@ -1238,105 +1307,214 @@ function ShiftCodeRow({
                       label: `${c.name} ${c.focusAreaId ? `(${focusAreas.find(w => w.id === c.focusAreaId)?.name})` : "(Global)"}`
                     })),
                 ]}
-                onChange={(v) => setForm((p) => ({ ...p, categoryId: v ? Number(v) : null }))}
+                onChange={(v) => {
+                  const newCatId = v ? Number(v) : null;
+                  setForm((p) => ({
+                    ...p,
+                    categoryId: newCatId,
+                    // Clear custom times so the code inherits from the new category
+                    defaultStartTime: null,
+                    defaultEndTime: null,
+                  }));
+                }}
                 style={{ width: "100%", marginTop: 4 }}
                 disabled={!canManageShiftCodes}
               />
             </div>
 
-          {/* Default Times vs Duration — mutually exclusive, duration only for general codes */}
+          {/* Default Times vs Duration — inherit from category, customize on demand */}
           {(() => {
-            const hasTimes = form.defaultStartTime != null || form.defaultEndTime != null;
+            const hasCustomTimes = effectiveStartTime != null || effectiveEndTime != null;
             const hasDuration = form.defaultDurationHours != null || form.defaultDurationMinutes != null;
             const isGeneral = form.focusAreaId == null;
-            const showTimes = !isGeneral || !hasDuration;
-            const showDuration = isGeneral && !hasTimes;
+            const selectedCategory = form.categoryId != null
+              ? shiftCategories.find(c => c.id === form.categoryId) ?? null
+              : null;
+            const categoryStart = selectedCategory?.startTime ?? null;
+            const categoryEnd = selectedCategory?.endTime ?? null;
+            const hasCategoryTime = categoryStart != null || categoryEnd != null;
 
-            return (
-              <>
-                {showTimes ? (
-                  <div>
-                    <label style={labelStyle}>CUSTOM TIMES</label>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                      <TimeInput12h
-                        value={form.defaultStartTime}
-                        onChange={(v) => setForm((p) => ({ ...p, defaultStartTime: v }))}
-                        disabled={!canManageShiftCodes}
-                      />
-                      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>to</span>
-                      <TimeInput12h
-                        value={form.defaultEndTime}
-                        onChange={(v) => setForm((p) => ({ ...p, defaultEndTime: v }))}
-                        disabled={!canManageShiftCodes}
-                      />
+            // For general codes using duration mode
+            if (isGeneral && hasDuration && !hasCustomTimes) {
+              return (
+                <div>
+                  <label style={labelStyle}>DEFAULT DURATION</label>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={form.defaultDurationHours ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? null : Math.max(0, Math.min(23, Number(e.target.value)));
+                        setForm((p) => ({ ...p, defaultDurationHours: v }));
+                      }}
+                      placeholder="0"
+                      style={{ ...inputStyle, width: 64, textAlign: "center" }}
+                      disabled={!canManageShiftCodes}
+                    />
+                    <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>h</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={form.defaultDurationMinutes ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? null : Math.max(0, Math.min(59, Number(e.target.value)));
+                        setForm((p) => ({ ...p, defaultDurationMinutes: v }));
+                      }}
+                      placeholder="0"
+                      style={{ ...inputStyle, width: 64, textAlign: "center" }}
+                      disabled={!canManageShiftCodes}
+                    />
+                    <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>m</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
+                    style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
+                    disabled={!canManageShiftCodes}
+                  >
+                    Set actual times instead
+                  </button>
+                </div>
+              );
+            }
+
+            // Custom times are set — show pickers with "Custom Time" label
+            if (hasCustomTimes) {
+              return (
+                <div>
+                  <label style={labelStyle}>
+                    <span style={{ color: "var(--color-brand)", fontWeight: 700 }}>CUSTOM TIME</span>
+                    {hasCategoryTime && (
+                      <span style={{ fontWeight: 400, color: "var(--color-text-muted)", marginLeft: 6 }}>
+                        (overrides {selectedCategory?.name}: {fmt12h(categoryStart)} – {fmt12h(categoryEnd)})
+                      </span>
+                    )}
+                  </label>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                    <TimeInput12h
+                      value={form.defaultStartTime}
+                      onChange={(v) => setForm((p) => ({ ...p, defaultStartTime: v }))}
+                      disabled={!canManageShiftCodes}
+                    />
+                    <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>to</span>
+                    <TimeInput12h
+                      value={form.defaultEndTime}
+                      onChange={(v) => setForm((p) => ({ ...p, defaultEndTime: v }))}
+                      disabled={!canManageShiftCodes}
+                    />
+                  </div>
+                  {calcTimeDuration(form.defaultStartTime, form.defaultEndTime) && (
+                    <div style={{ marginTop: 6, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                      Duration: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{calcTimeDuration(form.defaultStartTime, form.defaultEndTime)}</span>
                     </div>
-                    {isGeneral && !hasTimes && (
+                  )}
+                  <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+                    {hasCategoryTime && canManageShiftCodes && (
                       <button
                         type="button"
-                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
-                        style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
-                        disabled={!canManageShiftCodes}
+                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null }))}
+                        style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0, textDecoration: "underline" }}
                       >
-                        Set duration instead
+                        Revert to category default
                       </button>
                     )}
-                    {isGeneral && hasTimes && (
+                    {!hasCategoryTime && canManageShiftCodes && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null }))}
+                        style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                      >
+                        Remove custom time
+                      </button>
+                    )}
+                    {isGeneral && canManageShiftCodes && (
                       <button
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
-                        style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
-                        disabled={!canManageShiftCodes}
+                        style={{ background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
                       >
                         Use duration instead
                       </button>
                     )}
                   </div>
-                ) : null}
+                </div>
+              );
+            }
 
-                {showDuration && hasDuration ? (
-                  <div>
-                    <label style={labelStyle}>DEFAULT DURATION</label>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                      <input
-                        type="number"
-                        min={0}
-                        max={23}
-                        value={form.defaultDurationHours ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value === "" ? null : Math.max(0, Math.min(23, Number(e.target.value)));
-                          setForm((p) => ({ ...p, defaultDurationHours: v }));
-                        }}
-                        placeholder="0"
-                        style={{ ...inputStyle, width: 64, textAlign: "center" }}
-                        disabled={!canManageShiftCodes}
-                      />
-                      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>h</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        value={form.defaultDurationMinutes ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value === "" ? null : Math.max(0, Math.min(59, Number(e.target.value)));
-                          setForm((p) => ({ ...p, defaultDurationMinutes: v }));
-                        }}
-                        placeholder="0"
-                        style={{ ...inputStyle, width: 64, textAlign: "center" }}
-                        disabled={!canManageShiftCodes}
-                      />
-                      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>m</span>
-                    </div>
+            // No custom times set — show inherited info + customize button
+            return (
+              <div>
+                <label style={labelStyle}>DEFAULT TIME</label>
+                {hasCategoryTime ? (
+                  <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{
+                      fontSize: "var(--dg-fs-label)",
+                      color: "var(--color-text-secondary)",
+                      padding: "4px 10px",
+                      background: "var(--color-bg-subtle)",
+                      borderRadius: 6,
+                      border: "1px solid var(--color-border-light)",
+                    }}>
+                      {fmt12h(categoryStart)} – {fmt12h(categoryEnd)}
+                    </span>
+                    <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                      from {selectedCategory?.name}
+                    </span>
+                    {calcTimeDuration(categoryStart, categoryEnd) && (
+                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                        ({calcTimeDuration(categoryStart, categoryEnd)})
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                    {form.categoryId != null ? "Category has no default time set" : "No category selected — no inherited time"}
+                  </p>
+                )}
+                {canManageShiftCodes && (
+                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
                     <button
                       type="button"
-                      onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
-                      style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
-                      disabled={!canManageShiftCodes}
+                      onClick={() => setForm((p) => ({
+                        ...p,
+                        defaultStartTime: categoryStart ?? "07:00",
+                        defaultEndTime: categoryEnd ?? "15:00",
+                      }))}
+                      style={{
+                        background: "var(--color-bg-subtle)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 6,
+                        color: "var(--color-brand)",
+                        padding: "5px 12px",
+                        fontSize: "var(--dg-fs-caption)",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
                     >
-                      Set actual times instead
+                      Customize Time
                     </button>
+                    {isGeneral && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((p) => ({ ...p, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--color-brand)",
+                          padding: "5px 0",
+                          fontSize: "var(--dg-fs-caption)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Set duration instead
+                      </button>
+                    )}
                   </div>
-                ) : null}
-              </>
+                )}
+              </div>
             );
           })()}
 
@@ -1564,7 +1742,7 @@ function AbsenceTypeRow({
     setSaving(true);
     setSaveError(null);
     try {
-      const saved = await db.upsertAbsenceType({
+      const saved = await upsertAbsenceType({
         id: at.isNew ? undefined : at.id,
         orgId,
         label: form.label.trim(),
@@ -1591,7 +1769,7 @@ function AbsenceTypeRow({
     if (at.isNew) { onDeleted(at.id); return; }
     setDeleting(true);
     try {
-      await db.deleteAbsenceType(at.id);
+      await deleteAbsenceType(at.id);
       onDeleted(at.id);
       toast.success("Off day type deleted");
     } catch (err) {
@@ -2397,7 +2575,7 @@ function IndicatorTypesSettings({
     if (!indicator.name.trim()) return;
     setSaving(indicator.id);
     try {
-      const saved = await db.upsertIndicatorType({
+      const saved = await upsertIndicatorType({
         id: indicator.isNew ? undefined : indicator.id,
         orgId: orgId,
         name: indicator.name.trim(),
@@ -2425,7 +2603,7 @@ function IndicatorTypesSettings({
     }
     setDeleting(indicator.id);
     try {
-      await db.deleteIndicatorType(indicator.id);
+      await deleteIndicatorType(indicator.id);
       const updated = local.filter((i) => i.id !== indicator.id);
       setLocal(updated);
       onChange(updated);
@@ -2597,12 +2775,16 @@ function ShiftCategoriesSettings({
   orgId,
   onChange,
   canManageShiftCodes,
+  shiftCodes,
+  onShiftCodesChange,
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];
   orgId: string;
   onChange: (categories: ShiftCategory[]) => void;
   canManageShiftCodes: boolean;
+  shiftCodes: ShiftCode[];
+  onShiftCodesChange: (codes: ShiftCode[]) => void;
 }) {
   const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
   const [saving, setSaving] = useState<number | null>(null);
@@ -2654,7 +2836,10 @@ function ShiftCategoriesSettings({
     if (!cat.name.trim()) return;
     setSaving(cat.id);
     try {
-      const saved = await db.upsertShiftCategory({
+      // Capture old category times before saving, to cascade-clear child shift codes
+      const oldCat = originalRef.current.get(cat.id);
+
+      const saved = await upsertShiftCategory({
         id: cat.isNew ? undefined : cat.id,
         orgId: orgId,
         name: cat.name.trim(),
@@ -2669,6 +2854,32 @@ function ShiftCategoriesSettings({
       const updated = local.map((c) => (c.id === cat.id ? saved : c));
       setLocal(updated);
       onChange(updated);
+
+      // If category times changed, cascade-clear child shift codes that were
+      // inheriting (had times matching the old category values)
+      if (oldCat && (
+        normalizeTimeCompare(oldCat.startTime) !== normalizeTimeCompare(saved.startTime) ||
+        normalizeTimeCompare(oldCat.endTime) !== normalizeTimeCompare(saved.endTime)
+      )) {
+        const childCodes = shiftCodes.filter(sc =>
+          sc.categoryId === saved.id
+          && sc.defaultStartTime != null
+          && sc.defaultEndTime != null
+          && normalizeTimeCompare(sc.defaultStartTime) === normalizeTimeCompare(oldCat.startTime)
+          && normalizeTimeCompare(sc.defaultEndTime) === normalizeTimeCompare(oldCat.endTime)
+        );
+        if (childCodes.length > 0) {
+          const updatedCodes = [...shiftCodes];
+          for (const sc of childCodes) {
+            // Clear DB times to null (inherit from new category)
+            await upsertShiftCode({ ...sc, defaultStartTime: null, defaultEndTime: null });
+            const idx = updatedCodes.findIndex(c => c.id === sc.id);
+            if (idx >= 0) updatedCodes[idx] = { ...updatedCodes[idx], defaultStartTime: null, defaultEndTime: null };
+          }
+          onShiftCodesChange(updatedCodes);
+        }
+      }
+
       setEditingId(null);
       toast.success("Category saved");
     } catch (err) {
@@ -2689,7 +2900,7 @@ function ShiftCategoriesSettings({
     }
     setDeleting(cat.id);
     try {
-      await db.deleteShiftCategory(cat.id);
+      await deleteShiftCategory(cat.id);
       const updated = local.filter((c) => c.id !== cat.id);
       setLocal(updated);
       onChange(updated);
@@ -3221,7 +3432,7 @@ function CoverageRequirementsSettings({
             const cr = r.codeRequirements.find((c) => c.shiftCodeId === code.id);
             return { dayOfWeek: r.dayOfWeek, minStaff: cr?.minStaff ?? 0 };
           });
-          const saved = await db.saveCoverageRequirements(orgId, focusAreaId, code.id, rows);
+          const saved = await saveCoverageRequirements(orgId, focusAreaId, code.id, rows);
           allSaved.push(...saved);
         }
         // Update parent state: remove old entries for codes in this group, add new ones
@@ -3525,7 +3736,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
 
   useEffect(() => {
     let mounted = true;
-    db.fetchOrganizationUsers(orgId)
+    fetchOrganizationUsers(orgId)
       .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
       .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
     return () => { mounted = false; };
@@ -3535,7 +3746,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     setSaving(userId);
     setError(null);
     try {
-      await db.changeOrganizationUserRole(userId, newRole);
+      await changeOrganizationUserRole(userId, newRole);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
       if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
       toast.success("Role updated");
@@ -3578,7 +3789,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     setSavingPerms(userId);
     setError(null);
     try {
-      await db.updateAdminPermissions(userId, editingPerms[userId], orgId);
+      await updateAdminPermissions(userId, editingPerms[userId], orgId);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: editingPerms[userId] } : u));
       toast.success("Permissions saved");
     } catch (e) {
@@ -4223,6 +4434,8 @@ export default function SettingsPage({
               orgId={organization.id}
               onChange={onShiftCategoriesChange}
               canManageShiftCodes={canManageShiftCodes}
+              shiftCodes={shiftCodes}
+              onShiftCodesChange={onShiftCodesChange}
             />
           </div>
         )}
@@ -4279,7 +4492,7 @@ export default function SettingsPage({
                 placeholder="e.g. RN"
                 onSave={async (updated) => {
                   try {
-                    const saved = await db.saveCertifications(organization.id, updated, certifications);
+                    const saved = await saveCertifications(organization.id, updated, certifications);
                     onCertificationsChange(saved);
                     toast.success("Certifications saved");
                   } catch (err) {
@@ -4297,7 +4510,7 @@ export default function SettingsPage({
                 placeholder="e.g. Charge Nurse"
                 onSave={async (updated) => {
                   try {
-                    const saved = await db.saveOrganizationRoles(organization.id, updated, orgRoles);
+                    const saved = await saveOrganizationRoles(organization.id, updated, orgRoles);
                     onOrgRolesChange(saved);
                     toast.success("Roles saved");
                   } catch (err) {

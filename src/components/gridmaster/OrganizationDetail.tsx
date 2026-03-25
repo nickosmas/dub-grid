@@ -4,7 +4,7 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import * as db from "@/lib/db";
+import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail } from "@/lib/db";
 import type { TenantStats } from "@/lib/db";
 import type {
   Organization,
@@ -163,14 +163,14 @@ export default function OrganizationDetail({
       setTabError(null);
       try {
         if (tab === "users" && users === null) {
-          const data = await db.fetchOrganizationUsers(organization.id);
+          const data = await fetchOrganizationUsers(organization.id);
           if (!cancelled) setUsers(data);
         }
         if (tab === "employees" && employees === null) {
           const [active, benched, terminated] = await Promise.all([
-            db.fetchEmployees(organization.id, ["active"]),
-            db.fetchEmployees(organization.id, ["benched"]),
-            db.fetchEmployees(organization.id, ["terminated"]),
+            fetchEmployees(organization.id, ["active"]),
+            fetchEmployees(organization.id, ["benched"]),
+            fetchEmployees(organization.id, ["terminated"]),
           ]);
           if (!cancelled) {
             setEmployees(active);
@@ -180,12 +180,12 @@ export default function OrganizationDetail({
         }
         if (tab === "config" && focusAreas === null) {
           const [fa, sc, certs, roles, ind, abs] = await Promise.all([
-            db.fetchFocusAreas(organization.id, true),
-            db.fetchShiftCodes(organization.id, true),
-            db.fetchCertifications(organization.id, true),
-            db.fetchOrganizationRoles(organization.id, true),
-            db.fetchIndicatorTypes(organization.id, true),
-            db.fetchAbsenceTypes(organization.id, true),
+            fetchFocusAreas(organization.id, true),
+            fetchShiftCodes(organization.id, true),
+            fetchCertifications(organization.id, true),
+            fetchOrganizationRoles(organization.id, true),
+            fetchIndicatorTypes(organization.id, true),
+            fetchAbsenceTypes(organization.id, true),
           ]);
           if (!cancelled) {
             setFocusAreas(fa);
@@ -196,8 +196,8 @@ export default function OrganizationDetail({
             setAbsenceTypes(abs);
           }
         }
-      } catch (err: any) {
-        if (!cancelled) setTabError(err.message ?? "Failed to load data");
+      } catch (err: unknown) {
+        if (!cancelled) setTabError((err instanceof Error ? err.message : null) ?? "Failed to load data");
       } finally {
         if (!cancelled) setTabLoading(false);
       }
@@ -384,12 +384,12 @@ function OverviewTab({
         certificationLabel: editCertLabel.trim() || "Certifications",
         roleLabel: editRoleLabel.trim() || "Roles",
       };
-      await db.updateOrganization(updated);
+      await updateOrganization(updated);
       toast.success("Organization updated");
       setEditing(false);
       onOrgUpdated?.(updated);
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to update");
     } finally {
       setSaving(false);
     }
@@ -399,17 +399,17 @@ function OverviewTab({
     setArchiving(true);
     try {
       if (organization.archivedAt) {
-        await db.restoreOrganization(organization.id);
+        await restoreOrganization(organization.id);
         toast.success("Organization restored");
         onOrgUpdated?.({ ...organization, archivedAt: null });
       } else {
-        await db.archiveOrganization(organization.id);
+        await archiveOrganization(organization.id);
         toast.success("Organization archived");
         onOrgUpdated?.({ ...organization, archivedAt: new Date().toISOString() });
       }
       setArchiveConfirm(false);
-    } catch (err: any) {
-      toast.error(err.message ?? "Operation failed");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Operation failed");
     } finally {
       setArchiving(false);
     }
@@ -575,11 +575,11 @@ function UsersTab({
     if (newRole === "super_admin") return; // Handled separately
     setChangingRole(userId);
     try {
-      await db.changeOrganizationUserRole(userId, newRole as "admin" | "user");
+      await changeOrganizationUserRole(userId, newRole as "admin" | "user");
       toast.success("Role updated");
       onUsersChanged();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to change role");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to change role");
     } finally {
       setChangingRole(null);
     }
@@ -589,12 +589,12 @@ function UsersTab({
     if (!removeConfirm) return;
     setRemoving(true);
     try {
-      await db.removeUserFromOrganization(removeConfirm.id, orgId);
+      await removeUserFromOrganization(removeConfirm.id, orgId);
       toast.success("User removed from organization");
       setRemoveConfirm(null);
       onUsersChanged();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to remove user");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to remove user");
     } finally {
       setRemoving(false);
     }
@@ -605,13 +605,13 @@ function UsersTab({
     if (!addEmail.trim()) return;
     setAdding(true);
     try {
-      await db.assignOrgRoleByEmail(orgId, addEmail.trim(), addRole);
+      await assignOrgRoleByEmail(orgId, addEmail.trim(), addRole);
       toast.success(`User added as ${addRole}`);
       setAddEmail("");
       setShowAddForm(false);
       onUsersChanged();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to add user");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to add user");
     } finally {
       setAdding(false);
     }

@@ -3,6 +3,19 @@ import { arraysEqual, formatDateKey, iterateDateRange } from "@/lib/utils";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { parseHost } from "@/lib/subdomain";
 
+// ── PostgREST filter sanitization ──────────────────────────────────────────
+// Values interpolated into .or() filter strings must not contain PostgREST
+// operators that could alter query semantics.
+const POSTGREST_UNSAFE = /[(),."\\]/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function assertSafeFilterValue(value: string, label: string): void {
+  if (POSTGREST_UNSAFE.test(value)) {
+    throw new Error(`Unsafe PostgREST filter value for ${label}`);
+  }
+}
+
 import {
   Employee,
   EmployeeStatus,
@@ -42,6 +55,13 @@ export class OptimisticLockError extends Error {
     );
     this.name = "OptimisticLockError";
   }
+}
+
+/** Strip seconds from PostgreSQL TIME values ("HH:MM:SS" → "HH:MM"). */
+function trimTime(t: string | null): string | null {
+  if (!t) return t;
+  const parts = t.split(":");
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : t;
 }
 
 // ── Shift Types ──────────────────────────────────────────────────────────────
@@ -232,8 +252,8 @@ function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
     orgId: row.org_id,
     name: row.name,
     color: row.color,
-    startTime: row.start_time ?? null,
-    endTime: row.end_time ?? null,
+    startTime: trimTime(row.start_time) ?? null,
+    endTime: trimTime(row.end_time) ?? null,
     sortOrder: row.sort_order,
     focusAreaId: row.focus_area_id ?? null,
     breakMinutes: row.break_minutes ?? null,
@@ -266,8 +286,8 @@ export function rowToShiftCode(row: DbShiftCode): ShiftCode {
     focusAreaId: row.focus_area_id ?? null,
     sortOrder: row.sort_order,
     requiredCertificationIds: row.required_certification_ids ?? [],
-    defaultStartTime: row.default_start_time ?? null,
-    defaultEndTime: row.default_end_time ?? null,
+    defaultStartTime: trimTime(row.default_start_time) ?? null,
+    defaultEndTime: trimTime(row.default_end_time) ?? null,
     defaultDurationHours: row.default_duration_hours ?? null,
     defaultDurationMinutes: row.default_duration_minutes ?? null,
     archivedAt: row.archived_at ?? null,
@@ -605,17 +625,37 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
 export async function deleteFocusArea(focusAreaId: number): Promise<void> {
   const now = new Date().toISOString();
 
-  // Archive dependent shift_codes and shift_categories for this focus area
-  await supabase
+  // Archive dependent shift_codes for this focus area
+  const { error: scErr } = await supabase
     .from("shift_codes")
     .update({ archived_at: now })
     .eq("focus_area_id", focusAreaId)
     .is("archived_at", null);
-  await supabase
+  if (scErr) throw scErr;
+
+  // Archive dependent shift_categories for this focus area
+  const { error: catErr } = await supabase
     .from("shift_categories")
     .update({ archived_at: now })
     .eq("focus_area_id", focusAreaId)
     .is("archived_at", null);
+  if (catErr) throw catErr;
+
+  // Remove this focus area from employee focusAreaIds arrays
+  const { data: affectedEmps, error: empFetchErr } = await supabase
+    .from("employees")
+    .select("id, focus_area_ids")
+    .contains("focus_area_ids", [focusAreaId]);
+  if (empFetchErr) throw empFetchErr;
+
+  for (const emp of affectedEmps ?? []) {
+    const updated = (emp.focus_area_ids as number[]).filter((id: number) => id !== focusAreaId);
+    const { error: empErr } = await supabase
+      .from("employees")
+      .update({ focus_area_ids: updated })
+      .eq("id", emp.id);
+    if (empErr) throw empErr;
+  }
 
   // Soft-delete the focus area (row persists — all FK/array references remain valid)
   const { error } = await supabase
@@ -1045,12 +1085,12 @@ export async function fetchEmployeeRoleHistory(
 ): Promise<import("@/types").AuditLogEntry[]> {
   const { data, error } = await supabase.rpc("get_audit_log", {
     p_org_id: null,
-    p_limit: 100,
+    p_limit: 50,
     p_offset: 0,
+    p_target_user_id: userId,
   });
   if (error) throw error;
   return (data ?? [])
-    .filter((row: any) => row.target_user_id === userId)
     .map((row: any) => ({
       id: row.id as string,
       targetUserId: row.target_user_id as string,
@@ -1073,7 +1113,7 @@ export async function fetchEmployeeInvitations(
 ): Promise<Invitation[]> {
   const { data, error } = await supabase
     .from("invitations")
-    .select("*")
+    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
     .order("created_at", { ascending: false });
@@ -1084,7 +1124,6 @@ export async function fetchEmployeeInvitations(
     invitedBy: (row.invited_by as string) ?? null,
     email: row.email as string,
     roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-    token: row.token as string,
     expiresAt: row.expires_at as string,
     acceptedAt: (row.accepted_at as string) ?? null,
     revokedAt: (row.revoked_at as string) ?? null,
@@ -1416,6 +1455,10 @@ export async function discardScheduleDrafts(
   }
 
   if (toDelete.length > 0) {
+    for (const d of toDelete) {
+      assertSafeFilterValue(d.emp_id, "emp_id");
+      assertSafeFilterValue(d.date, "date");
+    }
     const orClauses = toDelete.map(d => `and(emp_id.eq.${d.emp_id},date.eq.${d.date})`).join(",");
     const { error: deleteError } = await supabase
       .from("shifts")
@@ -1695,7 +1738,7 @@ export async function sendInvitation(
 export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
   const { data, error } = await supabase
     .from("invitations")
-    .select("*")
+    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -1705,7 +1748,6 @@ export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
     invitedBy: (row.invited_by as string) ?? null,
     email: row.email as string,
     roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-    token: row.token as string,
     expiresAt: row.expires_at as string,
     acceptedAt: (row.accepted_at as string) ?? null,
     revokedAt: (row.revoked_at as string) ?? null,
@@ -1743,7 +1785,8 @@ interface DbRecurringShift {
   emp_id: string;
   org_id: string;
   day_of_week: number;
-  shift_code_id: number;
+  shift_code_id: number | null;
+  absence_type_id: number | null;
   effective_from: string;
   effective_until: string | null;
   created_at: string;
@@ -1751,14 +1794,25 @@ interface DbRecurringShift {
   archived_at: string | null;
 }
 
-function rowToRecurringShift(row: DbRecurringShift, codeMap: Map<number, string>): RecurringShift {
+function rowToRecurringShift(
+  row: DbRecurringShift,
+  codeMap: Map<number, string>,
+  absenceTypeMap?: Map<number, string>,
+): RecurringShift {
+  let label = '?';
+  if (row.shift_code_id != null) {
+    label = codeMap.get(row.shift_code_id) ?? '?';
+  } else if (row.absence_type_id != null) {
+    label = absenceTypeMap?.get(row.absence_type_id) ?? '?';
+  }
   return {
     id: row.id,
     empId: row.emp_id,
     orgId: row.org_id,
     dayOfWeek: row.day_of_week,
     shiftCodeId: row.shift_code_id,
-    shiftLabel: codeMap.get(row.shift_code_id) ?? '?',
+    absenceTypeId: row.absence_type_id,
+    shiftLabel: label,
     effectiveFrom: row.effective_from,
     effectiveUntil: row.effective_until,
     createdAt: row.created_at,
@@ -1772,6 +1826,7 @@ export async function fetchRecurringShifts(
   empId?: string,
   shiftCodeMap?: Map<number, string>,
   includeArchived = false,
+  absenceTypeMap?: Map<number, string>,
 ): Promise<RecurringShift[]> {
   let query = supabase
     .from("recurring_shifts")
@@ -1783,15 +1838,16 @@ export async function fetchRecurringShifts(
   if (empId) query = query.eq("emp_id", empId);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data as DbRecurringShift[]).map(r => rowToRecurringShift(r, shiftCodeMap ?? new Map()));
+  return (data as DbRecurringShift[]).map(r => rowToRecurringShift(r, shiftCodeMap ?? new Map(), absenceTypeMap));
 }
 
 export async function upsertRecurringShift(
   empId: string,
   orgId: string,
   dayOfWeek: number,
-  shiftCodeId: number,
+  shiftCodeId: number | null,
   effectiveFrom: string,
+  absenceTypeId?: number | null,
 ): Promise<void> {
   // Archive ALL existing active rows for this (emp, day) first.
   // This avoids duplicate active rows when the effectiveFrom date differs
@@ -1805,10 +1861,18 @@ export async function upsertRecurringShift(
 
   if (archiveError) throw new Error(archiveError.message);
 
-  // Insert a fresh row with the current effectiveFrom
+  // Insert a fresh row with the current effectiveFrom.
+  // Mutually exclusive: either shift_code_id or absence_type_id, never both.
   const { error: insertError } = await supabase
     .from("recurring_shifts")
-    .insert({ emp_id: empId, org_id: orgId, day_of_week: dayOfWeek, shift_code_id: shiftCodeId, effective_from: effectiveFrom });
+    .insert({
+      emp_id: empId,
+      org_id: orgId,
+      day_of_week: dayOfWeek,
+      shift_code_id: absenceTypeId != null ? null : shiftCodeId,
+      absence_type_id: absenceTypeId ?? null,
+      effective_from: effectiveFrom,
+    });
   if (insertError) throw new Error(insertError.message);
 }
 
@@ -1835,14 +1899,14 @@ export async function applyRecurringSchedules(
   orgId: string,
   startDate: Date,
   endDate: Date,
-): Promise<{ empId: string; date: string; label: string; shiftCodeId: number }[]> {
+): Promise<{ empId: string; date: string; label: string; shiftCodeId?: number; absenceTypeId?: number }[]> {
   const { data, error } = await supabase.rpc("apply_recurring_schedules", {
     p_org_id: orgId,
     p_start_date: formatDateKey(startDate),
     p_end_date: formatDateKey(endDate),
   });
   if (error) throw new Error(error.message);
-  return (data?.shifts ?? []) as { empId: string; date: string; label: string; shiftCodeId: number }[];
+  return (data?.shifts ?? []) as { empId: string; date: string; label: string; shiftCodeId?: number; absenceTypeId?: number }[];
 }
 
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
@@ -2336,6 +2400,7 @@ export async function fetchShiftRequests(
     query = query.eq("type", filters.type);
   }
   if (filters?.empId) {
+    assertSafeFilterValue(filters.empId, "empId");
     query = query.or(
       `requester_emp_id.eq.${filters.empId},target_emp_id.eq.${filters.empId}`
     );

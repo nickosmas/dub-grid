@@ -7,12 +7,12 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
-import { Employee, FocusArea, ShiftCode, NamedItem, Invitation } from "@/types";
+import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import { isEmployeeQualified } from "@/lib/schedule-logic";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
-import * as db from "@/lib/db";
+import { fetchInvitations, revokeInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";
@@ -54,6 +54,7 @@ interface StaffViewProps {
   shiftCodes?: ShiftCode[];
   /** Full code map (including archived) for resolving historical labels. */
   shiftCodeMap?: Map<number, string>;
+  absenceTypes?: AbsenceType[];
   canEditShifts?: boolean;
   canManageEmployees?: boolean;
   focusAreaLabel?: string;
@@ -204,12 +205,14 @@ function MembersSection({
   useEffect(() => {
     if (!orgId) return;
     let cancelled = false;
-    db.fetchInvitations(orgId).then((invites) => {
+    fetchInvitations(orgId).then((invites) => {
       if (cancelled) return;
       setPendingInvitations(
         invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
       );
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[StaffView] Failed to fetch invitations:", err);
+    });
     return () => { cancelled = true; };
   }, [orgId]);
 
@@ -223,7 +226,7 @@ function MembersSection({
 
   function refreshInvitations() {
     if (!orgId) return;
-    db.fetchInvitations(orgId).then((invites) => {
+    fetchInvitations(orgId).then((invites) => {
       setPendingInvitations(
         invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
       );
@@ -233,7 +236,7 @@ function MembersSection({
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     setRevokingId(invitationId);
     try {
-      await db.revokeInvitation(invitationId);
+      await revokeInvitation(invitationId);
       refreshInvitations();
       toast.success("Invitation revoked");
       return true;
@@ -502,15 +505,21 @@ function ShiftCellPopover({
   onClose,
   empFocusAreaIds,
   empCertificationId,
+  absenceTypes,
+  onAbsenceSelect,
+  currentAbsenceTypeId,
 }: {
   anchorRef: HTMLElement | null;
   shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
   currentLabel: string;
-  onSelect: (label: string) => void;
+  onSelect: (label: string, shiftCodeIds: number[]) => void;
   onClose: () => void;
   empFocusAreaIds: number[];
   empCertificationId?: number | null;
+  absenceTypes?: AbsenceType[];
+  onAbsenceSelect?: (absenceType: AbsenceType) => void;
+  currentAbsenceTypeId?: number | null;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -634,19 +643,22 @@ function ShiftCellPopover({
           <ShiftPicker
             shiftCodes={shiftCodes}
             focusAreas={focusAreas}
+            absenceTypes={absenceTypes}
             currentShiftCodeIds={currentShiftCodeIds}
-            onSelect={(label) => {
-              onSelect(label);
+            currentAbsenceTypeId={currentAbsenceTypeId}
+            onSelect={(label, shiftCodeIds) => {
+              onSelect(label, shiftCodeIds);
               onClose();
             }}
+            onAbsenceSelect={onAbsenceSelect ? (at) => { onAbsenceSelect(at); onClose(); } : undefined}
             empFocusAreaIds={empFocusAreaIds}
             empCertificationId={empCertificationId}
             multiSelect={false}
             closeOnSelect={true}
           />
-          {currentLabel && (
+          {(currentLabel || currentAbsenceTypeId) && (
             <button
-              onClick={() => { onSelect(""); onClose(); }}
+              onClick={() => { onSelect("", []); onClose(); }}
               className="dg-btn dg-btn-ghost"
               style={{ marginTop: 12, width: "100%", color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", fontWeight: 600 }}
             >
@@ -661,6 +673,32 @@ function ShiftCellPopover({
 }
 
 // ── Recurring Schedule section ────────────────────────────────────────────────
+
+/** Encode a shift code ID as a recurring cell value. */
+function encodeShift(id: number): string { return `s:${id}`; }
+/** Encode an absence type ID as a recurring cell value. */
+function encodeAbsence(id: number): string { return `a:${id}`; }
+/** Parse an encoded recurring cell value back to its type + ID. */
+function parseRecurringValue(v: string): { type: 'shift'; id: number } | { type: 'absence'; id: number } | null {
+  if (v.startsWith('s:')) { const id = Number(v.slice(2)); return Number.isFinite(id) ? { type: 'shift', id } : null; }
+  if (v.startsWith('a:')) { const id = Number(v.slice(2)); return Number.isFinite(id) ? { type: 'absence', id } : null; }
+  return null;
+}
+/** Migrate a legacy draft value (plain label or abs: prefix) to ID-based encoding. */
+function migrateLegacyDraftValue(v: string, shiftCodes: ShiftCode[], absenceTypes: AbsenceType[]): string {
+  if (!v) return v;
+  if (v.startsWith('s:') || v.startsWith('a:')) return v; // already new format
+  // Legacy abs: prefix (brief interim format)
+  if (v.startsWith('abs:')) {
+    const atLabel = v.slice(4);
+    const at = absenceTypes.find(a => a.label === atLabel);
+    return at ? encodeAbsence(at.id) : '';
+  }
+  // Legacy plain label (shift code)
+  const sc = shiftCodes.find(s => s.label === v);
+  return sc ? encodeShift(sc.id) : '';
+}
+
 function RecurringScheduleSection({
   employees,
   orgId,
@@ -669,6 +707,7 @@ function RecurringScheduleSection({
   canEdit,
   focusAreas,
   certifications,
+  absenceTypes = [],
 }: {
   employees: Employee[];
   orgId: string;
@@ -677,8 +716,13 @@ function RecurringScheduleSection({
   canEdit: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
+  absenceTypes?: AbsenceType[];
 }) {
   const isMobile = useMediaQuery(MOBILE);
+  // ── Lookup maps (by ID) for rendering ──
+  const absenceTypeMap = useMemo(() => new Map(absenceTypes.map(at => [at.id, at.label])), [absenceTypes]);
+  const absenceTypeIdMap = useMemo(() => new Map(absenceTypes.map(at => [at.id, at])), [absenceTypes]);
+  const shiftCodeIdMap = useMemo(() => new Map(shiftCodes.map(sc => [sc.id, sc])), [shiftCodes]);
   // ── Data state ──
   const [allSchedules, setAllSchedules] = useState<Record<string, Record<number, string>>>({});
   const [loading, setLoading] = useState(true);
@@ -705,30 +749,47 @@ function RecurringScheduleSection({
 
     async function load() {
       try {
-        const rows = await db.fetchRecurringShifts(orgId, undefined, shiftCodeMap);
+        const rows = await fetchRecurringShifts(orgId, undefined, shiftCodeMap, false, absenceTypeMap);
         if (cancelled) return;
 
         const schedules: Record<string, Record<number, string>> = {};
         for (const rs of rows) {
           if (!schedules[rs.empId]) schedules[rs.empId] = {};
           if (!(rs.dayOfWeek in schedules[rs.empId])) {
-            schedules[rs.empId][rs.dayOfWeek] = rs.shiftLabel;
+            // Encode as "s:<id>" or "a:<id>" — collision-proof and ID-stable
+            let encoded = '';
+            if (rs.shiftCodeId != null) encoded = encodeShift(rs.shiftCodeId);
+            else if (rs.absenceTypeId != null) encoded = encodeAbsence(rs.absenceTypeId);
+            schedules[rs.empId][rs.dayOfWeek] = encoded;
           }
         }
         setAllSchedules(schedules);
 
         // Load saved draft separately so a draft error doesn't block the main data
         try {
-          const draft = await db.getRecurringDraft(orgId);
+          const draft = await getRecurringDraft(orgId);
           if (!cancelled && draft?.draftData && Object.keys(draft.draftData).length > 0) {
-            setDirtySchedules(draft.draftData);
-            setSavedDraftTimestamp(draft.savedAt);
+            // Migrate legacy draft values (plain labels / abs: prefix) to ID-based format
+            const migrated: Record<string, Record<number, string>> = {};
+            for (const [eId, empDirty] of Object.entries(draft.draftData)) {
+              for (const [dayStr, val] of Object.entries(empDirty)) {
+                const mv = migrateLegacyDraftValue(val as string, shiftCodes, absenceTypes);
+                if (mv !== undefined) {
+                  if (!migrated[eId]) migrated[eId] = {};
+                  migrated[eId][Number(dayStr)] = mv;
+                }
+              }
+            }
+            if (Object.keys(migrated).length > 0) {
+              setDirtySchedules(migrated);
+              setSavedDraftTimestamp(draft.savedAt);
+            }
           }
         } catch {
           // Draft recovery is non-critical — ignore errors
         }
-      } catch (err: any) {
-        if (!cancelled) setError(err.message);
+      } catch (err: unknown) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -736,7 +797,7 @@ function RecurringScheduleSection({
 
     load();
     return () => { cancelled = true; };
-  }, [orgId, shiftCodeMap]);
+  }, [orgId, shiftCodeMap, absenceTypeMap]);
 
   // ── Derived state ──
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
@@ -798,32 +859,39 @@ function RecurringScheduleSection({
     const skippedLabels: string[] = [];
     try {
       for (const [empId, empDirty] of Object.entries(snapshot)) {
-        for (const [dayStr, newLabel] of Object.entries(empDirty)) {
+        for (const [dayStr, newValue] of Object.entries(empDirty)) {
           const day = Number(dayStr);
-          if (newLabel) {
-            const sc = shiftCodes.find((s) => s.label === newLabel);
-            if (!sc) {
-              skippedLabels.push(newLabel);
+          if (newValue) {
+            const parsed = parseRecurringValue(newValue);
+            if (!parsed) {
+              skippedLabels.push(newValue);
               continue;
             }
-            await db.upsertRecurringShift(empId, orgId, day, sc.id, todayKey);
+            if (parsed.type === 'absence') {
+              await upsertRecurringShift(empId, orgId, day, null, todayKey, parsed.id);
+            } else {
+              await upsertRecurringShift(empId, orgId, day, parsed.id, todayKey);
+            }
           } else {
-            await db.deleteRecurringShift(empId, day);
+            await deleteRecurringShift(empId, day);
           }
           savedKeys.add(`${empId}:${dayStr}`);
         }
       }
       if (skippedLabels.length > 0) {
         const unique = [...new Set(skippedLabels)];
-        toast.error(`Unknown shift code${unique.length > 1 ? "s" : ""}: ${unique.join(", ")}`);
+        toast.error(`Could not resolve ${unique.length} change${unique.length > 1 ? "s" : ""}`);
       }
       // Re-fetch from DB so allSchedules reflects what was actually persisted
-      const freshRows = await db.fetchRecurringShifts(orgId, undefined, shiftCodeMap);
+      const freshRows = await fetchRecurringShifts(orgId, undefined, shiftCodeMap, false, absenceTypeMap);
       const freshSchedules: Record<string, Record<number, string>> = {};
       for (const rs of freshRows) {
         if (!freshSchedules[rs.empId]) freshSchedules[rs.empId] = {};
         if (!(rs.dayOfWeek in freshSchedules[rs.empId])) {
-          freshSchedules[rs.empId][rs.dayOfWeek] = rs.shiftLabel;
+          let encoded = '';
+          if (rs.shiftCodeId != null) encoded = encodeShift(rs.shiftCodeId);
+          else if (rs.absenceTypeId != null) encoded = encodeAbsence(rs.absenceTypeId);
+          freshSchedules[rs.empId][rs.dayOfWeek] = encoded;
         }
       }
       setAllSchedules(freshSchedules);
@@ -841,11 +909,11 @@ function RecurringScheduleSection({
         return next;
       });
       setSavedDraftTimestamp(null);
-      await db.deleteRecurringDraft(orgId).catch(() => {});
+      await deleteRecurringDraft(orgId).catch(() => {});
       toast.success("Recurring schedules saved");
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Failed to save recurring schedules");
-      setError(err.message ?? "Save failed");
+      setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
     }
@@ -856,19 +924,19 @@ function RecurringScheduleSection({
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id;
       if (!userId) { toast.error("Not authenticated"); return; }
-      await db.saveRecurringDraft(orgId, userId, dirtySchedules);
+      await saveRecurringDraft(orgId, userId, dirtySchedules);
       setSavedDraftTimestamp(new Date().toISOString());
       toast.success("Draft saved");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Draft save error:", err);
-      toast.error(`Failed to save draft: ${err?.message ?? "Unknown error"}`);
+      toast.error(`Failed to save draft: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   }
 
   async function handleDiscardDraft() {
     setDirtySchedules({});
     setSavedDraftTimestamp(null);
-    await db.deleteRecurringDraft(orgId).catch(() => {});
+    await deleteRecurringDraft(orgId).catch(() => {});
   }
 
   // ── Filtering ──
@@ -1150,10 +1218,13 @@ function RecurringScheduleSection({
 
                 {/* Day cells */}
                 {DAY_LABELS.map((_, dayIdx) => {
-                  const label = getEffectiveLabel(emp.id, dayIdx);
-                  const st = label ? shiftCodes.find((s) => s.label === label) : null;
+                  const rawValue = getEffectiveLabel(emp.id, dayIdx);
+                  const parsed = rawValue ? parseRecurringValue(rawValue) : null;
+                  const st = parsed?.type === 'shift' ? shiftCodeIdMap.get(parsed.id) ?? null : null;
+                  const at = parsed?.type === 'absence' ? absenceTypeIdMap.get(parsed.id) ?? null : null;
                   const isDirty = !!(dirtySchedules[emp.id] && dayIdx in dirtySchedules[emp.id]);
                   const isActive = activeCell?.empId === emp.id && activeCell?.dayIndex === dayIdx;
+                  const cellLabel = st?.label ?? at?.label ?? null;
 
                   return (
                     <div
@@ -1162,7 +1233,7 @@ function RecurringScheduleSection({
                       data-interactive={canEdit ? "true" : "false"}
                       tabIndex={canEdit ? 0 : -1}
                       role="gridcell"
-                      aria-label={st ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: ${st.label}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: empty`}
+                      aria-label={cellLabel ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: ${cellLabel}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: empty`}
                       onClick={(e) => handleCellClick(emp.id, dayIdx, e.currentTarget)}
                       onKeyDown={(e) => {
                         if (canEdit && (e.key === "Enter" || e.key === " ")) {
@@ -1189,6 +1260,20 @@ function RecurringScheduleSection({
                           boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
                         }}>
                           {st.label}
+                        </div>
+                      ) : at ? (
+                        <div style={{
+                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
+                          background: at.color,
+                          border: isDirty ? `2px dashed ${at.text}` : `1px solid ${borderColor(at.text)}`,
+                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                          color: at.text,
+                          fontSize: isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)",
+                          fontWeight: 800,
+                          transition: "box-shadow 150ms ease",
+                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
+                        }}>
+                          {at.label}
                         </div>
                       ) : (
                         <div style={{
@@ -1223,18 +1308,30 @@ function RecurringScheduleSection({
       )}
 
       {/* Popover */}
-      {activeCell && activeCellEmp && (
-        <ShiftCellPopover
-          anchorRef={activeCellEl}
-          shiftCodes={shiftCodes}
-          focusAreas={focusAreas}
-          currentLabel={getEffectiveLabel(activeCell.empId, activeCell.dayIndex)}
-          onSelect={(label) => handleCellChange(activeCell.empId, activeCell.dayIndex, label)}
-          onClose={() => { setActiveCell(null); setActiveCellEl(null); }}
-          empFocusAreaIds={activeCellEmp.focusAreaIds}
-          empCertificationId={activeCellEmp.certificationId}
-        />
-      )}
+      {activeCell && activeCellEmp && (() => {
+        const rawValue = getEffectiveLabel(activeCell.empId, activeCell.dayIndex);
+        const parsed = rawValue ? parseRecurringValue(rawValue) : null;
+        const currentShiftLabel = parsed?.type === 'shift' ? (shiftCodeIdMap.get(parsed.id)?.label ?? "") : "";
+        const currentAtId = parsed?.type === 'absence' ? parsed.id : null;
+        return (
+          <ShiftCellPopover
+            anchorRef={activeCellEl}
+            shiftCodes={shiftCodes}
+            focusAreas={focusAreas}
+            absenceTypes={absenceTypes}
+            currentLabel={currentShiftLabel}
+            currentAbsenceTypeId={currentAtId}
+            onSelect={(_label, shiftCodeIds) => {
+              const encoded = shiftCodeIds.length > 0 ? encodeShift(shiftCodeIds[0]) : "";
+              handleCellChange(activeCell.empId, activeCell.dayIndex, encoded);
+            }}
+            onAbsenceSelect={(at) => handleCellChange(activeCell.empId, activeCell.dayIndex, encodeAbsence(at.id))}
+            onClose={() => { setActiveCell(null); setActiveCellEl(null); }}
+            empFocusAreaIds={activeCellEmp.focusAreaIds}
+            empCertificationId={activeCellEmp.certificationId}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -1487,6 +1584,7 @@ export default function StaffView({
   orgId,
   shiftCodes,
   shiftCodeMap,
+  absenceTypes,
   canEditShifts,
   canManageEmployees,
   focusAreaLabel = "Focus Areas",
@@ -1633,6 +1731,7 @@ export default function StaffView({
                 canEdit={canEditShifts ?? false}
                 focusAreas={focusAreas}
                 certifications={certifications}
+                absenceTypes={absenceTypes}
               />
             )}
 

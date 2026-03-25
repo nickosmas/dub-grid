@@ -335,8 +335,8 @@ export default function GridmasterPage() {
       const map = new Map<string, TenantStats>();
       for (const s of statsData) map.set(s.orgId, s);
       setStats(map);
-    } catch (err: any) {
-      setError(err.message ?? "Failed to load data");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }

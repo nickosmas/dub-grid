@@ -104,17 +104,17 @@ export default function CreateOrganizationForm({
         try {
           await assignOrgRoleByEmail(organization.id, superAdminEmail.trim(), "super_admin");
           toast.success(`Organization created and ${superAdminEmail.trim()} assigned as super admin`);
-        } catch (err: any) {
+        } catch (err: unknown) {
           toast.success("Organization created");
-          toast.error(`Failed to assign super admin: ${err.message}`);
+          toast.error(`Failed to assign super admin: ${err instanceof Error ? err.message : "Unknown error"}`);
         }
       } else {
         toast.success("Organization created");
       }
 
       onCreated(organization);
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to create organization");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to create organization");
     } finally {
       setSaving(false);
     }

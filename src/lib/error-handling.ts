@@ -1,8 +1,19 @@
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
+/** Extract a human-readable message from an unknown error value. */
+export function extractErrorMessage(err: unknown, fallback: string): string {
+    if (err instanceof Error) return err.message;
+    if (err && typeof err === "object" && "message" in err) {
+        const msg = (err as { message: unknown }).message;
+        if (typeof msg === "string") return msg;
+    }
+    if (typeof err === "string") return err;
+    return fallback;
+}
+
 export async function handleApiError(error: unknown) {
-    const message = (error as any)?.message ?? (typeof error === "string" ? error : "");
+    const message = extractErrorMessage(error, "");
 
     if (message.includes("jwt expired") || message.includes("Refresh Token Not Found") || message.includes("Invalid Refresh Token")) {
         toast.error("Your session has expired. Please log in again.", { duration: 5000 });

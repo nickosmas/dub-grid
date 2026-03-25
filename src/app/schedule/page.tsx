@@ -15,10 +15,10 @@ import ShiftSwapModal from "@/components/ShiftSwapModal";
 
 import { AnimatedDubGridLogo } from "@/components/Logo";
 import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName, iterateDateRange } from "@/lib/utils";
-import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, timesOverlap } from "@/lib/schedule-logic";
+import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, timesOverlap, checkCrossDateOverlap, checkSameDayOverlaps } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
-import * as db from "@/lib/db";
-import { OptimisticLockError } from "@/lib/db";
+import { fetchShifts, fetchScheduleNotes, fetchRecurringShifts, fetchLatestPublishHistory, upsertShiftTimes, deleteShift, upsertShift, updateSeriesAllShifts, deleteShiftSeries, createShiftSeries, moveShift, applyRecurringSchedules, publishSchedule, discardScheduleDrafts, upsertScheduleNote, deleteScheduleNote, OptimisticLockError } from "@/lib/db";
+import { extractErrorMessage } from "@/lib/error-handling";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { supabase } from "@/lib/supabase";
 import { usePermissions, useOrganizationData, useEmployees, useCellLocks, useShiftRequests } from "@/hooks";
@@ -79,6 +79,9 @@ function SchedulerContent() {
   // numbers even when the useCallback closure captures a stale `shifts` object.
   const shiftsRef = useRef(shifts);
   shiftsRef.current = shifts;
+  // Serializes DB writes per shift key to prevent race conditions (e.g. edit → undo
+  // firing before the edit's DB write completes, causing an optimistic lock conflict).
+  const pendingShiftWrites = useRef<Map<string, Promise<void>>>(new Map());
   const [notes, setNotes] = useState<Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>>({});
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
   const [preferredSpan, setPreferredSpan] = useState<1 | 2 | "month">(2);
@@ -192,8 +195,8 @@ function SchedulerContent() {
     if (!org) return;
     const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
     const [shiftData, noteRows] = await Promise.all([
-      db.fetchShifts(org.id, canEditShiftsRef.current, cMap, absenceTypeMap),
-      db.fetchScheduleNotes(org.id),
+      fetchShifts(org.id, canEditShiftsRef.current, cMap, absenceTypeMap),
+      fetchScheduleNotes(org.id),
     ]);
     const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
     for (const note of noteRows) {
@@ -248,10 +251,10 @@ function SchedulerContent() {
 
         // Critical fetches in parallel — unblock grid render ASAP
         const [shiftData, noteRows, recShifts, latestPublish] = await Promise.all([
-          db.fetchShifts(orgId, canEditShifts, codeMap, absenceTypeMap),
-          db.fetchScheduleNotes(orgId),
-          db.fetchRecurringShifts(orgId, undefined, codeMap),
-          db.fetchLatestPublishHistory(orgId).catch(() => null),
+          fetchShifts(orgId, canEditShifts, codeMap, absenceTypeMap),
+          fetchScheduleNotes(orgId),
+          fetchRecurringShifts(orgId, undefined, codeMap, false, absenceTypeMap),
+          fetchLatestPublishHistory(orgId).catch(() => null),
         ]);
 
         const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
@@ -446,12 +449,14 @@ function SchedulerContent() {
   useEffect(() => {
     if (!org) return;
 
+    let hadError = false;
+
     const channel = supabase
       .channel(`schedule:${org.id}`)
       .on('broadcast', { event: 'schedule_published' }, async () => {
         try {
           await refetchScheduleDataRef.current();
-          const history = await db.fetchLatestPublishHistory(org.id);
+          const history = await fetchLatestPublishHistory(org.id);
           setPublishHistory(history);
         } catch (err) {
           console.error('Failed to sync schedule update:', err);
@@ -503,12 +508,18 @@ function SchedulerContent() {
       .on('presence', { event: 'leave' }, () => syncPresenceRef.current())
       .subscribe(async (status: string, err?: Error) => {
         if (status === 'SUBSCRIBED') {
+          // Refetch on reconnection to catch events missed during downtime
+          if (hadError) {
+            hadError = false;
+            refetchScheduleDataRef.current().catch(() => {});
+          }
           const user = currentUserRef.current;
           if (user && canEditShiftsRef.current) {
             await channel.track({ editingCell: null, userId: user.id, userName: user.name, canEdit: true });
           }
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('[Realtime] Channel error:', err?.message ?? 'unknown');
+          hadError = true;
+          console.warn('[Realtime] Channel error (auto-retrying):', err ?? 'unknown');
         }
       });
 
@@ -582,7 +593,7 @@ function SchedulerContent() {
     (async () => {
       try {
         const cMap = new Map(allShiftCodesRef.current.map(sc => [sc.id, sc.label]));
-        const draftShifts = await db.fetchShifts(org.id, true, cMap, absenceTypeMap);
+        const draftShifts = await fetchShifts(org.id, true, cMap, absenceTypeMap);
         setShifts(draftShifts);
       } catch (err) {
         console.error("Draft check failed:", err);
@@ -727,6 +738,75 @@ function SchedulerContent() {
     return map;
   }, [shiftCodes, allShiftCodesRef]);
 
+  // ── Cross-date overlap warnings for the open edit panel ─────────────────
+  const overnightOverlapWarnings = useMemo((): string[] => {
+    if (!editPanel) return [];
+    const empId = editPanel.empId;
+    const date = editPanel.date;
+    const entry = shifts[`${empId}_${formatDateKey(date)}`];
+    if (!entry || (entry.shiftCodeIds.length === 0 && !entry.absenceTypeId)) return [];
+
+    // Resolve effective start/end: custom times → shift code defaults → category defaults
+    const resolveEffective = (
+      customStart: string | null | undefined,
+      customEnd: string | null | undefined,
+      codeIds: number[],
+    ): { start: string; end: string } | null => {
+      const s = customStart?.split("|")[0];
+      const e = customEnd?.split("|")[0];
+      if (s && e) return { start: s, end: e };
+      const code = codeIds[0] != null ? shiftCodeById.get(codeIds[0]) : undefined;
+      if (code?.defaultStartTime && code?.defaultEndTime) {
+        return { start: code.defaultStartTime, end: code.defaultEndTime };
+      }
+      const cat = code?.categoryId != null ? shiftCategories.find(c => c.id === code.categoryId) : undefined;
+      if (cat?.startTime && cat?.endTime) {
+        return { start: cat.startTime, end: cat.endTime };
+      }
+      return null;
+    };
+
+    const currentTimes = resolveEffective(entry.customStartTime, entry.customEndTime, entry.shiftCodeIds);
+    if (!currentTimes) return [];
+
+    // D-1 shift
+    const prevDate = addDays(date, -1);
+    const prevEntry = shifts[`${empId}_${formatDateKey(prevDate)}`];
+    const prevTimes = prevEntry && prevEntry.shiftCodeIds.length > 0
+      ? resolveEffective(prevEntry.customStartTime, prevEntry.customEndTime, prevEntry.shiftCodeIds)
+      : null;
+
+    // D+1 shift
+    const nextDate = addDays(date, 1);
+    const nextEntry = shifts[`${empId}_${formatDateKey(nextDate)}`];
+    const nextTimes = nextEntry && nextEntry.shiftCodeIds.length > 0
+      ? resolveEffective(nextEntry.customStartTime, nextEntry.customEndTime, nextEntry.shiftCodeIds)
+      : null;
+
+    const warnings = checkCrossDateOverlap(currentTimes, { prev: prevTimes, next: nextTimes });
+
+    // Same-day overlap check for multi-code cells
+    if (entry.shiftCodeIds.length >= 2) {
+      const pillRanges: { start: string; end: string }[] = [];
+      const pillLabels: string[] = [];
+      const startParts = entry.customStartTime?.split("|") ?? [];
+      const endParts = entry.customEndTime?.split("|") ?? [];
+      for (let i = 0; i < entry.shiftCodeIds.length; i++) {
+        const code = shiftCodeById.get(entry.shiftCodeIds[i]);
+        const cat = code?.categoryId != null ? shiftCategories.find(c => c.id === code.categoryId) : undefined;
+        const s = startParts[i] || code?.defaultStartTime || cat?.startTime;
+        const e = endParts[i] || code?.defaultEndTime || cat?.endTime;
+        if (s && e) {
+          pillRanges.push({ start: s, end: e });
+          pillLabels.push(code?.label ?? '?');
+        }
+      }
+      warnings.push(...checkSameDayOverlaps(pillRanges, pillLabels));
+    }
+
+    return warnings;
+  }, [editPanel, shifts, shiftCodeById, shiftCategories]);
+
   const coverageGaps = useMemo(() => {
     if (!coverageRequirements.length || !focusAreas.length) return [];
 
@@ -811,6 +891,16 @@ function SchedulerContent() {
     [shifts],
   );
 
+  const hasTimeChangesForKey = useCallback(
+    (empId: string, date: Date): boolean => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) return false;
+      return (entry.customStartTime ?? null) !== (entry.publishedCustomStartTime ?? null)
+        || (entry.customEndTime ?? null) !== (entry.publishedCustomEndTime ?? null);
+    },
+    [shifts],
+  );
+
   /** True if the shift's date is in the past, or it's today and the shift has already started. */
   const isShiftStarted = useCallback(
     (empId: string, date: Date): boolean => {
@@ -866,22 +956,14 @@ function SchedulerContent() {
       setShifts((prev) => {
         const existing = prev[key];
         if (!existing) return prev;
-        // Compute draftKind: if published content exists, this is a 'modified' draft
-        const hasPublished = (existing.publishedShiftCodeIds?.length ?? 0) > 0
-          || existing.publishedAbsenceTypeId != null;
-        const draftKind = hasPublished ? 'modified' as const : existing.draftKind;
+        const updated = { ...existing, customStartTime: start, customEndTime: end };
+        const dk = computeDraftKind(updated);
         return {
           ...prev,
-          [key]: {
-            ...existing,
-            customStartTime: start,
-            customEndTime: end,
-            isDraft: true,
-            draftKind: draftKind || 'modified',
-          },
+          [key]: { ...updated, isDraft: dk !== null, draftKind: dk },
         };
       });
-      db.upsertShiftTimes(editPanel.empId, dateKey, start, end, org.id).catch((err) => {
+      upsertShiftTimes(editPanel.empId, dateKey, start, end, org.id).catch((err) => {
         toast.error("Failed to save shift times");
         console.error(err);
       });
@@ -914,6 +996,35 @@ function SchedulerContent() {
     });
   }, []);
 
+  /** Compare current shift values against published state to determine correct draftKind. */
+  function computeDraftKind(entry: {
+    shiftCodeIds: number[];
+    publishedShiftCodeIds?: number[];
+    absenceTypeId?: number | null;
+    publishedAbsenceTypeId?: number | null;
+    customStartTime?: string | null;
+    customEndTime?: string | null;
+    publishedCustomStartTime?: string | null;
+    publishedCustomEndTime?: string | null;
+  }): DraftKind {
+    const pubCodes = entry.publishedShiftCodeIds ?? [];
+    const hasPub = pubCodes.length > 0 || entry.publishedAbsenceTypeId != null;
+
+    if (!hasPub) {
+      return (entry.shiftCodeIds.length > 0 || entry.absenceTypeId != null) ? 'new' : null;
+    }
+
+    const codesMatch = entry.shiftCodeIds.length === pubCodes.length
+      && entry.shiftCodeIds.every((id, i) => id === pubCodes[i]);
+    const absMatch = (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null);
+    const startMatch = (entry.customStartTime ?? null) === (entry.publishedCustomStartTime ?? null);
+    const endMatch = (entry.customEndTime ?? null) === (entry.publishedCustomEndTime ?? null);
+
+    if (codesMatch && absMatch && startMatch && endMatch) return null;
+
+    return (entry.shiftCodeIds.length === 0 && entry.absenceTypeId == null) ? 'deleted' : 'modified';
+  }
+
   const setShift = useCallback(
     (empId: string, date: Date, label: string, shiftCodeIds: number[]) => {
       const orgId = org?.id;
@@ -930,7 +1041,7 @@ function SchedulerContent() {
 
       const handleConflict = async () => {
         toast.error("Shift was modified by another user — refreshing");
-        const freshShifts = await db.fetchShifts(orgId, canEditShifts, shiftCodeMap, absenceTypeMap);
+        const freshShifts = await fetchShifts(orgId, canEditShifts, shiftCodeMap, absenceTypeMap);
         setShifts(freshShifts);
       };
 
@@ -957,18 +1068,22 @@ function SchedulerContent() {
             updatedBy: currentUserRef.current?.id ?? null,
           };
           setShifts((prev) => ({ ...prev, [key]: deleteValue }));
-          db.deleteShift(empId, dateKey).catch((err) => {
+          const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
+          const write = prev.then(() => deleteShift(empId, dateKey)).catch((err) => {
             toast.error("Failed to delete shift");
             console.error(err);
           });
+          pendingShiftWrites.current.set(key, write);
           broadcastDraftChanged({ shifts: { [key]: deleteValue } });
         } else {
           // Never-published draft being cleared → remove from map entirely
           setShifts((prev) => { const next = { ...prev }; delete next[key]; return next; });
-          db.deleteShift(empId, dateKey).catch((err) => {
+          const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
+          const write = prev.then(() => deleteShift(empId, dateKey)).catch((err) => {
             toast.error("Failed to delete shift");
             console.error(err);
           });
+          pendingShiftWrites.current.set(key, write);
           broadcastDraftChanged({ shifts: { [key]: null } });
         }
       } else {
@@ -982,15 +1097,27 @@ function SchedulerContent() {
           toast.warning("Some shift codes were removed (no longer available)");
         }
         const ex = shiftsRef.current[key];
-        const hasPublished = ex?.publishedShiftCodeIds?.length ?? 0;
-        const upsertValue = {
-          label, shiftCodeIds: validCodeIds, isDraft: true,
-          draftKind: (hasPublished ? 'modified' : 'new') as 'modified' | 'new',
+        const upsertValue: ShiftMap[string] = {
+          ...ex,
+          label, shiftCodeIds: validCodeIds,
+          absenceTypeId: null,
+          isDelete: false,
           publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
           publishedLabel: ex?.publishedLabel ?? '',
+          isDraft: true,
+          draftKind: null,
+          // Optimistically bump version to match the DB write so subsequent
+          // edits use the correct expectedVersion for the optimistic lock.
+          version: existingVersion != null ? existingVersion + 1 : undefined,
         };
+        const dk = computeDraftKind(upsertValue);
+        upsertValue.isDraft = dk !== null;
+        upsertValue.draftKind = dk;
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
-        db.upsertShift(empId, dateKey, validCodeIds, orgId, undefined, undefined, existingVersion).catch((err) => {
+        const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
+        const write = prev.then(() =>
+          upsertShift(empId, dateKey, validCodeIds, orgId, undefined, undefined, existingVersion)
+        ).catch((err) => {
           if (err instanceof OptimisticLockError) {
             handleConflict();
           } else {
@@ -998,6 +1125,7 @@ function SchedulerContent() {
             console.error(err);
           }
         });
+        pendingShiftWrites.current.set(key, write);
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
@@ -1085,9 +1213,9 @@ function SchedulerContent() {
 
         // Bulk-update all shifts in the series
         try {
-          await db.updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
+          await updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
           const prevShifts = shifts;
-          const shiftData = await db.fetchShifts(org!.id, canEditShifts, shiftCodeMap, absenceTypeMap);
+          const shiftData = await fetchShifts(org!.id, canEditShifts, shiftCodeMap, absenceTypeMap);
           setShifts(shiftData);
           const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
           for (const [k, v] of Object.entries(shiftData)) {
@@ -1114,8 +1242,8 @@ function SchedulerContent() {
     if (!pendingSeriesDelete || !org) return;
     try {
       const prevShifts = shifts;
-      const deletedCount = await db.deleteShiftSeries(pendingSeriesDelete.seriesId);
-      const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap);
+      const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId);
+      const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap);
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
       // Detect removed shifts
@@ -1156,7 +1284,7 @@ function SchedulerContent() {
       const codeIds = shiftCodeIdsForKey(editPanel.empId, editPanel.date);
       if (!codeIds.length) return;
       try {
-        await db.createShiftSeries(
+        await createShiftSeries(
           editPanel.empId,
           org.id,
           codeIds[0],
@@ -1168,7 +1296,7 @@ function SchedulerContent() {
           maxOccurrences,
         );
         const prevShifts = shifts;
-        const shiftData = await db.fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap);
+        const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap);
         setShifts(shiftData);
         // Broadcast new/changed shifts to other editors
         const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
@@ -1289,7 +1417,7 @@ function SchedulerContent() {
       },
     });
 
-    db.moveShift(
+    moveShift(
       org!.id,
       dragData.empId, dragData.dateKey,
       dropData.empId, dropData.dateKey,
@@ -1407,7 +1535,7 @@ function SchedulerContent() {
     const { startDate, endDate } = getAutoFillRange();
 
     // Fetch fresh recurring shifts to get an accurate count
-    const freshRecurringShifts = await db.fetchRecurringShifts(org.id, undefined, shiftCodeMap);
+    const freshRecurringShifts = await fetchRecurringShifts(org.id, undefined, shiftCodeMap, false, absenceTypeMap);
     setRecurringShifts(freshRecurringShifts);
 
     // Count empty slots that would be filled (matches server-side RPC logic)
@@ -1431,8 +1559,11 @@ function SchedulerContent() {
           const until = rs.effectiveUntil;
           return from <= dateKey && (!until || until >= dateKey);
         });
-        // Also verify the shift code is still active (not archived)
-        if (match && shiftCodes.some(sc => sc.id === match.shiftCodeId)) count++;
+        // Verify shift code or absence type is still active (not archived)
+        if (match) {
+          if (match.shiftCodeId != null && shiftCodes.some(sc => sc.id === match.shiftCodeId)) count++;
+          else if (match.absenceTypeId != null && absenceTypes.some(at => at.id === match.absenceTypeId)) count++;
+        }
       }
     }
 
@@ -1444,7 +1575,7 @@ function SchedulerContent() {
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     setAutoFillPreview({ count, dateRange });
     setShowAutoFillConfirm(true);
-  }, [org, getAutoFillRange, shiftCodes, shifts]);
+  }, [org, getAutoFillRange, shiftCodes, absenceTypes, absenceTypeMap, shiftCodeMap, shifts]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
@@ -1455,7 +1586,7 @@ function SchedulerContent() {
       const { startDate, endDate } = getAutoFillRange();
 
       // RPC reads fresh data from DB — no stale closures for recurringShifts/shifts
-      const generated = await db.applyRecurringSchedules(org.id, startDate, endDate);
+      const generated = await applyRecurringSchedules(org.id, startDate, endDate);
 
       if (generated.length > 0) {
         // Refetch to get accurate state (including from_recurring flags)
@@ -1559,7 +1690,7 @@ function SchedulerContent() {
 
             // Queue DB upsert
             upsertPromises.push(
-              db.upsertShift(
+              upsertShift(
                 emp.id,
                 targetDateKey,
                 sourceShift.shiftCodeIds,
@@ -1623,7 +1754,7 @@ function SchedulerContent() {
 
       try {
         if (active) {
-          await db.upsertScheduleNote(
+          await upsertScheduleNote(
             org.id,
             editPanel.empId,
             dateKey,
@@ -1632,7 +1763,7 @@ function SchedulerContent() {
             existingStatus
           );
         } else {
-          await db.deleteScheduleNote(
+          await deleteScheduleNote(
             editPanel.empId,
             dateKey,
             indicatorTypeId,
@@ -1700,10 +1831,10 @@ function SchedulerContent() {
         endDate = addDays(weekStart, (spanWeeks * 7) - 1);
       }
 
-      await db.publishSchedule(org.id, startDate, endDate);
+      await publishSchedule(org.id, startDate, endDate);
 
       await refetchScheduleData();
-      const latestPublish = await db.fetchLatestPublishHistory(org.id);
+      const latestPublish = await fetchLatestPublishHistory(org.id);
       setPublishHistory(latestPublish);
       setShowPublishDiff(false);
       unlockCell();
@@ -1717,8 +1848,8 @@ function SchedulerContent() {
         event: 'schedule_published',
         payload: {},
       });
-    } catch (err: any) {
-      console.error('publish_schedule failed:', err?.message ?? err);
+    } catch (err: unknown) {
+      console.error('publish_schedule failed:', err);
       toast.error("Failed to publish schedule");
     } finally {
       setIsPublishing(false);
@@ -1730,7 +1861,7 @@ function SchedulerContent() {
     if (!org || !user) return;
     setCancelingMode(discardAll ? 'all' : 'mine');
     try {
-      await db.discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
+      await discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
 
       await refetchScheduleDataRef.current();
       unlockCell();
@@ -1747,7 +1878,7 @@ function SchedulerContent() {
         broadcastDraftChanged();
       }
       toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Failed to discard changes");
       console.error(err);
     } finally {
@@ -2019,6 +2150,7 @@ function SchedulerContent() {
               showDiffOverlay={showDiffOverlay}
               publishedLabelForKey={publishedLabelForKey}
               publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+              hasTimeChangesForKey={hasTimeChangesForKey}
               publishDiffForKey={publishDiffKindForKey}
               cellLocks={lockedCells}
               showAudit={showAudit}
@@ -2151,6 +2283,7 @@ function SchedulerContent() {
           publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
           draftKind={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.draftKind}
           auditInfo={canEditShifts ? auditInfo : undefined}
+          overlapWarnings={overnightOverlapWarnings}
           isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
           hasActiveRequest={shiftRequests.requests.some(
             r => r.requesterEmpId === editPanel.empId
@@ -2181,30 +2314,32 @@ function SchedulerContent() {
             const existing = shiftsRef.current[key];
             const version = existing?.version;
             try {
-              await db.upsertShift(editPanel.empId, dateKey, [], org?.id ?? null, null, null, version, absenceType.id);
-              setShifts((prev) => ({
-                ...prev,
-                [key]: {
+              // Wait for any pending write on this key to complete before writing
+              await (pendingShiftWrites.current.get(key) ?? Promise.resolve());
+              await upsertShift(editPanel.empId, dateKey, [], org?.id ?? null, null, null, version, absenceType.id);
+              setShifts((prev) => {
+                const updated = {
                   ...prev[key],
                   label: absenceType.label,
-                  shiftCodeIds: [],
+                  shiftCodeIds: [] as number[],
                   absenceTypeId: absenceType.id,
-                  isDraft: true,
-                  draftKind: (existing?.publishedShiftCodeIds?.length ? 'modified' : 'new') as DraftKind,
                   publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
                   publishedLabel: existing?.publishedLabel ?? '',
-                },
-              }));
-              broadcastDraftChanged({ shifts: { [key]: {
+                  publishedAbsenceTypeId: existing?.publishedAbsenceTypeId ?? null,
+                };
+                const dk = computeDraftKind(updated);
+                return { ...prev, [key]: { ...updated, isDraft: dk !== null, draftKind: dk } };
+              });
+              const broadcastEntry = {
                 label: absenceType.label,
-                shiftCodeIds: [],
+                shiftCodeIds: [] as number[],
                 absenceTypeId: absenceType.id,
-                isDraft: true,
-                draftKind: (existing?.publishedShiftCodeIds?.length || existing?.publishedAbsenceTypeId != null ? 'modified' : 'new') as DraftKind,
                 publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
                 publishedLabel: existing?.publishedLabel ?? '',
                 publishedAbsenceTypeId: existing?.publishedAbsenceTypeId ?? null,
-              } } });
+              };
+              const bdk = computeDraftKind(broadcastEntry);
+              broadcastDraftChanged({ shifts: { [key]: { ...broadcastEntry, isDraft: bdk !== null, draftKind: bdk } } });
             } catch (err) {
               toast.error("Failed to save absence");
               console.error(err);

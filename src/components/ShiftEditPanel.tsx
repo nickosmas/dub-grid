@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { formatDate, getCertName, formatRelativeTime } from "@/lib/utils";
+import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { EditModalState, ShiftCode, ShiftCategory, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind } from "@/types";
 import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
@@ -69,12 +69,17 @@ interface ShiftEditPanelProps {
   onAbsenceSelect?: (absenceType: AbsenceType) => void;
   /** Currently active absence type ID on this cell. */
   currentAbsenceTypeId?: number | null;
+  /** Cross-date overlap warnings to display (non-blocking). */
+  overlapWarnings?: string[];
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
 function parseTo12h(time24: string | null | undefined): { hour: string; minute: string; period: "AM" | "PM" } {
   if (!time24) return { hour: "", minute: "00", period: "AM" };
-  const [h, m] = time24.split(":").map(Number);
+  // Handle pipe-delimited multi-shift times — use first segment
+  const seg = time24.split("|")[0];
+  if (!seg) return { hour: "", minute: "00", period: "AM" };
+  const [h, m] = seg.split(":").map(Number);
   const period: "AM" | "PM" = h >= 12 ? "PM" : "AM";
   const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return { hour: String(hour12), minute: String(m).padStart(2, "0"), period };
@@ -92,6 +97,19 @@ function fmt12h(time24: string | null | undefined): string {
   if (!time24) return "";
   const { hour, minute, period } = parseTo12h(time24);
   return `${hour}:${minute} ${period}`;
+}
+
+/** Normalize a time string to HH:MM (DB TIME columns may include seconds). */
+function normalizeTime(t: string): string {
+  return t.slice(0, 5);
+}
+
+/** True if start→end is a valid time range. Overnight shifts (end ≤ start) are valid for scheduling. */
+function isValidTimeOrder(start: string, end: string): boolean {
+  const s = normalizeTime(start);
+  const e = normalizeTime(end);
+  // Only invalid if start and end are identical (zero-duration shift)
+  return s !== e;
 }
 
 // ── Color helper — darken a hex/rgb color for borders ─────────────────────
@@ -118,6 +136,11 @@ function parseMultiTimes(time: string | null | undefined, count: number): (strin
 function joinMultiTimes(times: (string | null)[]): string | null {
   if (times.every(t => !t)) return null;
   return times.map(t => t ?? '').join('|');
+}
+
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
 }
 
 // ── Per-pill custom time editor (custom dropdown views, immediate save) ───
@@ -304,17 +327,24 @@ function PillTimeEditor({
   const s = parseTo12h(localStart);
   const e = parseTo12h(localEnd);
 
-  // Validation
-  const hasTimeError = !!(localStart && localEnd && localStart >= localEnd);
-  const isStartTooEarly = !!(minTime && localStart && localStart < minTime);
-  const isEndTooLate = !!(maxTime && localEnd && localEnd > maxTime);
-  const hasBoundsError = isStartTooEarly || isEndTooLate;
+  // Validation — normalize all times before comparison (DB TIME columns include seconds)
+  const nStart = localStart ? normalizeTime(localStart) : null;
+  const nEnd = localEnd ? normalizeTime(localEnd) : null;
+  const nMin = minTime ? normalizeTime(minTime) : null;
+  const nMax = maxTime ? normalizeTime(maxTime) : null;
+
+  const hasTimeError = !!(nStart && nEnd && !isValidTimeOrder(nStart, nEnd));
+  const isOvernightBounds = !!(nMin && nMax && nMax < nMin);
+  const isStartTooEarly = !!(nMin && nStart && nStart < nMin);
+  const isEndTooLate = !!(nMax && nEnd && !isOvernightBounds && nEnd > nMax);
 
   // Auto-save: when a dropdown changes and the result is valid, persist immediately
   function tryAutoSave(newStart: string | null, newEnd: string | null) {
-    const orderOk = !(newStart && newEnd && newStart >= newEnd);
-    const startOk = !(minTime && newStart && newStart < minTime);
-    const endOk = !(maxTime && newEnd && newEnd > maxTime);
+    const ns = newStart ? normalizeTime(newStart) : null;
+    const ne = newEnd ? normalizeTime(newEnd) : null;
+    const orderOk = !(ns && ne && !isValidTimeOrder(ns, ne));
+    const startOk = !(nMin && ns && ns < nMin);
+    const endOk = !(nMax && ne && !isOvernightBounds && ne > nMax);
     if (orderOk && startOk && endOk) {
       onSave(newStart, newEnd);
     }
@@ -347,7 +377,7 @@ function PillTimeEditor({
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
         Custom time
-        {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}</span>}
+        {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}{calcTimeDuration(defaultStart, defaultEnd) ? ` (${calcTimeDuration(defaultStart, defaultEnd)})` : ""}</span>}
       </button>
     );
   }
@@ -380,10 +410,17 @@ function PillTimeEditor({
         <TimeDropdown value={e.period} options={periodOptions} onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")} width={54} />
       </div>
 
+      {/* Duration display */}
+      {calcTimeDuration(localStart, localEnd) && !hasTimeError && (
+        <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-muted)", marginTop: 8, fontWeight: 600 }}>
+          Duration: <span style={{ color: "var(--color-text-secondary)" }}>{calcTimeDuration(localStart, localEnd)}</span>
+        </div>
+      )}
+
       {/* Validation errors */}
       {hasTimeError && (
         <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
-          Start time must be before end time
+          Start and end time cannot be the same
         </div>
       )}
       {isStartTooEarly && minTime && (
@@ -432,6 +469,7 @@ export default function ShiftEditPanel({
   absenceTypes = [],
   onAbsenceSelect,
   currentAbsenceTypeId,
+  overlapWarnings = [],
 }: ShiftEditPanelProps) {
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
@@ -475,6 +513,126 @@ export default function ShiftEditPanel({
     return false;
   })();
   const hasEdits = hasShiftEdit || hasNoteEdit || hasTimeEdit;
+
+  // Build concise change descriptions for the footer summary
+  function describeShiftChange(): string | null {
+    if (!hasShiftEdit) return null;
+
+    // Absence type changed — no per-pill detail needed
+    if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId) {
+      const resolveLabel = (shift: string | null, absId: number | null): string | null => {
+        if (absId != null) {
+          const at = absenceTypes.find(a => a.id === absId);
+          return at ? `${at.name} (${at.label})` : null;
+        }
+        return shift && shift !== "OFF" ? shift : null;
+      };
+      const from = resolveLabel(initialShift, initialAbsenceTypeId);
+      const to = resolveLabel(currentShift, currentAbsenceTypeId ?? null);
+      if (!from && to) return `Shift: added ${to}`;
+      if (from && !to) return `Shift: ${from} removed`;
+      if (from && to) return `Shift: ${from} \u2192 ${to}`;
+      return null;
+    }
+
+    const codeLabel = (id: number): string =>
+      shiftCodes.find(s => s.id === id)?.label ?? '?';
+
+    const initIds = initialShiftCodeIds;
+    const curIds = currentShiftCodeIds;
+
+    // Single pill
+    if (initIds.length <= 1 && curIds.length <= 1) {
+      const from = initIds[0] != null ? codeLabel(initIds[0]) : null;
+      const to = curIds[0] != null ? codeLabel(curIds[0]) : null;
+      if (!from && to) return `Shift: added ${to}`;
+      if (from && !to) return `Shift: ${from} removed`;
+      if (from && to && initIds[0] !== curIds[0]) return `Shift: ${from} \u2192 ${to}`;
+      return null;
+    }
+
+    // Multi-pill: per-pill detail
+    const maxLen = Math.max(initIds.length, curIds.length);
+    const parts: string[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const fromId = initIds[i];
+      const toId = curIds[i];
+      const from = fromId != null ? codeLabel(fromId) : null;
+      const to = toId != null ? codeLabel(toId) : null;
+      if (fromId === toId) continue;
+      if (!from && to) parts.push(`added ${to}`);
+      else if (from && !to) parts.push(`removed ${from}`);
+      else if (from && to) parts.push(`${from} \u2192 ${to}`);
+    }
+    return parts.length > 0 ? `Shift: ${parts.join(", ")}` : null;
+  }
+
+  function describeTimeChange(): string | null {
+    if (!hasTimeEdit) return null;
+
+    const pillCount = currentShiftCodeIds.length;
+    const codeLabel = (id: number): string =>
+      shiftCodes.find(s => s.id === id)?.label ?? '?';
+
+    // Single pill
+    if (pillCount <= 1) {
+      const hadTime = initialCustomStartTime != null || initialCustomEndTime != null;
+      const hasTime = (customStartTime ?? null) != null || (customEndTime ?? null) != null;
+      if (!hadTime && hasTime) {
+        return `Time: added ${fmt12h(customStartTime)} \u2013 ${fmt12h(customEndTime)}`;
+      }
+      if (hadTime && !hasTime) return "Time: removed custom time";
+      return `Time: ${fmt12h(initialCustomStartTime)} \u2013 ${fmt12h(initialCustomEndTime)} \u2192 ${fmt12h(customStartTime)} \u2013 ${fmt12h(customEndTime)}`;
+    }
+
+    // Multi-pill: per-pill detail
+    const maxPills = Math.max(initialShiftCodeIds.length, pillCount);
+    const initStarts = parseMultiTimes(initialCustomStartTime, maxPills);
+    const initEnds = parseMultiTimes(initialCustomEndTime, maxPills);
+    const curStarts = parseMultiTimes(customStartTime, maxPills);
+    const curEnds = parseMultiTimes(customEndTime, maxPills);
+
+    const parts: string[] = [];
+    for (let i = 0; i < pillCount; i++) {
+      if (initStarts[i] === curStarts[i] && initEnds[i] === curEnds[i]) continue;
+      const label = currentShiftCodeIds[i] != null ? codeLabel(currentShiftCodeIds[i]) : '?';
+      const hadPillTime = initStarts[i] != null || initEnds[i] != null;
+      const hasPillTime = curStarts[i] != null || curEnds[i] != null;
+      if (!hadPillTime && hasPillTime) {
+        parts.push(`${label}: added ${fmt12h(curStarts[i])} \u2013 ${fmt12h(curEnds[i])}`);
+      } else if (hadPillTime && !hasPillTime) {
+        parts.push(`${label}: removed custom time`);
+      } else {
+        parts.push(`${label}: ${fmt12h(initStarts[i])} \u2013 ${fmt12h(initEnds[i])} \u2192 ${fmt12h(curStarts[i])} \u2013 ${fmt12h(curEnds[i])}`);
+      }
+    }
+    return parts.length > 0 ? `Time: ${parts.join("; ")}` : null;
+  }
+
+  function describeNoteChange(): string | null {
+    if (!hasNoteEdit || !getActiveIndicatorIds) return null;
+    const tokens: string[] = [];
+    for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
+      const curTypes = getActiveIndicatorIds(Number(faIdStr));
+      for (const id of curTypes) {
+        if (!initTypes.includes(id)) {
+          const name = indicatorTypes.find(ind => ind.id === id)?.name ?? "?";
+          tokens.push(`+${name}`);
+        }
+      }
+      for (const id of initTypes) {
+        if (!curTypes.includes(id)) {
+          const name = indicatorTypes.find(ind => ind.id === id)?.name ?? "?";
+          tokens.push(`\u2212${name}`);
+        }
+      }
+    }
+    return tokens.length > 0 ? `Notes: ${tokens.join(", ")}` : null;
+  }
+
+  const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
+  const timeSummary = hasTimeEdit ? describeTimeChange() : null;
+  const noteSummary = hasNoteEdit ? describeNoteChange() : null;
 
   function handleUndo() {
     // Revert absence type if it changed
@@ -543,6 +701,30 @@ export default function ShiftEditPanel({
       maxTime: windowEnd ? addOneHour(windowEnd) : null,
     };
   }
+
+  // ── Double-shift time-sequential filtering ──────────────────────────────
+  const isAddingSecondShift = showPicker && currentShiftCodeIds.length === 1;
+  const firstShiftId = isAddingSecondShift ? currentShiftCodeIds[0] : null;
+
+  const firstShiftEndTime: string | null = (() => {
+    if (!isAddingSecondShift) return null;
+    const firstCode = shiftCodes.find(sc => sc.id === firstShiftId);
+    return resolveDefaultTimes(firstCode).end;
+  })();
+
+  const pickerShiftCodes = isAddingSecondShift && firstShiftEndTime
+    ? shiftCodes.filter(sc => {
+        // Never show the already-selected first shift
+        if (sc.id === firstShiftId) return false;
+        if (sc.isGeneral) return false;
+        const { start } = resolveDefaultTimes(sc);
+        if (!start) return false;
+        // Candidate must start at or after first shift ends (prevents overlap + same-time)
+        return timeToMinutes(start) >= timeToMinutes(firstShiftEndTime);
+      })
+    : shiftCodes;
+
+  const pickerAbsenceTypes = isAddingSecondShift ? [] : absenceTypes;
 
   // When shift is cleared externally, return to picker
   useEffect(() => {
@@ -748,9 +930,10 @@ export default function ShiftEditPanel({
           const shiftFaId = shiftCode?.focusAreaId;
           const shiftWingId = shiftFaId ?? activeTab;
           const pillNoteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(shiftWingId) : [];
-          const isNewPill = draftKind === 'new'
-            || (publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
-          const isModifiedPill = draftKind === 'modified' && !isNewPill;
+          const isNewPill = (draftKind === 'new' && !initialShiftCodeIds.includes(currentShiftCodeIds[i]))
+            || (draftKind !== 'new' && publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
+          const isModifiedPill = draftKind === 'modified' && !isNewPill
+            && !(publishedShiftCodeIds.length > 0 && publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
           const faName = shiftCode?.focusAreaId != null
             ? focusAreas.find(fa => fa.id === shiftCode.focusAreaId)?.name
             : undefined;
@@ -863,6 +1046,9 @@ export default function ShiftEditPanel({
                     <span style={{ fontWeight: 500 }}>
                       {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}
                     </span>
+                    {calcTimeDuration(defaultStart, defaultEnd) && (
+                      <span style={{ opacity: 0.7 }}>· {calcTimeDuration(defaultStart, defaultEnd)}</span>
+                    )}
                   </div>
                 )}
                 {/* Per-pill custom time editor */}
@@ -1316,8 +1502,11 @@ export default function ShiftEditPanel({
                 </div>
               )}
 
-              {/* Add another shift — hidden when at max (2) or when absence type is active */}
-              {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (
+              {/* Add another shift — hidden when at max (2), absence type, or first shift has no resolvable end time */}
+              {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (() => {
+                const firstCode = shiftCodes.find(sc => sc.id === currentShiftCodeIds[0]);
+                return firstCode ? resolveDefaultTimes(firstCode).end != null : true;
+              })() && (
                 <div style={{ marginTop: 8 }}>
                   <button
                     onClick={() => setShowPicker(true)}
@@ -1444,6 +1633,35 @@ export default function ShiftEditPanel({
                   A request is already active for this shift
                 </div>
               )}
+              {overlapWarnings.length > 0 && (
+                <div style={{
+                  marginTop: 16,
+                  padding: "10px 12px",
+                  background: "var(--color-warning-bg)",
+                  border: "1px solid var(--color-warning-border)",
+                  borderRadius: 8,
+                }}>
+                  <div style={{
+                    fontSize: "var(--dg-fs-badge)",
+                    fontWeight: 700,
+                    color: "var(--color-warning-text)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 4,
+                  }}>
+                    Overlap Warning
+                  </div>
+                  {overlapWarnings.map((w, i) => (
+                    <div key={i} style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--color-warning-text)",
+                      marginTop: i > 0 ? 4 : 0,
+                    }}>
+                      {w}
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             // ── Picker mode ───────────────────────────────────────────────────
@@ -1480,26 +1698,45 @@ export default function ShiftEditPanel({
               )}
 
               {/* Shift Picker Component */}
-              <ShiftPicker
-                shiftCodes={shiftCodes}
-                absenceTypes={absenceTypes}
-                focusAreas={focusAreas}
-                currentShiftCodeIds={currentShiftCodeIds}
-                currentAbsenceTypeId={currentAbsenceTypeId}
-                onSelect={(label, ids) => {
-                  onSelect(label, ids, seriesId ? seriesScope : undefined);
-                  if (label !== "OFF") setShowPicker(false);
-                }}
-                onAbsenceSelect={(at) => {
-                  onAbsenceSelect?.(at);
-                  setShowPicker(false);
-                }}
-                empFocusAreaIds={modal.empFocusAreaIds}
-                empCertificationId={modal.empCertificationId}
-                initialTab={modal.activeFocusAreaId}
-                multiSelect={true}
-                closeOnSelect={false}
-              />
+              {isAddingSecondShift && pickerShiftCodes.length === 0 ? (
+                <div
+                  style={{
+                    padding: "24px 16px",
+                    textAlign: "center",
+                    color: "var(--color-text-subtle)",
+                    fontSize: "var(--dg-fs-label)",
+                  }}
+                >
+                  No shifts start at or after {fmt12h(firstShiftEndTime)}.
+                </div>
+              ) : (
+                <ShiftPicker
+                  shiftCodes={pickerShiftCodes}
+                  absenceTypes={pickerAbsenceTypes}
+                  focusAreas={focusAreas}
+                  currentShiftCodeIds={currentShiftCodeIds}
+                  currentAbsenceTypeId={currentAbsenceTypeId}
+                  onSelect={(_label, ids) => {
+                    // Reconstruct label from full shiftCodes — the picker may have
+                    // a filtered list that can't resolve the first shift's label.
+                    const fullLabel = ids
+                      .map(id => shiftCodes.find(sc => sc.id === id)?.label)
+                      .filter((l): l is string => l != null && l !== "OFF")
+                      .join("/") || _label;
+                    onSelect(fullLabel, ids, seriesId ? seriesScope : undefined);
+                    if (fullLabel !== "OFF") setShowPicker(false);
+                  }}
+                  onAbsenceSelect={(at) => {
+                    onAbsenceSelect?.(at);
+                    setShowPicker(false);
+                  }}
+                  empFocusAreaIds={modal.empFocusAreaIds}
+                  empCertificationId={modal.empCertificationId}
+                  initialTab={modal.activeFocusAreaId}
+                  multiSelect={true}
+                  closeOnSelect={false}
+                />
+              )}
             </>
           )}
         </div>
@@ -1512,10 +1749,19 @@ export default function ShiftEditPanel({
               padding: "12px 20px",
               borderTop: "1px solid var(--color-border)",
               display: "flex",
-              gap: 8,
+              flexDirection: "column",
+              gap: 6,
               background: "var(--color-surface)",
             }}
           >
+            {(shiftSummary || timeSummary || noteSummary) && (
+              <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+                {shiftSummary && <div>{shiftSummary}</div>}
+                {timeSummary && <div>{timeSummary}</div>}
+                {noteSummary && <div>{noteSummary}</div>}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={handleUndo}
               className="dg-btn dg-btn-ghost"
@@ -1535,6 +1781,7 @@ export default function ShiftEditPanel({
             >
               Confirm
             </button>
+            </div>
           </div>
         )}
       </div>

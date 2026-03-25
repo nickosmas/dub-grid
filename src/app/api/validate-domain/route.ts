@@ -1,8 +1,29 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  // ── Rate limit by IP ──────────────────────────────────────────────────
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, ip);
+  if (misconfigured) {
+    return NextResponse.json(
+      { valid: false, error: "Service temporarily unavailable" },
+      { status: 503 },
+    );
+  }
+  if (limited) {
+    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+    return NextResponse.json(
+      { valid: false, error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfter) },
+      },
+    );
+  }
+
   const slug = req.nextUrl.searchParams.get("slug")?.trim().toLowerCase();
 
   if (!slug || RESERVED_SUBDOMAINS.has(slug) || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug)) {

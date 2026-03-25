@@ -6,7 +6,9 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
 
+import Link from "next/link";
 import { parseHost } from "@/lib/subdomain";
+import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -67,23 +69,23 @@ function PageShell({
         }}
       >
         <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-          <a
+          <Link
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
           >
             Privacy Policy
-          </a>
+          </Link>
           <span style={{ margin: "0 4px" }}>·</span>
-          <a
+          <Link
             href="/terms"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
           >
             Terms of Service
-          </a>
+          </Link>
         </div>
         {!footerCenteredOnly && (
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -408,8 +410,8 @@ function GridmasterLogin() {
         setLoading(false);
         toast.error("Navigation timed out. Please try refreshing the page.");
       }, 8000);
-    } catch (err: any) {
-      const msg = err.message?.toLowerCase() ?? "";
+    } catch (err: unknown) {
+      const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
         toast.error("Invalid email or password.");
       } else if (msg.includes("hook") || msg.includes("unexpected") || msg.includes("hook_payload")) {
@@ -683,8 +685,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         setLoading(false);
         toast.error("Navigation timed out. Please try refreshing the page.");
       }, 8000);
-    } catch (err: any) {
-      const msg = err.message?.toLowerCase() ?? "";
+    } catch (err: unknown) {
+      const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
         toast.error("Invalid email or password. Please try again.");
       } else if (msg.includes("email not confirmed")) {

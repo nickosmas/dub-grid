@@ -769,9 +769,14 @@ BEGIN
   RETURNING id INTO v_history_id;
 
   -- Promote drafts → published (shift codes, absence types, and custom times)
+  -- Use CASE for shift codes/absence: preserve published values when draft has no code change
+  -- (e.g. when only custom times or notes were modified).
   UPDATE public.shifts
-  SET published_shift_code_ids = draft_shift_code_ids,
-      published_absence_type_id = draft_absence_type_id,
+  SET published_shift_code_ids = CASE
+        WHEN array_length(draft_shift_code_ids, 1) IS NOT NULL THEN draft_shift_code_ids
+        ELSE published_shift_code_ids
+      END,
+      published_absence_type_id = COALESCE(draft_absence_type_id, published_absence_type_id),
       published_custom_start_time = COALESCE(draft_custom_start_time, published_custom_start_time),
       published_custom_end_time = COALESCE(draft_custom_end_time, published_custom_end_time),
       draft_shift_code_ids = '{}',
@@ -795,7 +800,7 @@ BEGIN
     AND date >= p_start_date AND date <= p_end_date
     AND draft_is_delete = TRUE;
 
-  -- Clean up empty rows (no shift codes, no absence types, not a draft-delete)
+  -- Clean up empty rows (no shift codes, no absence types, no custom times, not a draft-delete)
   DELETE FROM public.shifts
   WHERE org_id = p_org_id
     AND date >= p_start_date AND date <= p_end_date
@@ -803,6 +808,8 @@ BEGIN
     AND (draft_shift_code_ids IS NULL OR array_length(draft_shift_code_ids, 1) IS NULL)
     AND published_absence_type_id IS NULL
     AND draft_absence_type_id IS NULL
+    AND published_custom_start_time IS NULL
+    AND published_custom_end_time IS NULL
     AND draft_is_delete = FALSE;
 
   -- Notes: draft → published
@@ -985,16 +992,19 @@ BEGIN
   -- Iterate dates using pure DATE arithmetic (DST-safe)
   v_current := p_start_date;
   WHILE v_current <= p_end_date LOOP
+    -- ── Shift-code recurring templates ──
     -- For each active recurring shift template matching this day-of-week,
     -- pick the most recent effectiveFrom per employee (DISTINCT ON + ORDER BY DESC)
     FOR r IN
       SELECT DISTINCT ON (rs.emp_id)
-        rs.emp_id, rs.shift_code_id, sc.label AS shift_label
+        rs.emp_id, rs.shift_code_id, sc.label AS shift_label,
+        NULL::BIGINT AS absence_type_id, NULL::TEXT AS absence_label
       FROM public.recurring_shifts rs
       JOIN public.shift_codes sc
         ON sc.id = rs.shift_code_id AND sc.archived_at IS NULL
       WHERE rs.org_id = p_org_id
         AND rs.archived_at IS NULL
+        AND rs.shift_code_id IS NOT NULL
         AND rs.day_of_week = EXTRACT(DOW FROM v_current)::INTEGER
         AND rs.effective_from <= v_current
         AND (rs.effective_until IS NULL OR rs.effective_until >= v_current)
@@ -1021,6 +1031,45 @@ BEGIN
           'date', to_char(v_current, 'YYYY-MM-DD'),
           'label', r.shift_label,
           'shiftCodeId', r.shift_code_id
+        ));
+      END IF;
+    END LOOP;
+
+    -- ── Absence-type recurring templates ──
+    FOR r IN
+      SELECT DISTINCT ON (rs.emp_id)
+        rs.emp_id, rs.absence_type_id, at.label AS absence_label
+      FROM public.recurring_shifts rs
+      JOIN public.absence_types at
+        ON at.id = rs.absence_type_id AND at.archived_at IS NULL
+      WHERE rs.org_id = p_org_id
+        AND rs.archived_at IS NULL
+        AND rs.absence_type_id IS NOT NULL
+        AND rs.day_of_week = EXTRACT(DOW FROM v_current)::INTEGER
+        AND rs.effective_from <= v_current
+        AND (rs.effective_until IS NULL OR rs.effective_until >= v_current)
+        AND NOT EXISTS (
+          SELECT 1 FROM public.shifts s
+          WHERE s.emp_id = rs.emp_id AND s.date = v_current
+        )
+      ORDER BY rs.emp_id, rs.effective_from DESC
+    LOOP
+      INSERT INTO public.shifts (
+        emp_id, date, org_id, draft_shift_code_ids, draft_absence_type_id,
+        draft_is_delete, from_recurring, created_by, updated_by
+      ) VALUES (
+        r.emp_id, v_current, p_org_id, '{}', r.absence_type_id,
+        false, true, auth.uid(), auth.uid()
+      )
+      ON CONFLICT (emp_id, date) DO NOTHING;
+
+      IF FOUND THEN
+        v_inserted := v_inserted + 1;
+        v_results := v_results || jsonb_build_array(jsonb_build_object(
+          'empId', r.emp_id,
+          'date', to_char(v_current, 'YYYY-MM-DD'),
+          'label', r.absence_label,
+          'absenceTypeId', r.absence_type_id
         ));
       END IF;
     END LOOP;
@@ -1510,9 +1559,10 @@ GRANT EXECUTE ON FUNCTION public.get_org_users(UUID) TO authenticated;
 
 
 CREATE OR REPLACE FUNCTION public.get_audit_log(
-  p_org_id  UUID DEFAULT NULL,
-  p_limit   INTEGER DEFAULT 50,
-  p_offset  INTEGER DEFAULT 0
+  p_org_id           UUID DEFAULT NULL,
+  p_limit            INTEGER DEFAULT 50,
+  p_offset           INTEGER DEFAULT 0,
+  p_target_user_id   UUID DEFAULT NULL
 )
 RETURNS TABLE (
   id               UUID,
@@ -1542,12 +1592,13 @@ BEGIN
   LEFT JOIN public.profiles tp ON tp.id = rcl.target_user_id
   LEFT JOIN public.organizations o ON o.id = tp.org_id
   WHERE (p_org_id IS NULL OR tp.org_id = p_org_id)
+    AND (p_target_user_id IS NULL OR rcl.target_user_id = p_target_user_id)
   ORDER BY rcl.created_at DESC
   LIMIT p_limit OFFSET p_offset;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_audit_log(UUID, INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_audit_log(UUID, INTEGER, INTEGER, UUID) TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

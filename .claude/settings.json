@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python3:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(npm audit:*)",
+      "Bash(grep -rn \"fetch\\(\" /Users/nickosmas/Desktop/Dev/dub-grid/src/hooks/*.ts)"
     ]
   }
 }

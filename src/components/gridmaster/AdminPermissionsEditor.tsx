@@ -124,8 +124,8 @@ export default function AdminPermissionsEditor({
       toast.success("Permissions updated");
       onSaved(perms);
       onClose();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update permissions");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to update permissions");
     } finally {
       setSaving(false);
     }

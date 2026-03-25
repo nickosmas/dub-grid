@@ -247,7 +247,11 @@ export interface RecurringShift {
   orgId: string;
   /** 0 = Sunday, 1 = Monday … 6 = Saturday */
   dayOfWeek: number;
-  shiftCodeId: number;
+  /** FK to shift_codes. Null when this is an absence-type recurring shift. */
+  shiftCodeId: number | null;
+  /** FK to absence_types. Null when this is a shift-code recurring shift. */
+  absenceTypeId: number | null;
+  /** Resolved display label from either shiftCodeId or absenceTypeId. */
   shiftLabel: string;
   effectiveFrom: string;
   effectiveUntil: string | null;
@@ -418,7 +422,8 @@ export interface Invitation {
   invitedBy: string | null;
   email: string;
   roleToAssign: AssignableOrganizationRole;
-  token: string;
+  /** Only present when creating an invitation — never returned by list queries. */
+  token?: string;
   expiresAt: string;
   acceptedAt: string | null;
   revokedAt: string | null;

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import * as db from "@/lib/db";
+import { fetchShiftRequests, createShiftRequest, claimShiftRequest, respondToShiftRequest, resolveShiftRequest, cancelShiftRequest } from "@/lib/db";
 import { toast } from "sonner";
 import type {
   ShiftRequest,
@@ -69,6 +69,15 @@ export function useShiftRequests(
   const orgIdRef = useRef(orgId);
   orgIdRef.current = orgId;
 
+  // Stabilize the Map reference: serialize to a string key so useCallback
+  // doesn't get a new identity every render (Map is compared by reference).
+  const shiftCodeMapKey = useMemo(
+    () => JSON.stringify([...shiftCodeMap.entries()].sort((a, b) => a[0] - b[0])),
+    [shiftCodeMap],
+  );
+  const shiftCodeMapRef = useRef(shiftCodeMap);
+  shiftCodeMapRef.current = shiftCodeMap;
+
   const fetchRequests = useCallback(async () => {
     if (!orgId) {
       setRequests([]);
@@ -77,7 +86,7 @@ export function useShiftRequests(
     }
     try {
       setError(null);
-      const data = await db.fetchShiftRequests(orgId, shiftCodeMap, {
+      const data = await fetchShiftRequests(orgId, shiftCodeMapRef.current, {
         status: [
           "open",
           "pending_approval",
@@ -95,16 +104,23 @@ export function useShiftRequests(
     } finally {
       setLoading(false);
     }
-  }, [orgId, shiftCodeMap]);
+  }, [orgId, shiftCodeMapKey]);
 
   // Initial fetch
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
 
-  // Realtime subscription
+  // Realtime subscription — keyed on orgId only. Uses fetchRequestsRef
+  // so the channel callback always has the latest fetch function without
+  // causing channel teardown/recreate on every shiftCodeMap change.
+  const fetchRequestsRef = useRef(fetchRequests);
+  fetchRequestsRef.current = fetchRequests;
+
   useEffect(() => {
     if (!orgId) return;
+
+    let hadError = false;
 
     const channel = supabase
       .channel(`shift_requests_${orgId}`)
@@ -117,15 +133,23 @@ export function useShiftRequests(
           filter: `org_id=eq.${orgId}`,
         },
         () => {
-          fetchRequests();
+          fetchRequestsRef.current();
         }
       )
-      .subscribe();
+      .subscribe((status: string, err?: Error) => {
+        if (status === 'SUBSCRIBED' && hadError) {
+          hadError = false;
+          fetchRequestsRef.current();
+        } else if (status === 'CHANNEL_ERROR') {
+          hadError = true;
+          console.warn('[Realtime] shift_requests channel error (auto-retrying):', err ?? 'unknown');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [orgId, fetchRequests]);
+  }, [orgId]);
 
   // Filter expired at read time: must be a non-terminal status AND not past expiry
   const now = new Date().toISOString();
@@ -173,7 +197,7 @@ export function useShiftRequests(
     ): Promise<string | null> => {
       if (!orgId) return null;
       try {
-        const id = await db.createShiftRequest(
+        const id = await createShiftRequest(
           orgId,
           type,
           requesterEmpId,
@@ -198,7 +222,7 @@ export function useShiftRequests(
   const claim = useCallback(
     async (requestId: string, claimerEmpId: string): Promise<boolean> => {
       try {
-        await db.claimShiftRequest(requestId, claimerEmpId);
+        await claimShiftRequest(requestId, claimerEmpId);
         toast.success("Shift claimed — awaiting admin approval");
         return true;
       } catch (err: unknown) {
@@ -216,7 +240,7 @@ export function useShiftRequests(
       accept: boolean
     ): Promise<boolean> => {
       try {
-        await db.respondToShiftRequest(requestId, empId, accept);
+        await respondToShiftRequest(requestId, empId, accept);
         toast.success(
           accept
             ? "Swap accepted — awaiting admin approval"
@@ -238,7 +262,7 @@ export function useShiftRequests(
       note?: string
     ): Promise<boolean> => {
       try {
-        await db.resolveShiftRequest(requestId, approved, note);
+        await resolveShiftRequest(requestId, approved, note);
         toast.success(approved ? "Request approved" : "Request rejected");
         return true;
       } catch (err: unknown) {
@@ -252,7 +276,7 @@ export function useShiftRequests(
   const cancel = useCallback(
     async (requestId: string, empId: string): Promise<boolean> => {
       try {
-        await db.cancelShiftRequest(requestId, empId);
+        await cancelShiftRequest(requestId, empId);
         toast.success("Request cancelled");
         return true;
       } catch (err: unknown) {

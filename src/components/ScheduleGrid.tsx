@@ -26,6 +26,14 @@ function fmt12hShort(time24: string): string {
   return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
 
+/** Returns true if the given HH:MM times represent an overnight shift (crosses midnight).
+ *  An end time of "00:00" means midnight (end of day), not start of next day. */
+function isOvernightTimes(start: string | null | undefined, end: string | null | undefined): boolean {
+  if (!start || !end) return false;
+  const effectiveEnd = end === "00:00" ? "24:00" : end;
+  return start > effectiveEnd;
+}
+
 function getDraftBorder(draftKind: DraftKind, fallback: string): string {
   if (!draftKind) return fallback;
   return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
@@ -63,6 +71,8 @@ interface ScheduleGridProps {
   showDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  /** Returns true if the cell's custom times differ from published times. */
+  hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
   cellLocks?: Map<string, { userName: string }>;
   /** When true, show who created each shift below the cell */
@@ -110,6 +120,7 @@ interface SectionBlockProps {
   showDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
@@ -149,6 +160,7 @@ const SectionBlock = memo(function SectionBlock({
   showDiffOverlay,
   publishedLabelForKey,
   publishedShiftCodeIdsForKey,
+  hasTimeChangesForKey,
   publishDiffForKey,
   certifications,
   orgRoles,
@@ -179,6 +191,12 @@ const SectionBlock = memo(function SectionBlock({
     for (const sc of shiftCodes) map.set(sc.id, sc);
     return map;
   }, [shiftCodes]);
+
+  const categoryById = useMemo(() => {
+    const map = new Map<number, ShiftCategory>();
+    for (const cat of shiftCategories) map.set(cat.id, cat);
+    return map;
+  }, [shiftCategories]);
 
   const getStyleByIdOrLabel = useMemo(
     () => (label: string, codeId?: number): ShiftCode => {
@@ -514,6 +532,7 @@ const SectionBlock = memo(function SectionBlock({
                   const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
                   const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
                   const publishedCodeIds = publishedShiftCodeIdsForKey?.(emp.id, date) ?? [];
+                  const cellHasTimeEdits = hasTimeChangesForKey?.(emp.id, date) ?? false;
                   const noteTypes = activeIndicatorIdsForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                   const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
                   const cellLock = cellLocks?.get(`${emp.id}_${dateKey}`);
@@ -648,6 +667,11 @@ const SectionBlock = memo(function SectionBlock({
                               ? { ...getStyleByIdOrLabel(label, cellCodeIds[0]), color: cellAbsenceType!.color, text: cellAbsenceType!.text }
                               : getStyleByIdOrLabel(label, cellCodeIds[0]);
                             const codeEntry0 = cellCodeIds[0] != null ? shiftCodeById.get(cellCodeIds[0]) : undefined;
+                            const cat0 = codeEntry0?.categoryId != null ? categoryById.get(codeEntry0.categoryId) : undefined;
+                            const isOvernight = !isAbsence && isOvernightTimes(
+                              customTimes?.start ?? codeEntry0?.defaultStartTime ?? cat0?.startTime,
+                              customTimes?.end ?? codeEntry0?.defaultEndTime ?? cat0?.endTime,
+                            );
                             const isCross = !isAbsence && label !== "X" && codeEntry0?.focusAreaId != null
                               && sectionFocusArea != null
                               && codeEntry0.focusAreaId !== sectionFocusArea.id;
@@ -713,6 +737,9 @@ const SectionBlock = memo(function SectionBlock({
                                  )}
                                  <span style={{ fontSize: "var(--dg-fs-title)", fontWeight: 800, lineHeight: 1 }}>
                                    {label}
+                                   {!customTimes && isOvernight && (
+                                     <sup style={{ fontSize: "0.5em", fontWeight: 700, opacity: 0.5, marginLeft: 1 }}>+1</sup>
+                                   )}
                                  </span>
                                  {customTimes && (
                                    <span style={{
@@ -724,9 +751,10 @@ const SectionBlock = memo(function SectionBlock({
                                      letterSpacing: "0.02em",
                                    }}>
                                      {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
+                                     {isOvernight && <sup style={{ fontSize: "0.7em", fontWeight: 700, marginLeft: 1, opacity: 1 }}>+1</sup>}
                                    </span>
                                  )}
-                                 {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
+                                 {showDiffOverlay && draftKind === 'modified' && publishedLabel && shiftCode !== publishedLabel && (
                                    <span style={{
                                      position: "absolute",
                                      bottom: 2,
@@ -838,23 +866,29 @@ const SectionBlock = memo(function SectionBlock({
                           // Multi-pill: render each shift as a separate vertical pill
                           const hasMultiPillLabel = (showDiffOverlay && draftKind && draftKind !== 'deleted') || publishBadge;
                           const hasBottomLabel = hasMultiPillLabel || auditName;
+                          // When cell is 'modified' but all codes match published, it's a metadata-only
+                          // change (custom times, notes, etc.) — all pills should show dashed borders.
+                          const isMetadataOnlyChange = draftKind === 'modified'
+                            && publishedCodeIds.length > 0
+                            && cellCodeIds.length === publishedCodeIds.length
+                            && cellCodeIds.every((id, i) => id === publishedCodeIds[i]);
                           return (
                             <>
                             <div
                               style={{
                                 position: "absolute",
                                 top: "3px",
-                                right: "4px",
+                                right: "3px",
                                 bottom: (hasMultiPillLabel && auditName) ? "28px" : hasBottomLabel ? "16px" : "3px",
-                                left: "4px",
+                                left: "3px",
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: 2,
+                                gap: 1,
                                 alignItems: "stretch",
                                 opacity: draftKind === 'deleted' ? 0.5 : 1,
                               }}
                             >
-                              <div style={{ display: "flex", flexDirection: "row", gap: 2, flex: 1, minHeight: 0, alignItems: "stretch" }}>
+                              <div style={{ display: "flex", flexDirection: "row", gap: 1, flex: 1, minHeight: 0, alignItems: "stretch" }}>
                               {labels.map((label, li) => {
                                 const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
                                 const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
@@ -868,13 +902,19 @@ const SectionBlock = memo(function SectionBlock({
                                 const isNewPill = draftKind && publishedCodeIds.length > 0
                                   && cellCodeIds[li] != null
                                   && !publishedCodeIds.includes(cellCodeIds[li]);
-                                const pillBorder = isNewPill
+                                const isExistingPillEdited = draftKind === 'modified'
+                                  && publishedCodeIds.includes(cellCodeIds[li])
+                                  && cellHasTimeEdits;
+                                const pillBorder = (isNewPill || draftKind === 'new' || isMetadataOnlyChange || isExistingPillEdited)
                                   ? `2px dashed ${DRAFT_BORDER_COLORS[draftKind!]}`
-                                  : draftKind === 'new'
-                                    ? `2px dashed ${DRAFT_BORDER_COLORS.new}`
-                                    : `1px solid ${borderColor(style.text)}`;
+                                  : `1px solid ${borderColor(style.text)}`;
                                 const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
                                 const hasTime = pillTime && (pillTime.start || pillTime.end);
+                                const catLi = codeEntryLi?.categoryId != null ? categoryById.get(codeEntryLi.categoryId) : undefined;
+                                const isPillOvernight = isOvernightTimes(
+                                  pillTime?.start ?? codeEntryLi?.defaultStartTime ?? catLi?.startTime,
+                                  pillTime?.end ?? codeEntryLi?.defaultEndTime ?? catLi?.endTime,
+                                );
 
                                 return (
                                   <div
@@ -885,7 +925,7 @@ const SectionBlock = memo(function SectionBlock({
                                       border: draftKind === 'deleted'
                                         ? getDraftBorder(draftKind, `1px solid ${borderColor(style.text)}`)
                                         : pillBorder,
-                                      borderRadius: 8,
+                                      borderRadius: 6,
                                       color: style.text,
                                       boxShadow: (() => {
                                         const ps = pillPublishStatus(li);
@@ -898,13 +938,14 @@ const SectionBlock = memo(function SectionBlock({
                                       alignItems: "center",
                                       justifyContent: "center",
                                       gap: 1,
-                                      fontSize: "var(--dg-fs-label)",
+                                      fontSize: "var(--dg-fs-caption)",
                                       fontWeight: 800,
                                       position: "relative",
                                       cursor: "pointer",
                                       textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                       lineHeight: 1,
                                       overflow: "hidden",
+                                      minWidth: 0,
                                       paddingLeft: isCross && crossHomeFaLi ? 14 : 0,
                                     }}
                                   >
@@ -931,10 +972,16 @@ const SectionBlock = memo(function SectionBlock({
                                         {getFocusAreaInitials(crossHomeFaLi.name)}
                                       </span>
                                     )}
-                                    <span>{label}</span>
+                                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                                      {label}
+                                      {!hasTime && isPillOvernight && (
+                                        <sup style={{ fontSize: "0.65em", fontWeight: 700, opacity: 0.5, marginLeft: 1 }}>+1</sup>
+                                      )}
+                                    </span>
                                     {hasTime && (
-                                      <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                      <span style={{ fontSize: "var(--dg-fs-micro)", fontWeight: 500, opacity: 0.7, lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
                                         {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
+                                        {isPillOvernight && <sup style={{ fontSize: "0.65em", fontWeight: 700, marginLeft: 1, opacity: 1 }}>+1</sup>}
                                       </span>
                                     )}
                                   </div>
@@ -998,7 +1045,7 @@ const SectionBlock = memo(function SectionBlock({
                                 {auditName}
                               </span>
                             )}
-                            {showDiffOverlay && draftKind === 'modified' && publishedLabel && (
+                            {showDiffOverlay && draftKind === 'modified' && publishedLabel && shiftCode !== publishedLabel && (
                               <span style={{
                                 position: "absolute",
                                 bottom: 2,
@@ -1300,6 +1347,7 @@ export default function ScheduleGrid({
   showDiffOverlay,
   publishedLabelForKey,
   publishedShiftCodeIdsForKey,
+  hasTimeChangesForKey,
   publishDiffForKey,
   cellLocks,
   showAudit,
@@ -1526,6 +1574,7 @@ export default function ScheduleGrid({
             showDiffOverlay={showDiffOverlay}
             publishedLabelForKey={publishedLabelForKey}
             publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+            hasTimeChangesForKey={hasTimeChangesForKey}
             publishDiffForKey={publishDiffForKey}
             certifications={certifications}
             orgRoles={orgRoles}

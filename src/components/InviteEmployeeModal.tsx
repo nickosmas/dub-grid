@@ -6,8 +6,9 @@ import CustomSelect from "./CustomSelect";
 import { Employee, OrganizationUser } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
-import * as db from "@/lib/db";
+import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
 import { toast } from "sonner";
+import { z } from "zod";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -43,7 +44,7 @@ export default function InviteEmployeeModal({
 
   // On mount, fetch org users
   useEffect(() => {
-    db.fetchOrganizationUsers(orgId)
+    fetchOrganizationUsers(orgId)
       .then((users) => {
         setOrgUsers(users);
       })
@@ -66,7 +67,7 @@ export default function InviteEmployeeModal({
       ? "link"
       : "invite";
 
-  const canSend = email.trim() && email.includes("@") && !sending && !sent;
+  const canSend = z.string().email().safeParse(email.trim()).success && !sending && !sent;
 
   async function handleLink() {
     if (!matchedUser) return;
@@ -74,7 +75,7 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      await db.linkEmployeeToUser(employee.id, matchedUser.id, orgId);
+      await linkEmployeeToUser(employee.id, matchedUser.id, orgId);
       toast.success(`${getEmployeeDisplayName(employee)} linked to ${matchedUser.email}`);
       onInvited();
       onClose();
@@ -91,7 +92,7 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      const { token } = await db.sendInvitation(email.trim(), role, orgId, employee.id);
+      const { token } = await sendInvitation(email.trim(), role, orgId, employee.id);
 
       // Send the invitation email
       const res = await fetch("/api/send-invite-email", {
@@ -99,6 +100,13 @@ export default function InviteEmployeeModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, email: email.trim(), orgName }),
       });
+      if (!res.ok) {
+        // Invitation was saved to DB but email failed — tell the user clearly
+        const text = await res.text().catch(() => "");
+        let detail = "Failed to send invitation email";
+        try { detail = JSON.parse(text).error || detail; } catch { /* non-JSON response */ }
+        throw new Error(`Invitation created but email failed: ${detail}`);
+      }
       const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || "Failed to send invitation email");
