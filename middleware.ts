@@ -114,6 +114,7 @@ export async function middleware(req: NextRequest) {
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
+    console.log(`[middleware] NO SESSION → /login | host=${host} path=${pathname}`);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -136,8 +137,9 @@ export async function middleware(req: NextRequest) {
       console.warn("[middleware] SUPABASE_JWT_SECRET not set — using unverified JWT decode (dev only)");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
-  } catch {
+  } catch (jwtErr) {
     // JWT verification failed (expired, tampered, wrong secret) — re-authenticate
+    console.log(`[middleware] JWT VERIFY FAILED → /login | host=${host} path=${pathname} err=${jwtErr}`);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -146,6 +148,8 @@ export async function middleware(req: NextRequest) {
   // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
   const isGridmaster = claims.platform_role === "gridmaster";
   const subdomainMismatch = !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
+
+  console.log(`[middleware] CLAIMS | host=${host} path=${pathname} platform_role=${claims.platform_role} org_role=${claims.org_role} org_id=${claims.org_id ? "set" : "MISSING"} org_slug=${claims.org_slug} subdomain=${subdomain} subdomainMismatch=${subdomainMismatch}`);
 
   if (
     !claims.platform_role ||
@@ -179,9 +183,11 @@ export async function middleware(req: NextRequest) {
         resolvedOrgRole = membership.org_role;
         resolvedOrgId = membership.org_id;
         resolvedOrgSlug = membership.organizations?.slug;
+        console.log(`[middleware] FALLBACK resolved membership | org_role=${resolvedOrgRole} org_slug=${resolvedOrgSlug}`);
       } else if (subdomainMismatch) {
         // User is on a subdomain they don't belong to — redirect to login
         // instead of silently proceeding with stale/missing org context.
+        console.log(`[middleware] FALLBACK no membership + subdomainMismatch → /login | subdomain=${subdomain} claims.org_slug=${claims.org_slug}`);
         return NextResponse.redirect(new URL("/login", req.url));
       }
     }
@@ -200,6 +206,7 @@ export async function middleware(req: NextRequest) {
 
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster") {
+    console.log(`[middleware] NON-GRIDMASTER on gridmaster subdomain → /login | effectiveRole=${effectiveRole}`);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -207,6 +214,7 @@ export async function middleware(req: NextRequest) {
   if (effectiveRole !== "gridmaster" && claims.org_slug) {
     const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
     if (host !== expectedHost) {
+      console.log(`[middleware] SUBDOMAIN REDIRECT | host=${host} expectedHost=${expectedHost} org_slug=${claims.org_slug} rootDomain=${parsedHost.rootDomain}`);
       const url = new URL(req.url);
       url.host = expectedHost;
       return NextResponse.redirect(url);
@@ -237,6 +245,7 @@ export async function middleware(req: NextRequest) {
   if (claims.org_slug) {
     res.headers.set("x-dubgrid-org-slug", claims.org_slug);
   }
+  console.log(`[middleware] PASS | host=${host} path=${pathname} role=${effectiveRole} org_slug=${claims.org_slug}`);
   return res;
 }
 
