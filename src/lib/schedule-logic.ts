@@ -72,6 +72,74 @@ export function timesOverlap(a: TimeRange[], b: TimeRange[]): boolean {
   return a.some(r1 => b.some(r2 => rangesOverlap(r1, r2)));
 }
 
+/**
+ * Checks if a shift on a given date would overlap with adjacent-day shifts
+ * due to overnight time crossing.
+ *
+ * An overnight shift on date D occupies [start, 24:00) on D and [00:00, end) on D+1.
+ * This function checks:
+ * - If the new shift is overnight, does its D+1 tail overlap with the next day's shift?
+ * - If the previous day's shift is overnight, does its D tail overlap with the new shift?
+ */
+/** Treat "00:00" end time as "24:00" (end of day, not start of next day). */
+function normalizeEnd(t: TimeRange): TimeRange {
+  return t.end === "00:00" ? { start: t.start, end: "24:00" } : t;
+}
+
+export function checkCrossDateOverlap(
+  rawNewShiftTimes: TimeRange,
+  adjacentShifts: { prev?: TimeRange | null; next?: TimeRange | null },
+): string[] {
+  const warnings: string[] = [];
+  const newShiftTimes = normalizeEnd(rawNewShiftTimes);
+  const isNewOvernight = newShiftTimes.start > newShiftTimes.end;
+
+  // New shift is overnight → its tail [00:00, end) bleeds into D+1
+  if (isNewOvernight && adjacentShifts.next) {
+    const tailOnNextDay: TimeRange = { start: "00:00", end: newShiftTimes.end };
+    // Only compare against the D+1 portion of the next shift (not its D+2 tail)
+    const next = normalizeEnd(adjacentShifts.next);
+    const isNextOvernight = next.start > next.end;
+    const nextOnSameDay: TimeRange = isNextOvernight
+      ? { start: next.start, end: "24:00" }
+      : next;
+    if (rangesOverlap(tailOnNextDay, nextOnSameDay)) {
+      warnings.push("This overnight shift overlaps with the next day\u2019s shift");
+    }
+  }
+
+  // D-1 shift is overnight → its tail [00:00, prevEnd) bleeds into today
+  const prev = adjacentShifts.prev ? normalizeEnd(adjacentShifts.prev) : null;
+  if (prev && prev.start > prev.end) {
+    const prevTailOnToday: TimeRange = { start: "00:00", end: prev.end };
+    // Only compare against the D portion of the current shift (not its D+1 tail)
+    const currentOnDay: TimeRange = isNewOvernight
+      ? { start: newShiftTimes.start, end: "24:00" }
+      : newShiftTimes;
+    if (rangesOverlap(prevTailOnToday, currentOnDay)) {
+      warnings.push("Overlaps with yesterday\u2019s overnight shift");
+    }
+  }
+
+  return warnings;
+}
+
+/** Checks for time overlaps between multiple shift codes on the same day. */
+export function checkSameDayOverlaps(
+  ranges: TimeRange[],
+  labels: string[],
+): string[] {
+  const warnings: string[] = [];
+  for (let i = 0; i < ranges.length; i++) {
+    for (let j = i + 1; j < ranges.length; j++) {
+      if (rangesOverlap(normalizeEnd(ranges[i]), normalizeEnd(ranges[j]))) {
+        warnings.push(`${labels[i]} and ${labels[j]} times overlap`);
+      }
+    }
+  }
+  return warnings;
+}
+
 export interface Tally {
   [label: string]: number;
 }

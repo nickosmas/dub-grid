@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decodeJwt } from "jose";
-import * as db from "@/lib/db";
+import { toast } from "sonner";
+import { fetchUserOrganization, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchCoverageRequirements } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { handleApiError } from "@/lib/error-handling";
 import type {
@@ -157,15 +158,15 @@ export function useOrganizationData(): OrganizationData {
         if (earlyOrgId) {
           // Fast path: fetch org details AND subsidiary data in parallel
           const [orgResult, ...parallelData] = await Promise.all([
-            db.fetchUserOrganization(),
-            db.fetchFocusAreas(earlyOrgId),
-            db.fetchShiftCodes(earlyOrgId, true),
-            db.fetchAbsenceTypes(earlyOrgId, true),
-            db.fetchShiftCategories(earlyOrgId),
-            db.fetchIndicatorTypes(earlyOrgId),
-            db.fetchCertifications(earlyOrgId),
-            db.fetchOrganizationRoles(earlyOrgId),
-            db.fetchCoverageRequirements(earlyOrgId),
+            fetchUserOrganization(),
+            fetchFocusAreas(earlyOrgId),
+            fetchShiftCodes(earlyOrgId, true),
+            fetchAbsenceTypes(earlyOrgId, true),
+            fetchShiftCategories(earlyOrgId),
+            fetchIndicatorTypes(earlyOrgId),
+            fetchCertifications(earlyOrgId),
+            fetchOrganizationRoles(earlyOrgId),
+            fetchCoverageRequirements(earlyOrgId),
           ]);
           fetchedOrg = orgResult;
 
@@ -175,14 +176,14 @@ export function useOrganizationData(): OrganizationData {
           } else if (fetchedOrg) {
             // Rare: JWT orgId stale — refetch with correct id
             [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = await Promise.all([
-              db.fetchFocusAreas(fetchedOrg.id),
-              db.fetchShiftCodes(fetchedOrg.id, true),
-              db.fetchAbsenceTypes(fetchedOrg.id, true),
-              db.fetchShiftCategories(fetchedOrg.id),
-              db.fetchIndicatorTypes(fetchedOrg.id),
-              db.fetchCertifications(fetchedOrg.id),
-              db.fetchOrganizationRoles(fetchedOrg.id),
-              db.fetchCoverageRequirements(fetchedOrg.id),
+              fetchFocusAreas(fetchedOrg.id),
+              fetchShiftCodes(fetchedOrg.id, true),
+              fetchAbsenceTypes(fetchedOrg.id, true),
+              fetchShiftCategories(fetchedOrg.id),
+              fetchIndicatorTypes(fetchedOrg.id),
+              fetchCertifications(fetchedOrg.id),
+              fetchOrganizationRoles(fetchedOrg.id),
+              fetchCoverageRequirements(fetchedOrg.id),
             ]);
           } else {
             setLoadError("No organization found. Check your database setup.");
@@ -190,20 +191,20 @@ export function useOrganizationData(): OrganizationData {
           }
         } else {
           // Fallback: sequential (no JWT org_id available)
-          fetchedOrg = await db.fetchUserOrganization();
+          fetchedOrg = await fetchUserOrganization();
           if (!fetchedOrg) {
             setLoadError("No organization found. Check your database setup.");
             return;
           }
           [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = await Promise.all([
-            db.fetchFocusAreas(fetchedOrg.id),
-            db.fetchShiftCodes(fetchedOrg.id, true),
-            db.fetchAbsenceTypes(fetchedOrg.id, true),
-            db.fetchShiftCategories(fetchedOrg.id),
-            db.fetchIndicatorTypes(fetchedOrg.id),
-            db.fetchCertifications(fetchedOrg.id),
-            db.fetchOrganizationRoles(fetchedOrg.id),
-            db.fetchCoverageRequirements(fetchedOrg.id),
+            fetchFocusAreas(fetchedOrg.id),
+            fetchShiftCodes(fetchedOrg.id, true),
+            fetchAbsenceTypes(fetchedOrg.id, true),
+            fetchShiftCategories(fetchedOrg.id),
+            fetchIndicatorTypes(fetchedOrg.id),
+            fetchCertifications(fetchedOrg.id),
+            fetchOrganizationRoles(fetchedOrg.id),
+            fetchCoverageRequirements(fetchedOrg.id),
           ]);
         }
 
@@ -242,10 +243,13 @@ export function useOrganizationData(): OrganizationData {
         if (cancelled) return;
         console.error(err);
         handleApiError(err);
-        // Only set error if no cached data exists — a background re-fetch failure
-        // shouldn't wipe out valid cached state or trigger hooks-order violations.
         if (!orgDataCache) {
+          // No cached data — surface the error so the UI can show an error state.
           setLoadError(err instanceof Error ? err.message : "Failed to load data");
+        } else {
+          // Cached data exists — show a non-blocking warning so the user knows
+          // they may be viewing stale data.
+          toast.warning("Data may be outdated — refresh to retry");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -288,13 +292,14 @@ export function useOrganizationData(): OrganizationData {
     if (orgDataCache) orgDataCache.certifications = items;
     if (org) {
       try {
-        const allCodes = await db.fetchShiftCodes(org.id, true);
+        const allCodes = await fetchShiftCodes(org.id, true);
         const activeCodes = allCodes.filter((sc) => !sc.archivedAt);
         allShiftCodesRef.current = allCodes;
         setShiftCodesState(activeCodes);
         if (orgDataCache) orgDataCache.allShiftCodes = allCodes;
       } catch (err) {
         console.error("re-fetch shift codes after cert change:", err);
+        toast.error("Failed to refresh shift codes");
       }
     }
   }, [org]);

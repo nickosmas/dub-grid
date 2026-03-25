@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import * as db from "@/lib/db";
+import { startImpersonation, endImpersonation } from "@/lib/db";
 
 export default function ImpersonationPanel() {
   const [targetUserId, setTargetUserId] = useState("");
@@ -15,7 +15,7 @@ export default function ImpersonationPanel() {
     setLoading(true);
     setError(null);
     try {
-      const result = await db.startImpersonation(targetUserId.trim());
+      const result = await startImpersonation(targetUserId.trim());
       setSessionId(result.session_id);
       setExpiresAt(result.expires_at);
     } catch (err) {
@@ -32,7 +32,7 @@ export default function ImpersonationPanel() {
     setLoading(true);
     setError(null);
     try {
-      await db.endImpersonation(sessionId);
+      await endImpersonation(sessionId);
       setSessionId(null);
       setExpiresAt(null);
       setTargetUserId("");

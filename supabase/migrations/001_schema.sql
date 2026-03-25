@@ -247,10 +247,10 @@ CREATE TABLE public.shifts (
   version                  BIGINT NOT NULL DEFAULT 0,
   series_id                UUID,
   from_recurring           BOOLEAN NOT NULL DEFAULT false,
-  draft_custom_start_time      TIME,
-  draft_custom_end_time        TIME,
-  published_custom_start_time  TIME,
-  published_custom_end_time    TIME,
+  draft_custom_start_time      TEXT,
+  draft_custom_end_time        TEXT,
+  published_custom_start_time  TEXT,
+  published_custom_end_time    TEXT,
   draft_shift_code_ids     BIGINT[] NOT NULL DEFAULT '{}',
   published_shift_code_ids BIGINT[] NOT NULL DEFAULT '{}',
   draft_absence_type_id    BIGINT,
@@ -342,6 +342,7 @@ CREATE TABLE public.recurring_shifts (
   org_id          UUID NOT NULL,
   day_of_week     SMALLINT NOT NULL,
   shift_code_id   BIGINT,
+  absence_type_id BIGINT REFERENCES public.absence_types(id),
   effective_from  DATE NOT NULL DEFAULT CURRENT_DATE,
   effective_until DATE,
   archived_at     TIMESTAMPTZ,
@@ -351,7 +352,8 @@ CREATE TABLE public.recurring_shifts (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   CONSTRAINT recurring_shifts_day_of_week_check CHECK (day_of_week >= 0 AND day_of_week <= 6),
-  CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until)
+  CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until),
+  CONSTRAINT recurring_shifts_code_or_absence CHECK (NOT (shift_code_id IS NOT NULL AND absence_type_id IS NOT NULL))
 );
 
 
@@ -559,14 +561,14 @@ CREATE TABLE public.shift_requests (
   requester_shift_date        DATE NOT NULL,
   requester_shift_code_ids    BIGINT[] NOT NULL DEFAULT '{}',
   requester_focus_area_id     BIGINT,
-  requester_custom_start_time TIME,
-  requester_custom_end_time   TIME,
+  requester_custom_start_time TEXT,
+  requester_custom_end_time   TEXT,
   target_emp_id               UUID,
   target_shift_date           DATE,
   target_shift_code_ids       BIGINT[],
   target_focus_area_id        BIGINT,
-  target_custom_start_time    TIME,
-  target_custom_end_time      TIME,
+  target_custom_start_time    TEXT,
+  target_custom_end_time      TEXT,
   admin_user_id               UUID,
   admin_note                  TEXT,
   expires_at                  TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '72 hours'),
@@ -830,6 +832,7 @@ CREATE INDEX idx_indicator_types_active ON public.indicator_types(org_id) WHERE 
 CREATE INDEX idx_recurring_shifts_org ON public.recurring_shifts(org_id);
 CREATE INDEX idx_recurring_shifts_emp ON public.recurring_shifts(emp_id);
 CREATE INDEX idx_recurring_shifts_code_id ON public.recurring_shifts(shift_code_id);
+CREATE INDEX idx_recurring_shifts_absence_type_id ON public.recurring_shifts(absence_type_id);
 CREATE UNIQUE INDEX recurring_shifts_emp_day_from_active_unique ON public.recurring_shifts(emp_id, day_of_week, effective_from) WHERE archived_at IS NULL;
 CREATE INDEX idx_recurring_shifts_active ON public.recurring_shifts(org_id) WHERE archived_at IS NULL;
 

@@ -10,7 +10,7 @@ import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 function StaffPageContent() {
   const { canViewStaff, canEditShifts, canManageEmployees, isLoading: permsLoading, orgId } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, certifications, orgRoles, shiftCodeMap,
+    org, focusAreas, shiftCodes, certifications, orgRoles, shiftCodeMap, absenceTypes,
     loading: refLoading, loadError,
   } = useOrganizationData();
   const {
@@ -36,6 +36,11 @@ function StaffPageContent() {
         .sort((a, b) => a.seniority - b.seniority),
     [employees],
   );
+
+  // Don't render content until permissions are resolved and access is confirmed
+  if (permsLoading || !canViewStaff) {
+    return <ProgressBar loading />;
+  }
 
   if (loadError && !org) {
     return (
@@ -66,6 +71,7 @@ function StaffPageContent() {
             orgId={org?.id ?? ""}
             shiftCodes={shiftCodes}
             shiftCodeMap={shiftCodeMap}
+            absenceTypes={absenceTypes}
             canEditShifts={canEditShifts}
             canManageEmployees={canManageEmployees}
             focusAreaLabel={org?.focusAreaLabel}

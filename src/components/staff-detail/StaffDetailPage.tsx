@@ -110,7 +110,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         // Fetch the rest in parallel
         const [empShifts, recShifts, empInvitations, empRequests] = await Promise.all([
           fetchEmployeeShifts(employeeId, orgId, shiftCodeMap, absenceTypeMap),
-          fetchRecurringShifts(orgId, employeeId, shiftCodeMap),
+          fetchRecurringShifts(orgId, employeeId, shiftCodeMap, false, absenceTypeMap),
           fetchEmployeeInvitations(orgId, employeeId),
           fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
         ]);

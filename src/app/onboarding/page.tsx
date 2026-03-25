@@ -23,10 +23,19 @@ export default function OnboardingPage() {
     }
   }, [user, isAuthLoading, router]);
 
-  // Auto-poll for org assignment every 15s
+  // Auto-poll for org assignment every 15s, capped at ~5 minutes
+  const pollCountRef = useRef(0);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
   useEffect(() => {
     if (!user) return;
+    pollCountRef.current = 0;
     pollRef.current = setInterval(async () => {
+      pollCountRef.current += 1;
+      if (pollCountRef.current > 20) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPollTimedOut(true);
+        return;
+      }
       setChecking(true);
       try {
         const { data } = await supabase
@@ -144,7 +153,13 @@ export default function OnboardingPage() {
           >
             {checking ? "Checking..." : "I've been invited — refresh"}
           </button>
-          
+
+          {pollTimedOut && (
+            <p style={{ fontSize: "14px", color: "var(--color-warning-text)", margin: 0 }}>
+              Still waiting for your organization assignment. Please contact your administrator.
+            </p>
+          )}
+
           <button
             onClick={signOut}
             style={{

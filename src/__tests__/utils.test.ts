@@ -61,9 +61,11 @@ describe("getWeekStart — property tests", () => {
     fc.assert(
       fc.property(arbDate, (date) => {
         const weekStart = getWeekStart(date);
-        // weekStart is zeroed to midnight; input may have a time component.
-        // The calendar-day difference must be in [0, 6].
-        const diffDays = Math.floor((date.getTime() - weekStart.getTime()) / 86_400_000);
+        // Use calendar-day difference (not ms / 86400000) to avoid DST edge cases
+        // where a day may have 23 or 25 hours.
+        const inputMidnight = new Date(date);
+        inputMidnight.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((inputMidnight.getTime() - weekStart.getTime()) / 86_400_000);
         expect(diffDays).toBeGreaterThanOrEqual(0);
         expect(diffDays).toBeLessThanOrEqual(6);
       }),
@@ -247,5 +249,43 @@ describe("getInitials — property tests", () => {
         expect(result).toMatch(/^[A-Z]+$/);
       }),
     );
+  });
+});
+
+// ── PostgREST filter sanitization ─────────────────────────────────────────
+
+import { assertSafeFilterValue } from "@/lib/db";
+
+describe("assertSafeFilterValue", () => {
+  it("allows valid UUIDs", () => {
+    expect(() => assertSafeFilterValue("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "id")).not.toThrow();
+  });
+
+  it("allows date strings", () => {
+    expect(() => assertSafeFilterValue("2024-01-15", "date")).not.toThrow();
+  });
+
+  it("rejects values with parentheses (PostgREST operator injection)", () => {
+    expect(() => assertSafeFilterValue("abc),requester_emp_id.gt.(0", "id")).toThrow(/Unsafe/);
+  });
+
+  it("rejects values with commas", () => {
+    expect(() => assertSafeFilterValue("a,b", "id")).toThrow(/Unsafe/);
+  });
+
+  it("rejects values with dots (PostgREST field separator)", () => {
+    expect(() => assertSafeFilterValue("a.eq.b", "id")).toThrow(/Unsafe/);
+  });
+
+  it("rejects values with double quotes", () => {
+    expect(() => assertSafeFilterValue('a"b', "id")).toThrow(/Unsafe/);
+  });
+
+  it("rejects values with backslashes", () => {
+    expect(() => assertSafeFilterValue("a\\b", "id")).toThrow(/Unsafe/);
+  });
+
+  it("allows simple alphanumeric strings with dashes", () => {
+    expect(() => assertSafeFilterValue("simple-value-123", "id")).not.toThrow();
   });
 });

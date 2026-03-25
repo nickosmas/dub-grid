@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { extractErrorMessage } from "@/lib/error-handling";
 import { PublicRoute } from "@/components/RouteGuards";
 
 import { DubGridLogo } from "@/components/Logo";
@@ -36,8 +37,8 @@ export default function SuperAdminLoginPage() {
         setLoading(false);
         setMessage("Navigation timed out. Please try refreshing the page.");
       }, 8000);
-    } catch (err: any) {
-      setMessage(err.message || "An error occurred");
+    } catch (err: unknown) {
+      setMessage(extractErrorMessage(err, "An error occurred"));
       setLoading(false);
     }
   }

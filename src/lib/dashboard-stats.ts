@@ -215,6 +215,27 @@ export function computeShiftDurationHours(
   focusAreaById?: Map<number, FocusArea>,
 ): number {
   if (customStartTime && customEndTime) {
+    // Handle pipe-delimited per-pill custom times (e.g. "07:00|09:00")
+    const starts = customStartTime.split("|");
+    const ends = customEndTime.split("|");
+    if (starts.length > 1 || ends.length > 1) {
+      let total = 0;
+      for (let i = 0; i < Math.max(starts.length, ends.length); i++) {
+        const s = starts[i] || "";
+        const e = ends[i] || "";
+        const sc = shiftCodeIds[i] != null ? shiftCodeById.get(shiftCodeIds[i]) : undefined;
+        if (s && e) {
+          let h = durationHoursFromTimes(s, e);
+          if (sc) h = Math.max(0, h - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+          total += h;
+        } else if (sc?.defaultStartTime && sc.defaultEndTime) {
+          let h = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
+          h = Math.max(0, h - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+          total += h;
+        }
+      }
+      return total;
+    }
     let hours = durationHoursFromTimes(customStartTime, customEndTime);
     // Deduct break from the first code
     for (const codeId of shiftCodeIds) {

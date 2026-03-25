@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as db from "@/lib/db";
+import { fetchEmployees, insertEmployee, updateEmployee, deleteEmployee, benchEmployee, activateEmployee } from "@/lib/db";
 import { toast } from "sonner";
 import type { Employee } from "@/types";
 
@@ -78,7 +78,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     async function load() {
       try {
         // Single query with all statuses, split by status in memory
-        const all = await db.fetchEmployees(orgId!, ["active", "benched", "terminated"]);
+        const all = await fetchEmployees(orgId!, ["active", "benched", "terminated"]);
         if (!cancelled) {
           const active = all.filter((e) => e.status === "active");
           const benched = all.filter((e) => e.status === "benched");
@@ -109,7 +109,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
             ...added.map((e) => e.seniority),
             0,
           );
-          const newEmp = await db.insertEmployee(
+          const newEmp = await insertEmployee(
             { ...data, seniority: maxSen + 1 },
             orgId,
           );
@@ -128,11 +128,18 @@ export function useEmployees(orgId: string | null): EmployeesData {
   const handleSaveEmployee = useCallback(
     async (emp: Employee) => {
       if (!orgId) return;
-      setEmployees((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+      // Capture prev state via functional updater to avoid stale-ref race
+      // when multiple saves fire in rapid succession.
+      let prevEmployees: Employee[] = [];
+      setEmployees((prev) => {
+        prevEmployees = prev;
+        return prev.map((e) => (e.id === emp.id ? emp : e));
+      });
       try {
-        await db.updateEmployee(emp, orgId);
+        await updateEmployee(emp, orgId);
         toast.success("Employee saved");
       } catch (err) {
+        setEmployees(prevEmployees);
         toast.error("Failed to save employee");
         console.error(err);
       }
@@ -142,8 +149,15 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   const handleDeleteEmployee = useCallback(async (empId: string) => {
     const now = new Date().toISOString();
-    const activeEmp = employeesRef.current.find((e) => e.id === empId);
-    const benchedEmp = benchedRef.current.find((e) => e.id === empId);
+    // Capture prev state via functional updaters to avoid stale-ref race
+    let prevActive: Employee[] = [];
+    let prevBenched: Employee[] = [];
+    let prevTerminated: Employee[] = [];
+    setEmployees((prev) => { prevActive = prev; return prev; });
+    setBenchedEmployees((prev) => { prevBenched = prev; return prev; });
+    setTerminatedEmployees((prev) => { prevTerminated = prev; return prev; });
+    const activeEmp = prevActive.find((e) => e.id === empId);
+    const benchedEmp = prevBenched.find((e) => e.id === empId);
     const emp = activeEmp ?? benchedEmp;
     if (emp) {
       setTerminatedEmployees((t) => [...t, { ...emp, status: "terminated", statusChangedAt: now }]);
@@ -151,25 +165,34 @@ export function useEmployees(orgId: string | null): EmployeesData {
     if (activeEmp) setEmployees((prev) => prev.filter((e) => e.id !== empId));
     if (benchedEmp) setBenchedEmployees((prev) => prev.filter((e) => e.id !== empId));
     try {
-      await db.deleteEmployee(empId);
+      await deleteEmployee(empId);
       toast.success("Employee terminated");
     } catch (err) {
+      setEmployees(prevActive);
+      setBenchedEmployees(prevBenched);
+      setTerminatedEmployees(prevTerminated);
       toast.error("Failed to terminate employee");
       console.error(err);
     }
   }, []);
 
   const handleBenchEmployee = useCallback(async (empId: string, note?: string) => {
-    const emp = employeesRef.current.find((e) => e.id === empId);
+    let prevActive: Employee[] = [];
+    let prevBenched: Employee[] = [];
+    setEmployees((prev) => { prevActive = prev; return prev; });
+    setBenchedEmployees((prev) => { prevBenched = prev; return prev; });
+    const emp = prevActive.find((e) => e.id === empId);
     if (emp) {
       const benched: Employee = { ...emp, status: "benched", statusNote: note ?? "", statusChangedAt: new Date().toISOString() };
       setBenchedEmployees((b) => [...b, benched]);
       setEmployees((prev) => prev.filter((e) => e.id !== empId));
     }
     try {
-      await db.benchEmployee(empId, note);
+      await benchEmployee(empId, note);
       toast.success("Employee benched");
     } catch (err) {
+      setEmployees(prevActive);
+      setBenchedEmployees(prevBenched);
       toast.error("Failed to bench employee");
       console.error(err);
     }
@@ -177,8 +200,14 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   const handleActivateEmployee = useCallback(async (empId: string) => {
     const now = new Date().toISOString();
-    const benchedEmp = benchedRef.current.find((e) => e.id === empId);
-    const terminatedEmp = terminatedRef.current.find((e) => e.id === empId);
+    let prevActive: Employee[] = [];
+    let prevBenched: Employee[] = [];
+    let prevTerminated: Employee[] = [];
+    setEmployees((prev) => { prevActive = prev; return prev; });
+    setBenchedEmployees((prev) => { prevBenched = prev; return prev; });
+    setTerminatedEmployees((prev) => { prevTerminated = prev; return prev; });
+    const benchedEmp = prevBenched.find((e) => e.id === empId);
+    const terminatedEmp = prevTerminated.find((e) => e.id === empId);
     const emp = benchedEmp ?? terminatedEmp;
     if (emp) {
       setEmployees((a) => [...a, { ...emp, status: "active", statusNote: "", statusChangedAt: now }]);
@@ -186,9 +215,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
     if (benchedEmp) setBenchedEmployees((prev) => prev.filter((e) => e.id !== empId));
     if (terminatedEmp) setTerminatedEmployees((prev) => prev.filter((e) => e.id !== empId));
     try {
-      await db.activateEmployee(empId);
+      await activateEmployee(empId);
       toast.success("Employee activated");
     } catch (err) {
+      setEmployees(prevActive);
+      setBenchedEmployees(prevBenched);
+      setTerminatedEmployees(prevTerminated);
       toast.error("Failed to activate employee");
       console.error(err);
     }

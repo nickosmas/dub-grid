@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { extractErrorMessage } from "@/lib/error-handling";
 import { acceptInvitation } from "@/lib/db";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
@@ -101,8 +102,13 @@ export default function AcceptInvitePage() {
         slug = result.orgSlug;
       } catch (acceptErr: any) {
         const msg: string = acceptErr?.message ?? "";
-        // "Already accepted" is fine — just proceed to success
-        if (!msg.toLowerCase().includes("already been accepted")) {
+        const code: string = acceptErr?.code ?? "";
+        // "Already accepted" is fine — just proceed to success.
+        // Match on Postgres error code P0001 (RAISE EXCEPTION) + message, or message alone as fallback.
+        const isAlreadyAccepted =
+          (code === "P0001" && msg.toLowerCase().includes("already")) ||
+          msg.toLowerCase().includes("already been accepted");
+        if (!isAlreadyAccepted) {
           throw new Error(
             "Your account was created, but this invitation is no longer valid. " +
             "Please contact your organization administrator for a new invitation."
@@ -128,9 +134,9 @@ export default function AcceptInvitePage() {
 
       setOrgSlug(slug);
       setState("success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[accept-invite] Error:", err);
-      setFormError(err?.message ?? "Something went wrong. Please try again.");
+      setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setState("form");
       setLoading(false);
     }

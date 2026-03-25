@@ -251,8 +251,8 @@ export function usePermissions(): Permissions {
     supabase.auth
       .getSession()
       .then(({ data: { session } }: { data: { session: Session | null } }) => {
-        // Skip re-resolve if cache is fresh (< 30s old)
-        if (permsCache && Date.now() - permsCacheTimestamp < 30_000) return;
+        // Skip re-resolve if cache is fresh (< 10s old — matches JWT refresh lock window)
+        if (permsCache && Date.now() - permsCacheTimestamp < 10_000) return;
         loadSession(session);
       });
 

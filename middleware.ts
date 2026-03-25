@@ -19,9 +19,11 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
  * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
  */
 
-const SUPABASE_JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_JWT_SECRET
-);
+/** Lazily encode the JWT secret — avoids encoding `undefined` at module load. */
+function getJwtSecret(): Uint8Array | null {
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  return secret ? new TextEncoder().encode(secret) : null;
+}
 
 /**
  * Role hierarchy levels for permission checks.
@@ -116,31 +118,27 @@ export async function middleware(req: NextRequest) {
   }
 
   // Verify JWT and read top-level custom claims - Requirement 11.4
-  // If jwtVerify fails (expired token, wrong secret, etc.), fall back to
-  // unverified decode so the user isn't blocked. Real data security is
-  // enforced by Supabase RLS, not edge middleware. However, we never trust
-  // elevated roles (gridmaster) from unverified tokens.
+  // In production: SUPABASE_JWT_SECRET is required. If missing, block access.
+  // When jwtVerify fails (expired/tampered token): redirect to login — no
+  // fallback to unverified decode. RLS provides data-level security, but
+  // middleware must not inject unverified role claims into request headers.
   let claims: JWTClaims;
+  const jwtSecret = getJwtSecret();
   try {
-    if (process.env.SUPABASE_JWT_SECRET) {
-      const { payload } = await jwtVerify(session.access_token, SUPABASE_JWT_SECRET);
+    if (jwtSecret) {
+      const { payload } = await jwtVerify(session.access_token, jwtSecret);
       claims = payload as JWTClaims;
+    } else if (process.env.NODE_ENV === "production") {
+      console.error("[middleware] FATAL: SUPABASE_JWT_SECRET not set in production");
+      return NextResponse.redirect(new URL("/login", req.url));
     } else {
-      console.warn("[middleware] SUPABASE_JWT_SECRET not set — falling back to unverified JWT decode. Set SUPABASE_JWT_SECRET for production.");
+      // Dev-only: allow unverified decode for local development without the secret
+      console.warn("[middleware] SUPABASE_JWT_SECRET not set — using unverified JWT decode (dev only)");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
   } catch {
-    try {
-      claims = decodeJwt(session.access_token) as JWTClaims;
-      // Don't trust gridmaster from unverified tokens — a forged JWT could
-      // claim platform-level access. Org-level roles (super_admin/admin) are
-      // safe to pass through because RLS enforces all data access anyway.
-      if (claims.platform_role === "gridmaster") {
-        return NextResponse.redirect(new URL("/login", req.url));
-      }
-    } catch {
-      return NextResponse.redirect(new URL("/login", req.url));
-    }
+    // JWT verification failed (expired, tampered, wrong secret) — re-authenticate
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/org

@@ -75,8 +75,8 @@ export default function EnhancedImpersonation({
       setSessionId(result.session_id);
       setExpiresAt(result.expires_at);
       toast.success(`Impersonation session started for ${selectedUser.email}`);
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to start impersonation");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to start impersonation");
     } finally {
       setLoading(false);
     }
@@ -92,8 +92,8 @@ export default function EnhancedImpersonation({
       setSelectedUser(null);
       setSearch("");
       toast.success("Impersonation session ended");
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to end impersonation");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to end impersonation");
     } finally {
       setLoading(false);
     }

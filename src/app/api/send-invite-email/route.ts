@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { decodeJwt } from "jose";
+import { jwtVerify, decodeJwt } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
+import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
-  orgName: z.string().min(1).max(200),
-  inviterName: z.string().max(200).optional(),
+  orgName: z.string().trim().min(1).max(200),
+  inviterName: z.string().trim().max(200).optional(),
 });
 
-/** Strip CRLF / newline chars to prevent email header injection. */
+/** Strip control characters (including CRLF, null bytes) to prevent email header injection. */
 function sanitizeHeaderValue(str: string): string {
-  return str.replace(/[\r\n]/g, "");
+  return str.replace(/[\x00-\x1f\x7f]/g, "");
 }
 
 export async function POST(req: NextRequest) {
@@ -43,9 +44,73 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ── Rate limit by user ID ────────────────────────────────────────────
+  const { limited, reset, misconfigured } = await checkRateLimit(inviteLimiter, session.user.id);
+  if (misconfigured) {
+    return NextResponse.json(
+      { success: false, error: "Service temporarily unavailable" },
+      { status: 503 },
+    );
+  }
+  if (limited) {
+    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+    return NextResponse.json(
+      { success: false, error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfter) },
+      },
+    );
+  }
+
+  // ── CSRF: validate Origin header ────────────────────────────────────────
+  const origin = req.headers.get("origin");
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : null);
+  if (!origin || !siteUrl) {
+    // Fail-closed in production when Origin or site URL is absent
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+  } else {
+    const allowedHost = new URL(
+      siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`,
+    ).host;
+    // Allow exact match or subdomains (acme.dubgrid.com → dubgrid.com)
+    const originHost = new URL(origin).host;
+    if (originHost !== allowedHost && !originHost.endsWith(`.${allowedHost}`)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+  }
+
   // ── Authorization check — only super_admin / gridmaster can send invites ──
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
   try {
-    const claims = decodeJwt(session.access_token);
+    let claims: { platform_role?: unknown; org_role?: unknown };
+    if (jwtSecret) {
+      const { payload } = await jwtVerify(
+        session.access_token,
+        new TextEncoder().encode(jwtSecret),
+      );
+      claims = payload as typeof claims;
+    } else if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { success: false, error: "Server misconfigured" },
+        { status: 500 },
+      );
+    } else {
+      // Dev-only fallback
+      claims = decodeJwt(session.access_token) as typeof claims;
+    }
     const isGridmaster = claims.platform_role === "gridmaster";
     const isSuperAdmin = claims.org_role === "super_admin";
     if (!isGridmaster && !isSuperAdmin) {
@@ -97,7 +162,7 @@ export async function POST(req: NextRequest) {
   const { token, email, orgName, inviterName } = parsed.data;
 
   // ── Build email ─────────────────────────────────────────────────────
-  const siteUrl =
+  const emailBaseUrl =
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.NEXT_PUBLIC_VERCEL_URL
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
@@ -107,7 +172,7 @@ export async function POST(req: NextRequest) {
     console.warn("[send-invite-email] No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links");
   }
 
-  const acceptUrl = `${siteUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+  const acceptUrl = `${emailBaseUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 
   const inviterLine = inviterName
     ? `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
@@ -174,7 +239,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[send-invite-email] Resend error:", err);
+    console.error("[send-invite-email] Resend error:", err instanceof Error ? err.message : "Unknown error");
     return NextResponse.json(
       { success: false, error: "Failed to send email" },
       { status: 500 },
