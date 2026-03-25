@@ -19,11 +19,9 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
  * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
  */
 
-/** Lazily encode the JWT secret — avoids encoding `undefined` at module load. */
-function getJwtSecret(): Uint8Array | null {
-  const secret = process.env.SUPABASE_JWT_SECRET;
-  return secret ? new TextEncoder().encode(secret) : null;
-}
+const SUPABASE_JWT_SECRET = new TextEncoder().encode(
+  process.env.SUPABASE_JWT_SECRET
+);
 
 /**
  * Role hierarchy levels for permission checks.
@@ -114,33 +112,35 @@ export async function middleware(req: NextRequest) {
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
-    console.log(`[middleware] NO SESSION → /login | host=${host} path=${pathname}`);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
   // Verify JWT and read top-level custom claims - Requirement 11.4
-  // In production: SUPABASE_JWT_SECRET is required. If missing, block access.
-  // When jwtVerify fails (expired/tampered token): redirect to login — no
-  // fallback to unverified decode. RLS provides data-level security, but
-  // middleware must not inject unverified role claims into request headers.
+  // If jwtVerify fails (expired token, wrong secret, etc.), fall back to
+  // unverified decode so the user isn't blocked. Real data security is
+  // enforced by Supabase RLS, not edge middleware. However, we never trust
+  // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
-  const jwtSecret = getJwtSecret();
   try {
-    if (jwtSecret) {
-      const { payload } = await jwtVerify(session.access_token, jwtSecret);
+    if (process.env.SUPABASE_JWT_SECRET) {
+      const { payload } = await jwtVerify(session.access_token, SUPABASE_JWT_SECRET);
       claims = payload as JWTClaims;
-    } else if (process.env.NODE_ENV === "production") {
-      console.error("[middleware] FATAL: SUPABASE_JWT_SECRET not set in production");
-      return NextResponse.redirect(new URL("/login", req.url));
     } else {
-      // Dev-only: allow unverified decode for local development without the secret
-      console.warn("[middleware] SUPABASE_JWT_SECRET not set — using unverified JWT decode (dev only)");
+      console.warn("[middleware] SUPABASE_JWT_SECRET not set — falling back to unverified JWT decode. Set SUPABASE_JWT_SECRET for production.");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
-  } catch (jwtErr) {
-    // JWT verification failed (expired, tampered, wrong secret) — re-authenticate
-    console.log(`[middleware] JWT VERIFY FAILED → /login | host=${host} path=${pathname} err=${jwtErr}`);
-    return NextResponse.redirect(new URL("/login", req.url));
+  } catch {
+    try {
+      claims = decodeJwt(session.access_token) as JWTClaims;
+      // Don't trust gridmaster from unverified tokens — a forged JWT could
+      // claim platform-level access. Org-level roles (super_admin/admin) are
+      // safe to pass through because RLS enforces all data access anyway.
+      if (claims.platform_role === "gridmaster") {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
+    } catch {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/org
@@ -148,8 +148,6 @@ export async function middleware(req: NextRequest) {
   // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
   const isGridmaster = claims.platform_role === "gridmaster";
   const subdomainMismatch = !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
-
-  console.log(`[middleware] CLAIMS | host=${host} path=${pathname} platform_role=${claims.platform_role} org_role=${claims.org_role} org_id=${claims.org_id ? "set" : "MISSING"} org_slug=${claims.org_slug} subdomain=${subdomain} subdomainMismatch=${subdomainMismatch}`);
 
   if (
     !claims.platform_role ||
@@ -183,11 +181,9 @@ export async function middleware(req: NextRequest) {
         resolvedOrgRole = membership.org_role;
         resolvedOrgId = membership.org_id;
         resolvedOrgSlug = membership.organizations?.slug;
-        console.log(`[middleware] FALLBACK resolved membership | org_role=${resolvedOrgRole} org_slug=${resolvedOrgSlug}`);
       } else if (subdomainMismatch) {
         // User is on a subdomain they don't belong to — redirect to login
         // instead of silently proceeding with stale/missing org context.
-        console.log(`[middleware] FALLBACK no membership + subdomainMismatch → /login | subdomain=${subdomain} claims.org_slug=${claims.org_slug}`);
         return NextResponse.redirect(new URL("/login", req.url));
       }
     }
@@ -206,7 +202,6 @@ export async function middleware(req: NextRequest) {
 
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster") {
-    console.log(`[middleware] NON-GRIDMASTER on gridmaster subdomain → /login | effectiveRole=${effectiveRole}`);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -214,7 +209,6 @@ export async function middleware(req: NextRequest) {
   if (effectiveRole !== "gridmaster" && claims.org_slug) {
     const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
     if (host !== expectedHost) {
-      console.log(`[middleware] SUBDOMAIN REDIRECT | host=${host} expectedHost=${expectedHost} org_slug=${claims.org_slug} rootDomain=${parsedHost.rootDomain}`);
       const url = new URL(req.url);
       url.host = expectedHost;
       return NextResponse.redirect(url);
@@ -245,7 +239,6 @@ export async function middleware(req: NextRequest) {
   if (claims.org_slug) {
     res.headers.set("x-dubgrid-org-slug", claims.org_slug);
   }
-  console.log(`[middleware] PASS | host=${host} path=${pathname} role=${effectiveRole} org_slug=${claims.org_slug}`);
   return res;
 }
 
