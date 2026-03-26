@@ -25,6 +25,7 @@ import { usePermissions, useOrganizationData, useEmployees, useCellLocks, useShi
 import { useAuth } from "@/components/AuthProvider";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
+import SetupGuard from "@/components/SetupGuard";
 import { toast } from "sonner";
 import { DndContext, DragOverlay, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
@@ -363,18 +364,39 @@ function SchedulerContent() {
     (async () => {
       try {
         const ids = Array.from(uncached);
-        const { data } = await supabase
+        // 1. Try profiles table first
+        const { data, error } = await supabase
           .from("profiles")
           .select("id, first_name, last_name")
           .in("id", ids);
         if (cancelled) return;
+        if (error) {
+          console.warn("Audit names: profile query failed, will retry", error.message);
+          // Don't cache "Deleted user" — let the next trigger retry
+          return;
+        }
         for (const row of data ?? []) {
           const first = row.first_name?.trim() || "";
           const last = row.last_name?.trim() || "";
           const name = [first, last].filter(Boolean).join(" ");
           if (name) profileNameCache.current.set(row.id, name);
         }
-        // Cache fallback for deleted/missing profiles to avoid re-fetching
+        // 2. Fallback: resolve remaining IDs from employees table (names are NOT NULL there)
+        const unresolvedIds = ids.filter(id => !profileNameCache.current.has(id));
+        if (unresolvedIds.length > 0) {
+          const { data: empData } = await supabase
+            .from("employees")
+            .select("user_id, first_name, last_name")
+            .in("user_id", unresolvedIds);
+          if (cancelled) return;
+          for (const row of empData ?? []) {
+            if (row.user_id) {
+              const name = [row.first_name?.trim(), row.last_name?.trim()].filter(Boolean).join(" ");
+              if (name) profileNameCache.current.set(row.user_id, name);
+            }
+          }
+        }
+        // 3. Cache "Deleted user" only for IDs not found in either table
         for (const id of ids) {
           if (!profileNameCache.current.has(id)) {
             profileNameCache.current.set(id, "Deleted user");
@@ -2527,7 +2549,9 @@ function SchedulerContent() {
 export default function SchedulerPage() {
   return (
     <ProtectedRoute>
-      <SchedulerContent />
+      <SetupGuard>
+        <SchedulerContent />
+      </SetupGuard>
     </ProtectedRoute>
   );
 }

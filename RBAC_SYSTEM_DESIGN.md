@@ -98,7 +98,11 @@ CREATE TABLE public.organizations (
   focus_area_label      TEXT NOT NULL DEFAULT 'Focus Areas',
   certification_label   TEXT NOT NULL DEFAULT 'Certifications',
   role_label            TEXT NOT NULL DEFAULT 'Roles',
-  is_active             BOOLEAN NOT NULL DEFAULT TRUE,
+  logo_url              TEXT,
+  app_name              TEXT DEFAULT 'DubGrid',
+  theme_config          JSONB DEFAULT '{}'::JSONB,
+  landing_page_config   JSONB DEFAULT '{}'::JSONB,
+  archived_at           TIMESTAMPTZ,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -880,7 +884,7 @@ The Gridmaster dashboard provides global platform oversight without routing thro
 | User Management         | Platform-wide user list across all organizations                             | Role changes via idempotent RPC                 |
 | User Impersonation      | Create `impersonation_sessions` row, receive scoped JWT                      | UNIQUE constraint prevents collision            |
 | Org Creation            | Create new organizations with slug validation                                | UNIQUE slug constraint                          |
-| Org Deactivation        | Set `organizations.is_active = false` in transaction                         | `SELECT FOR UPDATE` prevents concurrent toggles |
+| Org Archiving           | Set `organizations.archived_at = NOW()` in transaction                       | `SELECT FOR UPDATE` prevents concurrent toggles |
 | Global Audit Log Viewer | SELECT from `role_change_log` (all orgs visible to gridmaster)               | Append-only table — no mutation risk            |
 | Admin Permission Config | Configure per-admin permissions via AdminPermissionsEditor                   | Optimistic locking on membership row            |
 

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
-import { fetchUserOrganization, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchCoverageRequirements } from "@/lib/db";
+import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchCoverageRequirements } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
+import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
 import type {
   Organization,
@@ -42,6 +43,16 @@ export function clearOrgDataCache(): void {
 
 // ── Hook ────────────────────────────────────────────────────────────────────
 
+export interface SetupStatus {
+  isComplete: boolean;
+  missing: {
+    focusAreas: boolean;
+    shiftCodes: boolean;
+    certifications: boolean;
+    orgRoles: boolean;
+  };
+}
+
 export interface OrganizationData {
   org: Organization | null;
   focusAreas: FocusArea[];
@@ -57,6 +68,7 @@ export interface OrganizationData {
   absenceTypeMap: Map<number, string>;
   loading: boolean;
   loadError: string | null;
+  setupStatus: SetupStatus;
   setOrg: (org: Organization) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
   handleShiftCodesChange: (codes: ShiftCode[]) => void;
@@ -127,16 +139,37 @@ export function useOrganizationData(): OrganizationData {
       try {
         validateConfig();
 
-        // Extract orgId from JWT to parallelize org + subsidiary fetches.
-        // getSession() reads from local storage (~5ms), decodeJwt is sync.
+        // ── Determine target orgId ──────────────────────────────────────
+        // During impersonation the cookie's targetOrgId takes precedence
+        // over the JWT's org_id (which belongs to the gridmaster, not
+        // the user being impersonated).
         let earlyOrgId: string | null = null;
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            const payload = decodeJwt(session.access_token) as Record<string, unknown>;
-            earlyOrgId = (payload.org_id as string) || null;
+        let isImpersonating = false;
+
+        if (typeof document !== "undefined") {
+          const imp = getImpersonationFromCookie(document.cookie);
+          if (imp) {
+            earlyOrgId = imp.targetOrgId;
+            isImpersonating = true;
           }
-        } catch { /* proceed without hint */ }
+        }
+
+        if (!earlyOrgId) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              const payload = decodeJwt(session.access_token) as Record<string, unknown>;
+              // Gridmaster users have no org — skip all org data fetching.
+              // This prevents 9+ unnecessary API calls that would either fail
+              // or return data for a random org the gridmaster doesn't need.
+              if (payload.platform_role === "gridmaster") {
+                setLoading(false);
+                return;
+              }
+              earlyOrgId = (payload.org_id as string) || null;
+            }
+          } catch { /* proceed without hint */ }
+        }
 
         // Skip re-fetch if cache is fresh (< 30s old) AND belongs to the
         // same org. Without the orgId check, an org switch could serve stale
@@ -156,9 +189,10 @@ export function useOrganizationData(): OrganizationData {
         let covReqs: CoverageRequirement[];
 
         if (earlyOrgId) {
-          // Fast path: fetch org details AND subsidiary data in parallel
+          // Fast path: fetch org details AND subsidiary data in parallel.
+          // During impersonation, fetch org by ID (not subdomain).
           const [orgResult, ...parallelData] = await Promise.all([
-            fetchUserOrganization(),
+            isImpersonating ? fetchOrganizationById(earlyOrgId) : fetchUserOrganization(),
             fetchFocusAreas(earlyOrgId),
             fetchShiftCodes(earlyOrgId, true),
             fetchAbsenceTypes(earlyOrgId, true),
@@ -171,10 +205,10 @@ export function useOrganizationData(): OrganizationData {
           fetchedOrg = orgResult;
 
           if (fetchedOrg && fetchedOrg.id === earlyOrgId) {
-            // JWT orgId matches — use parallel data
+            // orgId matches — use parallel data
             [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = parallelData;
           } else if (fetchedOrg) {
-            // Rare: JWT orgId stale — refetch with correct id
+            // Rare: orgId stale — refetch with correct id
             [w, allCodes, absTypes, cats, indicators, certs, roles, covReqs] = await Promise.all([
               fetchFocusAreas(fetchedOrg.id),
               fetchShiftCodes(fetchedOrg.id, true),
@@ -190,7 +224,7 @@ export function useOrganizationData(): OrganizationData {
             return;
           }
         } else {
-          // Fallback: sequential (no JWT org_id available)
+          // Fallback: sequential (no org_id available)
           fetchedOrg = await fetchUserOrganization();
           if (!fetchedOrg) {
             setLoadError("No organization found. Check your database setup.");
@@ -287,6 +321,20 @@ export function useOrganizationData(): OrganizationData {
     if (orgDataCache) orgDataCache.allShiftCodes = allCodes;
   }, []);
 
+  const setupStatus = useMemo<SetupStatus>(() => ({
+    isComplete:
+      focusAreas.length > 0 &&
+      shiftCodes.length > 0 &&
+      certifications.length > 0 &&
+      orgRoles.length > 0,
+    missing: {
+      focusAreas: focusAreas.length === 0,
+      shiftCodes: shiftCodes.length === 0,
+      certifications: certifications.length === 0,
+      orgRoles: orgRoles.length === 0,
+    },
+  }), [focusAreas, shiftCodes, certifications, orgRoles]);
+
   const handleCertificationsChange = useCallback(async (items: NamedItem[]) => {
     setCertificationsState(items);
     if (orgDataCache) orgDataCache.certifications = items;
@@ -319,6 +367,7 @@ export function useOrganizationData(): OrganizationData {
     absenceTypeMap,
     loading,
     loadError,
+    setupStatus,
     setOrg,
     setFocusAreas,
     handleShiftCodesChange,

@@ -5,17 +5,23 @@ import { startImpersonation, endImpersonation } from "@/lib/db";
 
 export default function ImpersonationPanel() {
   const [targetUserId, setTargetUserId] = useState("");
+  const [justification, setJustification] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function start() {
-    if (!targetUserId.trim()) return;
+    if (!targetUserId.trim() || justification.trim().length < 10) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await startImpersonation(targetUserId.trim());
+      const result = await startImpersonation(
+        targetUserId.trim(),
+        justification.trim(),
+        undefined,
+        navigator.userAgent,
+      );
       setSessionId(result.session_id);
       setExpiresAt(result.expires_at);
     } catch (err) {
@@ -67,10 +73,17 @@ export default function ImpersonationPanel() {
           className="dg-input"
           style={{ flex: "1 1 280px" }}
         />
+        <input
+          value={justification}
+          onChange={(e) => setJustification(e.target.value)}
+          placeholder="justification (min 10 chars)"
+          className="dg-input"
+          style={{ flex: "1 1 280px" }}
+        />
         <button
           className="dg-btn dg-btn-primary"
           onClick={start}
-          disabled={loading || !targetUserId.trim()}
+          disabled={loading || !targetUserId.trim() || justification.trim().length < 10}
         >
           {loading ? "Starting..." : "Start session"}
         </button>

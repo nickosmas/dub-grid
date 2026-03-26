@@ -6,6 +6,7 @@ import { createOrganization, assignOrgRoleByEmail } from "@/lib/db";
 import type { Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
+import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 
 const TIMEZONES = [
   "America/New_York",
@@ -60,10 +61,14 @@ export default function CreateOrganizationForm({
 
   async function validateSlug(s: string): Promise<boolean> {
     if (!s) return false;
+    // Client-side format check (mirrors API + DB constraint)
+    if (RESERVED_SUBDOMAINS.has(s) || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(s)) return false;
     try {
       const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(s)}`);
       const json = await res.json();
-      return json.valid === true;
+      // API returns valid:true when slug EXISTS (designed for login).
+      // For creation, slug must NOT exist → invert the check.
+      return json.valid === false;
     } catch {
       return false;
     }

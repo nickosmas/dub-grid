@@ -120,7 +120,7 @@ export default function OrganizationDetail({
   organization: Organization;
   stats: TenantStats | undefined;
   onOrgUpdated?: (updated: Organization) => void;
-  onImpersonate?: (userId: string) => void;
+  onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -560,7 +560,7 @@ function UsersTab({
   users: OrganizationUser[];
   orgId: string;
   onUsersChanged: () => void;
-  onImpersonate?: (userId: string) => void;
+  onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [editingPerms, setEditingPerms] = useState<OrganizationUser | null>(null);
@@ -572,10 +572,9 @@ function UsersTab({
   const [showAddForm, setShowAddForm] = useState(false);
 
   async function handleRoleChange(userId: string, newRole: OrganizationRole) {
-    if (newRole === "super_admin") return; // Handled separately
     setChangingRole(userId);
     try {
-      await changeOrganizationUserRole(userId, newRole as "admin" | "user");
+      await changeOrganizationUserRole(userId, newRole);
       toast.success("Role updated");
       onUsersChanged();
     } catch (err: unknown) {
@@ -697,21 +696,18 @@ function UsersTab({
                       {u.email ?? "—"}
                     </td>
                     <td style={tdStyle}>
-                      {u.orgRole === "super_admin" ? (
-                        <RoleBadge role={u.orgRole} />
-                      ) : (
-                        <CustomSelect
-                          value={u.orgRole}
-                          options={[
-                            { value: "user", label: "User" },
-                            { value: "admin", label: "Admin" },
-                          ]}
-                          onChange={(v) => handleRoleChange(u.id, v as OrganizationRole)}
-                          disabled={changingRole === u.id}
-                          style={{ width: 130 }}
-                          fontSize={12}
-                        />
-                      )}
+                      <CustomSelect
+                        value={u.orgRole}
+                        options={[
+                          { value: "user", label: "User" },
+                          { value: "admin", label: "Admin" },
+                          { value: "super_admin", label: "Super Admin" },
+                        ]}
+                        onChange={(v) => handleRoleChange(u.id, v as OrganizationRole)}
+                        disabled={changingRole === u.id}
+                        style={{ width: 140 }}
+                        fontSize={12}
+                      />
                     </td>
                     <td style={{ ...tdStyle, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
                       {u.orgRole === "admin" ? (
@@ -736,7 +732,7 @@ function UsersTab({
                           <button
                             className="dg-btn dg-btn-ghost"
                             style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px" }}
-                            onClick={() => onImpersonate(u.id)}
+                            onClick={() => onImpersonate(u.id, orgId)}
                           >
                             Impersonate
                           </button>

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { decodeJwt } from "jose";
 import { supabase } from "@/lib/supabase";
+import { getImpersonationFromCookie } from "@/lib/impersonation";
 import type { Session } from "@supabase/supabase-js";
 import type { AdminPermissions } from "@/types";
 
@@ -59,6 +60,8 @@ export interface Permissions extends AdminPermissions {
   isLoading: boolean;
   isGridmaster: boolean;
   isSuperAdmin: boolean;
+  /** True when gridmaster is impersonating another user. */
+  isImpersonating: boolean;
   /** True if user can access the settings page (has any config-level permission). */
   canManageOrg: boolean;
   /** True if user can invite / change roles of org members (super_admin+ only). */
@@ -73,6 +76,7 @@ function buildPerms(
   orgId: string | null,
   isLoading: boolean,
   adminPerms?: AdminPermissions | null,
+  isImpersonating = false,
 ): Permissions {
   const level = ROLE_LEVEL[role] ?? 0;
   const isGridmaster = level >= 4;
@@ -87,6 +91,23 @@ function buildPerms(
       : READ_ONLY_PERMS;
   } else {
     p = READ_ONLY_PERMS;
+  }
+
+  // ── Impersonation action restrictions ─────────────────────────────
+  // During impersonation, block destructive/administrative operations.
+  // Schedule editing is preserved for debugging write flows.
+  if (isImpersonating) {
+    p = {
+      ...p,
+      canManageEmployees: false,
+      canManageOrgSettings: false,
+      canManageOrgLabels: false,
+      canManageFocusAreas: false,
+      canManageShiftCodes: false,
+      canManageIndicatorTypes: false,
+      canManageCoverageRequirements: false,
+      canApproveShiftRequests: false,
+    };
   }
 
   const canManageOrg =
@@ -107,9 +128,10 @@ function buildPerms(
     isLoading,
     isGridmaster,
     isSuperAdmin,
+    isImpersonating,
     canManageOrg,
-    canManageUsers: isSuperAdmin || isGridmaster,
-    canConfigureAdminPermissions: isSuperAdmin || isGridmaster,
+    canManageUsers: isImpersonating ? false : (isSuperAdmin || isGridmaster),
+    canConfigureAdminPermissions: isImpersonating ? false : (isSuperAdmin || isGridmaster),
     atLeast: (r: string) => level >= (ROLE_LEVEL[r] ?? 0),
   };
 }
@@ -126,11 +148,13 @@ const NO_PERMS: Permissions = buildPerms("user", null, false);
 
 let permsCache: Permissions | null = null;
 let permsCacheTimestamp = 0;
+let permsCacheUserId: string | null = null;
 
 /** Clear the cache (call on logout). */
 export function clearPermsCache(): void {
   permsCache = null;
   permsCacheTimestamp = 0;
+  permsCacheUserId = null;
 }
 
 /**
@@ -171,9 +195,10 @@ export function usePermissions(): Permissions {
     let mounted = true;
 
     /** Set both React state and module-level cache. */
-    function setPermsAndCache(p: Permissions) {
+    function setPermsAndCache(p: Permissions, userId: string | null = null) {
       permsCache = p;
       permsCacheTimestamp = Date.now();
+      permsCacheUserId = userId;
       if (mounted) setPerms(p);
     }
 
@@ -181,15 +206,61 @@ export function usePermissions(): Permissions {
       if (!mounted) return;
 
       if (!session?.access_token) {
-        setPermsAndCache(NO_PERMS);
+        setPermsAndCache(NO_PERMS, null);
         return;
+      }
+
+      // Invalidate cache if it belongs to a different user (e.g. logout → login
+      // as different account). Prevents stale role/org data from flashing.
+      const sessionUserId = session.user?.id ?? null;
+      if (permsCache && permsCacheUserId && permsCacheUserId !== sessionUserId) {
+        permsCache = null;
+        permsCacheTimestamp = 0;
+        permsCacheUserId = null;
+        if (mounted) setPerms({ ...LOADING_PERMS });
+      }
+
+      // ── Impersonation override ──────────────────────────────────────
+      // When a gridmaster has an active impersonation cookie, resolve
+      // permissions as the target user instead of the gridmaster.
+      if (typeof document !== "undefined") {
+        const imp = getImpersonationFromCookie(document.cookie);
+        if (imp) {
+          const targetRole = imp.targetOrgRole;
+          const targetOrgId = imp.targetOrgId;
+
+          if (targetRole === "super_admin") {
+            setPermsAndCache(buildPerms("super_admin", targetOrgId, false, null, true), sessionUserId);
+            return;
+          }
+
+          if (targetRole === "admin") {
+            // Fetch the target user's admin_permissions
+            const { data } = await supabase
+              .from("organization_memberships")
+              .select("org_role, admin_permissions")
+              .eq("user_id", imp.targetUserId)
+              .eq("org_id", targetOrgId)
+              .single();
+
+            if (mounted) {
+              const dbRole = data?.org_role ?? "user";
+              setPermsAndCache(buildPerms(dbRole, targetOrgId, false, data?.admin_permissions ?? null, true), sessionUserId);
+            }
+            return;
+          }
+
+          // user role
+          setPermsAndCache(buildPerms("user", targetOrgId, false, null, true), sessionUserId);
+          return;
+        }
       }
 
       const { effectiveRole, orgId } = extractJwtClaims(session.access_token);
 
       // gridmaster / super_admin: all perms, no DB query needed.
       if (effectiveRole === "gridmaster" || effectiveRole === "super_admin") {
-        setPermsAndCache(buildPerms(effectiveRole, orgId, false));
+        setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
         return;
       }
 
@@ -205,7 +276,7 @@ export function usePermissions(): Permissions {
 
         if (mounted) {
           const dbRole = data?.org_role ?? "user";
-          setPermsAndCache(buildPerms(dbRole, orgId, false, data?.admin_permissions ?? null));
+          setPermsAndCache(buildPerms(dbRole, orgId, false, data?.admin_permissions ?? null), sessionUserId);
         }
         return;
       }
@@ -220,7 +291,7 @@ export function usePermissions(): Permissions {
 
         if (mounted && profile) {
           if (profile.platform_role === "gridmaster") {
-            setPermsAndCache(buildPerms("gridmaster", profile.org_id, false));
+            setPermsAndCache(buildPerms("gridmaster", profile.org_id, false), sessionUserId);
             return;
           }
 
@@ -238,21 +309,27 @@ export function usePermissions(): Permissions {
                 profile.org_id,
                 false,
                 membership.admin_permissions ?? null,
-              ));
+              ), sessionUserId);
               return;
             }
           }
         }
       }
 
-      setPermsAndCache(buildPerms(effectiveRole, orgId, false));
+      setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
     }
 
     supabase.auth
       .getSession()
       .then(({ data: { session } }: { data: { session: Session | null } }) => {
-        // Skip re-resolve if cache is fresh (< 10s old — matches JWT refresh lock window)
-        if (permsCache && Date.now() - permsCacheTimestamp < 10_000) return;
+        // Skip re-resolve if cache is fresh (< 10s old) AND belongs to the same user.
+        // Still update local state from cache so every usePermissions() instance
+        // gets the resolved value (multiple hooks share one module-level cache).
+        const sameUser = !session?.user?.id || permsCacheUserId === session.user.id;
+        if (permsCache && sameUser && Date.now() - permsCacheTimestamp < 10_000) {
+          if (mounted) setPerms(permsCache);
+          return;
+        }
         loadSession(session);
       });
 
@@ -260,6 +337,13 @@ export function usePermissions(): Permissions {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: string, session: Session | null) => {
       if (event === "INITIAL_SESSION") return;
+      // On sign-out, immediately clear cached perms to prevent stale data
+      // flashing when a different user signs in.
+      if (event === "SIGNED_OUT") {
+        permsCache = null;
+        permsCacheTimestamp = 0;
+        permsCacheUserId = null;
+      }
       setPerms((prev) => ({ ...prev, isLoading: true }));
       loadSession(session);
     });

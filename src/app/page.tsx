@@ -373,10 +373,10 @@ export default function RootPage() {
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <Link
-              href="/login"
+              href="/request-demo"
               className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[var(--color-brand)] text-white font-semibold text-base hover:-translate-y-0.5 hover:shadow-xl transition-all duration-200"
             >
-              Get Started
+              Request Demo
               <ArrowRight size={18} className="ml-2" />
             </Link>
             <a
@@ -560,10 +560,10 @@ export default function RootPage() {
             Your team deserves a scheduling tool that just works.
           </p>
           <Link
-            href="/login"
+            href="/request-demo"
             className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 rounded-full bg-[var(--color-surface)] text-[var(--color-brand)] font-semibold text-base hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
           >
-            Get Started
+            Request Demo
             <ArrowRight size={18} />
           </Link>
         </div>
@@ -572,12 +572,15 @@ export default function RootPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
+          <a
+            href={typeof window !== "undefined" ? `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login` : "/login"}
+            className="flex items-center gap-2.5"
+          >
             <DubGridLogo size={20} color="#94A3B8" />
             <span className="text-xs text-slate-400">
               &copy; {new Date().getFullYear()} DubGrid
             </span>
-          </div>
+          </a>
           <div className="flex gap-6">
             <Link
               href="/privacy"

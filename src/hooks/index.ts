@@ -12,7 +12,7 @@ export type {
 export { useLogout } from "./useLogout";
 
 export { useOrganizationData, clearOrgDataCache } from "./useOrganizationData";
-export type { OrganizationData } from "./useOrganizationData";
+export type { OrganizationData, SetupStatus } from "./useOrganizationData";
 
 export { useEmployees, clearEmployeeCache } from "./useEmployees";
 export type { EmployeesData } from "./useEmployees";

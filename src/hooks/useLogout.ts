@@ -1,6 +1,7 @@
 // src/hooks/useLogout.ts
 import { supabase } from "@/lib/supabase";
 import { parseHost } from "@/lib/subdomain";
+import { clearImpersonationCookie } from "@/lib/impersonation";
 import { clearOrgDataCache } from "./useOrganizationData";
 import { clearEmployeeCache } from "./useEmployees";
 import { clearPermsCache } from "./usePermissions";
@@ -11,10 +12,11 @@ import { clearPermsCache } from "./usePermissions";
  * - signOutOthers: all other devices
  */
 export function useLogout() {
-  async function signOutLocal(): Promise<void> {
+  async function signOutLocal(redirectTo?: string): Promise<void> {
     clearOrgDataCache();
     clearEmployeeCache();
     clearPermsCache();
+    clearImpersonationCookie();
 
     // Clean up any active impersonation sessions for this user
     try {
@@ -23,7 +25,7 @@ export function useLogout() {
         await supabase
           .from("impersonation_sessions")
           .delete()
-          .eq("impersonator_id", session.user.id);
+          .eq("gridmaster_id", session.user.id);
       }
     } catch {
       // Best-effort cleanup — don't block logout
@@ -32,9 +34,14 @@ export function useLogout() {
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;
     sessionStorage.removeItem("dg_user_name");
-    const parsed = parseHost(window.location.host);
-    const apexUrl = `${window.location.protocol}//${parsed.rootDomain}${parsed.port}/`;
-    window.location.replace(apexUrl);
+
+    if (redirectTo) {
+      window.location.replace(redirectTo);
+    } else {
+      const parsed = parseHost(window.location.host);
+      const apexUrl = `${window.location.protocol}//${parsed.rootDomain}${parsed.port}/`;
+      window.location.replace(apexUrl);
+    }
   }
 
   async function signOutOthers(): Promise<void> {

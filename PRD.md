@@ -263,7 +263,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-38 | Staff Detail Overview   | Should   | ✅     | Full employee profile page with personal info, certifications, focus areas, and status.                                |
 | FR-39 | Staff Schedule Tab      | Should   | ✅     | Historical schedule view for an individual employee with date range filtering.                                          |
 | FR-40 | Staff Activity Tab      | Should   | ✅     | Employee activity timeline showing status changes, role changes, and events.                                            |
-| FR-41 | Staff Reports Tab       | Should   | ❌     | Hours reports, shift distribution charts, day-of-week patterns, and focus area distribution. Not yet implemented.      |
+| FR-41 | Staff Reports Tab       | Should   | ✅     | Hours reports, shift distribution charts, day-of-week patterns, and focus area distribution per employee.              |
 
 ### 7.9 Shift Requests
 
@@ -302,19 +302,22 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | `organizations`             | id, name, slug, address, phone, timezone, employee_count, focus_area_label, certification_label, role_label |
 | `profiles`                  | id (FK auth.users), org_id, platform_role (enum), version, role_locked                               |
 | `organization_memberships`  | user_id, org_id, org_role (enum), admin_permissions (JSONB), joined_at                               |
-| `employees`                 | id, org_id, name, status (active/benched/terminated), certifications[], roles[], focus_areas[], phone, email, seniority_rank, user_id (FK auth.users, nullable) |
-| `shifts`                    | emp_id, date (composite PK), org_id, draft_shift_code_ids[], published_shift_code_ids[], draft_is_delete, version (optimistic lock), series_id, from_recurring, custom_start_time, custom_end_time, focus_area_id |
-| `focus_areas`               | id, org_id, name, color, display_order, break_duration_minutes                                       |
-| `shift_codes`               | id, org_id, code, label, bg_color, text_color, border_color, default_start_time, default_end_time, is_off_day, certification_id, category_id |
-| `shift_categories`          | id, org_id, name, time_window_start, time_window_end, display_order                                 |
-| `schedule_notes`            | id, org_id, employee_id, date, focus_area_id, indicator_type_id, text, status (draft/published)     |
-| `indicator_types`           | id, org_id, name, color, icon                                                                        |
-| `certifications`            | id, org_id, name, abbreviation                                                                       |
-| `organization_roles`        | id, org_id, name, abbreviation                                                                       |
-| `recurring_shifts`          | id, org_id, emp_id, shift_code_id, day_of_week (0-6), effective_from, effective_until                |
-| `shift_series`              | id, org_id, employee_id, shift_code_id, recurrence (daily/weekly/biweekly), start_date, end_date, max_occurrences |
+| `employees`                 | id, org_id, first_name, last_name, status (active/benched/terminated), certification_id (FK), role_ids[], focus_area_ids[], phone, email, seniority, user_id (FK auth.users, nullable) |
+| `shifts`                    | emp_id, date (composite PK), org_id, draft_shift_code_ids[], published_shift_code_ids[], draft_absence_type_id, published_absence_type_id, draft_is_delete, version (optimistic lock), series_id, from_recurring, draft_custom_start_time, published_custom_start_time, focus_area_id |
+| `focus_areas`               | id, org_id, name, color_bg, color_text, sort_order, break_minutes                                    |
+| `shift_codes`               | id, org_id, label, name, color, text_color, border_color, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, category_id, focus_area_id, required_certification_ids[] |
+| `shift_categories`          | id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes              |
+| `schedule_notes`            | id, org_id, emp_id, date, indicator_type_id, status (published/draft/draft_deleted), focus_area_id   |
+| `indicator_types`           | id, org_id, name, color, sort_order                                                                  |
+| `certifications`            | id, org_id, name, abbr, sort_order                                                                   |
+| `organization_roles`        | id, org_id, name, abbr, sort_order                                                                   |
+| `recurring_shifts`          | id, org_id, emp_id, shift_code_id, absence_type_id, day_of_week (0-6), effective_from, effective_until |
+| `shift_series`              | id, org_id, emp_id, shift_code_id, frequency (daily/weekly/biweekly), days_of_week[], start_date, end_date, max_occurrences |
 | `coverage_requirements`     | id, org_id, focus_area_id, shift_code_id, day_of_week, min_staff                                    |
-| `shift_requests`            | id, org_id, type (pickup/swap), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, shift dates, shift codes |
+| `absence_types`             | id, org_id, label (X/V/S), name, color, border_color, text_color, sort_order                        |
+| `shift_requests`            | id, org_id, type (pickup/swap), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, admin_user_id, expires_at |
+| `schedule_draft_sessions`   | id, org_id, saved_by, start_date, end_date, saved_at                                                |
+| `publish_history`           | id, org_id, published_by, start_date, end_date, change_count, changes (JSONB), published_at         |
 
 ### 8.2 RBAC & Security Tables
 
@@ -364,7 +367,7 @@ Edge middleware (`middleware.ts`) enforces:
 | `/schedule`              | Authenticated   | Main schedule grid                                         |
 | `/schedules`             | Authenticated   | Redirect alias to `/schedule`                              |
 | `/staff`                 | Admin+          | Staff roster management                                    |
-| `/staff/[id]`            | Admin+          | Individual staff member detail (tabs: Overview, Schedule, Activity)          |
+| `/staff/[id]`            | Admin+          | Individual staff member detail (tabs: Overview, Schedule, Activity, Reports) |
 | `/settings`              | Admin+          | Organization configuration                                 |
 | `/profile`               | Authenticated   | User profile settings                                      |
 | `/gridmaster`            | Gridmaster      | Platform command center                                    |
@@ -435,7 +438,7 @@ AppShell.tsx (root layout — sidebar, header, navigation)
 │   ├── OverviewTab.tsx (profile, certs, focus areas)
 │   ├── ScheduleTab.tsx (historical schedule)
 │   ├── ActivityTab.tsx (timeline)
-│   └── (ReportsTab planned — not yet implemented)
+│   └── ReportsTab.tsx (hours, shift distribution, day patterns, focus area breakdown)
 │
 ├── SettingsPage.tsx (org configuration)
 │
@@ -504,11 +507,11 @@ gridmaster/page.tsx
 
 - Full-page employee profile view at `/staff/[id]`
 - Header: avatar, name, status badge, certifications
-- Tabs: Overview, Schedule, Activity
+- Tabs: Overview, Schedule, Activity, Reports
 - Overview: personal info, focus areas, roles, certifications
 - Schedule: historical shift view with date range picker
 - Activity: status change timeline, events
-- Reports tab planned but not yet implemented
+- Reports: hours history, shift distribution, day-of-week patterns, focus area breakdown
 
 ### 10.6 Print View
 
@@ -590,7 +593,7 @@ These items were open questions in previous PRD versions and have been resolved 
 | Cross-staff counting?            | Employees belong to multiple focus areas. Shift entries are per-employee per-date.            |
 | Authentication & RBAC?           | Fully implemented. Four-tier role hierarchy with granular admin permissions. JWT-based claims. |
 | Dashboard analytics?             | Implemented with stat cards, charts, coverage tracking, and expandable detail views.          |
-| Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity. Reports tab planned.                     |
+| Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity, Reports.                                 |
 | Shift requests?                  | Pickup and swap requests implemented with admin approval workflow.                            |
 | Coverage tracking?               | Coverage requirements and status visualization implemented.                                   |
 

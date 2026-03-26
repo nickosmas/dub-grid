@@ -1,7 +1,9 @@
 # Staff Detail Page — Comprehensive Employee Profile & Reports
 
+> **Status: COMPLETED** — This plan has been fully implemented. All tabs (Overview, Schedule, Activity, Reports) are live. Components are in `src/components/staff-detail/`, route at `src/app/staff/[id]/page.tsx`, stat computations in `src/lib/staff-detail-stats.ts`.
+
 ## Overview
-Create a full-page employee detail view at `/staff/[id]` with profile data, schedule history, hours analytics, account activity, and exportable reports. Clicking an employee name in the staff list navigates here.
+Full-page employee detail view at `/staff/[id]` with profile data, schedule history, hours analytics, account activity, and reports. Clicking an employee name in the staff list navigates here.
 
 ---
 

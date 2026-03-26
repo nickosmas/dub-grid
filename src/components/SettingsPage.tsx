@@ -511,7 +511,7 @@ function FocusAreaRow({
 }: {
   focusArea: FocusArea & { isNew?: boolean };
   onDeleted: (id: number) => void;
-  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string; breakMinutes: number | null }) => void;
+  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
   canManageFocusAreas: boolean;
   isDragging: boolean;
   isDropTarget: boolean;
@@ -525,7 +525,6 @@ function FocusAreaRow({
     name: focusArea.name,
     colorBg: focusArea.colorBg,
     colorText: focusArea.colorText,
-    breakMinutes: focusArea.breakMinutes ?? null as number | null,
   });
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -586,11 +585,6 @@ function FocusAreaRow({
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
           {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
         </span>
-        {focusArea.breakMinutes != null && focusArea.breakMinutes > 0 && (
-          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-            {focusArea.breakMinutes}m break
-          </span>
-        )}
       </div>
     );
   }
@@ -694,24 +688,6 @@ function FocusAreaRow({
         />
       </div>
 
-      {/* Break Duration */}
-      <div style={{ paddingLeft: 24, marginTop: 8 }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-        <label style={labelStyle}>BREAK (MIN)</label>
-        <input
-          type="number"
-          min={0}
-          max={480}
-          value={form.breakMinutes ?? ""}
-          onChange={(e) => {
-            const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
-            setForm((p) => ({ ...p, breakMinutes: val }));
-          }}
-          placeholder="No break"
-          draggable={false}
-          style={{ ...inputStyle, width: 120 }}
-        />
-      </div>
-
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete Focus Area?"
@@ -750,8 +726,8 @@ function FocusAreasSettings({
   const [saving, setSaving] = useState(false);
   const nextTmpId = useRef(-1);
 
-  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText, breakMinutes: fa.breakMinutes ?? null })))
-    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText, breakMinutes: fa.breakMinutes ?? null })));
+  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })))
+    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })));
 
   // Live preview: show items in dragged order without committing
   const displayList = useMemo(() => {
@@ -787,7 +763,6 @@ function FocusAreasSettings({
             colorBg: fa.colorBg,
             colorText: fa.colorText,
             sortOrder: fa.sortOrder,
-            breakMinutes: fa.breakMinutes ?? null,
           }),
         ),
       );
@@ -816,7 +791,7 @@ function FocusAreasSettings({
     setIsEditing(true);
   };
 
-  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string; breakMinutes: number | null }) => {
+  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string }) => {
     setLocalFocusAreas((prev) =>
       prev.map((fa) => (fa.id === id ? { ...fa, ...patch } : fa)),
     );
