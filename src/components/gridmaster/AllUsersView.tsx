@@ -35,7 +35,7 @@ export default function AllUsersView({
 }: {
   organizations: Organization[];
   onNavigateToOrg: (orgId: string) => void;
-  onImpersonate: (userId: string) => void;
+  onImpersonate: (userId: string, orgId?: string) => void;
 }) {
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +206,7 @@ export default function AllUsersView({
                         <button
                           className="dg-btn dg-btn-ghost"
                           style={{ fontSize: "var(--dg-fs-caption)", padding: "3px 8px" }}
-                          onClick={() => onImpersonate(u.id)}
+                          onClick={() => onImpersonate(u.id, u.orgId ?? undefined)}
                         >
                           Impersonate
                         </button>

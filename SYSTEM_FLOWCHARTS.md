@@ -333,15 +333,29 @@ erDiagram
     shift_codes {
         bigint id PK
         uuid org_id FK "→ organizations"
-        text label "e.g. D, EVE, N, OFF"
+        text label "e.g. D, EVE, N"
         text name "e.g. Day Shift"
         text color
-        boolean is_off_day "OFF/SICK/VACATION"
+        text border_color
+        text text_color
         bigint category_id FK "→ shift_categories"
         bigint focus_area_id FK "→ focus_areas"
         bigint_arr required_certification_ids "→ certifications[]"
         time default_start_time
         time default_end_time
+        numeric default_duration_hours
+        integer default_duration_minutes
+    }
+
+    absence_types {
+        bigint id PK
+        uuid org_id FK "→ organizations"
+        text label "e.g. X, V, S"
+        text name "e.g. Day Off, PTO, Sick"
+        text color
+        text border_color
+        text text_color
+        integer sort_order
     }
 
     shifts {
@@ -363,6 +377,7 @@ erDiagram
         uuid org_id FK "→ organizations"
         smallint day_of_week "0=Sun 6=Sat"
         bigint shift_code_id FK "→ shift_codes"
+        bigint absence_type_id FK "→ absence_types"
         date effective_from
         date effective_until
     }
@@ -511,6 +526,7 @@ erDiagram
     organizations ||--o{ organization_roles : "has roles"
     organizations ||--o{ shift_categories : "has categories"
     organizations ||--o{ shift_codes : "has codes"
+    organizations ||--o{ absence_types : "has absence types"
     organizations ||--o{ indicator_types : "has indicators"
     organizations ||--o{ coverage_requirements : "has requirements"
     organizations ||--o{ invitations : "sends invites"
@@ -534,6 +550,7 @@ erDiagram
     focus_areas ||--o{ coverage_requirements : "staffing rules"
 
     shift_categories ||--o{ shift_codes : "categorizes"
+    absence_types ||--o{ recurring_shifts : "template absence"
     shift_codes ||--o{ recurring_shifts : "template code"
     shift_codes ||--o{ shift_series : "series code"
     shift_codes ||--o{ coverage_requirements : "requirement for"

@@ -28,6 +28,14 @@ export const inviteLimiter = redis
   ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, "1 h") })
   : null;
 
+/**
+ * Demo request rate limiter — 3 requests per hour per key (IP).
+ * Returns `{ success: true }` if Redis is not configured (local dev).
+ */
+export const demoLimiter = redis
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(3, "1 h") })
+  : null;
+
 if (!hasRedisEnv) {
   if (process.env.NODE_ENV === "production") {
     console.error(

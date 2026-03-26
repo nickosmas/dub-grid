@@ -3,6 +3,29 @@ export const RESERVED_SUBDOMAINS = new Set([
   "www", "login", "gridmaster", "api", "admin", "status", "app",
 ]);
 
+/**
+ * Subdomains treated as apex (invisible to the router).
+ * "gridmaster" is intentionally excluded — it's a routable subdomain
+ * with its own portal, login, and middleware guards.
+ */
+const APEX_ALIAS_SUBDOMAINS = new Set([
+  "www", "login", "api", "admin", "status", "app",
+]);
+
+/** Validates a port number and returns the formatted port string (":port") or empty string if invalid. */
+export function getValidPort(portStr: string | number | null | undefined): string {
+  if (!portStr) return "";
+
+  const portNum = typeof portStr === "string" ? parseInt(portStr, 10) : portStr;
+
+  // Valid port range: 0-65535
+  if (Number.isInteger(portNum) && portNum >= 0 && portNum <= 65535) {
+    return `:${portNum}`;
+  }
+
+  return "";
+}
+
 export interface ParsedHost {
   subdomain: string | null;
   rootDomain: string;
@@ -13,7 +36,7 @@ export interface ParsedHost {
 export function parseHost(hostWithPort: string): ParsedHost {
   const [hostnamePart, portPart] = hostWithPort.split(":");
   const hostname = (hostnamePart || "").toLowerCase();
-  const port = portPart ? `:${portPart}` : "";
+  const port = getValidPort(portPart);
 
   if (!hostname) {
     return { subdomain: null, rootDomain: "", port, hostname };
@@ -25,10 +48,10 @@ export function parseHost(hostWithPort: string): ParsedHost {
   const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
   if (baseDomain && (hostname === baseDomain || hostname.endsWith("." + baseDomain))) {
     const subdomainPart = hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));
-    const isReserved = !!subdomainPart && RESERVED_SUBDOMAINS.has(subdomainPart);
+    const isApexAlias = !!subdomainPart && APEX_ALIAS_SUBDOMAINS.has(subdomainPart);
 
     return {
-      subdomain: isReserved ? null : subdomainPart,
+      subdomain: isApexAlias ? null : subdomainPart,
       rootDomain: baseDomain,
       port,
       hostname,
@@ -42,9 +65,9 @@ export function parseHost(hostWithPort: string): ParsedHost {
 
   // Local development subdomains like calmhaven.localhost
   if (labels.length === 2 && labels[1] === "localhost") {
-    const isReserved = RESERVED_SUBDOMAINS.has(labels[0]);
+    const isApexAlias = APEX_ALIAS_SUBDOMAINS.has(labels[0]);
     return {
-      subdomain: isReserved ? null : labels[0],
+      subdomain: isApexAlias ? null : labels[0],
       rootDomain: "localhost",
       port,
       hostname,
@@ -74,8 +97,8 @@ export function parseHost(hostWithPort: string): ParsedHost {
   }
 
   // 4. General heuristic (last resort)
-  const isReserved = RESERVED_SUBDOMAINS.has(labels[0]);
-  if (labels.length === 3 && isReserved) {
+  const isApexAlias = APEX_ALIAS_SUBDOMAINS.has(labels[0]);
+  if (labels.length === 3 && isApexAlias) {
     return {
       subdomain: null,
       rootDomain: labels.slice(1).join("."),

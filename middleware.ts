@@ -74,10 +74,10 @@ export async function middleware(req: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
-    pathname === "/gridmaster/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/accept-invite" ||
+    pathname === "/request-demo" ||
     pathname.startsWith("/api")
   ) {
     return NextResponse.next();
@@ -197,22 +197,89 @@ export async function middleware(req: NextRequest) {
   }
 
   // Calculate effective role - Requirement 11.1
-  const effectiveRole = calculateEffectiveRole(claims);
+  let effectiveRole = calculateEffectiveRole(claims);
+  let isImpersonating = false;
+
+  // ── Impersonation context override ───────────────────────────────────
+  // When a gridmaster has an active impersonation cookie, override the
+  // org context and effective role to match the target user. This makes
+  // route guards and headers reflect the impersonated identity.
+  // The gridmaster's JWT is unchanged — RLS still sees full access.
+  if (isGridmaster) {
+    const rawCookie = req.headers.get("cookie") ?? "";
+    const impCookiePrefix = "dubgrid-impersonation=";
+    const impCookie = rawCookie
+      .split("; ")
+      .find((c) => c.startsWith(impCookiePrefix));
+
+    if (impCookie) {
+      try {
+        const impData = JSON.parse(
+          decodeURIComponent(impCookie.slice(impCookiePrefix.length)),
+        );
+        const expired =
+          !impData.expiresAt ||
+          new Date(impData.expiresAt).getTime() <= Date.now();
+
+        if (expired) {
+          // Clear expired cookie
+          res.cookies.set("dubgrid-impersonation", "", {
+            path: "/",
+            maxAge: 0,
+          });
+        } else if (pathname.startsWith("/gridmaster") || subdomain === "gridmaster") {
+          // Safety escape: navigating to /gridmaster or gridmaster subdomain auto-ends impersonation
+          res.cookies.set("dubgrid-impersonation", "", {
+            path: "/",
+            maxAge: 0,
+          });
+        } else {
+          // Active impersonation — override context to target user
+          isImpersonating = true;
+          claims = {
+            ...claims,
+            org_id: impData.targetOrgId,
+            org_slug: impData.targetOrgSlug,
+            org_role: impData.targetOrgRole,
+          };
+          effectiveRole = impData.targetOrgRole ?? "user";
+        }
+      } catch {
+        // Malformed cookie — clear it
+        res.cookies.set("dubgrid-impersonation", "", {
+          path: "/",
+          maxAge: 0,
+        });
+      }
+    }
+  }
+
   const level = getRoleLevel(effectiveRole);
 
   // Gridmaster subdomain check - Requirement 11.1
-  if (subdomain === "gridmaster" && effectiveRole !== "gridmaster") {
+  if (subdomain === "gridmaster" && effectiveRole !== "gridmaster" && !isImpersonating) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
   // Keep org-scoped users on their org subdomain.
-  if (effectiveRole !== "gridmaster" && claims.org_slug) {
+  // Skip during impersonation — gridmaster stays on the current host.
+  if (!isImpersonating && effectiveRole !== "gridmaster" && claims.org_slug) {
     const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
     if (host !== expectedHost) {
       const url = new URL(req.url);
       url.host = expectedHost;
       return NextResponse.redirect(url);
     }
+  }
+
+  // Redirect /gridmaster to /dashboard on the gridmaster subdomain.
+  // The gridmaster portal renders at /dashboard when the user is a gridmaster.
+  if (isGridmaster && !isImpersonating && pathname.startsWith("/gridmaster") && subdomain !== "gridmaster") {
+    const gridmasterHost = buildSubdomainHost("gridmaster", parsedHost);
+    const url = new URL(req.url);
+    url.host = gridmasterHost;
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
   }
 
   // Route guards - Requirements 11.2, 11.3
@@ -227,17 +294,26 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
-  // Gridmaster-only route
-  if (pathname.startsWith("/gridmaster") && effectiveRole !== "gridmaster") {
+  // Gridmaster-only route — always allow actual gridmasters (even during impersonation,
+  // since /gridmaster access auto-ends impersonation above)
+  if (pathname.startsWith("/gridmaster") && !isGridmaster) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
+  // On gridmaster subdomain, redirect /gridmaster to /dashboard
+  // (the gridmaster portal renders at /dashboard for gridmaster users)
+  if (pathname.startsWith("/gridmaster") && subdomain === "gridmaster") {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
 
   // Inject headers - Requirement 11.5
   res.headers.set("x-dubgrid-role", effectiveRole);
   res.headers.set("x-dubgrid-org-id", claims.org_id ?? "");
   if (claims.org_slug) {
     res.headers.set("x-dubgrid-org-slug", claims.org_slug);
+  }
+  if (isImpersonating) {
+    res.headers.set("x-dubgrid-impersonating", "true");
   }
   return res;
 }

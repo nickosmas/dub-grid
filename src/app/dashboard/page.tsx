@@ -1,10 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
+import dynamic from "next/dynamic";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
+import SetupGuard from "@/components/SetupGuard";
 import DashboardView from "@/components/dashboard/DashboardView";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
+
+const GridmasterPortal = dynamic(() => import("@/app/gridmaster/page"), {
+  loading: () => null,
+});
 
 function DashboardPageContent() {
   const perms = usePermissions();
@@ -70,9 +76,21 @@ function DashboardPageContent() {
 }
 
 export default function DashboardPage() {
+  const { isGridmaster, isLoading } = usePermissions();
+
+  if (isLoading) return null;
+
+  // Gridmaster users see the gridmaster portal at /dashboard
+  // (the gridmaster subdomain makes the role obvious, no need for /gridmaster path)
+  if (isGridmaster) {
+    return <GridmasterPortal />;
+  }
+
   return (
     <ProtectedRoute>
-      <DashboardPageContent />
+      <SetupGuard>
+        <DashboardPageContent />
+      </SetupGuard>
     </ProtectedRoute>
   );
 }

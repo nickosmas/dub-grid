@@ -47,12 +47,11 @@ CREATE POLICY "own_profile_select"
   ON public.profiles FOR SELECT TO authenticated
   USING (id = auth.uid());
 
-CREATE POLICY "admin_profiles_select"
+CREATE POLICY "org_member_profiles_select"
   ON public.profiles FOR SELECT TO authenticated
   USING (
     org_id IS NOT NULL
     AND org_id = public.caller_org_id()
-    AND public.caller_org_role() IN ('admin', 'super_admin')
   );
 
 CREATE POLICY "admin_profiles_update"
@@ -677,5 +676,31 @@ CREATE POLICY "shift_requests_insert"
 CREATE POLICY "shift_requests_update"
   ON public.shift_requests FOR UPDATE TO authenticated
   USING (FALSE);
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 16. NOTIFICATIONS (own notifications only; system-generated via SECURITY DEFINER)
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own notifications
+CREATE POLICY "own_notifications_select"
+  ON public.notifications FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+-- Users can update (mark read) their own notifications
+CREATE POLICY "own_notifications_update"
+  ON public.notifications FOR UPDATE TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- Gridmaster can read all notifications (for support/debugging)
+CREATE POLICY "gridmaster_all_notifications"
+  ON public.notifications FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+-- No direct INSERT policy — notifications are system-generated via SECURITY DEFINER functions
 
 

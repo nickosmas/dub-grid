@@ -447,19 +447,47 @@ CREATE TABLE public.impersonation_sessions (
   gridmaster_id  UUID NOT NULL,
   target_user_id UUID NOT NULL,
   target_org_id  UUID NOT NULL,
+  justification  TEXT NOT NULL DEFAULT '',
+  ip_address     INET,
+  user_agent     TEXT,
   expires_at     TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '30 minutes',
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at       TIMESTAMPTZ,
+  end_reason     TEXT CHECK (end_reason IN ('manual', 'expired', 'navigation')),
 
-  CONSTRAINT one_active_session_per_target UNIQUE (gridmaster_id, target_user_id)
+  CONSTRAINT no_self_impersonation CHECK (gridmaster_id != target_user_id)
 );
 
-COMMENT ON TABLE public.impersonation_sessions IS 'Tracks active Gridmaster impersonation sessions for tenant user support';
+COMMENT ON TABLE public.impersonation_sessions IS 'Tracks Gridmaster impersonation sessions (active and historical) for tenant user support';
 COMMENT ON COLUMN public.impersonation_sessions.session_id IS 'Unique identifier for the impersonation session';
 COMMENT ON COLUMN public.impersonation_sessions.gridmaster_id IS 'The Gridmaster user performing the impersonation';
 COMMENT ON COLUMN public.impersonation_sessions.target_user_id IS 'The tenant user being impersonated';
 COMMENT ON COLUMN public.impersonation_sessions.target_org_id IS 'The organization of the target user for scoping data access';
+COMMENT ON COLUMN public.impersonation_sessions.justification IS 'Mandatory reason for why the impersonation was started (e.g. "Investigating scheduling bug reported in ticket #1234")';
+COMMENT ON COLUMN public.impersonation_sessions.ip_address IS 'IP address of the gridmaster when the session was created';
+COMMENT ON COLUMN public.impersonation_sessions.user_agent IS 'Browser user-agent string of the gridmaster at session creation';
 COMMENT ON COLUMN public.impersonation_sessions.expires_at IS 'Session expiry time (default 30 minutes from creation)';
 COMMENT ON COLUMN public.impersonation_sessions.created_at IS 'Timestamp when the session was created';
+COMMENT ON COLUMN public.impersonation_sessions.ended_at IS 'When the session was ended. NULL means still active or pending expiry';
+COMMENT ON COLUMN public.impersonation_sessions.end_reason IS 'How the session ended: manual (user clicked end), expired (time ran out), navigation (gridmaster navigated to /gridmaster)';
+COMMENT ON CONSTRAINT no_self_impersonation ON public.impersonation_sessions IS 'Prevents a gridmaster from impersonating themselves';
+
+
+-- ── notifications ───────────────────────────────────────────────────────────
+
+CREATE TABLE public.notifications (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL,
+  org_id     UUID,
+  type       TEXT NOT NULL CHECK (type IN ('impersonation_start', 'impersonation_end', 'system')),
+  title      TEXT NOT NULL,
+  message    TEXT NOT NULL,
+  metadata   JSONB DEFAULT '{}'::JSONB,
+  read_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.notifications IS 'In-app notifications for users (e.g. impersonation notices, system messages)';
 
 
 -- ── user_sessions ─────────────────────────────────────────────────────────────
@@ -717,6 +745,12 @@ ALTER TABLE public.impersonation_sessions
   ADD CONSTRAINT impersonation_sessions_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id),
   ADD CONSTRAINT impersonation_sessions_target_org_id_fkey FOREIGN KEY (target_org_id) REFERENCES public.organizations(id);
 
+-- notifications
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
 -- user_sessions
 ALTER TABLE public.user_sessions
   ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
@@ -853,7 +887,16 @@ CREATE INDEX idx_role_change_log_idempotency_key ON public.role_change_log(idemp
 CREATE INDEX idx_role_change_log_target_user_created ON public.role_change_log(target_user_id, created_at DESC);
 
 -- impersonation_sessions
+CREATE UNIQUE INDEX one_active_session_per_target
+  ON public.impersonation_sessions (gridmaster_id, target_user_id)
+  WHERE ended_at IS NULL;
 CREATE INDEX idx_impersonation_sessions_expires_at ON public.impersonation_sessions(expires_at);
+CREATE INDEX idx_impersonation_sessions_history ON public.impersonation_sessions(created_at DESC);
+
+-- notifications
+CREATE INDEX idx_notifications_user_unread ON public.notifications(user_id, created_at DESC) WHERE read_at IS NULL;
+CREATE INDEX idx_notifications_user_all ON public.notifications(user_id, created_at DESC);
+CREATE INDEX idx_notifications_user_org ON public.notifications(user_id, org_id, created_at DESC);
 
 -- user_sessions
 CREATE INDEX idx_user_sessions_user_last_active ON public.user_sessions(user_id, last_active_at DESC);

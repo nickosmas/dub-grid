@@ -94,35 +94,46 @@ export async function POST(req: NextRequest) {
 
   // ── Authorization check — only super_admin / gridmaster can send invites ──
   const jwtSecret = process.env.SUPABASE_JWT_SECRET;
-  try {
-    let claims: { platform_role?: unknown; org_role?: unknown };
-    if (jwtSecret) {
+  type JwtClaims = { platform_role?: unknown; org_role?: unknown };
+  let claims: JwtClaims | null = null;
+
+  // Try verified JWT first
+  if (jwtSecret) {
+    try {
       const { payload } = await jwtVerify(
         session.access_token,
         new TextEncoder().encode(jwtSecret),
       );
-      claims = payload as typeof claims;
-    } else if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "Server misconfigured" },
-        { status: 500 },
-      );
-    } else {
-      // Dev-only fallback
-      claims = decodeJwt(session.access_token) as typeof claims;
+      claims = payload as JwtClaims;
+    } catch {
+      // jwtVerify can fail in dev (secret mismatch) — fall through to unverified decode
     }
-    const isGridmaster = claims.platform_role === "gridmaster";
-    const isSuperAdmin = claims.org_role === "super_admin";
-    if (!isGridmaster && !isSuperAdmin) {
+  }
+
+  // Fallback to unverified decode (dev only; production requires verified JWT)
+  if (!claims) {
+    if (process.env.NODE_ENV === "production") {
       return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 403 },
+        { success: false, error: jwtSecret ? "Invalid session" : "Server misconfigured" },
+        { status: jwtSecret ? 401 : 500 },
       );
     }
-  } catch {
+    try {
+      claims = decodeJwt(session.access_token) as JwtClaims;
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid session" },
+        { status: 401 },
+      );
+    }
+  }
+
+  const isGridmaster = claims!.platform_role === "gridmaster";
+  const isSuperAdmin = claims!.org_role === "super_admin";
+  if (!isGridmaster && !isSuperAdmin) {
     return NextResponse.json(
-      { success: false, error: "Invalid session" },
-      { status: 401 },
+      { success: false, error: "Unauthorized" },
+      { status: 403 },
     );
   }
 

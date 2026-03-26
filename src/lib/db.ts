@@ -385,6 +385,19 @@ export async function fetchUserOrganization(): Promise<Organization | null> {
 
 
 
+/** Fetch a single organization by its ID (used during impersonation). */
+export async function fetchOrganizationById(orgId: string): Promise<Organization | null> {
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("id", orgId)
+    .maybeSingle();
+
+  if (error) throw new Error(`fetchOrganizationById error: ${error.message}`);
+  if (!data) return null;
+  return rowToOrganization(data as DbOrganization);
+}
+
 export async function updateOrganization(org: Organization): Promise<void> {
   const { error } = await supabase
     .from("organizations")
@@ -601,7 +614,6 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
     color_bg: focusArea.colorBg,
     color_text: focusArea.colorText,
     sort_order: focusArea.sortOrder,
-    break_minutes: focusArea.breakMinutes ?? null,
   };
   if (focusArea.id) {
     const { data, error } = await supabase
@@ -1685,18 +1697,94 @@ export async function revokeUserSession(refreshTokenHash: string): Promise<void>
   if (error) throw error;
 }
 
-export async function startImpersonation(targetUserId: string) {
+export async function startImpersonation(
+  targetUserId: string,
+  justification: string,
+  ipAddress?: string,
+  userAgent?: string,
+  targetOrgId?: string,
+) {
   const { data, error } = await supabase.rpc("start_impersonation", {
     p_target_user_id: targetUserId,
+    p_justification: justification,
+    p_ip_address: ipAddress ?? null,
+    p_user_agent: userAgent ?? null,
+    p_target_org_id: targetOrgId ?? null,
   });
   if (error) throw error;
   return data as { session_id: string; expires_at: string };
 }
 
-export async function endImpersonation(sessionId: string): Promise<void> {
+export async function endImpersonation(sessionId: string, reason: string = 'manual'): Promise<void> {
   const { error } = await supabase.rpc("end_impersonation", {
     p_session_id: sessionId,
+    p_reason: reason,
   });
+  if (error) throw error;
+}
+
+export async function fetchImpersonationHistory(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<import("@/types").ImpersonationHistoryEntry[]> {
+  const { data, error } = await supabase.rpc("get_impersonation_history", {
+    p_limit: options?.limit ?? 50,
+    p_offset: options?.offset ?? 0,
+  });
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    sessionId: row.session_id as string,
+    gridmasterId: row.gridmaster_id as string,
+    gridmasterEmail: row.gridmaster_email as string,
+    targetUserId: row.target_user_id as string,
+    targetEmail: row.target_email as string,
+    targetOrgId: row.target_org_id as string,
+    targetOrgName: (row.target_org_name as string | null) ?? null,
+    justification: (row.justification as string) ?? "",
+    ipAddress: (row.ip_address as string | null) ?? null,
+    userAgent: (row.user_agent as string | null) ?? null,
+    createdAt: row.created_at as string,
+    endedAt: (row.ended_at as string | null) ?? null,
+    endReason: (row.end_reason as string | null) ?? null,
+    expiresAt: row.expires_at as string,
+  }));
+}
+
+export async function fetchNotifications(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<import("@/types").Notification[]> {
+  const { data, error } = await supabase.rpc("get_notifications", {
+    p_limit: options?.limit ?? 20,
+    p_offset: options?.offset ?? 0,
+  });
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    id: row.id as string,
+    type: row.type as import("@/types").NotificationType,
+    title: row.title as string,
+    message: row.message as string,
+    metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    readAt: (row.read_at as string | null) ?? null,
+    createdAt: row.created_at as string,
+  }));
+}
+
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  const { data, error } = await supabase.rpc("get_unread_notification_count");
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const { error } = await supabase.rpc("mark_notification_read", {
+    p_notification_id: notificationId,
+  });
+  if (error) throw error;
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const { error } = await supabase.rpc("mark_all_notifications_read");
   if (error) throw error;
 }
 
@@ -2183,6 +2271,7 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
       slug: data.slug || null,
       address: data.address || '',
       phone: data.phone || '',
+      employee_count: data.employeeCount ?? null,
       focus_area_label: data.focusAreaLabel || null,
       certification_label: data.certificationLabel || null,
       role_label: data.roleLabel || null,
@@ -2222,6 +2311,7 @@ export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]>
     orgRole: (row.org_role as string | null) as import("@/types").OrganizationRole | null,
     orgId: (row.org_id as string | null) ?? null,
     orgName: (row.org_name as string | null) ?? null,
+    orgSlug: (row.org_slug as string | null) ?? null,
     createdAt: row.created_at as string,
     lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
   }));
@@ -2265,17 +2355,17 @@ export async function removeUserFromOrganization(
 }
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {
-  const [{ data: profileData, error: pErr }, { data: empData, error: eErr }] =
+  const [{ data: memberData, error: mErr }, { data: empData, error: eErr }] =
     await Promise.all([
-      supabase.from("profiles").select("org_id").neq("platform_role", "gridmaster"),
+      supabase.from("organization_memberships").select("org_id"),
       supabase.from("employees").select("org_id").is("archived_at", null),
     ]);
-  if (pErr) throw pErr;
+  if (mErr) throw mErr;
   if (eErr) throw eErr;
 
   const statsMap = new Map<string, TenantStats>();
 
-  for (const row of profileData ?? []) {
+  for (const row of memberData ?? []) {
     const cid = row.org_id;
     if (!cid) continue;
     const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };

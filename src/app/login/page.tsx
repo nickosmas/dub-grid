@@ -7,7 +7,7 @@ import { decodeJwt } from "jose";
 import { toast } from "sonner";
 
 import Link from "next/link";
-import { parseHost } from "@/lib/subdomain";
+import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
@@ -126,12 +126,14 @@ function DomainSelector() {
   // Hidden gridmaster entry — 5 taps on logo within 3s
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleLogoTap = useCallback(() => {
+  const handleLogoTap = useCallback((e: React.MouseEvent) => {
     tapCountRef.current += 1;
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
     if (tapCountRef.current >= 5) {
+      e.preventDefault();
       tapCountRef.current = 0;
-      window.location.href = "/gridmaster/login";
+      const gridmasterHost = buildSubdomainHost("gridmaster", parsed!);
+      window.location.href = `${window.location.protocol}//${gridmasterHost}/login`;
       return;
     }
     tapTimerRef.current = setTimeout(() => {
@@ -168,15 +170,16 @@ function DomainSelector() {
     }
 
     const { protocol, port } = window.location;
-    const portStr = port ? `:${port}` : "";
+    const portStr = getValidPort(port);
     window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login?verified=1`;
   }
 
   return (
     <PageShell footerCenteredOnly>
       <Card>
-        {/* Logo — hidden gridmaster entry on 5 rapid taps */}
-        <div
+        {/* Logo — links to landing page; hidden gridmaster entry on 5 rapid taps */}
+        <a
+          href="/"
           onClick={handleLogoTap}
           style={{
             display: "flex",
@@ -186,11 +189,12 @@ function DomainSelector() {
             marginBottom: "32px",
             userSelect: "none",
             WebkitTapHighlightColor: "transparent",
+            textDecoration: "none",
           }}
         >
           <DubGridLogo size={52} />
           <DubGridWordmark />
-        </div>
+        </a>
 
         <p
           style={{
@@ -393,6 +397,9 @@ function GridmasterLogin() {
   const [loading, setLoading] = useState(false);
   const showLoadingText = useDelayedFlag(loading);
 
+  const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
+  const landingUrl = `${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -404,7 +411,7 @@ function GridmasterLogin() {
       });
       if (error) throw error;
 
-      window.location.replace("/gridmaster");
+      window.location.replace("/dashboard");
 
       setTimeout(() => {
         setLoading(false);
@@ -452,13 +459,15 @@ function GridmasterLogin() {
           border: "1px solid #0040A0",
         }}
       >
-        <div
+        <a
+          href={landingUrl}
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: "10px",
             marginBottom: "28px",
+            textDecoration: "none",
           }}
         >
           <DubGridLogo size={48} color="#EFF5FF" />
@@ -473,7 +482,7 @@ function GridmasterLogin() {
           >
             Gridmaster Portal
           </span>
-        </div>
+        </a>
 
         <h1
           style={{
@@ -576,6 +585,46 @@ function GridmasterLogin() {
             {showLoadingText ? "Authenticating…" : "Access Portal"}
           </button>
         </form>
+
+        {/* Navigation links */}
+        <div
+          style={{
+            marginTop: "20px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <a
+            href={`${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#6690CC",
+              fontSize: "var(--dg-fs-label)",
+              cursor: "pointer",
+              padding: 0,
+              textDecoration: "underline",
+            }}
+          >
+            Back to Standard Login
+          </a>
+          <a
+            href={landingUrl}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#4A6A9A",
+              fontSize: "var(--dg-fs-label)",
+              cursor: "pointer",
+              padding: 0,
+              textDecoration: "underline",
+            }}
+          >
+            Back to Home
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -604,8 +653,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         if (!cancelled && !valid) {
           const parsed = parseHost(window.location.host);
           const { protocol } = window.location;
-          const portStr = parsed.port || "";
-          window.location.replace(`${protocol}//${parsed.rootDomain}${portStr}/login`);
+          window.location.replace(`${protocol}//${parsed.rootDomain}${parsed.port}/login`);
         }
       } catch {
         // Network error — allow login attempt; JWT check catches mismatches
@@ -708,19 +756,21 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   return (
     <PageShell>
       <Card>
-        {/* Logo */}
-        <div
+        {/* Logo — links to apex landing page */}
+        <a
+          href={`${typeof window !== "undefined" ? window.location.protocol : "https:"}//${baseDomain}${parsed?.port ?? ""}/`}
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: "10px",
             marginBottom: "28px",
+            textDecoration: "none",
           }}
         >
           <DubGridLogo size={52} />
           <DubGridWordmark />
-        </div>
+        </a>
 
         {/* Organization badge */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
@@ -852,7 +902,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             type="button"
             onClick={() => {
               const { protocol, port } = window.location;
-              const portStr = port ? `:${port}` : "";
+              const portStr = getValidPort(port);
               const target = `${protocol}//${baseDomain}${portStr}/login`;
               window.location.href = target;
             }}

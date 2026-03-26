@@ -412,7 +412,47 @@ export interface ImpersonationSession {
   gridmasterId: string;
   targetUserId: string;
   targetOrgId: string;
+  /** Mandatory reason for why the impersonation was started. */
+  justification: string;
+  /** IP address of the gridmaster at session start. */
+  ipAddress: string | null;
+  /** User agent of the gridmaster at session start. */
+  userAgent: string | null;
   expiresAt: string;
+  createdAt: string;
+  endedAt: string | null;
+  endReason: string | null;
+}
+
+export interface ImpersonationHistoryEntry {
+  sessionId: string;
+  gridmasterId: string;
+  gridmasterEmail: string;
+  targetUserId: string;
+  targetEmail: string;
+  targetOrgId: string;
+  targetOrgName: string | null;
+  /** Mandatory reason for why the impersonation was started. */
+  justification: string;
+  /** IP address of the gridmaster at session start. */
+  ipAddress: string | null;
+  /** User agent of the gridmaster at session start. */
+  userAgent: string | null;
+  createdAt: string;
+  endedAt: string | null;
+  endReason: string | null;
+  expiresAt: string;
+}
+
+export type NotificationType = 'impersonation_start' | 'impersonation_end' | 'system';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  metadata: Record<string, unknown>;
+  readAt: string | null;
   createdAt: string;
 }
 
@@ -490,6 +530,7 @@ export interface PlatformUser {
   orgRole: OrganizationRole | null;
   orgId: string | null;
   orgName: string | null;
+  orgSlug: string | null;
   createdAt: string;
   lastSignInAt: string | null;
 }

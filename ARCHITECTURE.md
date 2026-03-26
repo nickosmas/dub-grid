@@ -96,7 +96,7 @@ Super Admin (3) ── org_role = 'super_admin'
     │                Full org access, manages users + permissions
     ▼
 Admin (2) ──────── org_role = 'admin'
-    │                Configurable per-user permissions (17 flags)
+    │                Configurable per-user permissions (16 flags)
     ▼
 User (0) ───────── org_role = 'user'
                      Read-only (canViewSchedule + canViewStaff)
@@ -279,7 +279,7 @@ DubGrid uses Supabase Realtime for three purposes:
 | **4-file migration strategy** | Eliminates migration ordering issues, makes full schema readable, simplifies resets. Trade-off: merge conflicts on team, but acceptable at current team size. |
 | **Subdomain-based multi-tenancy** | Strongest tenant isolation — org context is in the URL, not a query parameter. Prevents accidental cross-tenant data access. |
 | **JWT claims at top level** | Middleware reads `payload.platform_role` directly. Avoids the `app_metadata` nesting that Supabase defaults to, which is harder to parse at the edge. |
-| **Per-user admin permissions (JSONB)** | More flexible than fixed roles. Organizations can create custom permission profiles without schema changes. 17 flags cover all current capabilities. |
+| **Per-user admin permissions (JSONB)** | More flexible than fixed roles. Organizations can create custom permission profiles without schema changes. 16 flags cover all current capabilities. |
 | **No global state store** | React Query handles server state; local state handles UI. Avoids the complexity and boilerplate of Redux/Zustand for an app that is primarily server-data driven. |
 | **Optimistic locking over pessimistic** | Allows concurrent editing without blocking. Lock violations are rare in practice (shown by cell lock feature reducing conflicts). Better UX than waiting for locks. |
 | **Simple routes (no catch-all)** | Vercel statically prerenders simple routes at build time. Catch-all routes (`[[...slug]]`) force dynamic serverless rendering, which is slower and more expensive. |

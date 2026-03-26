@@ -12,7 +12,7 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 - **Real-Time Collaboration** — Live sync via Supabase Realtime with cell locks and presence indicators
 - **Dashboard Analytics** — KPI cards, coverage charts, shift breakdowns, activity feeds with expandable detail views
 - **Staff Management** — Full employee lifecycle (add, edit, bench, terminate) with certifications, roles, and focus areas
-- **Staff Detail Pages** — Tabbed views per employee: Overview, Schedule, Activity
+- **Staff Detail Pages** — Tabbed views per employee: Overview, Schedule, Activity, Reports
 - **Coverage Tracking** — Define minimum staffing requirements; visualize coverage status per section
 - **Shift Requests** — Pickup and swap request workflow with admin approval
 - **Gridmaster Portal** — Platform-wide org management, user impersonation, audit logs, permission configuration
@@ -123,14 +123,19 @@ middleware.ts               # Edge middleware for RBAC + subdomain routing
 
 ## Available Scripts
 
-| Script              | Description                                              |
-| ------------------- | -------------------------------------------------------- |
-| `npm run dev`       | Start Next.js dev server                                 |
-| `npm run build`     | Production build                                         |
-| `npm run start`     | Start production server                                  |
-| `npm test`          | Run unit + component tests (Vitest)                      |
-| `npm run db:reset`  | Reset local Supabase DB (runs migrations + seed)         |
-| `npm run db:reset:remote` | Reset remote Supabase DB (for staging environments) |
+| Script                    | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `npm run dev`             | Start Next.js dev server                                 |
+| `npm run build`           | Production build                                         |
+| `npm run start`           | Start production server                                  |
+| `npm test`                | Run unit + component tests (Vitest)                      |
+| `npm run test:e2e`        | Run Playwright end-to-end tests                          |
+| `npm run test:e2e:ui`     | Run Playwright tests with interactive UI                 |
+| `npm run seed`            | Seed the local database with test data                   |
+| `npm run db:reset`        | Reset local Supabase DB (runs migrations + seed)         |
+| `npm run db:reset:remote` | Reset remote Supabase DB (for staging environments)      |
+| `npm run use:local`       | Switch .env.local to local Supabase credentials          |
+| `npm run use:remote`      | Switch .env.local to remote Supabase credentials         |
 
 ## Database
 

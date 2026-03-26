@@ -5,10 +5,11 @@ import { usePermissions, useLogout, useMediaQuery, MOBILE } from "@/hooks";
 import { DubGridLogo } from "@/components/Logo";
 import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
-import CreateOrganizationForm from "@/components/gridmaster/CreateOrganizationForm";
-import AllUsersView from "@/components/gridmaster/AllUsersView";
+import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
+
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
+import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
 import {
   fetchAllOrganizations,
   fetchTenantStats,
@@ -18,10 +19,10 @@ import type { Organization } from "@/types";
 
 type GridmasterView =
   | "dashboard"
-  | "all-users"
   | "audit-log"
   | "organization"
   | "impersonation"
+  | "impersonation-history"
   | "create-organization";
 
 // ── Sidebar link (same pattern as StaffView / SettingsPage) ──────────────────
@@ -113,12 +114,6 @@ const DashboardIcon = (
   </svg>
 );
 
-const UsersIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
 
 const AuditIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -138,6 +133,13 @@ const ImpersonateIcon = (
 const PlusIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+const HistoryIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
   </svg>
 );
 
@@ -303,6 +305,12 @@ export default function GridmasterPage() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
   const { signOutLocal } = useLogout();
   const isMobile = useMediaQuery(MOBILE);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = useCallback(async () => {
+    setSigningOut(true);
+    await signOutLocal("/login");
+  }, [signOutLocal]);
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [stats, setStats] = useState<Map<string, TenantStats>>(new Map());
@@ -312,6 +320,7 @@ export default function GridmasterPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<GridmasterView>("dashboard");
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
+  const [impersonateOrgId, setImpersonateOrgId] = useState<string | undefined>();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -349,7 +358,7 @@ export default function GridmasterPage() {
 
   // ── Loading / denied states ──────────────────────────────────────────────
 
-  if (permLoading || (isGridmaster && loading)) {
+  if (permLoading || signingOut || (isGridmaster && loading)) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center" }}>
         <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>Loading…</span>
@@ -382,10 +391,10 @@ export default function GridmasterPage() {
     setView("organization");
   }
 
-  function handleImpersonate(userId: string) {
+  function handleImpersonate(userId: string, orgId?: string) {
     setImpersonateTargetId(userId);
+    setImpersonateOrgId(orgId);
     setView("impersonation");
-    setSelectedId(null);
   }
 
   function handleOrgCreated(org: Organization) {
@@ -446,7 +455,7 @@ export default function GridmasterPage() {
         </div>
         {!isMobile && (
           <button
-            onClick={signOutLocal}
+            onClick={handleSignOut}
             className="dg-btn dg-btn-ghost"
             style={{ fontSize: "var(--dg-fs-label)" }}
           >
@@ -460,15 +469,16 @@ export default function GridmasterPage() {
         <div className="dg-mobile-section-bar">
           {([
             { key: "dashboard", label: "Dashboard" },
-            { key: "all-users", label: "Users" },
+
             { key: "audit-log", label: "Audit" },
             { key: "create-organization", label: "New Org" },
             { key: "impersonation", label: "Impersonate" },
+            { key: "impersonation-history", label: "History" },
           ] as { key: GridmasterView; label: string }[]).map((item) => (
             <button
               key={item.key}
               className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
-              onClick={() => { setView(item.key); setSelectedId(null); if (item.key === "impersonation") setImpersonateTargetId(undefined); }}
+              onClick={() => { setView(item.key); setSelectedId(null); if (item.key === "impersonation") { setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } }}
             >
               {item.label}
             </button>
@@ -529,12 +539,7 @@ export default function GridmasterPage() {
                 active={view === "dashboard"}
                 onClick={() => { setView("dashboard"); setSelectedId(null); }}
               />
-              <SidebarLink
-                label="All Users"
-                icon={UsersIcon}
-                active={view === "all-users"}
-                onClick={() => { setView("all-users"); setSelectedId(null); }}
-              />
+
               <SidebarLink
                 label="Audit Log"
                 icon={AuditIcon}
@@ -583,7 +588,13 @@ export default function GridmasterPage() {
                 label="Impersonation"
                 icon={ImpersonateIcon}
                 active={view === "impersonation"}
-                onClick={() => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); }}
+                onClick={() => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); }}
+              />
+              <SidebarLink
+                label="Impersonation History"
+                icon={HistoryIcon}
+                active={view === "impersonation-history"}
+                onClick={() => { setView("impersonation-history"); setSelectedId(null); }}
               />
             </div>
           </aside>
@@ -618,20 +629,13 @@ export default function GridmasterPage() {
             />
           )}
 
-          {view === "all-users" && (
-            <AllUsersView
-              organizations={organizations}
-              onNavigateToOrg={selectOrg}
-              onImpersonate={handleImpersonate}
-            />
-          )}
 
           {view === "audit-log" && (
             <AuditLogView />
           )}
 
           {view === "create-organization" && (
-            <CreateOrganizationForm
+            <OrganizationSetupWizard
               onCreated={handleOrgCreated}
               onCancel={() => setView("dashboard")}
             />
@@ -673,8 +677,14 @@ export default function GridmasterPage() {
 
           {view === "impersonation" && (
             <EnhancedImpersonation
+              organizations={organizations}
+              initialOrgId={impersonateOrgId}
               initialTargetId={impersonateTargetId}
             />
+          )}
+
+          {view === "impersonation-history" && (
+            <ImpersonationHistory />
           )}
         </main>
       </div>

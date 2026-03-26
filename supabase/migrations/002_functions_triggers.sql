@@ -1382,7 +1382,13 @@ GRANT EXECUTE ON FUNCTION public.link_employee_to_user(UUID, UUID, UUID) TO auth
 
 -- ── start_impersonation ───────────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION public.start_impersonation(p_target_user_id UUID)
+CREATE OR REPLACE FUNCTION public.start_impersonation(
+  p_target_user_id UUID,
+  p_justification TEXT,
+  p_ip_address INET DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL,
+  p_target_org_id UUID DEFAULT NULL
+)
 RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -1390,43 +1396,262 @@ AS $$
 DECLARE
   v_session impersonation_sessions;
   v_target_org_id UUID;
+  v_caller_id UUID;
+  v_active_count INTEGER;
 BEGIN
   IF NOT public.is_gridmaster() THEN
     RAISE EXCEPTION 'Only gridmaster can impersonate users';
   END IF;
 
-  SELECT org_id INTO v_target_org_id
-  FROM profiles WHERE id = p_target_user_id;
+  v_caller_id := auth.uid();
+
+  -- Self-impersonation prevention (defense in depth with CHECK constraint)
+  IF v_caller_id = p_target_user_id THEN
+    RAISE EXCEPTION 'Cannot impersonate yourself';
+  END IF;
+
+  -- Validate justification (minimum 10 characters for meaningful reason)
+  IF length(trim(p_justification)) < 10 THEN
+    RAISE EXCEPTION 'Justification must be at least 10 characters';
+  END IF;
+
+  -- Multi-level impersonation prevention: block if caller already has an active session
+  SELECT count(*) INTO v_active_count
+  FROM impersonation_sessions
+  WHERE gridmaster_id = v_caller_id
+    AND ended_at IS NULL
+    AND expires_at > now();
+
+  IF v_active_count > 0 THEN
+    RAISE EXCEPTION 'Cannot start a new impersonation while another session is active. End the current session first.';
+  END IF;
+
+  -- Resolve target org: use explicit param if provided, else fall back to profile
+  IF p_target_org_id IS NOT NULL THEN
+    -- Validate that the target user has a membership in the specified org
+    IF NOT EXISTS (
+      SELECT 1 FROM organization_memberships
+      WHERE user_id = p_target_user_id AND org_id = p_target_org_id
+    ) THEN
+      RAISE EXCEPTION 'Target user does not belong to the specified organization';
+    END IF;
+    v_target_org_id := p_target_org_id;
+  ELSE
+    SELECT org_id INTO v_target_org_id
+    FROM profiles WHERE id = p_target_user_id;
+  END IF;
 
   IF v_target_org_id IS NULL THEN
     RAISE EXCEPTION 'Target user not found or has no organization';
   END IF;
 
-  INSERT INTO impersonation_sessions (gridmaster_id, target_user_id, target_org_id)
-    VALUES (auth.uid(), p_target_user_id, v_target_org_id)
+  INSERT INTO impersonation_sessions (
+    gridmaster_id, target_user_id, target_org_id,
+    justification, ip_address, user_agent
+  )
+  VALUES (
+    v_caller_id, p_target_user_id, v_target_org_id,
+    trim(p_justification), p_ip_address, p_user_agent
+  )
   RETURNING * INTO v_session;
+
+  -- Notify the target user about the impersonation (scoped to target org)
+  INSERT INTO notifications (user_id, org_id, type, title, message, metadata)
+  VALUES (
+    p_target_user_id,
+    v_target_org_id,
+    'impersonation_start',
+    'Account access notice',
+    'A platform administrator is currently reviewing your account for support purposes.',
+    jsonb_build_object(
+      'session_id', v_session.session_id,
+      'expires_at', v_session.expires_at,
+      'justification', trim(p_justification)
+    )
+  );
 
   RETURN jsonb_build_object('session_id', v_session.session_id, 'expires_at', v_session.expires_at);
 END;
 $$;
 
-COMMENT ON FUNCTION public.start_impersonation IS 'Creates an impersonation session for a Gridmaster to impersonate a target user. Returns session_id and expires_at.';
+COMMENT ON FUNCTION public.start_impersonation IS 'Creates an impersonation session for a Gridmaster. Requires mandatory justification (min 10 chars). Prevents self-impersonation and multi-level impersonation. Inserts a notification for the target user. Returns session_id and expires_at.';
 
 
 -- ── end_impersonation ─────────────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION public.end_impersonation(p_session_id UUID)
+CREATE OR REPLACE FUNCTION public.end_impersonation(
+  p_session_id UUID,
+  p_reason TEXT DEFAULT 'manual'
+)
+RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_target_user_id UUID;
+  v_target_org_id  UUID;
+BEGIN
+  -- Soft-delete: update instead of delete
+  UPDATE impersonation_sessions
+     SET ended_at = now(),
+         end_reason = p_reason
+   WHERE session_id = p_session_id
+     AND gridmaster_id = auth.uid()
+     AND ended_at IS NULL
+  RETURNING target_user_id, target_org_id INTO v_target_user_id, v_target_org_id;
+
+  -- Notify the target user that the impersonation ended (scoped to target org)
+  IF v_target_user_id IS NOT NULL THEN
+    INSERT INTO notifications (user_id, org_id, type, title, message, metadata)
+    VALUES (
+      v_target_user_id,
+      v_target_org_id,
+      'impersonation_end',
+      'Account access ended',
+      'A platform administrator has finished reviewing your account.',
+      jsonb_build_object('session_id', p_session_id, 'end_reason', p_reason)
+    );
+  END IF;
+END;
+$$;
+
+COMMENT ON FUNCTION public.end_impersonation IS 'Soft-ends an impersonation session (sets ended_at + reason). Inserts a notification for the target user.';
+
+
+-- ── get_impersonation_history ─────────────────────────────────────────────────
+
+-- Must DROP first because return type is changing (new columns added)
+DROP FUNCTION IF EXISTS public.get_impersonation_history(INTEGER, INTEGER);
+
+CREATE OR REPLACE FUNCTION public.get_impersonation_history(
+  p_limit  INTEGER DEFAULT 50,
+  p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+  session_id       UUID,
+  gridmaster_id    UUID,
+  gridmaster_email TEXT,
+  target_user_id   UUID,
+  target_email     TEXT,
+  target_org_id    UUID,
+  target_org_name  TEXT,
+  justification    TEXT,
+  ip_address       INET,
+  user_agent       TEXT,
+  created_at       TIMESTAMPTZ,
+  ended_at         TIMESTAMPTZ,
+  end_reason       TEXT,
+  expires_at       TIMESTAMPTZ
+)
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  -- Lazy cleanup: mark expired-but-unclosed sessions
+  UPDATE impersonation_sessions imp
+     SET ended_at = imp.expires_at,
+         end_reason = 'expired'
+   WHERE imp.ended_at IS NULL
+     AND imp.expires_at < now();
+
+  RETURN QUERY
+  SELECT s.session_id, s.gridmaster_id, gm.email::TEXT,
+         s.target_user_id, tu.email::TEXT,
+         s.target_org_id, o.name,
+         s.justification, s.ip_address, s.user_agent,
+         s.created_at, s.ended_at, s.end_reason, s.expires_at
+  FROM impersonation_sessions s
+  JOIN auth.users gm ON gm.id = s.gridmaster_id
+  JOIN auth.users tu ON tu.id = s.target_user_id
+  LEFT JOIN organizations o ON o.id = s.target_org_id
+  ORDER BY s.created_at DESC
+  LIMIT p_limit OFFSET p_offset;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_impersonation_history(INTEGER, INTEGER) TO authenticated;
+
+COMMENT ON FUNCTION public.get_impersonation_history IS 'Returns paginated impersonation session history with justification and audit fields. Gridmaster only. Lazy-cleans expired sessions.';
+
+
+-- ── Notification RPCs ─────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.get_notifications(
+  p_limit  INTEGER DEFAULT 20,
+  p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+  id         UUID,
+  type       TEXT,
+  title      TEXT,
+  message    TEXT,
+  metadata   JSONB,
+  read_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE PLPGSQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT n.id, n.type, n.title, n.message, n.metadata, n.read_at, n.created_at
+  FROM notifications n
+  WHERE n.user_id = auth.uid()
+    AND (n.org_id = public.caller_org_id() OR n.org_id IS NULL)
+  ORDER BY n.created_at DESC
+  LIMIT p_limit OFFSET p_offset;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_notifications(INTEGER, INTEGER) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.get_unread_notification_count()
+RETURNS INTEGER
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT COUNT(*)::INTEGER FROM notifications
+  WHERE user_id = auth.uid()
+    AND read_at IS NULL
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_unread_notification_count() TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.mark_notification_read(p_notification_id UUID)
 RETURNS VOID
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 BEGIN
-  DELETE FROM impersonation_sessions
-   WHERE session_id = p_session_id AND gridmaster_id = auth.uid();
+  UPDATE notifications SET read_at = now()
+  WHERE id = p_notification_id AND user_id = auth.uid();
 END;
 $$;
 
-COMMENT ON FUNCTION public.end_impersonation IS 'Ends an impersonation session. Only the owning Gridmaster can end their own sessions.';
+GRANT EXECUTE ON FUNCTION public.mark_notification_read(UUID) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.mark_all_notifications_read()
+RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  UPDATE notifications SET read_at = now()
+  WHERE user_id = auth.uid()
+    AND read_at IS NULL
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.mark_all_notifications_read() TO authenticated;
 
 
 -- ── force_logout_user ─────────────────────────────────────────────────────────
@@ -1495,6 +1720,7 @@ RETURNS TABLE (
   org_role        public.org_role,
   org_id          UUID,
   org_name        TEXT,
+  org_slug        TEXT,
   created_at      TIMESTAMPTZ,
   last_sign_in_at TIMESTAMPTZ
 )
@@ -1507,7 +1733,7 @@ BEGIN
   RETURN QUERY
   SELECT u.id, u.email::TEXT, p.platform_role,
     COALESCE(cm.org_role, 'user'::public.org_role), p.org_id,
-    o.name, p.created_at, u.last_sign_in_at
+    o.name, o.slug, p.created_at, u.last_sign_in_at
   FROM auth.users u
   LEFT JOIN public.profiles p ON u.id = p.id
   LEFT JOIN public.organization_memberships cm ON cm.user_id = p.id AND cm.org_id = p.org_id
@@ -1545,12 +1771,12 @@ BEGIN
 
   RETURN QUERY
   SELECT p.id, u.email::TEXT, p.first_name, p.last_name, p.platform_role,
-    COALESCE(cm.org_role, 'user'::public.org_role), cm.admin_permissions, p.created_at,
+    cm.org_role, cm.admin_permissions, p.created_at,
     u.last_sign_in_at
-  FROM public.profiles p
-  JOIN auth.users u ON u.id = p.id
-  LEFT JOIN public.organization_memberships cm ON cm.user_id = p.id AND cm.org_id = p_org_id
-  WHERE p.org_id = p_org_id
+  FROM public.organization_memberships cm
+  JOIN public.profiles p ON p.id = cm.user_id
+  JOIN auth.users u ON u.id = cm.user_id
+  WHERE cm.org_id = p_org_id
   ORDER BY u.email ASC;
 END;
 $$;
