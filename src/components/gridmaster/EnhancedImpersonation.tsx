@@ -8,7 +8,7 @@ import { clearPermsCache } from "@/hooks/usePermissions";
 import { clearOrgDataCache } from "@/hooks/useOrganizationData";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function EnhancedImpersonation({
   organizations,
@@ -215,7 +215,7 @@ export default function EnhancedImpersonation({
             disabled={loading}
             style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
           >
-            {loading ? <ButtonSpinner size={14} /> : "End Session"}
+            <ButtonLoading loading={loading} spinnerSize={14}>End Session</ButtonLoading>
           </button>
         </div>
       )}
@@ -324,7 +324,7 @@ export default function EnhancedImpersonation({
                     onClick={handleStart}
                     disabled={loading || justification.trim().length < 10}
                   >
-                    {loading ? <ButtonSpinner size={16} /> : `Impersonate ${selectedUser.email}`}
+                    <ButtonLoading loading={loading} spinnerSize={16}>{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
@@ -430,7 +430,7 @@ export default function EnhancedImpersonation({
                     onClick={handleStart}
                     disabled={loading || justification.trim().length < 10}
                   >
-                    {loading ? <ButtonSpinner size={16} /> : `Impersonate ${selectedUser.email}`}
+                    <ButtonLoading loading={loading} spinnerSize={16}>{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
