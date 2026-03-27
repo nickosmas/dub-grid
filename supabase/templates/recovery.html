@@ -18,7 +18,7 @@
         <p style="margin:0 0 28px;font-size:15px;color:#6b7280;text-align:center;line-height:1.5;">Click the button below to choose a new password for your account.</p>
         <!-- CTA Button -->
         <div style="text-align:center;margin:0 0 28px;">
-          <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password" style="display:inline-block;background:#005F02;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;">Reset Password</a>
+          <a href="{{ .SiteURL }}/auth/verify?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password" style="display:inline-block;background:#005F02;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;">Reset Password</a>
         </div>
         <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;line-height:1.5;">If you didn't request a password reset, you can safely ignore this email.</p>
       </div>
