@@ -48,6 +48,10 @@ export function parseHost(hostWithPort: string): ParsedHost {
   const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
   if (baseDomain && (hostname === baseDomain || hostname.endsWith("." + baseDomain))) {
     const subdomainPart = hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));
+    // Org slugs are single-label only — reject multi-part subdomains like "a.b"
+    if (subdomainPart && subdomainPart.includes(".")) {
+      return { subdomain: null, rootDomain: baseDomain, port, hostname };
+    }
     const isApexAlias = !!subdomainPart && APEX_ALIAS_SUBDOMAINS.has(subdomainPart);
 
     return {

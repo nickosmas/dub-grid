@@ -11,7 +11,7 @@ import {
   saveCertifications,
   saveOrganizationRoles,
 } from "@/lib/db";
-import type { Organization, Employee, AssignableOrganizationRole } from "@/types";
+import type { Organization, AssignableOrganizationRole } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
@@ -217,8 +217,6 @@ export default function OrganizationSetupWizard({
   const [employeeRows, setEmployeeRows] = useState<EmployeeRow[]>(
     Array.from({ length: 5 }, () => ({ firstName: "", lastName: "", email: "", phone: "" })),
   );
-  const [createdEmployees, setCreatedEmployees] = useState<CreatedEmployee[]>([]);
-
   // ── Step 5: Invitations ───────────────────────────────────────────────────
   const [invitationRows, setInvitationRows] = useState<InvitationRow[]>([]);
 
@@ -306,6 +304,7 @@ export default function OrganizationSetupWizard({
             status: "active",
             statusChangedAt: null,
             statusNote: "",
+            userId: null,
           }, org.id);
           employeeId = emp.id;
         } catch (empErr: unknown) {
@@ -445,8 +444,6 @@ export default function OrganizationSetupWizard({
           email: emp.email,
         });
       }
-
-      setCreatedEmployees(created);
 
       // Build invitation rows for employees with emails
       const withEmail = created.filter((e) => e.email);
