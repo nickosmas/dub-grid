@@ -308,14 +308,14 @@ export default function RootPage() {
             <a
               href="#features"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-slate-900 hover:text-[var(--color-brand)] transition-colors"
+              className="text-2xl font-semibold text-slate-900 hover:text-slate-600 transition-colors"
             >
               Features
             </a>
             <a
               href="#security"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-slate-900 hover:text-[var(--color-brand)] transition-colors"
+              className="text-2xl font-semibold text-slate-900 hover:text-slate-600 transition-colors"
             >
               Security
             </a>
@@ -344,7 +344,7 @@ export default function RootPage() {
             className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03]"
             style={{
               background:
-                "radial-gradient(circle, #3B82F6 0%, transparent 70%)",
+                "radial-gradient(circle, #2E9930 0%, transparent 70%)",
             }}
           />
           <div
@@ -422,10 +422,10 @@ export default function RootPage() {
                   className="group rounded-2xl border border-slate-100 bg-[var(--color-surface)] p-6 lg:p-8 hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                   style={{ transitionDelay: `${i * 75}ms` }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-[var(--color-brand)]/10 transition-colors duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-slate-200 transition-colors duration-300">
                     <Icon
                       size={20}
-                      className="text-[var(--color-text-muted)] group-hover:text-[var(--color-brand)] transition-colors duration-300"
+                      className="text-[var(--color-text-muted)] group-hover:text-slate-700 transition-colors duration-300"
                     />
                   </div>
                   <h3 className="text-base font-semibold text-slate-900 mb-2">
@@ -540,12 +540,12 @@ export default function RootPage() {
 
       {/* ── CTA ── */}
       <RevealSection className="py-16 sm:py-20 lg:py-24 bg-[var(--color-brand)] relative overflow-hidden">
-        {/* Subtle grid pattern */}
+        {/* Grid pattern */}
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
             backgroundSize: "48px 48px",
           }}
         />

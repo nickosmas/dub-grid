@@ -201,7 +201,7 @@ export default function SettingsMockup() {
                       background: "#fff",
                       flex: 1,
                       minWidth: 0,
-                      boxShadow: "0 0 0 3px rgba(56,189,248,0.15)",
+                      boxShadow: "0 0 0 3px rgba(46,153,48,0.15)",
                     }}
                   >
                     {fa.name}

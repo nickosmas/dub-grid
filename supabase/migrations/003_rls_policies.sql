@@ -47,6 +47,11 @@ CREATE POLICY "own_profile_select"
   ON public.profiles FOR SELECT TO authenticated
   USING (id = auth.uid());
 
+CREATE POLICY "own_profile_update"
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
+
 CREATE POLICY "org_member_profiles_select"
   ON public.profiles FOR SELECT TO authenticated
   USING (

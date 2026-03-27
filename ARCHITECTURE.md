@@ -110,6 +110,16 @@ Instead of fixed role-based capabilities, admins have 16 individually configurab
 
 This design allows organizations to create specialized admin roles (e.g., "Schedule Manager" who can edit shifts but not manage employees) without requiring new database roles.
 
+### Password Reset & Email Verification
+
+The authentication system includes complete self-service flows:
+
+- **Forgot Password** (`/forgot-password`) — Email-based password reset via Supabase `resetPasswordForEmail()`. Includes email enumeration protection (always shows success regardless of email existence).
+- **Reset Password** (`/reset-password`) — Token-validated form with password strength meter (4 levels: too short, weak, fair, strong). Minimum 10 characters. Signs out user after reset.
+- **Email Verification** (`/verify-email`) — Verification page with resend button (60-second cooldown). Auto-redirects on successful verification via auth event listener.
+
+All auth pages use the `AuthCard` layout component (`PageShell` + `Card`) and `PasswordInput`/`PasswordStrength` reusable components from `src/components/auth/`.
+
 ---
 
 ## 4. Database Design
@@ -196,16 +206,18 @@ user_sessions           — per-device session tracking
 
 ### Custom Hooks
 
+All hooks are barrel-exported from `src/hooks/index.ts`.
+
 | Hook | Purpose |
 | ---- | ------- |
-| `usePermissions` | Decodes JWT, fetches admin_permissions from DB, provides `can(permission)` helper |
-| `useOrganizationData` | Fetches org config, focus areas, shift codes, categories, coverage requirements |
-| `useEmployees` | Employee list with filtering, search, and pagination |
+| `usePermissions` | Decodes JWT, fetches admin_permissions from DB, provides `can(permission)` helper. Exports `getPermissionsFromSession()` and `clearPermsCache()` |
+| `useOrganizationData` | Fetches org config, focus areas, shift codes, categories, coverage requirements. Exports `clearOrgDataCache()` |
+| `useEmployees` | Employee list with filtering, search, and pagination. Exports `clearEmployeeCache()` |
 | `useCellLocks` | Real-time cell lock/occupancy via Supabase Realtime subscriptions |
 | `useShiftRequests` | Shift pickup/swap requests with status management |
-| `useRoleChange` | React Query mutation for changing user roles (idempotent) |
-| `useLogout` | Scoped logout (local vs global) |
-| `useMediaQuery` | Responsive breakpoint detection |
+| `useRoleChange` | React Query mutation for changing user roles (idempotent) with `generateIdempotencyKey()` |
+| `useLogout` | Scoped logout (local vs global) with auth provider integration |
+| `useMediaQuery` | Responsive breakpoint detection. Exports breakpoint constants: `MOBILE`, `TABLET`, `SMALL_DESKTOP`, `DESKTOP` |
 
 ### Data Access Layer
 
@@ -223,6 +235,17 @@ This pattern provides:
 - Type safety via row mappers (DB snake_case → TS camelCase)
 - Centralized error handling
 - Single place to add optimistic locking, idempotency, and audit logic
+
+### Styling Architecture
+
+DubGrid uses a layered approach to styling with Tailwind v4 as the foundation:
+
+| File | Purpose |
+| ---- | ------- |
+| `src/lib/palette.ts` | Static hex values matching CSS custom properties, used for JS inline styles. Defines backgrounds, borders, text, brand, state, and grid colors. |
+| `src/lib/colors.ts` | Predefined color presets for shift codes and focus areas (18 color pairs). Draft border colors. Designation badge colors. |
+| `src/lib/styles.ts` | Shared CSS-in-JS style objects for consistent layouts (section cards, table headers/cells, form labels, role badge colors). |
+| `src/lib/email.ts` | Branded HTML email templates with header, wrapper, and sanitization utilities. Used by invite and demo request API routes. |
 
 ---
 
@@ -267,8 +290,11 @@ DubGrid uses Supabase Realtime for three purposes:
 | -------- | ------- | ----- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL | Client + Server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Client + Server |
+| `NEXT_PUBLIC_SITE_URL` | Public site URL (CSRF origin check) | Client + Server |
 | `SUPABASE_JWT_SECRET` | JWT verification secret | Server only (middleware) |
-| `RESEND_API_KEY` | Email sending | Server only (API routes) |
+| `RESEND_API_KEY` | Email sending via Resend | Server only (API routes) |
+| `UPSTASH_REDIS_REST_URL` | Rate limiting Redis backend | Server only (API routes) |
+| `UPSTASH_REDIS_REST_TOKEN` | Rate limiting Redis auth | Server only (API routes) |
 
 ---
 

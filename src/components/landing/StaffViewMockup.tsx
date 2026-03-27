@@ -8,7 +8,7 @@ const FOCUS_AREAS = [
 
 /* ── Account statuses — matches real semantic colors ── */
 const STATUSES = [
-  { label: "Linked", bg: "var(--color-info-bg)", text: "var(--color-link)" },
+  { label: "Linked", bg: "var(--color-brand-bg)", text: "var(--color-link)" },
   { label: "Invited", bg: "#FFFBEB", text: "#92400E" },
   { label: "Not invited", bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
 ];

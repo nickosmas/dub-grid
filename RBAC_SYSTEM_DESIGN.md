@@ -1045,11 +1045,61 @@ ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 
 ---
 
-## 12. Recommended Features Not Yet Implemented
+## 12. Implemented Security Features (Since v1.0)
 
-The following features are absent from the current design but are recommended before a production launch.
+The following features have been implemented since the initial RBAC design:
 
-### 12.1 Priority 1 — Security (Implement Before Launch)
+### 12.1 Password Reset Flow
+
+Self-service password reset is fully implemented with security best practices:
+
+1. **Forgot Password** (`/forgot-password`) — User enters email, Supabase sends reset link via `resetPasswordForEmail()`. Includes email enumeration protection: always shows "Check your email" regardless of whether the email exists in the system.
+2. **Reset Password** (`/reset-password`) — Token-validated form with:
+   - Password strength meter (4 levels: too short → weak → fair → strong)
+   - Minimum 10-character requirement
+   - Confirmation field with match validation
+   - 5-second timeout fallback for invalid/expired tokens
+   - Automatic local sign-out after successful reset
+3. **Auth components** in `src/components/auth/`: `PasswordInput` (show/hide toggle), `PasswordStrength` (visual meter), `AuthCard` (consistent layout)
+
+### 12.2 Email Verification
+
+New accounts created via invitation acceptance go through email verification:
+
+- **Verify Email** (`/verify-email`) — Displays verification status with optional `?email=` param
+- Resend button with 60-second cooldown to prevent abuse
+- Listens for `SIGNED_IN` auth event to auto-redirect when verified
+- Email enumeration protection (same UI regardless of email validity)
+
+### 12.3 Rate Limiting
+
+All public-facing API routes are rate-limited via Upstash Redis (`src/lib/rate-limit.ts`):
+
+| Limiter | Scope | Applied To |
+| ------- | ----- | ---------- |
+| `apiLimiter` | IP-based | `/api/validate-domain`, `/api/notify-impersonation` |
+| `inviteLimiter` | User-based | `/api/send-invite-email` |
+| `demoLimiter` | IP-based | `/api/request-demo` |
+
+### 12.4 Branded Email Templates
+
+Shared email template system in `src/lib/email.ts`:
+- `sanitizeHeaderValue()` — Prevents email header injection (strips CRLF, null bytes)
+- `escapeHtml()` — Prevents XSS in email content
+- `emailWrapper()` — Branded HTML template with DubGrid header, card layout, responsive design
+- Used by invitation emails and demo request notifications
+
+### 12.5 CSRF Protection
+
+API routes that accept mutations validate the `Origin` header against `NEXT_PUBLIC_SITE_URL`. Server Actions include built-in CSRF protection via Next.js.
+
+---
+
+## 13. Recommended Features Not Yet Implemented
+
+The following features are recommended before a production launch.
+
+### 13.1 Priority 1 — Security (Implement Before Launch)
 
 #### Multi-Factor Authentication (MFA)
 
@@ -1073,7 +1123,7 @@ The following features are absent from the current design but are recommended be
 | Gap            | Any authenticated Gridmaster can access from any IP, including a stolen laptop.                               |
 | Recommendation | Add a `gridmaster_allowed_ips` table. Middleware checks `req.ip` against the allowlist.                      |
 
-### 12.2 Priority 2 — User Lifecycle
+### 13.2 Priority 2 — User Lifecycle
 
 #### Soft Delete for Users and Orgs
 
@@ -1082,14 +1132,7 @@ The following features are absent from the current design but are recommended be
 | Gap            | Hard deletes cascade through all tables with no recovery path.                                                      |
 | Recommendation | Add `deleted_at TIMESTAMPTZ` to profiles and organizations. RLS adds `AND deleted_at IS NULL` to all queries.       |
 
-#### Email Verification Gate
-
-| Property       | Detail                                                                                                             |
-| -------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Gap            | A user could be assigned a role before verifying their email address.                                              |
-| Recommendation | In the auth hook, check `email_confirmed_at`. If null, inject minimal claims.                                      |
-
-### 12.3 Priority 3 — Operational
+### 13.3 Priority 3 — Operational
 
 #### Refresh Token Rotation & Reuse Detection
 
@@ -1112,18 +1155,20 @@ The following features are absent from the current design but are recommended be
 | Gap            | No mechanism for a user to request all their personal data.                                                                |
 | Recommendation | Add a data export RPC that assembles all user rows into a JSON archive.                                                    |
 
-### 12.4 Feature Priority Summary
+### 13.4 Feature Priority Summary
 
-| Priority | Feature                                  | Risk if Skipped                                      |
-| -------- | ---------------------------------------- | ---------------------------------------------------- |
-| P1       | MFA for Gridmaster & Super Admin         | Account takeover via password compromise             |
-| P1       | Failed login tracking & lockout          | Brute-force attacks succeed silently                 |
-| P1       | IP allowlisting for Gridmaster           | Stolen credentials = full platform access            |
-| P2       | Soft delete (users & orgs)               | Accidental permanent data loss                       |
-| P2       | Email verification gate                  | Unverified accounts receive org roles                |
-| P3       | Refresh token rotation + reuse detection | Stolen tokens usable indefinitely                    |
-| P3       | Role change notifications                | Silent UX — confused users after demotion            |
-| P3       | GDPR data export                         | Legal compliance gap in EU/UK markets                |
+| Priority | Feature                                  | Status     | Risk if Skipped                                      |
+| -------- | ---------------------------------------- | ---------- | ---------------------------------------------------- |
+| P1       | MFA for Gridmaster & Super Admin         | Not done   | Account takeover via password compromise             |
+| P1       | Failed login tracking & lockout          | Not done   | Brute-force attacks succeed silently                 |
+| P1       | IP allowlisting for Gridmaster           | Not done   | Stolen credentials = full platform access            |
+| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done    | ~~Users locked out permanently if password lost~~    |
+| ~~P2~~   | ~~Email verification~~                   | ✅ Done    | ~~Unverified accounts receive org roles~~            |
+| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done    | ~~Abuse of public endpoints~~                        |
+| P2       | Soft delete (users & orgs)               | Not done   | Accidental permanent data loss                       |
+| P3       | Refresh token rotation + reuse detection | Not done   | Stolen tokens usable indefinitely                    |
+| P3       | Role change notifications                | Not done   | Silent UX — confused users after demotion            |
+| P3       | GDPR data export                         | Not done   | Legal compliance gap in EU/UK markets                |
 
 ---
 

@@ -1,13 +1,13 @@
 export function DubGridLogo({
   size = 48,
-  color = "#0357CA",
+  color = "#005F02",
 }: {
   size?: number;
   color?: string;
 }) {
   const cell = size / 4;
-  const gap = cell * 0.18;
-  const r = cell * 0.22;
+  const gap = cell * 0.10;
+  const r = cell * 0.20;
   const cols = [0, 1, 2, 3];
   const rows = [0, 1, 2, 3];
   // Filled cells forming a simple grid mark (all 16)
@@ -39,14 +39,14 @@ export function DubGridLogo({
  */
 export function AnimatedDubGridLogo({
   size = 48,
-  color = "#0357CA",
+  color = "#005F02",
 }: {
   size?: number;
   color?: string;
 }) {
   const cell = size / 4;
-  const gap = cell * 0.18;
-  const r = cell * 0.22;
+  const gap = cell * 0.10;
+  const r = cell * 0.20;
 
   // [duration, delay] — all 16 cells have unique pairs so every dot animates independently
   const timing: [number, number][] = [

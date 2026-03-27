@@ -424,7 +424,7 @@ export default function Toolbar({
               borderRadius: 10,
               height: 44,
               padding: "0 12px",
-              background: toolsOpen ? "rgba(58, 125, 224, 0.08)" : undefined,
+              background: toolsOpen ? "rgba(46, 153, 48, 0.08)" : undefined,
               color: toolsOpen ? "var(--color-primary)" : undefined,
               flexShrink: 0,
               position: "relative",
@@ -680,7 +680,7 @@ export default function Toolbar({
             borderRadius: 10,
             height: "var(--dg-toolbar-h)",
             padding: "0 12px",
-            background: toolsOpen ? "rgba(58, 125, 224, 0.08)" : undefined,
+            background: toolsOpen ? "rgba(46, 153, 48, 0.08)" : undefined,
             color: toolsOpen ? "var(--color-primary)" : undefined,
             position: "relative",
           }}

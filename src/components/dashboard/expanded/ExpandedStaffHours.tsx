@@ -82,8 +82,8 @@ export default function ExpandedStaffHours({
                     padding: "5px 10px",
                     borderRadius: 6,
                     border: "1px solid",
-                    borderColor: active ? "var(--color-primary, #2D6B3A)" : "var(--color-border)",
-                    background: active ? "var(--color-primary, #2D6B3A)" : "transparent",
+                    borderColor: active ? "var(--color-primary, #005F02)" : "var(--color-border)",
+                    background: active ? "var(--color-primary, #005F02)" : "transparent",
                     color: active ? "#fff" : "var(--color-text-secondary)",
                     cursor: "pointer",
                   }}

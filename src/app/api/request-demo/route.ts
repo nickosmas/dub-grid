@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
 import { demoLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 
 const bodySchema = z.object({
   contactName: z.string().trim().min(1, "Name is required").max(100),
@@ -12,19 +13,6 @@ const bodySchema = z.object({
   industry: z.string().trim().max(200).optional().default(""),
   message: z.string().trim().max(2000).optional().default(""),
 });
-
-/** Strip control characters to prevent email header injection. */
-function sanitizeHeaderValue(str: string): string {
-  return str.replace(/[\x00-\x1f\x7f]/g, "");
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 export async function POST(req: NextRequest) {
   // ── Rate limit by IP ──────────────────────────────────────────────────
@@ -121,18 +109,7 @@ export async function POST(req: NextRequest) {
         </tr>`
       : "";
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#F7F8F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:560px;margin:40px auto;padding:0 20px;">
-    <!-- Header -->
-    <div style="background:#0357CA;border-radius:16px 16px 0 0;padding:32px;text-align:center;">
-      <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.02em;">DubGrid</h1>
-    </div>
-    <!-- Body -->
-    <div style="background:#fff;padding:40px 32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
+  const html = emailWrapper(`
       <h2 style="color:#111410;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">
         New Demo Request
       </h2>
@@ -159,17 +136,13 @@ export async function POST(req: NextRequest) {
         <p style="color:#94A3B8;font-size:13px;margin:0;">
           Reply directly to this email to respond to ${escapeHtml(contactName)}.
         </p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`.trim();
+      </div>`);
 
   try {
     const resend = new Resend(apiKey);
     await resend.emails.send({
       from: fromEmail,
-      to: "nicokosmas.dev@gmail.com",
+      to: process.env.DEMO_RECIPIENT_EMAIL || "nicokosmas.dev@gmail.com",
       replyTo: sanitizeHeaderValue(email),
       subject: sanitizeHeaderValue(`DubGrid Demo Request: ${orgName}`),
       html,

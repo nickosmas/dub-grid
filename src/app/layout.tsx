@@ -18,22 +18,6 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com"),
   title: "DubGrid",
   description: "Smart staff scheduling for care facilities",
-  icons: {
-    icon: [
-      {
-        url: "/icon/light",
-        type: "image/png",
-        sizes: "32x32",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon/dark",
-        type: "image/png",
-        sizes: "32x32",
-        media: "(prefers-color-scheme: dark)",
-      },
-    ],
-  },
   openGraph: {
     title: "DubGrid",
     description: "Smart staff scheduling for care facilities",

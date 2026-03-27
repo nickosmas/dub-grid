@@ -403,7 +403,7 @@ export default function MonthView({
                 }
               }}
               style={{
-                background: isToday ? "var(--color-info-bg)" : "var(--color-surface)",
+                background: isToday ? "var(--color-today-bg)" : "var(--color-surface)",
                 border: isOpen
                   ? "2px solid var(--color-primary)"
                   : isToday
@@ -413,7 +413,7 @@ export default function MonthView({
                 padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
                 minHeight: 64,
                 boxShadow: isOpen
-                  ? "0 0 0 2px rgba(99, 102, 241, 0.15)"
+                  ? "0 0 0 2px rgba(46, 153, 48, 0.15)"
                   : "0 1px 3px rgba(0,0,0,0.04)",
                 cursor: "pointer",
                 transition: "border-color 150ms ease, box-shadow 150ms ease",

@@ -104,7 +104,7 @@ export default function ExpandedStats({
   ]);
 
   const columns = [
-    { key: "totalShifts", label: "Total shifts", color: "var(--color-success, #22C55E)" },
+    { key: "totalShifts", label: "Total shifts", color: "var(--color-success, #2E9930)" },
     ...(hasRequirements ? [{ key: "coveragePct", label: "Coverage", color: "#2563EB" }] : []),
     { key: "staffScheduled", label: "Staff", color: "var(--color-text-subtle, #64748B)" },
     ...(showOT ? [{ key: "otCount", label: "OT alerts", color: "var(--color-danger, #DC2626)" }] : []),

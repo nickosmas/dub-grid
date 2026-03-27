@@ -6,7 +6,7 @@ import Modal from "@/components/Modal";
 const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; border: string; label: string }> = {
   high: { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA", label: "Urgent" },
   medium: { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A", label: "Open" },
-  low: { bg: "#F0FDF4", color: "#166534", border: "#BBF7D0", label: "Open" },
+  low: { bg: "#F0F7F0", color: "#004501", border: "#BFDFBF", label: "Open" },
 };
 
 const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;

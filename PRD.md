@@ -129,6 +129,9 @@ Admins receive a configurable set of permissions stored as JSONB in `organizatio
 - Edge middleware verifies JWT, calculates effective role, and enforces route-level access
 - Subdomain routing ensures users stay within their org context
 - Invitation-only registration with 72-hour expiry tokens
+- Self-service password reset via email (forgot password → reset password flow)
+- Email verification for new accounts with resend capability (60s cooldown)
+- Password strength meter (4 levels: too short, weak, fair, strong; minimum 10 characters)
 
 ---
 
@@ -238,13 +241,24 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-29 | Cell Locks              | Should   | ✅     | Real-time cell lock/occupancy tracking. Shows which user is currently editing a cell.                                  |
 | FR-30 | Presence Avatars        | Should   | ✅     | Active user presence indicators showing who is currently viewing the schedule.                                          |
 
-### 7.6 Staff Schedule View
+### 7.6 Authentication & Account Management
+
+| ID    | Feature                 | Priority | Status | Description                                                                                                            |
+| ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| FR-60 | Forgot Password         | Must     | ✅     | Email-based password reset request with enumeration protection (always shows success). Rate limited.                   |
+| FR-61 | Reset Password          | Must     | ✅     | Token-validated reset form via email link. Password strength meter (4 levels). Minimum 10 characters. Signs out after. |
+| FR-62 | Email Verification      | Must     | ✅     | Verification page for new accounts with resend button (60s cooldown). Auto-redirects on confirmation.                  |
+| FR-63 | Organization Setup      | Must     | ✅     | Setup wizard for new orgs: add employees, configure focus areas, set up shift codes, publish schedule. Auto-redirects when complete. |
+| FR-64 | User Onboarding         | Must     | ✅     | Polling page for newly invited users awaiting org assignment. Auto-polls every 15s for up to 5 minutes.                |
+| FR-65 | Demo Request Form       | Should   | ✅     | Landing page contact form with Zod validation, CSRF protection, and branded email notification via Resend.            |
+
+### 7.7 Staff Schedule View
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | FR-18 | Staff Schedule View     | Should   | 🔨     | Users with `user` role can view the schedule in read-only mode. Full per-wing scoped view not yet implemented.        |
 
-### 7.7 Dashboard & Analytics
+### 7.8 Dashboard & Analytics
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -256,7 +270,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-36 | Activity Feed           | Should   | ✅     | Recent activity feed showing schedule changes, publishes, and user actions.                                             |
 | FR-37 | Expanded Views          | Could    | ✅     | Each dashboard card expands to a detailed full-page view for deeper analysis.                                           |
 
-### 7.8 Staff Detail Page
+### 7.9 Staff Detail Page
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -265,7 +279,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-40 | Staff Activity Tab      | Should   | ✅     | Employee activity timeline showing status changes, role changes, and events.                                            |
 | FR-41 | Staff Reports Tab       | Should   | ✅     | Hours reports, shift distribution charts, day-of-week patterns, and focus area distribution per employee.              |
 
-### 7.9 Shift Requests
+### 7.10 Shift Requests
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -273,14 +287,14 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-43 | Shift Swap Requests     | Could    | ✅     | Employees can propose shift swaps with colleagues. Lifecycle: open → pending_approval → approved/rejected/cancelled/expired. |
 | FR-44 | Shift Request Board     | Could    | ✅     | Admin view for managing all shift requests with filtering by status and type.                                           |
 
-### 7.10 Coverage & Staffing
+### 7.11 Coverage & Staffing
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | FR-45 | Coverage Requirements   | Should   | ✅     | Define minimum staffing levels per focus area, shift code, and day of week.                                            |
 | FR-46 | Coverage Status         | Should   | ✅     | Visual coverage panel showing actual vs. required staffing with met/unmet indicators.                                  |
 
-### 7.11 Gridmaster Portal
+### 7.12 Gridmaster Portal
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -358,17 +372,22 @@ Edge middleware (`middleware.ts`) enforces:
 
 | Route                    | Access Level    | Purpose                                                    |
 | ------------------------ | --------------- | ---------------------------------------------------------- |
-| `/`                      | Public          | Landing page                                               |
+| `/`                      | Public          | Landing page with feature showcase                         |
 | `/login`                 | Public          | Organization user login                                    |
 | `/gridmaster/login`      | Public          | Gridmaster platform login                                  |
+| `/forgot-password`       | Public          | Password reset request (email-based)                       |
+| `/reset-password`        | Public          | Password reset form (via email link token)                 |
+| `/verify-email`          | Public          | Email verification for new accounts                        |
 | `/accept-invite`         | Public          | Invitation acceptance flow                                 |
-| `/onboarding`            | Authenticated   | New user onboarding                                        |
+| `/request-demo`          | Public          | Demo request / contact form                                |
+| `/onboarding`            | Authenticated   | New user org assignment polling                            |
+| `/setup`                 | Authenticated   | Organization setup wizard (admin)                          |
 | `/dashboard`             | Authenticated   | Organization dashboard with analytics                      |
 | `/schedule`              | Authenticated   | Main schedule grid                                         |
 | `/schedules`             | Authenticated   | Redirect alias to `/schedule`                              |
 | `/staff`                 | Admin+          | Staff roster management                                    |
 | `/staff/[id]`            | Admin+          | Individual staff member detail (tabs: Overview, Schedule, Activity, Reports) |
-| `/settings`              | Admin+          | Organization configuration                                 |
+| `/settings`              | Admin+          | Organization configuration (8 sections)                    |
 | `/profile`               | Authenticated   | User profile settings                                      |
 | `/gridmaster`            | Gridmaster      | Platform command center                                    |
 | `/privacy`               | Public          | Privacy policy                                             |
@@ -391,6 +410,11 @@ Edge middleware (`middleware.ts`) enforces:
 | `src/lib/schedule-logic.ts`       | Schedule grid calculations and shift resolution            |
 | `src/lib/dashboard-stats.ts`      | Dashboard KPI calculations                                 |
 | `src/lib/staff-detail-stats.ts`   | Staff detail analytics                                     |
+| `src/lib/email.ts`                | Branded HTML email templates + sanitization utilities       |
+| `src/lib/rate-limit.ts`           | Upstash Redis rate limiters (API, invite, demo)            |
+| `src/lib/palette.ts`              | Static hex color values for JS inline styles               |
+| `src/lib/colors.ts`               | Color presets for shift codes, focus areas, drafts          |
+| `src/lib/styles.ts`               | Shared CSS-in-JS style objects for layout consistency       |
 | `src/types/index.ts`              | All domain + RBAC TypeScript types                         |
 | `src/hooks/usePermissions.ts`     | JWT claim parsing + DB admin permission fetching           |
 | `src/hooks/useOrganizationData.ts`| Org, focus areas, shift codes, coverage data               |
@@ -404,47 +428,85 @@ Edge middleware (`middleware.ts`) enforces:
 AppShell.tsx (root layout — sidebar, header, navigation)
 ├── Header.tsx (top navigation bar)
 ├── MobileNavSheet.tsx (mobile navigation drawer)
+├── MobileSubNavContext.tsx (mobile sub-navigation context)
+├── SetupGuard.tsx (org setup completion guard)
+├── ImpersonationBanner.tsx (gridmaster impersonation indicator)
+├── PageTransition.tsx (fade-in page animations)
+│
+├── Auth components (src/components/auth/)
+│   ├── AuthCard.tsx (PageShell + Card layout for auth pages)
+│   ├── PasswordInput.tsx (password field with show/hide toggle)
+│   └── PasswordStrength.tsx (4-level visual strength meter)
 │
 ├── DashboardView.tsx (organization dashboard)
-│   ├── StatCardsRow.tsx (KPI cards)
-│   ├── CoverageBySectionCard.tsx (coverage by section donut chart)
+│   ├── DashboardHeader.tsx (title + controls)
+│   ├── AlertBanner.tsx (critical issue alerts)
+│   ├── StatCardsRow.tsx → StatCard.tsx (KPI cards)
+│   ├── CoverageBySectionCard.tsx (coverage donut chart)
 │   ├── OpenShiftsCard.tsx
 │   ├── StaffHoursCard.tsx
 │   ├── ShiftBreakdownCard.tsx
 │   ├── ActivityFeed.tsx
-│   └── expanded/*.tsx (expanded detail views)
+│   ├── DonutChart.tsx (reusable chart)
+│   └── expanded/ (full-page detail views)
+│       ├── ExpandedStats.tsx
+│       ├── ExpandedActivity.tsx
+│       ├── ExpandedOpenShifts.tsx
+│       ├── ExpandedStaffHours.tsx
+│       ├── ExpandedCoverage.tsx
+│       └── ExpandedBreakdown.tsx
 │
 ├── ScheduleGrid.tsx (employee × date grid with DND)
 │   ├── DraggableShift.tsx / DroppableCell.tsx
 │   ├── ShiftEditPanel.tsx (shift code picker, notes)
+│   ├── ShiftPicker.tsx (shift code selector)
 │   ├── ShiftContextMenu.tsx (right-click actions)
 │   ├── RepeatForm.tsx (shift series creation)
 │   ├── DraftBanner.tsx (draft change count + publish/cancel)
-│   ├── CoveragePanel.tsx (coverage status)
+│   ├── CoveragePanel.tsx (coverage intelligence sidebar)
 │   └── PresenceAvatars.tsx (active users)
 │
 ├── MonthView.tsx (calendar month view)
+├── MobileDayView.tsx (mobile day-by-day view)
 │
 ├── StaffView.tsx (employee roster management)
-│   ├── StaffToolbar.tsx (search, filter, sort)
+│   ├── StaffToolbar.tsx (search, filter, sort, export)
+│   ├── StaffFilterPopover.tsx (advanced filtering)
 │   ├── StaffTableRow.tsx
+│   ├── StaffContextBar.tsx (quick actions)
+│   ├── StaffPagination.tsx
+│   ├── StaffEmptyState.tsx
 │   ├── AddEmployeeModal.tsx
 │   ├── EditEmployeePanel.tsx
 │   ├── InviteEmployeeModal.tsx
 │   └── StaffDetailPanel.tsx (side panel)
 │
-├── StaffDetailPage.tsx (individual staff member)
-│   ├── StaffDetailHeader.tsx (avatar, name, status)
-│   ├── OverviewTab.tsx (profile, certs, focus areas)
-│   ├── ScheduleTab.tsx (historical schedule)
-│   ├── ActivityTab.tsx (timeline)
-│   └── ReportsTab.tsx (hours, shift distribution, day patterns, focus area breakdown)
+├── StaffDetailPage.tsx (individual staff member at /staff/[id])
+│   ├── StaffDetailHeader.tsx (avatar, name, status, actions)
+│   ├── tabs/OverviewTab.tsx (profile, certs, focus areas)
+│   ├── tabs/ScheduleTab.tsx (historical schedule)
+│   ├── tabs/ActivityTab.tsx (timeline)
+│   └── tabs/ReportsTab.tsx (hours, shift distribution, day patterns, focus area breakdown)
 │
-├── SettingsPage.tsx (org configuration)
+├── SettingsPage.tsx (org configuration — 8 sections)
 │
 ├── ShiftRequestBoard.tsx / ShiftSwapModal.tsx
 │
+├── Landing page mockups (src/components/landing/)
+│   ├── ScheduleGridMockup.tsx
+│   ├── StaffViewMockup.tsx
+│   ├── SettingsMockup.tsx
+│   ├── PermissionsMockup.tsx
+│   └── RecurringShiftsMockup.tsx
+│
 ├── PrintOptionsModal.tsx + PrintScheduleView.tsx + PrintLegend.tsx
+│
+├── Shared UI
+│   ├── Modal.tsx / ConfirmDialog.tsx
+│   ├── CustomSelect.tsx (searchable dropdown)
+│   ├── ScrollableTabs.tsx / NotificationBell.tsx
+│   ├── ButtonSpinner.tsx / ProgressBar.tsx
+│   └── Logo.tsx (wordmark + icon)
 │
 └── Toolbar.tsx (date nav, view toggle, filters, search, print)
 ```
@@ -458,8 +520,10 @@ gridmaster/page.tsx
 ├── AuditLogView.tsx (role change audit trail)
 ├── OrganizationDetail.tsx (org management)
 │   └── AdminPermissionsEditor.tsx (per-admin permission config)
+├── OrganizationSetupWizard.tsx (guided setup for new orgs)
 ├── CreateOrganizationForm.tsx (new org registration)
-└── EnhancedImpersonation.tsx (impersonate org users)
+├── EnhancedImpersonation.tsx (impersonate org users)
+└── ImpersonationHistory.tsx (impersonation session log)
 ```
 
 ---
@@ -531,6 +595,32 @@ gridmaster/page.tsx
 - Print button
 - Edit mode toggle
 
+### 10.8 Settings (8 Sections)
+
+- **Organization** — Name, address, phone, employee count, timezone, custom terminology labels
+- **Shift Categories** — Create/edit/delete shift categories with time windows
+- **Shift Codes** — Schedule codes with colors, times, certification requirements
+- **Coverage** — Minimum staffing requirements per focus area, shift code, and day
+- **Indicators** — Note/indicator type definitions with colors
+- **Staff Config** — Focus areas, certifications, absence types, organization roles
+- **Users** — User management, role assignment, admin permission configuration (super_admin only)
+- **Impersonation** — Gridmaster-only impersonation controls
+
+### 10.9 Authentication Pages
+
+- **Login** — Email/password login with org subdomain validation and domain selector
+- **Forgot Password** — Email input with enumeration protection (always shows success)
+- **Reset Password** — Token-validated form with password strength meter and min 10 char requirement
+- **Email Verification** — Verification status with resend button (60s cooldown) and auto-redirect
+- **Accept Invite** — Invitation token validation, account creation, employee linking
+- All auth pages use consistent `AuthCard` layout with branded styling
+
+### 10.10 Landing Page
+
+- Feature showcase with interactive mockups (schedule grid, staff view, settings, permissions, recurring shifts)
+- Demo request form with contact information
+- Responsive layout with branded design
+
 ---
 
 ## 11. Non-Functional Requirements
@@ -551,11 +641,19 @@ gridmaster/page.tsx
 
 DubGrid uses a thin API surface, with most operations going directly through the Supabase client (RLS-protected):
 
-| Endpoint                         | Method | Purpose                                           |
-| -------------------------------- | ------ | ------------------------------------------------- |
-| `/api/validate-domain`           | GET    | Check if org subdomain slug is available           |
-| `/api/send-invite-email`         | POST   | Send invitation email via Resend                   |
-| Supabase RPC: `change_user_role` | POST   | Change user's organization role (with idempotency) |
+| Endpoint                         | Method | Purpose                                           | Auth        | Rate Limit |
+| -------------------------------- | ------ | ------------------------------------------------- | ----------- | ---------- |
+| `/api/validate-domain`           | GET    | Check if org subdomain slug is available           | Public      | IP-based   |
+| `/api/send-invite-email`         | POST   | Send invitation email via Resend                   | Authenticated | User-based |
+| `/api/request-demo`              | POST   | Demo request form submission (landing page)        | Public      | IP-based   |
+| `/api/notify-impersonation`      | POST   | Log impersonation start/end events                 | Authenticated | User-based |
+| Supabase RPC: `change_user_role` | POST   | Change user's organization role (with idempotency) | Authenticated | N/A (DB)   |
+
+All API routes include:
+- **Input validation** via Zod schemas
+- **Rate limiting** via Upstash Redis (`src/lib/rate-limit.ts`)
+- **CSRF protection** via Origin header validation (where applicable)
+- **HTML sanitization** via `escapeHtml()` and `sanitizeHeaderValue()` from `src/lib/email.ts`
 
 All other CRUD operations use Supabase client-side queries protected by Row-Level Security policies.
 
@@ -569,10 +667,11 @@ All other CRUD operations use Supabase client-side queries protected by Row-Leve
 | ------------------------ | -------- | ------------------------------------------------------------------------------ |
 | Wing-Scoped User View   | Could    | Staff-role users see only their assigned focus area's schedule                 |
 | E2E Test Suite           | Should   | Playwright config exists but tests not yet written                             |
-| Onboarding Flow          | Should   | New org setup wizard (currently a minimal placeholder)                         |
-| Mobile Responsive Polish | Could    | Grid further optimized for smaller viewports                                  |
+| Mobile Responsive Polish | Could    | Grid further optimized for smaller viewports (MobileDayView exists)           |
 | MFA for Elevated Roles   | Should   | TOTP enforcement for gridmaster and super_admin accounts                      |
 | CSV/PDF Export           | Could    | Export schedule data and staff reports to CSV/PDF                              |
+| Failed Login Tracking    | Should   | Account lockout after repeated failed login attempts                           |
+| IP Allowlisting          | Could    | Restrict gridmaster access to trusted IPs                                     |
 
 ### 13.2 Known Issues
 
@@ -596,6 +695,11 @@ These items were open questions in previous PRD versions and have been resolved 
 | Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity, Reports.                                 |
 | Shift requests?                  | Pickup and swap requests implemented with admin approval workflow.                            |
 | Coverage tracking?               | Coverage requirements and status visualization implemented.                                   |
+| Password reset flow?             | Implemented. Forgot password → email link → reset form with strength meter → sign out.        |
+| Email verification?              | Implemented. Verification page with resend button (60s cooldown), auto-redirect on confirm.    |
+| Org setup/onboarding?            | Implemented. Setup wizard with checklist + onboarding polling page for new users.              |
+| Rate limiting?                   | Implemented via Upstash Redis on all public API routes.                                        |
+| Branded emails?                  | Shared email template system in src/lib/email.ts with header, wrapper, sanitization.           |
 
 ---
 

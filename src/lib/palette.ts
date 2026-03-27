@@ -22,7 +22,7 @@ export const BG_SECONDARY = "#F1F5F9";
 
 export const BORDER = "#CBD5E1";
 export const BORDER_LIGHT = "#E2E8F0";
-export const BORDER_FOCUS = "#3A7DE0";
+export const BORDER_FOCUS = "#2E9930";
 
 // ── Text ─────────────────────────────────────────────────────────────────────
 
@@ -33,19 +33,22 @@ export const TEXT_SUBTLE = "#64748B";
 export const TEXT_FAINT = "#718096";
 export const TEXT_INVERSE = "#FFFFFF";
 
-// ── Brand / Accent ──────────────────────────────────────────────────────────
+// ── Brand / Accent — #005F02 green ramp ──────────────────────────────────────
 
-export const BRAND = "#0357CA";
-export const BRAND_LIGHT = "#3A7DE0";
-export const PRIMARY = "#3A7DE0";
-export const LINK = "#0357CA";
-export const ACCENT_TEXT = "#0357CA";
+export const BRAND = "#005F02";
+export const BRAND_LIGHT = "#2E9930";
+export const BRAND_BG = "#F0F7F0";
+export const BRAND_BORDER = "#BFDFBF";
+export const PRIMARY = "#005F02";
+export const LINK = "#005F02";
+export const ACCENT_TEXT = "#005F02";
 
-// ── Success ──────────────────────────────────────────────────────────────────
+// ── Success (shares brand ramp) ──────────────────────────────────────────────
 
-export const SUCCESS = "#22C55E";
-export const SUCCESS_BG = "#F0FDF4";
-export const SUCCESS_TEXT = "#15803D";
+export const SUCCESS = "#2E9930";
+export const SUCCESS_BG = "#F0F7F0";
+export const SUCCESS_TEXT = "#004501";
+export const SUCCESS_BORDER = "#BFDFBF";
 
 // ── Warning ──────────────────────────────────────────────────────────────────
 
@@ -66,7 +69,7 @@ export const DANGER_DARK = "#991B1B";
 
 export const INFO = "#3B82F6";
 export const INFO_BG = "#EFF6FF";
-export const INFO_TEXT = "#0357CA";
+export const INFO_TEXT = "#1D4ED8";
 export const INFO_BORDER = "#BFDBFE";
 
 // ── Dark / Elevated ──────────────────────────────────────────────────────────
@@ -76,6 +79,8 @@ export const DARK_ELEVATED = "#1E293B";
 
 // ── Grid ─────────────────────────────────────────────────────────────────────
 
-export const TODAY_BG = "#EFF6FF";
-export const TODAY_TEXT = "#0357CA";
+export const TODAY_BG = "#F0F7F0";
+export const TODAY_TEXT = "#005F02";
+export const TODAY_BORDER = "#7DBF7E";
 export const ROW_ALT = "#FAFBFC";
+export const ROW_HOVER = "#F1F5F9";

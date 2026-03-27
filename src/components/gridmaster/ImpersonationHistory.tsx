@@ -14,7 +14,7 @@ function StatusBadge({ entry }: { entry: ImpersonationHistoryEntry }) {
   const config = isActive
     ? { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A", label: "Active" }
     : isEnded
-      ? { bg: "#F0FDF4", text: "#15803D", border: "#BBF7D0", label: "Ended" }
+      ? { bg: "#F0F7F0", text: "#004501", border: "#BFDFBF", label: "Ended" }
       : { bg: "#F1F5F9", text: "#64748B", border: "#CBD5E1", label: "Expired" };
 
   return (

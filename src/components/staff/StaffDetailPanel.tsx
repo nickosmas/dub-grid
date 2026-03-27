@@ -182,8 +182,8 @@ export function StaffDetailPanel({
                 textDecoration: "none",
                 padding: "4px 12px",
                 borderRadius: 20,
-                background: "var(--color-info-bg)",
-                border: "1px solid var(--color-info-border)",
+                background: "var(--color-brand-bg)",
+                border: "1px solid var(--color-brand-border)",
                 cursor: "pointer",
                 transition: "opacity 150ms ease",
               }}

@@ -84,19 +84,19 @@ export function StaffTableRow({
           gridTemplateColumns: gridCols,
           padding: isMobile ? "10px 12px" : "14px 24px",
           borderTop: isDropTarget
-            ? "2px solid var(--color-info)"
+            ? "2px solid var(--color-brand)"
             : index === 0
               ? "none"
               : "1px solid var(--color-border-light)",
           alignItems: "center",
           cursor: isReordering ? "grab" : canManageEmployees ? "pointer" : "default",
           opacity: isDragging ? 0.5 : 1,
-          borderLeft: isExpanded ? "3px solid var(--color-info)" : "3px solid transparent",
+          borderLeft: isExpanded ? "3px solid var(--color-brand)" : "3px solid transparent",
           paddingLeft: isMobile ? "calc(12px - 3px)" : "calc(24px - 3px)",
           position: "relative",
           zIndex: isExpanded ? 1 : 0,
           boxShadow: isExpanded
-            ? "inset 0 1px 0 var(--color-info-border), inset 0 -1px 0 var(--color-info-border)"
+            ? "inset 0 1px 0 var(--color-brand-border), inset 0 -1px 0 var(--color-brand-border)"
             : "none",
         }}
       >
@@ -148,7 +148,7 @@ export function StaffTableRow({
               style={{
                 fontWeight: isExpanded ? 700 : 600,
                 fontSize: "var(--dg-fs-body-sm)",
-                color: isExpanded ? "var(--color-info-text)" : "var(--color-text-secondary)",
+                color: isExpanded ? "var(--color-brand)" : "var(--color-text-secondary)",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
@@ -164,7 +164,7 @@ export function StaffTableRow({
                   borderBottom: "1px solid transparent",
                   transition: "border-color 150ms ease",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "var(--color-info)"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "var(--color-text-muted)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "transparent"; }}
               >
                 {getEmployeeDisplayName(emp)}
@@ -176,8 +176,8 @@ export function StaffTableRow({
                     fontWeight: 700,
                     padding: "1px 6px",
                     borderRadius: 10,
-                    background: "var(--color-info-bg)",
-                    color: "var(--color-link)",
+                    background: "var(--color-brand-bg)",
+                    color: "var(--color-brand)",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -343,7 +343,7 @@ export function StaffTableRow({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: isExpanded ? "var(--color-info)" : "var(--color-text-faint)",
+            color: isExpanded ? "var(--color-brand)" : "var(--color-text-faint)",
             transition: "color 150ms ease",
             userSelect: "none",
             visibility: isReordering ? "hidden" : "visible",
