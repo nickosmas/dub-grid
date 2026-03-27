@@ -14,39 +14,44 @@ export function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Build the logo as a static image tag pointing to the hosted logo.png. */
-function logoHtml(): string {
-  const siteUrl =
+/** Resolve the site URL for absolute links in emails. */
+function siteUrl(): string {
+  return (
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.NEXT_PUBLIC_VERCEL_URL
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : "http://localhost:3000");
-  return `<img src="${siteUrl}/logo.png" alt="DubGrid" width="44" height="44" style="display:block;margin:0 auto 12px auto;border:0;" />`;
+      : "http://localhost:3000")
+  );
 }
 
 /**
- * Render the branded email header: green banner with grid logo + "dubgrid" wordmark.
+ * Render the branded email header: logo icon + PNG wordmark side by side.
  */
 function emailHeader(): string {
-  return `<div style="background:#005F02;border-radius:16px 16px 0 0;padding:32px 32px 24px;text-align:center;">
-      ${logoHtml()}
-      <div style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.02em;margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">dubgrid</div>
+  const url = siteUrl();
+  return `<div style="padding:32px 32px 0;text-align:center;">
+      <img src="${url}/logo.png" alt="DubGrid" width="40" height="40" style="display:inline-block;vertical-align:middle;margin-right:8px;border:0;" /><img src="${url}/wordmark-dark.png" alt="dubgrid" height="22" style="display:inline-block;vertical-align:middle;border:0;" />
     </div>`;
 }
 
 /**
  * Wrap email body content in the full branded template shell.
- * Provides consistent header, body card, and outer styling.
+ * Clean white card — consistent with Supabase auth email templates.
  */
 export function emailWrapper(bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&display=swap" rel="stylesheet"></head>
-<body style="margin:0;padding:0;background:#F7F8F5;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:560px;margin:40px auto;padding:0 20px;">
-    ${emailHeader()}
-    <div style="background:#fff;padding:40px 32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
-      ${bodyHtml}
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;padding:0 16px;">
+    <div style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+      ${emailHeader()}
+      <div style="padding:32px;">
+        ${bodyHtml}
+      </div>
+    </div>
+    <div style="padding:20px 0;text-align:center;">
+      <span style="font-size:12px;color:#9ca3af;">DubGrid</span>
     </div>
   </div>
 </body>

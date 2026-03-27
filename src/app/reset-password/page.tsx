@@ -26,26 +26,44 @@ function ResetPasswordContent() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for error flag from /auth/confirm route (invalid/expired token)
     const params = new URLSearchParams(window.location.search);
+
+    // Check for error flag from /auth/confirm route (invalid/expired token)
     if (params.get("error") === "invalid_link") {
       setState("error");
       stateRef.current = "error";
       return;
     }
 
-    // Check if session already exists (established by /auth/confirm route).
-    // This is the primary path — the confirm route verifies the token server-side,
-    // sets session cookies, and redirects here.
-    void supabase.auth.getSession().then((res: { data: { session: unknown } }) => {
-      if (res.data.session && stateRef.current === "loading") {
-        setState("form");
-        stateRef.current = "form";
-      }
-    });
+    // PKCE flow: Supabase redirects here with ?code=xxx after the user clicks
+    // the email link. Exchange it client-side where the code_verifier cookie
+    // (set when resetPasswordForEmail was called) is available.
+    const code = params.get("code");
+    if (code) {
+      // Clean the code from the URL so it can't be reused / bookmarked
+      window.history.replaceState({}, "", window.location.pathname);
 
-    // Fallback: listen for PASSWORD_RECOVERY event (handles legacy implicit flow
-    // or client-side PKCE code exchange if the token arrives via URL hash/params).
+      supabase.auth.exchangeCodeForSession(code).then(({ error }: { error: unknown }) => {
+        if (error) {
+          setState("error");
+          stateRef.current = "error";
+        } else {
+          setState("form");
+          stateRef.current = "form";
+        }
+      });
+    } else {
+      // No code — check if session already exists (e.g. from /auth/confirm).
+      void supabase.auth.getSession().then((res: { data: { session: unknown } }) => {
+        if (res.data.session && stateRef.current === "loading") {
+          setState("form");
+          stateRef.current = "form";
+        }
+      });
+    }
+
+    // Fallback: listen for PASSWORD_RECOVERY event (handles implicit flow
+    // or other edge cases where the token arrives via URL hash).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
@@ -55,8 +73,7 @@ function ResetPasswordContent() {
       }
     });
 
-    // Timeout fallback — if neither session check nor recovery event resolves
-    // within 15s, the link is invalid/expired.
+    // Timeout fallback — if nothing resolves within 15s, the link is invalid/expired.
     const timeout = setTimeout(() => {
       if (stateRef.current === "loading") {
         setState("error");

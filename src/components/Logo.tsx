@@ -102,6 +102,7 @@ export function DubGridWordmark({
       style={{
         fontSize: `${fontSize}px`,
         fontWeight: 700,
+        fontFamily: "'DM Sans', sans-serif",
         color,
         letterSpacing: "-0.02em",
       }}
