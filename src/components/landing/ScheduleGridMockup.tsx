@@ -72,7 +72,7 @@ function ShiftCell({ shiftIdx, isToday }: { shiftIdx: number | null; isToday: bo
       style={{
         borderTop: "1px solid var(--color-border-light)",
         borderLeft: "1px solid var(--color-border-light)",
-        background: isToday ? "#F0F9FF" : "transparent",
+        background: isToday ? "#F0F7F0" : "transparent",
         position: "relative",
         height: 52,
         display: "flex",
@@ -130,7 +130,7 @@ function CoverageCell({ label, actual, required, isToday }: { label: string; act
         lineHeight: 1.3,
         borderLeft: "1px solid var(--color-border)",
         background: met ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
-        color: met ? "#15803D" : "#991B1B",
+        color: met ? "#004501" : "#991B1B",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -290,7 +290,7 @@ export default function ScheduleGridMockup() {
                 width: 3,
                 height: 18,
                 borderRadius: 2,
-                background: "linear-gradient(135deg, var(--color-border-focus), #818CF8)",
+                background: "linear-gradient(135deg, var(--color-border-focus), #7DBF7E)",
                 flexShrink: 0,
               }}
             />
@@ -346,14 +346,14 @@ export default function ScheduleGridMockup() {
                         padding: "8px 0",
                         borderBottom: "2px solid var(--color-text-primary)",
                         borderLeft: "1px solid var(--color-border-light)",
-                        background: isToday ? "#F0F9FF" : "transparent",
+                        background: isToday ? "#F0F7F0" : "transparent",
                       }}
                     >
                       <div
                         style={{
                           fontSize: 12,
                           fontWeight: 600,
-                          color: isToday ? "#0284C7" : "var(--color-text-subtle)",
+                          color: isToday ? "#005F02" :"var(--color-text-subtle)",
                           letterSpacing: "0.04em",
                         }}
                       >
@@ -363,7 +363,7 @@ export default function ScheduleGridMockup() {
                         style={{
                           fontSize: 16,
                           fontWeight: 700,
-                          color: isToday ? "#0284C7" : "var(--color-text-secondary)",
+                          color: isToday ? "#005F02" :"var(--color-text-secondary)",
                           lineHeight: 1.1,
                           marginTop: 1,
                         }}

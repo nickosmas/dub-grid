@@ -574,7 +574,7 @@ const SectionBlock = memo(function SectionBlock({
                           : "1px solid var(--color-border-light)",
                         boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 var(--color-border-light)" : undefined,
                         background: isLocked
-                          ? "rgba(99, 102, 241, 0.08)"
+                          ? "rgba(46, 153, 48, 0.08)"
                           : isToday
                             ? "var(--color-today-bg)"
                             : "transparent",

@@ -69,9 +69,9 @@ export const ROLE_BADGE_COLORS: Record<
     border: "#FDE68A",
   },
   admin: {
-    bg: "#F0FDF4",
-    text: "#166534",
-    border: "#BBF7D0",
+    bg: "#F0F7F0",
+    text: "#004501",
+    border: "#BFDFBF",
   },
   user: {
     bg: "var(--color-bg-secondary)",

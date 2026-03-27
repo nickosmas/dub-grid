@@ -16,11 +16,11 @@ export default function StatCardsRow({ stats, showOT, isMobile, hasRequirements,
     <StatCard
       key="shifts"
       label="Total shifts"
-      dotColor="var(--color-success, #22C55E)"
+      dotColor="var(--color-success, #2E9930)"
       value={stats.totalShifts.value}
       subtext={`vs ${stats.totalShifts.prevValue} ${prevPeriodLabel}`}
       progress={stats.totalShifts.prevValue > 0 ? (stats.totalShifts.value / stats.totalShifts.prevValue) * 100 : 100}
-      progressColor="var(--color-success, #22C55E)"
+      progressColor="var(--color-success, #2E9930)"
       delta={stats.totalShifts.delta}
       deltaLabel={`${stats.totalShifts.delta > 0 ? "+" : ""}${stats.totalShifts.delta}`}
     />,

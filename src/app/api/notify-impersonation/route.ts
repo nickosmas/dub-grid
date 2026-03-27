@@ -5,6 +5,7 @@ import { jwtVerify, decodeJwt } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 
 const bodySchema = z.object({
   targetEmail: z.string().email(),
@@ -13,18 +14,6 @@ const bodySchema = z.object({
   sessionId: z.string().uuid(),
   justification: z.string().trim().max(500).optional(),
 });
-
-function sanitizeHeaderValue(str: string): string {
-  return str.replace(/[\x00-\x1f\x7f]/g, "");
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 export async function POST(req: NextRequest) {
   // ── Auth check ──────────────────────────────────────────────────────
@@ -175,18 +164,7 @@ export async function POST(req: NextRequest) {
     ? `A platform administrator is currently reviewing your account on <strong>${orgDisplay}</strong> for support purposes. This is a routine support action.${justificationHtml}`
     : `A platform administrator has finished reviewing your account on <strong>${orgDisplay}</strong>. No further action is required.`;
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#F7F8F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:560px;margin:40px auto;padding:0 20px;">
-    <!-- Header -->
-    <div style="background:#0357CA;border-radius:16px 16px 0 0;padding:32px;text-align:center;">
-      <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.02em;">DubGrid</h1>
-    </div>
-    <!-- Body -->
-    <div style="background:#fff;padding:40px 32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
+  const html = emailWrapper(`
       <h2 style="color:#111410;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">
         ${headline}
       </h2>
@@ -197,11 +175,7 @@ export async function POST(req: NextRequest) {
         <p style="color:#94A3B8;font-size:13px;margin:0;">
           This is an automated notification from DubGrid. If you have questions about this access, please contact your organization administrator.
         </p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`.trim();
+      </div>`);
 
   try {
     const resend = new Resend(apiKey);

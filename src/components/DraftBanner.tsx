@@ -68,7 +68,7 @@ export default function DraftBanner({
             style={{
               fontSize: "var(--dg-fs-caption)",
               padding: "6px 14px",
-              background: showDiff ? "var(--color-info-bg)" : undefined,
+              background: showDiff ? "var(--color-brand-bg)" : undefined,
               color: showDiff ? "var(--color-accent-text)" : undefined,
             }}
           >

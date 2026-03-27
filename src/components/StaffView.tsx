@@ -121,7 +121,7 @@ function EmpChip({ emp }: { emp: Employee }) {
       {isYou && (
         <span style={{
           fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-          background: "var(--color-info-bg)", color: "var(--color-link)", whiteSpace: "nowrap",
+          background: "var(--color-brand-bg)", color: "var(--color-link)", whiteSpace: "nowrap",
         }}>
           You
         </span>
@@ -1196,7 +1196,7 @@ function RecurringScheduleSection({
                       {isCurrentUser && (
                         <span style={{
                           fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-                          background: "var(--color-info-bg)", color: "var(--color-link)", whiteSpace: "nowrap", flexShrink: 0,
+                          background: "var(--color-brand-bg)", color: "var(--color-link)", whiteSpace: "nowrap", flexShrink: 0,
                         }}>
                           You
                         </span>
@@ -1244,7 +1244,7 @@ function RecurringScheduleSection({
                       style={{
                         height: "var(--dg-grid-cell-height)",
                         borderLeft: "1px solid var(--color-border-light)",
-                        background: isActive ? "rgba(56,189,248,0.08)" : undefined,
+                        background: isActive ? "rgba(100,116,139,0.08)" : undefined,
                       }}
                     >
                       {st ? (
@@ -1257,7 +1257,7 @@ function RecurringScheduleSection({
                           fontSize: isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)",
                           fontWeight: 800,
                           transition: "box-shadow 150ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
+                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
                         }}>
                           {st.label}
                         </div>
@@ -1271,7 +1271,7 @@ function RecurringScheduleSection({
                           fontSize: isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)",
                           fontWeight: 800,
                           transition: "box-shadow 150ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
+                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
                         }}>
                           {at.label}
                         </div>
@@ -1283,7 +1283,7 @@ function RecurringScheduleSection({
                           borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
                           color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)", fontWeight: 500,
                           transition: "box-shadow 150ms ease, background 80ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(56,189,248,0.3)" : "none",
+                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
                         }}>
                           --
                         </div>
@@ -1661,9 +1661,9 @@ export default function StaffView({
                         render={<Link href={link.id === "members" ? "/staff" : `/staff?section=${link.id}`} replace />}
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 data-[active=true]:bg-[var(--color-info-bg)] data-[active=true]:text-[var(--color-brand)] hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                        className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
                       >
-                        <span className={activeSection === link.id ? "text-[var(--color-today-text)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                        <span className={activeSection === link.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
                           {link.icon}
                         </span>
                         <span className="font-semibold">{link.label}</span>
@@ -1680,7 +1680,7 @@ export default function StaffView({
                 <SidebarMenuButton
                   onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                   tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                  className="h-9 text-[var(--color-text-faint)] hover:text-black hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                  className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
                 >
                   <span className="flex shrink-0 items-center justify-center">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>

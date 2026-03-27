@@ -5,7 +5,7 @@ import type { PublishHistoryEntry, ShiftRequest } from "@/types";
 import Modal from "@/components/Modal";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "#F0FDF4", stroke: "#2D6B3A" },
+  success: { bg: "#F0F7F0", stroke: "#004501" },
   danger: { bg: "#FEF2F2", stroke: "#DC2626" },
   warning: { bg: "#FFFBEB", stroke: "#D97706" },
   neutral: { bg: "var(--color-bg-secondary, #F1F5F9)", stroke: "var(--color-text-secondary, #495057)" },
@@ -104,8 +104,8 @@ export default function ExpandedActivity({
                   padding: "5px 12px",
                   borderRadius: 6,
                   border: "1px solid",
-                  borderColor: active ? "var(--color-primary, #2D6B3A)" : "var(--color-border)",
-                  background: active ? "var(--color-primary, #2D6B3A)" : "transparent",
+                  borderColor: active ? "var(--color-primary, #005F02)" : "var(--color-border)",
+                  background: active ? "var(--color-primary, #005F02)" : "transparent",
                   color: active ? "#fff" : "var(--color-text-secondary)",
                   cursor: "pointer",
                   transition: "all 0.15s",

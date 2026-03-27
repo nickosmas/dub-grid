@@ -12,23 +12,27 @@
   --color-bg: #F8FAFC;
   --color-surface: #FFFFFF;
   --color-bg-secondary: #F1F5F9;
+  --color-row-alt: #FAFBFC;
   --color-border: #CBD5E1;
   --color-border-light: #E2E8F0;
-  --color-border-focus: #3A7DE0;
+  --color-border-focus: #2E9930;
   --color-text-primary: #0F172A;
   --color-text-secondary: #1E293B;
   --color-text-muted: #475569;
   --color-text-subtle: #64748B;
   --color-text-faint: #718096;
   --color-text-inverse: #FFFFFF;
-  --color-brand: #0357CA;
-  --color-brand-light: #3A7DE0;
-  --color-primary: #3A7DE0;
-  --color-link: #0357CA;
-  --color-accent-text: #0357CA;
-  --color-success: #22C55E;
-  --color-success-bg: #F0FDF4;
-  --color-success-text: #15803D;
+  --color-brand: #005F02;
+  --color-brand-light: #2E9930;
+  --color-brand-bg: #F0F7F0;
+  --color-brand-border: #BFDFBF;
+  --color-primary: #005F02;
+  --color-link: #005F02;
+  --color-accent-text: #005F02;
+  --color-success: #2E9930;
+  --color-success-bg: #F0F7F0;
+  --color-success-text: #004501;
+  --color-success-border: #BFDFBF;
   --color-warning: #F59E0B;
   --color-warning-bg: #FFFBEB;
   --color-warning-text: #92400E;
@@ -40,13 +44,14 @@
   --color-danger-dark: #991B1B;
   --color-info: #3B82F6;
   --color-info-bg: #EFF6FF;
-  --color-info-text: #0357CA;
+  --color-info-text: #1D4ED8;
   --color-info-border: #BFDBFE;
   --color-dark: #0F172A;
   --color-dark-elevated: #1E293B;
-  --color-today-bg: #EFF6FF;
-  --color-today-text: #0357CA;
-  --color-row-alt: #FAFBFC;
+  --color-today-bg: #F0F7F0;
+  --color-today-text: #005F02;
+  --color-today-border: #7DBF7E;
+  --color-row-hover: #F1F5F9;
 }
 
 *,
@@ -72,7 +77,7 @@
   ---------------------------------------------------------- */
   --color-border:           #CBD5E1;
   --color-border-light:     #E2E8F0;
-  --color-border-focus:     #3A7DE0;
+  --color-border-focus:     #2E9930;
 
   /* ----------------------------------------------------------
      Text
@@ -85,20 +90,23 @@
   --color-text-inverse:     #FFFFFF;
 
   /* ----------------------------------------------------------
-     Brand / Accent
+     Brand / Accent — #005F02 green ramp
   ---------------------------------------------------------- */
-  --color-brand:            #0357CA;
-  --color-brand-light:      #3A7DE0;
-  --color-primary:          #3A7DE0;
-  --color-link:             #0357CA;
-  --color-accent-text:      #0357CA;
+  --color-brand:            #005F02;
+  --color-brand-light:      #2E9930;
+  --color-brand-bg:         #F0F7F0;
+  --color-brand-border:     #BFDFBF;
+  --color-primary:          #005F02;
+  --color-link:             #005F02;
+  --color-accent-text:      #005F02;
 
   /* ----------------------------------------------------------
-     Success
+     Success (shares brand ramp — one green on screen)
   ---------------------------------------------------------- */
-  --color-success:          #22C55E;
-  --color-success-bg:       #F0FDF4;
-  --color-success-text:     #15803D;
+  --color-success:          #2E9930;
+  --color-success-bg:       #F0F7F0;
+  --color-success-text:     #004501;
+  --color-success-border:   #BFDFBF;
 
   /* ----------------------------------------------------------
      Warning
@@ -122,7 +130,7 @@
   ---------------------------------------------------------- */
   --color-info:             #3B82F6;
   --color-info-bg:          #EFF6FF;
-  --color-info-text:        #0357CA;
+  --color-info-text:        #1D4ED8;
   --color-info-border:      #BFDBFE;
 
   /* ----------------------------------------------------------
@@ -134,8 +142,10 @@
   /* ----------------------------------------------------------
      Grid-specific
   ---------------------------------------------------------- */
-  --color-today-bg:         #EFF6FF;
-  --color-today-text:       #0357CA;
+  --color-today-bg:         #F0F7F0;
+  --color-today-text:       #005F02;
+  --color-today-border:     #7DBF7E;
+  --color-row-hover:        #F1F5F9;
   --color-row-alt:          #FAFBFC;
 
   /* Elevation shadows */
@@ -217,8 +227,8 @@
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #EFF6FF;
-  --sidebar-accent-foreground: #0357CA;
+  --sidebar-accent: #F0F7F0;
+  --sidebar-accent-foreground: #005F02;
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 }
@@ -371,7 +381,7 @@ textarea {
 
 .dg-input:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgba(58, 125, 224, 0.15);
+  box-shadow: 0 0 0 3px rgba(46, 153, 48, 0.15);
 }
 
 .dg-input:disabled {
@@ -400,7 +410,7 @@ textarea {
 .dg-segment {
   display: flex;
   height: var(--dg-toolbar-h);
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 10px;
   border: 1px solid var(--color-border);
   overflow: hidden;
@@ -619,8 +629,8 @@ textarea {
 }
 
 .dg-nav-tab.active {
-  background: var(--color-info-bg);
-  border-color: var(--color-brand);
+  background: var(--color-brand-bg);
+  border-color: var(--color-today-border);
   color: var(--color-brand);
 }
 
@@ -758,7 +768,7 @@ textarea {
 }
 
 .dg-menu-item--accent:hover {
-  background: var(--color-info-bg);
+  background: var(--color-bg-secondary);
 }
 
 .dg-menu-divider {
@@ -1059,7 +1069,7 @@ textarea {
 }
 
 .dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):not([data-dragging="true"]):hover {
-  background: var(--color-today-bg) !important;
+  background: var(--color-bg-secondary) !important;
 }
 
 .dg-grid-cell[data-interactive="true"]:not([data-locked="true"]) {
@@ -1117,11 +1127,11 @@ textarea {
   padding: 8px 16px;
   margin: 8px 16px;
   background: var(--color-warning-bg);
-  border: 1px solid #FDE68A;
+  border: 1px solid var(--color-warning-border);
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  color: #92400E;
+  color: var(--color-warning-text);
 }
 
 .dg-draft-banner-dot {
@@ -1149,9 +1159,9 @@ textarea {
   border-radius: 10px;
 }
 .dg-draft-chip--new { background: var(--color-success-bg); color: var(--color-success-text); }
-.dg-draft-chip--modified { background: var(--color-info-bg); color: var(--color-brand); }
+.dg-draft-chip--modified { background: var(--color-brand-bg); color: var(--color-brand); }
 .dg-draft-chip--deleted { background: var(--color-danger-bg); color: var(--color-danger); }
-.dg-draft-chip--notes { background: var(--color-info-bg); color: var(--color-brand); }
+.dg-draft-chip--notes { background: var(--color-brand-bg); color: var(--color-brand); }
 
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
 /* Vibrant, full-color banner toasts — no shadows */
@@ -1167,9 +1177,9 @@ textarea {
 
 /* Toast type colors — vibrant solid backgrounds with white text */
 [data-sonner-toast][data-type="success"] {
-  background: #16A34A !important;
+  background: #005F02 !important;
   color: #FFFFFF !important;
-  border: 1px solid #15803D !important;
+  border: 1px solid #004501 !important;
 }
 
 [data-sonner-toast][data-type="error"] {
@@ -1179,7 +1189,7 @@ textarea {
 }
 
 [data-sonner-toast][data-type="info"] {
-  background: #0357CA !important;
+  background: #1D4ED8 !important;
   color: #FFFFFF !important;
   border: 1px solid #1E3A8A !important;
 }
@@ -1197,7 +1207,7 @@ textarea {
 }
 
 [data-sonner-toast] [data-description] {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
 }
@@ -1209,9 +1219,9 @@ textarea {
   right: 10px !important;
   left: auto !important;
   transform: translateY(-50%) !important;
-  background: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
   color: #FFFFFF !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
   opacity: 1 !important;
   padding: 0 !important;
   border-radius: 50% !important;
@@ -1267,7 +1277,7 @@ textarea {
 
 /* ── Skeleton Shimmer ──────────────────────────────────── */
 .dg-skeleton {
-  background: linear-gradient(90deg, var(--color-bg-secondary) 25%, #E2E8F0 50%, var(--color-bg-secondary) 75%);
+  background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-border-light) 50%, var(--color-bg-secondary) 75%);
   background-size: 200% 100%;
   animation: dg-shimmer 1.5s ease-in-out infinite;
   border-radius: 8px;
@@ -1349,7 +1359,7 @@ textarea {
   padding: 48px 44px 44px;
   width: 100%;
   max-width: 440px;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 18px;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
 }
@@ -1606,11 +1616,11 @@ textarea {
   .dg-bottom-sheet-main-item.active {
     font-weight: 600;
     color: var(--color-brand);
-    background: var(--color-info-bg);
+    background: var(--color-brand-bg);
   }
 
   .dg-bottom-sheet-main-item--gridmaster {
-    color: #2563EB;
+    color: var(--color-brand);
   }
 
   /* Chevron indicator on main items */
@@ -1690,7 +1700,7 @@ textarea {
   .dg-bottom-sheet-drill-item.active {
     font-weight: 600;
     color: var(--color-brand);
-    background: var(--color-info-bg);
+    background: var(--color-brand-bg);
   }
 
   /* Shared item utilities */

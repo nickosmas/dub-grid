@@ -36,6 +36,14 @@ export const demoLimiter = redis
   ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(3, "1 h") })
   : null;
 
+/**
+ * Password reset rate limiter — 5 requests per 15 minutes per key (email hash).
+ * Returns `{ success: true }` if Redis is not configured (local dev).
+ */
+export const passwordResetLimiter = redis
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, "15 m") })
+  : null;
+
 if (!hasRedisEnv) {
   if (process.env.NODE_ENV === "production") {
     console.error(

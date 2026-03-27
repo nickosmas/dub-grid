@@ -43,7 +43,7 @@ export default function StatCard({
     padding: "2px 7px",
     borderRadius: 4,
     ...(isGood
-      ? { background: "var(--color-success-bg, #F0FDF4)", color: "var(--color-success, #16A34A)" }
+      ? { background: "var(--color-success-bg, #F0F7F0)", color: "var(--color-success, #2E9930)" }
       : isBad
         ? { background: "var(--color-danger-bg, #FEF2F2)", color: "var(--color-danger, #DC2626)" }
         : { background: "var(--color-bg-secondary, #F1F5F9)", color: "var(--color-text-subtle, #64748B)" }),

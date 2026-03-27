@@ -82,7 +82,7 @@ export default function OnboardingPage() {
         minHeight: "100vh",
         padding: "24px",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-info-bg) 100%)",
+        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-brand-bg) 100%)",
       }}
     >
       <div
@@ -103,7 +103,7 @@ export default function OnboardingPage() {
             padding: "16px", 
             background: "var(--color-brand)",
             borderRadius: "20px",
-            boxShadow: "0 8px 16px rgba(3, 87, 202, 0.25)"
+            boxShadow: "0 8px 16px rgba(0, 95, 2, 0.25)"
           }}>
             <DubGridLogo size={40} color="var(--color-text-inverse)" />
           </div>
@@ -148,7 +148,7 @@ export default function OnboardingPage() {
               fontWeight: 700,
               cursor: "pointer",
               transition: "transform 150ms ease, box-shadow 150ms ease",
-              boxShadow: "0 4px 12px rgba(3, 87, 202, 0.2)",
+              boxShadow: "0 4px 12px rgba(0, 95, 2, 0.2)",
             }}
           >
             {checking ? "Checking..." : "I've been invited — refresh"}

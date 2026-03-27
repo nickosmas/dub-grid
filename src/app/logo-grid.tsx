@@ -4,7 +4,7 @@
  */
 
 export const COLORS = {
-  light: "#0357CA",
+  light: "#005F02",
   dark: "#F1F5F9",
 } as const;
 
@@ -27,8 +27,8 @@ export function LogoGrid({ size, color = COLORS.light }: GridProps) {
   }
 
   const cell = size / 4;
-  const gap = cell * 0.18;
-  const r = cell * 0.22;
+  const gap = cell * 0.10;
+  const r = cell * 0.20;
 
   return (
     <div

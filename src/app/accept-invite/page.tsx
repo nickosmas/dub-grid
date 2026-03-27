@@ -6,6 +6,9 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { acceptInvitation } from "@/lib/db";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { PasswordInput } from "@/components/auth/PasswordInput";
+import { PasswordStrength } from "@/components/auth/PasswordStrength";
+import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
 
@@ -43,14 +46,12 @@ export default function AcceptInvitePage() {
 
   function getLoginUrl(slug: string | null) {
     if (!slug) return "/login";
-    // Validate slug to prevent open redirect via crafted slug values
     if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(slug)) return "/login";
-    const host = window.location.host;
-    const protocol = window.location.protocol;
-    if (host.startsWith(`${slug}.`)) return "/login";
-    const parts = host.split(".");
-    const baseDomain = parts.length >= 2 ? parts.slice(-2).join(".") : host;
-    return `${protocol}//${slug}.${baseDomain}/login`;
+    const parsed = parseHost(window.location.host);
+    // Already on this org's subdomain — use relative redirect
+    if (parsed.subdomain === slug) return "/login";
+    const host = buildSubdomainHost(slug, parsed);
+    return `${window.location.protocol}//${host}/login`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,8 +62,8 @@ export default function AcceptInvitePage() {
       setFormError("Passwords do not match");
       return;
     }
-    if (password.length < 6) {
-      setFormError("Password must be at least 6 characters");
+    if (password.length < 10) {
+      setFormError("Password must be at least 10 characters");
       return;
     }
 
@@ -154,7 +155,7 @@ export default function AcceptInvitePage() {
         minHeight: "100vh",
         padding: "24px",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-info-bg) 100%)",
+        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-brand-bg) 100%)",
       }}
     >
       <div
@@ -275,70 +276,6 @@ export default function AcceptInvitePage() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function PasswordInput({
-  placeholder,
-  value,
-  onChange,
-  showPassword,
-  onToggle,
-  ariaDescribedBy,
-}: {
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  showPassword: boolean;
-  onToggle: () => void;
-  ariaDescribedBy?: string;
-}) {
-  return (
-    <div style={{ position: "relative" }}>
-      <input
-        type={showPassword ? "text" : "password"}
-        placeholder={placeholder}
-        className="dg-standalone-input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
-        minLength={6}
-        aria-describedby={ariaDescribedBy}
-        style={{ ...inputStyle, paddingRight: 48 }}
-      />
-      <button
-        type="button"
-        onClick={onToggle}
-        tabIndex={-1}
-        style={{
-          position: "absolute",
-          right: 12,
-          top: "50%",
-          transform: "translateY(-50%)",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 4,
-          color: "var(--color-text-subtle)",
-          display: "flex",
-          alignItems: "center",
-        }}
-        aria-label={showPassword ? "Hide password" : "Show password"}
-      >
-        {showPassword ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-            <line x1="1" y1="1" x2="23" y2="23" />
-          </svg>
-        ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        )}
-      </button>
-    </div>
-  );
-}
-
 function LoadingState({ message }: { message: string }) {
   return (
     <>
@@ -401,24 +338,6 @@ function ErrorState({ title, message }: { title: string; message: string }) {
         Go to Login
       </button>
     </>
-  );
-}
-
-function PasswordStrength({ password }: { password: string }) {
-  const level = password.length < 8 ? 0 : password.length < 10 ? 1 : /[A-Z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password) ? 3 : /[A-Z]/.test(password) && /[0-9]/.test(password) ? 2 : 1;
-  const labels = ["Too short", "Weak", "Fair", "Strong"];
-  const colors = ["var(--color-danger)", "var(--color-warning)", "var(--color-warning)", "var(--color-success)"];
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 4 }} role="meter" aria-label="Password strength" aria-valuenow={level} aria-valuemin={0} aria-valuemax={3}>
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= level ? colors[level] : "var(--color-border-light)", transition: "background 150ms ease" }} />
-        ))}
-      </div>
-      <span id="password-strength-label" style={{ fontSize: "var(--dg-fs-caption)", color: colors[level], fontWeight: 500 }}>
-        {labels[level]}
-      </span>
-    </div>
   );
 }
 

@@ -171,7 +171,7 @@ function SetupContent() {
               style={{
                 fontSize: 13,
                 fontWeight: 700,
-                color: progress === 100 ? "var(--color-success, #16a34a)" : "var(--color-primary, #0357CA)",
+                color: progress === 100 ? "var(--color-success, #2E9930)" : "var(--color-primary, #005F02)",
               }}
             >
               {progress}%
@@ -191,8 +191,8 @@ function SetupContent() {
                 width: `${progress}%`,
                 borderRadius: 3,
                 background: progress === 100
-                  ? "var(--color-success, #16a34a)"
-                  : "var(--color-primary, #0357CA)",
+                  ? "var(--color-success, #2E9930)"
+                  : "var(--color-primary, #005F02)",
                 transition: "width 0.3s ease",
               }}
             />
@@ -230,7 +230,7 @@ function SetupContent() {
                   alignItems: "center",
                   justifyContent: "center",
                   background: item.done
-                    ? "var(--color-success, #16a34a)"
+                    ? "var(--color-success, #2E9930)"
                     : "var(--color-bg, #f7f8f5)",
                   color: item.done ? "white" : "var(--color-text-faint)",
                   border: item.done ? "none" : "1.5px solid var(--color-border)",
@@ -278,7 +278,7 @@ function SetupContent() {
                     gap: 4,
                     fontSize: 13,
                     fontWeight: 600,
-                    color: "var(--color-primary, #0357CA)",
+                    color: "var(--color-primary, #005F02)",
                     textDecoration: "none",
                     whiteSpace: "nowrap",
                     flexShrink: 0,

@@ -1526,7 +1526,7 @@ function ShiftCodeRow({
                         border: `1.5px solid ${
                           checked ? "var(--color-brand)" : "var(--color-border)"
                         }`,
-                        background: checked ? "var(--color-info-bg)" : "transparent",
+                        background: checked ? "var(--color-brand-bg)" : "transparent",
                         transition: "border-color 150ms ease, background 150ms ease",
                       }}
                     >
@@ -2321,7 +2321,7 @@ function StringListSettings({
             gridTemplateColumns: gridCols,
             padding: "10px 16px",
             borderBottom: "1px solid var(--color-border-light)",
-            background: isEditing ? "var(--color-info-bg)" : undefined,
+            background: isEditing ? "var(--color-brand-bg)" : undefined,
           }}
         >
           {(isEditing
@@ -2781,7 +2781,7 @@ function ShiftCategoriesSettings({
       id: tmpId,
       orgId: orgId,
       name: "",
-      color: "var(--color-info-bg)",
+      color: "var(--color-bg-secondary)",
       startTime: null,
       endTime: null,
       sortOrder: local.filter((c) => c.focusAreaId === focusAreaId).length,
@@ -3535,7 +3535,7 @@ function CoverageRequirementsSettings({
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 700,
                           color: "var(--color-brand)",
-                          background: "var(--color-info-bg)",
+                          background: "var(--color-brand-bg)",
                           padding: "2px 6px",
                           borderRadius: 4,
                         }}
@@ -3782,8 +3782,8 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
   };
 
   const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-    super_admin: { bg: "var(--color-info-bg)", text: "var(--color-brand)" },
-    admin: { bg: "var(--color-info-bg)", text: "var(--color-brand)" },
+    super_admin: { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
+    admin: { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
     user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
   };
 
@@ -3955,7 +3955,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                           <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground truncate">
                             {displayName}
                             {currentUser && user.id === currentUser.id && (
-                              <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-blue-50 text-blue-600 shrink-0">
+                              <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-brand-bg)] text-[var(--color-brand)] shrink-0">
                                 You
                               </span>
                             )}
@@ -4322,9 +4322,9 @@ export default function SettingsPage({
                           render={<Link href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`} replace />}
                           isActive={activeSection === link.id}
                           tooltip={link.label}
-                          className="h-9 data-[active=true]:bg-[var(--color-info-bg)] data-[active=true]:text-[var(--color-brand)] hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                          className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
                         >
-                          <span className={activeSection === link.id ? "text-[var(--color-today-text)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                          <span className={activeSection === link.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
                             {link.icon}
                           </span>
                           <span className="font-semibold">{link.label}</span>
@@ -4341,7 +4341,7 @@ export default function SettingsPage({
                   <SidebarMenuButton
                     onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                     tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                    className="h-9 text-[var(--color-text-faint)] hover:text-black hover:bg-[var(--color-bg-secondary)] transition-all ease-in-out duration-150"
+                    className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
                   >
                     <span className="flex shrink-0 items-center justify-center">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>

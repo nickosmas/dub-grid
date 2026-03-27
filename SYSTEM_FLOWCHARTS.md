@@ -732,6 +732,107 @@ flowchart LR
 
 ---
 
+## 8. Password Reset & Email Verification Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant ForgotPage as /forgot-password
+    participant SupaAuth as Supabase Auth
+    participant Email as Email (Resend)
+    participant ResetPage as /reset-password
+    participant VerifyPage as /verify-email
+
+    Note over User,VerifyPage: === PASSWORD RESET FLOW ===
+
+    User->>ForgotPage: Navigate to /forgot-password
+    User->>ForgotPage: Enter email address
+    ForgotPage->>SupaAuth: resetPasswordForEmail(email,<br/>redirectTo: /reset-password)
+
+    Note over ForgotPage: Email enumeration protection:<br/>Always shows "Check your email"<br/>regardless of email existence
+
+    ForgotPage-->>User: "Check Your Email" confirmation
+    SupaAuth->>Email: Send password reset link
+    Email-->>User: Email with reset link
+
+    User->>ResetPage: Click link → /reset-password?token=...
+    ResetPage->>SupaAuth: Listen for PASSWORD_RECOVERY event
+
+    alt Valid token (event fires)
+        SupaAuth-->>ResetPage: PASSWORD_RECOVERY event received
+        ResetPage-->>User: Show reset form
+        User->>ResetPage: Enter new password (min 10 chars)
+        ResetPage->>ResetPage: Validate: strength meter,<br/>confirmation match
+        ResetPage->>SupaAuth: updateUser({ password })
+        SupaAuth-->>ResetPage: Success
+        ResetPage->>SupaAuth: signOut({ scope: 'local' })
+        ResetPage-->>User: "Password reset successful"<br/>Redirect to /login
+    else Invalid/expired token (5s timeout)
+        ResetPage-->>User: "Invalid or expired link"<br/>Link to /forgot-password
+    end
+
+    Note over User,VerifyPage: === EMAIL VERIFICATION FLOW ===
+
+    User->>VerifyPage: Redirected after invitation acceptance
+    VerifyPage-->>User: "Verify your email" message
+    VerifyPage->>SupaAuth: Listen for SIGNED_IN event
+
+    alt User clicks resend
+        User->>VerifyPage: Click "Resend Verification Email"
+        VerifyPage->>SupaAuth: resend({ type: 'signup', email })
+        Note over VerifyPage: 60-second cooldown<br/>before next resend
+    end
+
+    SupaAuth-->>VerifyPage: SIGNED_IN event (email confirmed)
+    VerifyPage-->>User: Auto-redirect to /dashboard
+```
+
+---
+
+## 9. Organization Setup & Onboarding Flow
+
+```mermaid
+flowchart TD
+    INVITE["Super Admin sends invitation<br/>(employee_id + email + role)"]
+    EMAIL["Invitation email sent<br/>via /api/send-invite-email"]
+    ACCEPT["User clicks link →<br/>/accept-invite?token=uuid"]
+    VALIDATE{"Token valid?<br/>Not expired?<br/>Not accepted?"}
+    CREATE["Create Supabase auth user<br/>Set employees.user_id<br/>Create organization_membership"]
+    VERIFY["Redirect → /verify-email<br/>Wait for email confirmation"]
+    ONBOARD["Redirect → /onboarding<br/>Poll for org assignment<br/>(every 15s, max 5 min)"]
+
+    subgraph SetupGuard["SetupGuard Component"]
+        SETUP_CHECK{"Org setup<br/>complete?"}
+        SETUP["Redirect → /setup<br/>Admin setup wizard"]
+        CHECKLIST["Setup checklist:<br/>✓ Add employees<br/>✓ Configure focus areas<br/>✓ Set up shift codes<br/>✓ Publish schedule"]
+        COMPLETE{"All steps done +<br/>≥1 employee?"}
+    end
+
+    DASHBOARD["Redirect → /dashboard<br/>Fully operational"]
+
+    INVITE --> EMAIL
+    EMAIL --> ACCEPT
+    ACCEPT --> VALIDATE
+    VALIDATE -->|No| REJECT["Error: Invalid/expired invite"]
+    VALIDATE -->|Yes| CREATE
+    CREATE --> VERIFY
+    VERIFY --> ONBOARD
+    ONBOARD --> SETUP_CHECK
+    SETUP_CHECK -->|"No (admin)"| SETUP
+    SETUP --> CHECKLIST
+    CHECKLIST --> COMPLETE
+    COMPLETE -->|No| CHECKLIST
+    COMPLETE -->|Yes| DASHBOARD
+    SETUP_CHECK -->|Yes| DASHBOARD
+    SETUP_CHECK -->|"No (user)"| WAIT["Show waiting message:<br/>'Your organization is<br/>being set up'"]
+
+    style REJECT fill:#fee2e2,stroke:#dc2626
+    style DASHBOARD fill:#bbf7d0,stroke:#16a34a
+    style SetupGuard fill:#f0fdf4,stroke:#16a34a
+```
+
+---
+
 ## Quick Reference: Defense in Depth
 
 ```mermaid

@@ -225,7 +225,7 @@ function EventIcon({ type }: { type: TimelineEvent["type"] }) {
   const cls = "w-3.5 h-3.5 shrink-0";
   switch (type) {
     case "role_change":
-      return <UserPlus className={`${cls} text-blue-600`} />;
+      return <UserPlus className={`${cls} text-emerald-700`} />;
     case "invitation_sent":
       return <Mail className={`${cls} text-muted-foreground`} />;
     case "invitation_accepted":

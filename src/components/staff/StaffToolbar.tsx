@@ -210,7 +210,7 @@ export function StaffToolbar({
                   placeholder="Search staff..."
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="h-11 w-full rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] pl-8 pr-8 text-[14px] font-medium text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-border-focus)] focus:ring-[3px] focus:ring-[rgba(56,189,248,0.15)] outline-none transition-all duration-150"
+                  className="h-11 w-full rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] pl-8 pr-8 text-[14px] font-medium text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-border-focus)] focus:ring-[3px] focus:ring-[rgba(46,153,48,0.15)] outline-none transition-all duration-150"
                 />
                 {searchQuery && (
                   <button
@@ -310,7 +310,7 @@ export function StaffToolbar({
                   placeholder="Search staff..."
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className={`h-[var(--dg-toolbar-h)] rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] pl-8 pr-8 text-[13px] font-medium text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-border-focus)] focus:ring-[3px] focus:ring-[rgba(56,189,248,0.15)] outline-none transition-all duration-150 ${
+                  className={`h-[var(--dg-toolbar-h)] rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] pl-8 pr-8 text-[13px] font-medium text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-border-focus)] focus:ring-[3px] focus:ring-[rgba(46,153,48,0.15)] outline-none transition-all duration-150 ${
                     isTablet ? "w-[180px] focus:w-[240px]" : "w-[200px]"
                   }`}
                 />

@@ -2,7 +2,7 @@ import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "#F0FDF4", stroke: "#2D6B3A" },
+  success: { bg: "#F0F7F0", stroke: "#004501" },
   danger: { bg: "#FEF2F2", stroke: "#DC2626" },
   warning: { bg: "#FFFBEB", stroke: "#D97706" },
   neutral: { bg: "var(--color-bg-secondary, #F1F5F9)", stroke: "var(--color-text-secondary, #495057)" },

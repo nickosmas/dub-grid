@@ -58,7 +58,9 @@
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:stytch.com)",
       "WebFetch(domain:techdocs.broadcom.com)",
-      "WebFetch(domain:dribbble.com)"
+      "WebFetch(domain:dribbble.com)",
+      "Bash(file:*)",
+      "Bash(sips:*)"
     ]
   }
 }

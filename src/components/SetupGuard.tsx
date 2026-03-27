@@ -65,7 +65,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             width: 56,
             height: 56,
             borderRadius: 16,
-            background: "var(--color-primary, #0357CA)",
+            background: "var(--color-primary, #005F02)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

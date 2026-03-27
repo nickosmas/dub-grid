@@ -17,6 +17,7 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 - **Shift Requests** — Pickup and swap request workflow with admin approval
 - **Gridmaster Portal** — Platform-wide org management, user impersonation, audit logs, permission configuration
 - **Invite-Only Registration** — No public sign-up; 72-hour invitation tokens linked to employee records
+- **Password Reset & Email Verification** — Forgot password flow, password strength meter, email verification for new accounts
 - **Print Export** — Configurable print layout with legend, focus area selection, and date range
 
 ## Tech Stack
@@ -31,7 +32,10 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 | State         | [TanStack React Query v5](https://tanstack.com/query) |
 | Drag & Drop   | @dnd-kit/core                                         |
 | Email         | [Resend](https://resend.com)                          |
+| Rate Limiting | [@upstash/ratelimit](https://upstash.com) + Redis     |
 | Validation    | [Zod](https://zod.dev)                                |
+| Notifications | [Sonner](https://sonner.emilkowal.dev) v2             |
+| Analytics     | [@vercel/analytics](https://vercel.com/analytics)     |
 | Testing       | [Vitest](https://vitest.dev) + Testing Library        |
 | Deployment    | [Vercel](https://vercel.com)                          |
 
@@ -94,15 +98,22 @@ src/
 │   ├── settings/           # Organization configuration
 │   ├── gridmaster/         # Gridmaster portal
 │   ├── login/              # Authentication
+│   ├── forgot-password/    # Password reset request
+│   ├── reset-password/     # Password reset form (via email link)
+│   ├── verify-email/       # Email verification for new accounts
 │   ├── accept-invite/      # Invitation acceptance
+│   ├── onboarding/         # New user org assignment polling
+│   ├── setup/              # Organization setup wizard
+│   ├── request-demo/       # Demo request form (landing page)
 │   ├── profile/            # User profile
 │   └── api/                # API route handlers
 ├── components/             # UI components
+│   ├── auth/               # Auth UI (PasswordInput, PasswordStrength, AuthCard)
 │   ├── dashboard/          # Dashboard cards, charts, expanded views
 │   ├── gridmaster/         # Gridmaster portal components
 │   ├── staff/              # Staff list components
 │   ├── staff-detail/       # Staff detail page + tabs
-│   ├── landing/            # Landing page mockups
+│   ├── landing/            # Landing page feature mockups
 │   └── ui/                 # Base UI components (shadcn/ui)
 ├── hooks/                  # Custom React hooks
 ├── lib/                    # Data access, utilities, business logic
@@ -164,3 +175,7 @@ Key configuration:
 | [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md) | Four-tier role hierarchy, 16 admin permissions, race condition mitigations |
 | [SYSTEM_FLOWCHARTS.md](SYSTEM_FLOWCHARTS.md) | Mermaid-based diagrams for auth, JWT hook, org validation, and request flows |
 | [CLAUDE.md](CLAUDE.md) | Development workflow rules, React/Next.js/security best practices |
+
+## License
+
+Proprietary — DubGrid is confidential software. All rights reserved.

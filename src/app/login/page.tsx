@@ -11,6 +11,8 @@ import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { PageShell, Card } from "@/components/auth/AuthCard";
+import { Eye, EyeOff } from "lucide-react";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -18,82 +20,6 @@ function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
   const parsed = parseHost(window.location.host);
   return parsed.subdomain;
-}
-
-// ── Shared layout wrapper ──────────────────────────────────────────────────────
-
-function PageShell({
-  children,
-  footerCenteredOnly,
-}: {
-  children: React.ReactNode;
-  footerCenteredOnly?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        padding: "24px 16px",
-      }}
-    >
-      {children}
-
-      {/* Footer */}
-      <footer
-        style={{
-          marginTop: "36px",
-          width: "100%",
-          maxWidth: "860px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: footerCenteredOnly ? "center" : "space-between",
-          padding: "0 8px",
-          fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-faint)",
-        }}
-      >
-        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-          <Link
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
-          >
-            Privacy Policy
-          </Link>
-          <span style={{ margin: "0 4px" }}>·</span>
-          <Link
-            href="/terms"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
-          >
-            Terms of Service
-          </Link>
-        </div>
-        {!footerCenteredOnly && (
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <DubGridLogo size={20} />
-            <DubGridWordmark fontSize={14} color="var(--color-text-subtle)" />
-          </div>
-        )}
-      </footer>
-    </div>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dg-auth-card">
-      {children}
-    </div>
-  );
 }
 
 // ── Step 1: Domain selector (root domain) ─────────────────────────────────────
@@ -388,6 +314,7 @@ function DomainSelector() {
 function GridmasterLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
@@ -429,29 +356,8 @@ function GridmasterLogin() {
   // which is inside AuthProvider (which has the Toaster).
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#001F52",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        padding: "24px 16px",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "400px",
-          padding: "40px 36px 36px",
-          background: "#00287A",
-          borderRadius: "14px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
-          border: "1px solid #0040A0",
-        }}
-      >
+    <PageShell footerCenteredOnly>
+      <Card>
         <a
           href={landingUrl}
           style={{
@@ -463,14 +369,14 @@ function GridmasterLogin() {
             textDecoration: "none",
           }}
         >
-          <DubGridLogo size={48} color="#EFF5FF" />
+          <DubGridLogo size={52} />
           <span
             style={{
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color:"#6690CC",
+              color: "var(--color-text-subtle)",
             }}
           >
             Gridmaster Portal
@@ -481,7 +387,7 @@ function GridmasterLogin() {
           style={{
             fontSize: "var(--dg-fs-card-title)",
             fontWeight: 700,
-            color: "#EFF5FF",
+            color: "var(--color-text-primary)",
             textAlign: "center",
             marginBottom: "24px",
           }}
@@ -500,7 +406,7 @@ function GridmasterLogin() {
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color:"#6690CC",
+                color: "var(--color-text-secondary)",
               }}
             >
               Email
@@ -515,11 +421,9 @@ function GridmasterLogin() {
               style={{
                 width: "100%",
                 padding: "11px 13px",
-                border: "1px solid #0040A0",
+                border: "1.5px solid var(--color-border)",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
-                background: "#001F52",
-                color: "#EFF5FF",
                 outline: "none",
                 boxSizing: "border-box",
               }}
@@ -533,30 +437,63 @@ function GridmasterLogin() {
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
                 marginBottom: "6px",
-                color:"#6690CC",
+                color: "var(--color-text-secondary)",
               }}
             >
               Password
             </label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              className="dg-standalone-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                className="dg-standalone-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "11px 40px 11px 13px",
+                  border: "1.5px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "var(--dg-fs-body)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "2px",
+                  color: "var(--color-text-subtle)",
+                  fontSize: "var(--dg-fs-body)",
+                  lineHeight: 1,
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ textAlign: "right", marginTop: "2px" }}>
+            <a
+              href="/forgot-password"
               style={{
-                width: "100%",
-                padding: "11px 13px",
-                border: "1px solid #0040A0",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body)",
-                background: "#001F52",
-                color: "#EFF5FF",
-                outline: "none",
-                boxSizing: "border-box",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-subtle)",
+                textDecoration: "underline",
               }}
-            />
+            >
+              Forgot password?
+            </a>
           </div>
 
           <button
@@ -566,10 +503,10 @@ function GridmasterLogin() {
               marginTop: "4px",
               width: "100%",
               padding: "13px",
-              background: "#0058CC",
-              color: "#fff",
+              background: "var(--color-brand)",
+              color: "var(--color-text-inverse)",
               border: "none",
-              borderRadius: "8px",
+              borderRadius: "999px",
               fontSize: "var(--dg-fs-body)",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
@@ -580,7 +517,7 @@ function GridmasterLogin() {
               opacity: loading ? 0.85 : 1,
             }}
           >
-            <ButtonLoading loading={loading} spinnerColor="#fff" spinnerSize={28}>Access Portal</ButtonLoading>
+            <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Access Portal</ButtonLoading>
           </button>
         </form>
 
@@ -599,7 +536,7 @@ function GridmasterLogin() {
             style={{
               background: "none",
               border: "none",
-              color: "#6690CC",
+              color: "var(--color-text-faint)",
               fontSize: "var(--dg-fs-label)",
               cursor: "pointer",
               padding: 0,
@@ -613,7 +550,7 @@ function GridmasterLogin() {
             style={{
               background: "none",
               border: "none",
-              color: "#4A6A9A",
+              color: "var(--color-text-faint)",
               fontSize: "var(--dg-fs-label)",
               cursor: "pointer",
               padding: 0,
@@ -623,8 +560,8 @@ function GridmasterLogin() {
             Back to Home
           </a>
         </div>
-      </div>
-    </div>
+      </Card>
+    </PageShell>
   );
 }
 
@@ -633,6 +570,7 @@ function GridmasterLogin() {
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   // Validate subdomain in the background — never block form render.
   // DomainSelector already validates before redirecting here (?verified=1),
@@ -735,7 +673,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
       if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
         toast.error("Invalid email or password. Please try again.");
       } else if (msg.includes("email not confirmed")) {
-        toast.error("Your email has not been confirmed. Check your inbox for a confirmation link.");
+        window.location.replace(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
       } else if (msg.includes("hook") || msg.includes("unexpected")) {
         toast.error("Something went wrong during sign in. Please try again.");
       } else if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
@@ -774,9 +713,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           <span
             style={{
               display: "inline-block",
-              background: "var(--color-info-bg)",
+              background: "var(--color-brand-bg)",
               color: "var(--color-brand)",
-              border: "1px solid #BDD4F8",
+              border: "1px solid var(--color-brand-border)",
               borderRadius: "999px",
               padding: "4px 14px",
               fontSize: "var(--dg-fs-label)",
@@ -847,23 +786,58 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             >
               Password
             </label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              className="dg-standalone-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                className="dg-standalone-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "11px 40px 11px 13px",
+                  border: "1.5px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "var(--dg-fs-body)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "2px",
+                  color: "var(--color-text-subtle)",
+                  fontSize: "var(--dg-fs-body)",
+                  lineHeight: 1,
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ textAlign: "right", marginTop: "2px" }}>
+            <a
+              href="/forgot-password"
               style={{
-                width: "100%",
-                padding: "11px 13px",
-                border: "1.5px solid var(--color-border)",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body)",
-                outline: "none",
-                boxSizing: "border-box",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-subtle)",
+                textDecoration: "underline",
               }}
-            />
+            >
+              Forgot password?
+            </a>
           </div>
 
           <button

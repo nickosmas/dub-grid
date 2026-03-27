@@ -422,8 +422,8 @@ export default function Header({ orgName }: HeaderProps) {
               transition: "background 150ms ease, border-color 150ms ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--color-info-bg)";
-              e.currentTarget.style.borderColor = "var(--color-info-border)";
+              e.currentTarget.style.background = "var(--color-bg-secondary)";
+              e.currentTarget.style.borderColor = "var(--color-border)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
