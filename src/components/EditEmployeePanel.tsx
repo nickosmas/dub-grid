@@ -5,7 +5,7 @@ import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
@@ -397,7 +397,7 @@ export default function EditEmployeePanel({
                     className="dg-btn dg-btn-ghost"
                     style={{ fontSize: "var(--dg-fs-footnote)", padding: "4px 8px", color: "var(--color-link)" }}
                   >
-                    {revoking ? <ButtonSpinner size={12} /> : "Reinvite"}
+                    <ButtonLoading loading={revoking} spinnerSize={12}>Reinvite</ButtonLoading>
                   </button>
                 )}
                 {onRevoke && (
@@ -414,7 +414,7 @@ export default function EditEmployeePanel({
                     className="dg-btn dg-btn-ghost"
                     style={{ fontSize: "var(--dg-fs-footnote)", padding: "4px 8px", color: "var(--color-danger)" }}
                   >
-                    {revoking ? <ButtonSpinner size={12} /> : "Revoke"}
+                    <ButtonLoading loading={revoking} spinnerSize={12}>Revoke</ButtonLoading>
                   </button>
                 )}
               </div>

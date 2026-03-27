@@ -10,7 +10,7 @@ import Link from "next/link";
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ function DomainSelector() {
                 opacity: loading ? 0.85 : 1,
               }}
             >
-              {loading ? <ButtonSpinner color="var(--color-text-inverse)" size={28} /> : "Continue"}
+              <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Continue</ButtonLoading>
             </button>
             <button
               type="button"
@@ -580,7 +580,7 @@ function GridmasterLogin() {
               opacity: loading ? 0.85 : 1,
             }}
           >
-            {loading ? <ButtonSpinner color="#fff" size={28} /> : "Access Portal"}
+            <ButtonLoading loading={loading} spinnerColor="#fff" spinnerSize={28}>Access Portal</ButtonLoading>
           </button>
         </form>
 
@@ -887,7 +887,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               opacity: loading ? 0.85 : 1,
             }}
           >
-            {loading ? <ButtonSpinner color="var(--color-text-inverse)" size={28} /> : "Sign In"}
+            <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Sign In</ButtonLoading>
           </button>
         </form>
 

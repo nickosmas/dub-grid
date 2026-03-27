@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import Modal from "@/components/Modal";
 import { updateAdminPermissions } from "@/lib/db";
 import type { AdminPermissions } from "@/types";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const PERMISSION_GROUPS = [
   {
@@ -184,7 +184,7 @@ export default function AdminPermissionsEditor({
             Cancel
           </button>
           <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <ButtonSpinner size={16} /> : "Save Permissions"}
+            <ButtonLoading loading={saving} spinnerSize={16}>Save Permissions</ButtonLoading>
           </button>
         </div>
       </div>

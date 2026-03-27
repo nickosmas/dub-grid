@@ -1,7 +1,7 @@
 "use client";
 
 import Modal from "@/components/Modal";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 interface ConfirmDialogProps {
   title: string;
@@ -66,7 +66,7 @@ export default function ConfirmDialog({
           onClick={onConfirm}
           disabled={isLoading || isSecondaryLoading}
         >
-          {isLoading ? <ButtonSpinner size={16} /> : confirmLabel}
+          <ButtonLoading loading={isLoading} spinnerSize={16}>{confirmLabel}</ButtonLoading>
         </button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
           <button
@@ -75,7 +75,7 @@ export default function ConfirmDialog({
             onClick={onSecondaryConfirm}
             disabled={isLoading || isSecondaryLoading}
           >
-            {isSecondaryLoading ? <ButtonSpinner size={16} /> : secondaryConfirmLabel}
+            <ButtonLoading loading={isSecondaryLoading} spinnerSize={16}>{secondaryConfirmLabel}</ButtonLoading>
           </button>
         )}
       </div>
