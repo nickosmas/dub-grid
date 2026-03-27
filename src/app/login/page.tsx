@@ -10,29 +10,9 @@ import Link from "next/link";
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function ButtonSpinner({ color = "currentColor" }: { color?: string }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      style={{ animation: "dg-spin 0.8s linear infinite", flexShrink: 0 }}
-    >
-      <circle cx="8" cy="8" r="6" stroke={color} strokeWidth="2.5" opacity="0.25" />
-      <path
-        d="M14 8a6 6 0 0 0-6-6"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <style>{`@keyframes dg-spin { to { transform: rotate(360deg) } }`}</style>
-    </svg>
-  );
-}
 
 function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
@@ -306,8 +286,7 @@ function DomainSelector() {
                 opacity: loading ? 0.85 : 1,
               }}
             >
-              {loading && <ButtonSpinner color="var(--color-text-inverse)" />}
-              Continue
+              {loading ? <ButtonSpinner color="var(--color-text-inverse)" size={28} /> : "Continue"}
             </button>
             <button
               type="button"
@@ -601,8 +580,7 @@ function GridmasterLogin() {
               opacity: loading ? 0.85 : 1,
             }}
           >
-            {loading && <ButtonSpinner color="#fff" />}
-            Access Portal
+            {loading ? <ButtonSpinner color="#fff" size={28} /> : "Access Portal"}
           </button>
         </form>
 
@@ -909,8 +887,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               opacity: loading ? 0.85 : 1,
             }}
           >
-            {loading && <ButtonSpinner color="var(--color-text-inverse)" />}
-            Sign In
+            {loading ? <ButtonSpinner color="var(--color-text-inverse)" size={28} /> : "Sign In"}
           </button>
         </form>
 

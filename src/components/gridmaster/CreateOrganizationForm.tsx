@@ -7,6 +7,7 @@ import type { Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 const TIMEZONES = [
   "America/New_York",
@@ -261,7 +262,7 @@ export default function CreateOrganizationForm({
           className="dg-btn dg-btn-primary"
           disabled={saving || !name.trim()}
         >
-          {saving ? "Creating…" : "Create Organization"}
+          {saving ? <ButtonSpinner size={16} /> : "Create Organization"}
         </button>
         <button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
           Cancel

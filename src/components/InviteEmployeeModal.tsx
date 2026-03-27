@@ -9,6 +9,7 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
 import { toast } from "sonner";
 import { z } from "zod";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -178,7 +179,7 @@ export default function InviteEmployeeModal({
               disabled={sending}
               style={{ opacity: sending ? 0.5 : 1 }}
             >
-              {sending ? "Linking..." : `Link to ${userName}`}
+              {sending ? <ButtonSpinner size={16} /> : `Link to ${userName}`}
             </button>
           </div>
         </div>
@@ -235,7 +236,7 @@ export default function InviteEmployeeModal({
               disabled={!canSend}
               style={{ opacity: canSend ? 1 : 0.5 }}
             >
-              {sending ? "Sending..." : "Send Invitation"}
+              {sending ? <ButtonSpinner size={16} /> : "Send Invitation"}
             </button>
           </div>
         </div>

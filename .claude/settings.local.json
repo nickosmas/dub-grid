@@ -57,7 +57,8 @@
       "WebFetch(domain:workos.com)",
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:stytch.com)",
-      "WebFetch(domain:techdocs.broadcom.com)"
+      "WebFetch(domain:techdocs.broadcom.com)",
+      "WebFetch(domain:dribbble.com)"
     ]
   }
 }
