@@ -60,7 +60,9 @@
       "WebFetch(domain:techdocs.broadcom.com)",
       "WebFetch(domain:dribbble.com)",
       "Bash(file:*)",
-      "Bash(sips:*)"
+      "Bash(sips:*)",
+      "Bash(fc-list:*)",
+      "Bash(echo:*)"
     ]
   }
 }
