@@ -26,6 +26,26 @@ function ResetPasswordContent() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for error flag from /auth/confirm route (invalid/expired token)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "invalid_link") {
+      setState("error");
+      stateRef.current = "error";
+      return;
+    }
+
+    // Check if session already exists (established by /auth/confirm route).
+    // This is the primary path — the confirm route verifies the token server-side,
+    // sets session cookies, and redirects here.
+    void supabase.auth.getSession().then((res: { data: { session: unknown } }) => {
+      if (res.data.session && stateRef.current === "loading") {
+        setState("form");
+        stateRef.current = "form";
+      }
+    });
+
+    // Fallback: listen for PASSWORD_RECOVERY event (handles legacy implicit flow
+    // or client-side PKCE code exchange if the token arrives via URL hash/params).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
@@ -35,8 +55,8 @@ function ResetPasswordContent() {
       }
     });
 
-    // Timeout fallback — if no recovery event within 15s, link is invalid/expired.
-    // 5s was too short and caused false "invalid link" errors on slow networks/VPNs.
+    // Timeout fallback — if neither session check nor recovery event resolves
+    // within 15s, the link is invalid/expired.
     const timeout = setTimeout(() => {
       if (stateRef.current === "loading") {
         setState("error");

@@ -92,6 +92,7 @@ export async function middleware(req: NextRequest) {
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
     pathname === "/verify-email" ||
+    pathname.startsWith("/auth/") ||
     pathname.startsWith("/api")
   ) {
     return NextResponse.next();
