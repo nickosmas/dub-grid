@@ -13,15 +13,25 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Returns true only after `delay` ms of `active` being true. Resets immediately when `active` becomes false. */
-function useDelayedFlag(active: boolean, delay = 2000): boolean {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    if (!active) { setVisible(false); return; }
-    const id = setTimeout(() => setVisible(true), delay);
-    return () => clearTimeout(id);
-  }, [active, delay]);
-  return visible;
+function ButtonSpinner({ color = "currentColor" }: { color?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      style={{ animation: "dg-spin 0.8s linear infinite", flexShrink: 0 }}
+    >
+      <circle cx="8" cy="8" r="6" stroke={color} strokeWidth="2.5" opacity="0.25" />
+      <path
+        d="M14 8a6 6 0 0 0-6-6"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <style>{`@keyframes dg-spin { to { transform: rotate(360deg) } }`}</style>
+    </svg>
+  );
 }
 
 function getOrgSlug(): string | null {
@@ -112,7 +122,6 @@ function DomainSelector() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const showLoadingText = useDelayedFlag(loading);
   const [showHelp, setShowHelp] = useState(false);
 
   function showToast(msg: string) {
@@ -281,7 +290,7 @@ function DomainSelector() {
               type="submit"
               disabled={loading}
               style={{
-                background: loading ? "var(--color-text-subtle)" : "var(--color-brand)",
+                background: "var(--color-brand)",
                 color: "var(--color-text-inverse)",
                 border: "none",
                 borderRadius: "999px",
@@ -290,9 +299,15 @@ function DomainSelector() {
                 fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer",
                 whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                opacity: loading ? 0.85 : 1,
               }}
             >
-              {showLoadingText ? "Checking…" : "Continue"}
+              {loading && <ButtonSpinner color="var(--color-text-inverse)" />}
+              Continue
             </button>
             <button
               type="button"
@@ -395,7 +410,6 @@ function GridmasterLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const showLoadingText = useDelayedFlag(loading);
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const landingUrl = `${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
@@ -573,16 +587,22 @@ function GridmasterLogin() {
               marginTop: "4px",
               width: "100%",
               padding: "13px",
-              background: loading ? "#1A2640" : "#0058CC",
+              background: "#0058CC",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
               fontSize: "var(--dg-fs-body)",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              opacity: loading ? 0.85 : 1,
             }}
           >
-            {showLoadingText ? "Authenticating…" : "Access Portal"}
+            {loading && <ButtonSpinner color="#fff" />}
+            Access Portal
           </button>
         </form>
 
@@ -636,7 +656,6 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const showLoadingText = useDelayedFlag(loading);
   // Validate subdomain in the background — never block form render.
   // DomainSelector already validates before redirecting here (?verified=1),
   // and the post-login JWT check catches org mismatches regardless.
@@ -876,16 +895,22 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               marginTop: "4px",
               width: "100%",
               padding: "13px",
-              background: loading ? "var(--color-text-subtle)" : "var(--color-brand)",
+              background: "var(--color-brand)",
               color: "var(--color-text-inverse)",
               border: "none",
               borderRadius: "999px",
               fontSize: "var(--dg-fs-body)",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              opacity: loading ? 0.85 : 1,
             }}
           >
-            {showLoadingText ? "Signing in…" : "Sign In"}
+            {loading && <ButtonSpinner color="var(--color-text-inverse)" />}
+            Sign In
           </button>
         </form>
 

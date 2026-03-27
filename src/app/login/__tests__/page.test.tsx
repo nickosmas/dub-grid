@@ -55,19 +55,19 @@ describe("Login page submit states", () => {
     mockToastError.mockReset();
   });
 
-  it("successful sign-in: button stays disabled and shows 'Signing in…'", async () => {
-    // Arrange: signInWithPassword resolves with no error (but never settles synchronously
-    // so loading stays true long enough to assert)
-    mockSignInWithPassword.mockReturnValue(new Promise(() => {})); // never resolves
+  it("successful sign-in: button stays disabled and shows spinner", async () => {
+    // Arrange: signInWithPassword never resolves so loading stays true
+    mockSignInWithPassword.mockReturnValue(new Promise(() => {}));
 
     const { container } = render(<LoginPage />);
     submitForm(container);
 
     await waitFor(() => {
-      const button = screen.getByRole("button", { name: /signing in/i });
-      expect(button).toBeInTheDocument();
+      const button = screen.getByRole("button", { name: /sign in/i });
       expect(button).toBeDisabled();
-    }, { timeout: 3000 });
+      // Spinner SVG should be rendered inside the button
+      expect(button.querySelector("svg")).toBeInTheDocument();
+    });
   });
 
   it("failed sign-in: loading resets to false and error message is displayed", async () => {
