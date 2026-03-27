@@ -62,7 +62,8 @@
       "Bash(file:*)",
       "Bash(sips:*)",
       "Bash(fc-list:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git show:*)"
     ]
   }
 }
