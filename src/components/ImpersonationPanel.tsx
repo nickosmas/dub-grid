@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { startImpersonation, endImpersonation } from "@/lib/db";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 export default function ImpersonationPanel() {
   const [targetUserId, setTargetUserId] = useState("");
@@ -85,7 +86,7 @@ export default function ImpersonationPanel() {
           onClick={start}
           disabled={loading || !targetUserId.trim() || justification.trim().length < 10}
         >
-          {loading ? "Starting..." : "Start session"}
+          {loading ? <ButtonSpinner size={16} /> : "Start session"}
         </button>
         <button
           className="dg-btn dg-btn-secondary"

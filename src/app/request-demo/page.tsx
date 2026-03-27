@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 const ORG_SIZE_OPTIONS = ["1-25", "26-50", "51-100", "101-250", "250+"];
 
@@ -348,9 +349,7 @@ export default function RequestDemoPage() {
                 width: "100%",
                 marginTop: "28px",
                 padding: "13px",
-                background: loading
-                  ? "var(--color-text-subtle)"
-                  : "var(--color-brand)",
+                background: "var(--color-brand)",
                 color: "#fff",
                 border: "none",
                 borderRadius: "999px",
@@ -359,9 +358,13 @@ export default function RequestDemoPage() {
                 cursor: loading ? "not-allowed" : "pointer",
                 fontFamily: "inherit",
                 transition: "background 0.15s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: loading ? 0.85 : 1,
               }}
             >
-              {loading ? "Submitting..." : "Submit Request"}
+              {loading ? <ButtonSpinner color="#fff" size={28} /> : "Submit Request"}
             </button>
           </form>
         </div>

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { acceptInvitation } from "@/lib/db";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
 
@@ -248,11 +249,14 @@ export default function AcceptInvitePage() {
                 disabled={loading}
                 style={{
                   ...primaryButtonStyle,
-                  opacity: loading ? 0.6 : 1,
+                  opacity: loading ? 0.85 : 1,
                   cursor: loading ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                {loading ? "Setting up..." : "Set Password & Accept"}
+                {loading ? <ButtonSpinner color="var(--color-text-inverse)" size={28} /> : "Set Password & Accept"}
               </button>
             </form>
           </>

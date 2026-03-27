@@ -63,10 +63,10 @@ describe("Login page submit states", () => {
     submitForm(container);
 
     await waitFor(() => {
-      const button = screen.getByRole("button", { name: /sign in/i });
-      expect(button).toBeDisabled();
-      // Spinner SVG should be rendered inside the button
-      expect(button.querySelector("svg")).toBeInTheDocument();
+      const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitBtn).toBeDisabled();
+      // Spinner SVG replaces button text while loading
+      expect(submitBtn.querySelector("svg")).toBeInTheDocument();
     });
   });
 

@@ -8,6 +8,7 @@ import { clearPermsCache } from "@/hooks/usePermissions";
 import { clearOrgDataCache } from "@/hooks/useOrganizationData";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
+import ButtonSpinner from "@/components/ButtonSpinner";
 
 export default function EnhancedImpersonation({
   organizations,
@@ -214,7 +215,7 @@ export default function EnhancedImpersonation({
             disabled={loading}
             style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
           >
-            {loading ? "Ending…" : "End Session"}
+            {loading ? <ButtonSpinner size={14} /> : "End Session"}
           </button>
         </div>
       )}
@@ -323,7 +324,7 @@ export default function EnhancedImpersonation({
                     onClick={handleStart}
                     disabled={loading || justification.trim().length < 10}
                   >
-                    {loading ? "Starting…" : `Impersonate ${selectedUser.email}`}
+                    {loading ? <ButtonSpinner size={16} /> : `Impersonate ${selectedUser.email}`}
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
@@ -429,7 +430,7 @@ export default function EnhancedImpersonation({
                     onClick={handleStart}
                     disabled={loading || justification.trim().length < 10}
                   >
-                    {loading ? "Starting…" : `Impersonate ${selectedUser.email}`}
+                    {loading ? <ButtonSpinner size={16} /> : `Impersonate ${selectedUser.email}`}
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
