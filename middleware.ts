@@ -68,6 +68,17 @@ export async function middleware(req: NextRequest) {
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
+  // Marketing pages should only render on the apex domain — redirect
+  // any subdomain (including nonsense slugs) back to the bare domain.
+  if (subdomain && subdomain !== "gridmaster") {
+    const isMarketingPage = pathname === "/" || pathname === "/privacy" || pathname === "/terms" || pathname === "/request-demo";
+    if (isMarketingPage) {
+      const url = new URL(req.url);
+      url.host = `${parsedHost.rootDomain}${parsedHost.port}`;
+      return NextResponse.redirect(url);
+    }
+  }
+
   // Public routes — accessible without authentication.
   // Note: /api routes are also excluded at the matcher level (line 191),
   // so the /api check here is a safety net for if the matcher changes.
