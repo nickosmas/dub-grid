@@ -143,7 +143,7 @@ describe("getRoleLevel", () => {
 // Dynamic import of middleware function — needs mocks set up first
 async function runMiddleware(req: ReturnType<typeof makeNextRequest>) {
   const mod = await import("../../middleware");
-  return mod.middleware(req as Parameters<typeof mod.middleware>[0]);
+  return mod.middleware(req as Parameters<typeof mod.middleware>[0]) as unknown;
 }
 
 describe("middleware: public routes", () => {

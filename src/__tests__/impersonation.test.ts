@@ -116,7 +116,7 @@ describe("setImpersonationCookie", () => {
 
   afterEach(() => {
     // Restore default cookie behavior
-    delete (document as Record<string, unknown>).cookie;
+    delete (document as unknown as Record<string, unknown>).cookie;
   });
 
   it("sets cookie with correct name, path, and SameSite", () => {
@@ -153,7 +153,7 @@ describe("clearImpersonationCookie", () => {
   });
 
   afterEach(() => {
-    delete (document as Record<string, unknown>).cookie;
+    delete (document as unknown as Record<string, unknown>).cookie;
   });
 
   it("sets max-age=0 to clear the cookie", () => {
