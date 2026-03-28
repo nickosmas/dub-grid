@@ -63,7 +63,10 @@
       "Bash(sips:*)",
       "Bash(fc-list:*)",
       "Bash(echo:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run test:*)"
     ]
   }
 }
