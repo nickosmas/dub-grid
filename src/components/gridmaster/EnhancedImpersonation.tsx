@@ -42,6 +42,7 @@ export default function EnhancedImpersonation({
   // Load users when org changes
   useEffect(() => {
     if (!selectedOrgId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUsers([]);
       setSelectedUser(null);
       return;
@@ -69,6 +70,7 @@ export default function EnhancedImpersonation({
 
   // Countdown timer for active session
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!expiresAt) { setCountdown(null); return; }
     const interval = setInterval(() => {
       const diff = new Date(expiresAt).getTime() - Date.now();

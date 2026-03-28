@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, type MutableRefObject } from "react";
+import { useState, useCallback, useRef, useEffect, type MutableRefObject } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface CellLock {
@@ -43,9 +43,11 @@ export function useCellLocks(
   );
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const currentUserRef = useRef(currentUser);
-  currentUserRef.current = currentUser;
   const canEditRef = useRef(canEdit);
-  canEditRef.current = canEdit;
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+    canEditRef.current = canEdit;
+  });
 
   // Rebuild lockedCells map + onlineUsers list from presence state.
   // Returned so the parent can register it directly on the channel —

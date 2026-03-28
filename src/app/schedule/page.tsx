@@ -1959,8 +1959,8 @@ function SchedulerContent() {
             Workspace Setup Required
           </h1>
           <p style={{ fontSize: "var(--dg-fs-title)", color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 32 }}>
-            Your account is active, but it looks like your workspace hasn't been initialized yet.
-            Once your administrator completes the setup, you'll be able to access the schedule.
+            Your account is active, but it looks like your workspace hasn&apos;t been initialized yet.
+            Once your administrator completes the setup, you&apos;ll be able to access the schedule.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

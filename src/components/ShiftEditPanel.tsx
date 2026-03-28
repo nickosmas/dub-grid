@@ -317,12 +317,15 @@ function PillTimeEditor({
   // Re-sync local state when parent props change (e.g. after undo or external update)
   const prevStartRef = useRef(customStart);
   const prevEndRef = useRef(customEnd);
-  if (customStart !== prevStartRef.current || customEnd !== prevEndRef.current) {
-    prevStartRef.current = customStart;
-    prevEndRef.current = customEnd;
-    setLocalStart(customStart ?? defaultStart);
-    setLocalEnd(customEnd ?? defaultEnd);
-  }
+  useEffect(() => {
+    if (customStart !== prevStartRef.current || customEnd !== prevEndRef.current) {
+      prevStartRef.current = customStart;
+      prevEndRef.current = customEnd;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLocalStart(customStart ?? defaultStart);
+      setLocalEnd(customEnd ?? defaultEnd);
+    }
+  });
 
   const s = parseTo12h(localStart);
   const e = parseTo12h(localEnd);
@@ -729,6 +732,7 @@ export default function ShiftEditPanel({
   // When shift is cleared externally, return to picker
   useEffect(() => {
     if (!currentShift || currentShift === "OFF") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowPicker(true);
     }
   }, [currentShift]);

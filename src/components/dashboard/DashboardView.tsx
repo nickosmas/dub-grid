@@ -133,10 +133,11 @@ export default function DashboardView({
   // Stable ref for shiftCodeMap to avoid re-fetching on every render
   // (Map objects have no referential stability)
   const shiftCodeMapRef = useRef(shiftCodeMap);
-  shiftCodeMapRef.current = shiftCodeMap;
+  useEffect(() => { shiftCodeMapRef.current = shiftCodeMap; });
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShiftsLoading(true);
 
     Promise.all([

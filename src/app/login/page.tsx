@@ -93,7 +93,7 @@ function DomainSelector() {
     <PageShell footerCenteredOnly>
       <Card>
         {/* Logo — links to landing page; hidden gridmaster entry on 5 rapid taps */}
-        <a
+        <Link
           href="/"
           onClick={handleLogoTap}
           style={{
@@ -109,7 +109,7 @@ function DomainSelector() {
         >
           <DubGridLogo size={52} />
           <DubGridWordmark />
-        </a>
+        </Link>
 
         <p
           style={{
@@ -630,7 +630,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               return;
             }
 
-            const targetOrg = orgs.find((o: any) => o.org_slug === orgSlug);
+            const targetOrg = orgs.find((o: { org_slug: string }) => o.org_slug === orgSlug);
 
             if (targetOrg) {
               // Switch org + refresh JWT in parallel-ish (switch must complete first)
@@ -908,6 +908,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const slug = getOrgSlug();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrgSlug(slug);
     setMounted(true);
   }, []);

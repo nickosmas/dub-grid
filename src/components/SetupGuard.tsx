@@ -23,16 +23,12 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
   const redirected = useRef(false);
 
   const isLoading = orgLoading || empLoading || perms.isLoading;
-
-  // Gridmaster users have no org — skip the guard entirely
-  if (perms.isGridmaster && !perms.isImpersonating) {
-    return <>{children}</>;
-  }
-
   const hasEmployees = employees.length > 0;
   const isComplete = setupStatus.isComplete && hasEmployees;
+  const isGridmasterBypass = perms.isGridmaster && !perms.isImpersonating;
 
   useEffect(() => {
+    if (isGridmasterBypass) return;
     if (isLoading || isComplete || redirected.current) return;
 
     // Super admin or admin → redirect to setup checklist
@@ -40,7 +36,12 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
       redirected.current = true;
       router.replace("/setup");
     }
-  }, [isLoading, isComplete, perms.isSuperAdmin, perms.canManageOrg, router]);
+  }, [isGridmasterBypass, isLoading, isComplete, perms.isSuperAdmin, perms.canManageOrg, router]);
+
+  // Gridmaster users have no org — skip the guard entirely
+  if (isGridmasterBypass) {
+    return <>{children}</>;
+  }
 
   if (isLoading) return null;
   if (isComplete) return <>{children}</>;

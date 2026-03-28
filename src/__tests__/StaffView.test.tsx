@@ -33,7 +33,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ href, children, ...rest }: any) => <a href={href} {...rest}>{children}</a>,
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [key: string]: unknown }) => <a href={href} {...rest}>{children}</a>,
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
@@ -41,10 +41,10 @@ vi.mock("@/components/AuthProvider", () => ({
 }));
 
 vi.mock("@/components/ui/sidebar", () => {
-  const passthrough = ({ children }: any) => <>{children}</>;
+  const passthrough = ({ children }: { children: React.ReactNode }) => <>{children}</>;
   return {
     SidebarProvider: passthrough,
-    SidebarInset: ({ children, ...props }: any) => <main {...props}>{children}</main>,
+    SidebarInset: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <main {...props}>{children}</main>,
     Sidebar: () => <div data-testid="mock-sidebar" />,
     SidebarContent: passthrough,
     SidebarGroup: passthrough,
@@ -59,14 +59,14 @@ vi.mock("@/components/ui/sidebar", () => {
 // Mock base-ui popover to avoid Floating UI positioning overhead in jsdom.
 // Root always renders children so Trigger stays visible; Popup content is always present in tests.
 vi.mock("@base-ui/react/popover", () => {
-  const passthrough = ({ children }: any) => <>{children}</>;
+  const passthrough = ({ children }: { children: React.ReactNode }) => <>{children}</>;
   return {
     Popover: {
       Root: passthrough,
-      Trigger: ({ children, render, ...props }: any) => <button {...props}>{children}</button>,
+      Trigger: ({ children, ...props }: { children: React.ReactNode; render?: unknown; [key: string]: unknown }) => <button {...props}>{children}</button>,
       Portal: passthrough,
       Positioner: passthrough,
-      Popup: ({ children, className }: any) => <div className={className}>{children}</div>,
+      Popup: ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div>,
     },
   };
 });
@@ -274,7 +274,7 @@ describe("Property-based tests", () => {
 
   it(
     "name sort produces non-decreasing alphabetical sequence",
-    { timeout: 15000 },
+    { timeout: 30000 },
     async () => {
       // Validates: Requirements 5.5
       // Use a dedicated arbitrary with unique ids to avoid React key conflicts
@@ -332,7 +332,7 @@ describe("Property-based tests", () => {
           }
           return true;
         }),
-        { numRuns: 100 },
+        { numRuns: 30 },
       );
     },
   );

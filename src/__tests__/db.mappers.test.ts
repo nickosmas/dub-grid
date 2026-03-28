@@ -297,19 +297,19 @@ describe("rowToEmployee", () => {
   });
 
   it("phone: null defaults to empty string", () => {
-    const row = { ...baseEmployeeRow, phone: null } as any;
+    const row = { ...baseEmployeeRow, phone: null } as unknown as Parameters<typeof rowToEmployee>[0];
     const result = rowToEmployee(row);
     expect(result.phone).toBe("");
   });
 
   it("email: null defaults to empty string", () => {
-    const row = { ...baseEmployeeRow, email: null } as any;
+    const row = { ...baseEmployeeRow, email: null } as unknown as Parameters<typeof rowToEmployee>[0];
     const result = rowToEmployee(row);
     expect(result.email).toBe("");
   });
 
   it("contact_notes: null defaults to empty string", () => {
-    const row = { ...baseEmployeeRow, contact_notes: null } as any;
+    const row = { ...baseEmployeeRow, contact_notes: null } as unknown as Parameters<typeof rowToEmployee>[0];
     const result = rowToEmployee(row);
     expect(result.contactNotes).toBe("");
   });

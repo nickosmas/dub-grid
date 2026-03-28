@@ -46,6 +46,7 @@ export default function AllUsersView({
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetchAllUsers()
       .then((data) => { if (!cancelled) setUsers(data); })

@@ -115,6 +115,7 @@ export default function RepeatForm({
   }, [frequency, daysOfWeek, resolvedDays, start, resolvedEnd, resolvedMax]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (generatedDates.length === 0) { setOverwrites(0); return; }
 
     let cancelled = false;

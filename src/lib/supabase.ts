@@ -30,6 +30,6 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
       );
     }
     const value = (browserClient as unknown as Record<string, unknown>)[prop as string];
-    return typeof value === "function" ? (value as Function).bind(browserClient) : value;
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(browserClient) : value;
   },
 });

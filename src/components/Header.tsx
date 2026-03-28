@@ -209,6 +209,7 @@ export default function Header({ orgName }: HeaderProps) {
   // Hydrate cached name from sessionStorage after mount
   useEffect(() => {
     const cached = sessionStorage.getItem("dg_user_name");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (cached) setUserName(cached);
   }, []);
 

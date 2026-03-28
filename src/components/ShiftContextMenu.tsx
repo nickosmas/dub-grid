@@ -38,7 +38,7 @@ export default function ShiftContextMenu({
 }: ShiftContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

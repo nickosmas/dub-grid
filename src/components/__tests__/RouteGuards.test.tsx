@@ -40,7 +40,7 @@ describe("PublicRoute — always renders children (passthrough)", () => {
 
   it("renders children when user is authenticated", () => {
     vi.mocked(useAuth).mockReturnValue({
-      user: { id: "user-1" } as any,
+      user: { id: "user-1" } as unknown as import("@supabase/supabase-js").User,
       isLoading: false,
       signOut: vi.fn(),
     });

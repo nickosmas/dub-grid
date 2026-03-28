@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 export interface SubNavItem {
   id: string;
@@ -40,19 +40,8 @@ export function useMobileSubNav() {
  */
 export function useSetMobileSubNav(items: SubNavItem[]) {
   const { setItems } = useMobileSubNav();
-  const itemsRef = useRef(items);
-  itemsRef.current = items;
-
-  // Stable setter wrapped in useCallback to avoid re-running effect
-  const stableSet = useCallback((i: SubNavItem[]) => setItems(i), [setItems]);
-
   useEffect(() => {
-    stableSet(itemsRef.current);
-    return () => stableSet([]);
-  }, [stableSet]);
-
-  // Also update when items actually change (by reference)
-  useEffect(() => {
-    stableSet(items);
-  }, [items, stableSet]);
+    setItems(items);
+    return () => setItems([]);
+  }, [items, setItems]);
 }

@@ -143,7 +143,7 @@ describe("AuthProvider — auth state changes", () => {
   it("updates user when onAuthStateChange fires SIGNED_IN", async () => {
     let authCallback: (event: string, session: unknown) => void = () => {};
 
-    mockOnAuthStateChange.mockImplementation((cb: any) => {
+    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
       authCallback = cb;
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     });
@@ -172,7 +172,7 @@ describe("AuthProvider — auth state changes", () => {
 
     let authCallback: (event: string, session: unknown) => void = () => {};
 
-    mockOnAuthStateChange.mockImplementation((cb: any) => {
+    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
       authCallback = cb;
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     });

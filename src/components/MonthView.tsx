@@ -69,12 +69,14 @@ function DayPopover({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   useLayoutEffect(() => {
     const rect = anchorEl.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom - 12;
     const flipUp = spaceBelow < 260;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuStyle({
       position: "absolute",
       top: flipUp ? undefined : rect.bottom + window.scrollY + 4,
@@ -495,6 +497,7 @@ export default function MonthView({
       </div>
 
       {/* Day popover */}
+      {/* eslint-disable react-hooks/refs -- accessing a stable DOM ref in render is safe here */}
       {popoverData && popoverAnchorRef.current && (
         <DayPopover
           anchorEl={popoverAnchorRef.current}
@@ -503,6 +506,7 @@ export default function MonthView({
           onClose={closePopover}
         />
       )}
+      {/* eslint-enable react-hooks/refs */}
     </div>
   );
 }

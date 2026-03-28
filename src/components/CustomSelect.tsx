@@ -30,6 +30,7 @@ export default function CustomSelect<T extends string | number>({
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -57,6 +58,7 @@ export default function CustomSelect<T extends string | number>({
 
   // Reset focusedIndex when dropdown closes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!open) setFocusedIndex(-1);
   }, [open]);
 

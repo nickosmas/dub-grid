@@ -41,6 +41,9 @@
     "uuid": "^13.0.0",
     "zod": "^3.25.76"
   },
+  "overrides": {
+    "tar": "^7.5.13"
+  },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@snaplet/copycat": "^6.0.0",

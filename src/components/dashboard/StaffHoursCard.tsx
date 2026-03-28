@@ -1,5 +1,6 @@
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import type { Employee, FocusArea } from "@/types";
+import Link from "next/link";
 import ExpandButton from "./ExpandButton";
 
 interface StaffHoursCardProps {
@@ -43,12 +44,12 @@ export default function StaffHoursCard({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <a
+          <Link
             href="/staff"
             style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary, #2D6B3A)", cursor: "pointer", textDecoration: "none" }}
           >
             All staff &rarr;
-          </a>
+          </Link>
           {onExpand && <ExpandButton onClick={onExpand} label="Expand staff hours" />}
         </div>
       </div>

@@ -15,6 +15,7 @@ export default function ProgressBar({ loading }: { loading: boolean }) {
 
   useEffect(() => {
     if (loading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
       setWidth(30);
 

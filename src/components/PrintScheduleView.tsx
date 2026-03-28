@@ -66,8 +66,6 @@ function PrintSection({
   splitAtIndex,
   fontSize,
 }: PrintSectionProps) {
-  if (employees.length === 0) return null;
-
   // Bind focus-area context so label lookups resolve the section-specific definition first.
   const contextualGetShiftStyle = useMemo(
     () => (label: string) => getShiftStyle(label, sectionName),
@@ -120,6 +118,8 @@ function PrintSection({
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((cat) => ({ id: cat.id, name: cat.name }));
   }, [dailyTallies, shiftCategories]);
+
+  if (employees.length === 0) return null;
 
   // em-based name column; day columns fill the rest equally
   const nameColEm = 16;

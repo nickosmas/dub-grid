@@ -552,7 +552,7 @@ export async function fetchOrganizationUsers(orgId: string): Promise<Organizatio
     p_org_id: orgId,
   });
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     email: (row.email as string | null) ?? null,
     firstName: (row.first_name as string | null) ?? null,
@@ -1103,7 +1103,7 @@ export async function fetchEmployeeRoleHistory(
   });
   if (error) throw error;
   return (data ?? [])
-    .map((row: any) => ({
+    .map((row: Record<string, unknown>) => ({
       id: row.id as string,
       targetUserId: row.target_user_id as string,
       targetEmail: (row.target_email as string | null) ?? null,
@@ -1677,7 +1677,7 @@ export async function fetchUserSessions() {
 
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     userId: row.user_id as string,
     deviceLabel: (row.device_label as string | null) ?? null,
@@ -1732,7 +1732,7 @@ export async function fetchImpersonationHistory(options?: {
     p_offset: options?.offset ?? 0,
   });
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     sessionId: row.session_id as string,
     gridmasterId: row.gridmaster_id as string,
     gridmasterEmail: row.gridmaster_email as string,
@@ -1759,7 +1759,7 @@ export async function fetchNotifications(options?: {
     p_offset: options?.offset ?? 0,
   });
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     type: row.type as import("@/types").NotificationType,
     title: row.title as string,
@@ -2254,7 +2254,7 @@ export async function fetchAllOrganizations(): Promise<Organization[]> {
     .select("*")
     .order("name");
   if (error) throw error;
-  return (data ?? []).map((row: any) => rowToOrganization(row as DbOrganization));
+  return (data ?? []).map((row: unknown) => rowToOrganization(row as DbOrganization));
 }
 
 export interface TenantStats {
@@ -2302,7 +2302,7 @@ export async function restoreOrganization(orgId: string): Promise<void> {
 export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]> {
   const { data, error } = await supabase.rpc("get_all_users_with_profiles");
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     email: (row.email as string | null) ?? null,
     firstName: null, // auth.users doesn't expose first_name; profiles may be joined separately
@@ -2328,7 +2328,7 @@ export async function fetchAuditLog(options?: {
     p_offset: options?.offset ?? 0,
   });
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     targetUserId: row.target_user_id as string,
     targetEmail: (row.target_email as string | null) ?? null,

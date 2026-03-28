@@ -190,7 +190,7 @@ export async function middleware(req: NextRequest) {
         .select("org_role, org_id, organizations!inner(slug)")
         .eq("user_id", userId)
         .eq("organizations.slug", subdomain)
-        .maybeSingle<any>();
+        .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
 
       if (membership) {
         resolvedOrgRole = membership.org_role;

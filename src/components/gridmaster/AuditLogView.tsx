@@ -42,6 +42,7 @@ export default function AuditLogView({
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     fetchAuditLog({ orgId, limit: PAGE_SIZE, offset: page * PAGE_SIZE })

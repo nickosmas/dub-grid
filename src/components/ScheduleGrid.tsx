@@ -175,7 +175,6 @@ const SectionBlock = memo(function SectionBlock({
   absenceTypeIdForKey,
 }: SectionBlockProps) {
   const { user: currentUser } = useAuth();
-  if (employees.length === 0) return null;
 
   // Bind focus-area context so all label lookups within this section
   // resolve the focus-area-specific shift definition first, falling back
@@ -314,6 +313,8 @@ const SectionBlock = memo(function SectionBlock({
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((cat) => ({ id: cat.id, name: cat.name }));
   }, [dailyCoverageStatus, shiftCategories]);
+
+  if (employees.length === 0) return null;
 
   const gridTemplate = `var(--dg-grid-name-col) repeat(${weekDates.length}, minmax(var(--dg-grid-col-min), 1fr))`;
 

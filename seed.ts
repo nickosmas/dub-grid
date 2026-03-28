@@ -717,8 +717,8 @@ async function main() {
   const { rows: orgs } = await db.query(
     `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven')`
   );
-  const defaultOrgId = orgs.find((o: any) => o.slug === 'sunrise-senior')?.id;
-  const calmhavenOrgId = orgs.find((o: any) => o.slug === 'calmhaven')?.id;
+  const defaultOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'sunrise-senior')?.id;
+  const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'calmhaven')?.id;
 
   const TEST_USERS = [
     { email: "nicokosmas.dev@gmail.com",     platform_role: "gridmaster", org_role: "user",        label: "gridmaster",  first_name: "Nicodamus", last_name: "Kosmas", preferred_org: "sunrise-senior" },

@@ -319,14 +319,14 @@ function DonutChart({
   const circumference = 2 * Math.PI * radius;
   const center = size / 2;
 
-  let accumulatedOffset = 0;
-  const arcs = segments.map((seg) => {
+  const arcs = segments.reduce<(typeof segments[number] & { dashLength: number; dashOffset: number })[]>((acc, seg) => {
     const ratio = seg.value / total;
     const dashLength = circumference * ratio;
-    const dashOffset = circumference - accumulatedOffset;
-    accumulatedOffset += dashLength;
-    return { ...seg, dashLength, dashOffset };
-  });
+    const prevOffset = acc.reduce((sum, a) => sum + a.dashLength, 0);
+    const dashOffset = circumference - prevOffset;
+    acc.push({ ...seg, dashLength, dashOffset });
+    return acc;
+  }, []);
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>

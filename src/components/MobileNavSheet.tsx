@@ -46,6 +46,7 @@ export default function MobileNavSheet({
 
   // Reset drill state when sheet closes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!open) setDrillSection(null);
   }, [open]);
 

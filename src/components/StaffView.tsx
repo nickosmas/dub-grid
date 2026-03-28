@@ -527,8 +527,9 @@ function ShiftCellPopover({
   const [flippedUp, setFlippedUp] = useState(false);
   const [mounted, setMounted] = useState(false);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; });
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   const updatePosition = useCallback(() => {
@@ -558,6 +559,7 @@ function ShiftCellPopover({
       : Math.max(16, Math.min(anchorCenterX - popoverLeft, popoverWidth - 16)));
   }, [anchorRef]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useLayoutEffect(() => { updatePosition(); }, [updatePosition]);
 
   useEffect(() => {

@@ -1844,6 +1844,7 @@ function AbsenceTypesSettings({
   const nextTmpId = useRef(-1);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal((prev) => {
       const newItems = prev.filter((s) => (s as { isNew?: boolean }).isNew);
       return [...absenceTypes, ...newItems];
@@ -1946,6 +1947,7 @@ function ShiftCodesSettings({
   // data replacing stale cache data). Only replaces items that haven't been
   // locally added (isNew), so unsaved additions aren't lost.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal((prev) => {
       const newItems = prev.filter((s) => (s as { isNew?: boolean }).isNew);
       return [...shiftCodes, ...newItems];
@@ -4517,7 +4519,7 @@ export default function SettingsPage({
             padding: "60px 20px", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)", textAlign: "center", gap: 12,
           }}>
             <span style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-secondary)" }}>No access</span>
-            <span>You don't have permission to view settings. Contact your organization admin for access.</span>
+            <span>You don&apos;t have permission to view settings. Contact your organization admin for access.</span>
           </div>
         )}
       </div>

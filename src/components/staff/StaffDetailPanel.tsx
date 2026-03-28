@@ -59,7 +59,7 @@ export function StaffDetailPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; });
 
   const handleClose = useCallback(() => {
     setClosing(true);

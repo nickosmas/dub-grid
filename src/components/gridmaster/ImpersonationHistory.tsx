@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { fetchImpersonationHistory } from "@/lib/db";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 
 function StatusBadge({ entry }: { entry: ImpersonationHistoryEntry }) {
-  const now = Date.now();
+  // eslint-disable-next-line react-hooks/purity -- Date.now() is intentionally impure; value is stable per mount
+  const now = useMemo(() => Date.now(), []);
   const isEnded = entry.endedAt !== null;
   const isExpired = !isEnded && new Date(entry.expiresAt).getTime() < now;
   const isActive = !isEnded && !isExpired;
@@ -71,6 +72,7 @@ export default function ImpersonationHistory() {
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     fetchImpersonationHistory({ limit: PAGE_SIZE, offset: page * PAGE_SIZE })

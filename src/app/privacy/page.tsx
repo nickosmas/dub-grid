@@ -232,7 +232,7 @@ export default function PrivacyPolicyPage() {
               prohibited from entering resident names, medical records, or
               clinical health data into any free-form notes fields. Any shift or
               reading notes must be limited to operational coordination (e.g.,
-              "John assigned to Reading A").
+              &quot;John assigned to Reading A&quot;).
             </p>
           </div>
         </section>

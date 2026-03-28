@@ -25,21 +25,22 @@ export default function DonutChart({
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((s, seg) => s + seg.value, 0);
 
-  let offset = 0;
   const arcs = segments
     .filter((s) => s.value > 0)
-    .map((seg, i) => {
-      const pct = total > 0 ? seg.value / total : 0;
-      const dash = pct * circumference;
-      const arc = {
-        key: `${seg.label}_${i}`,
-        color: seg.color,
-        dashArray: `${dash} ${circumference}`,
-        dashOffset: -offset,
-      };
-      offset += dash;
-      return arc;
-    });
+    .reduce<{ items: { key: string; color: string; dashArray: string; dashOffset: number }[]; offset: number }>(
+      (acc, seg, i) => {
+        const pct = total > 0 ? seg.value / total : 0;
+        const dash = pct * circumference;
+        acc.items.push({
+          key: `${seg.label}_${i}`,
+          color: seg.color,
+          dashArray: `${dash} ${circumference}`,
+          dashOffset: -acc.offset,
+        });
+        return { items: acc.items, offset: acc.offset + dash };
+      },
+      { items: [], offset: 0 },
+    ).items;
 
   return (
     <svg

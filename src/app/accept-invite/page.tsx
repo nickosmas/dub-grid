@@ -102,9 +102,9 @@ export default function AcceptInvitePage() {
       try {
         const result = await acceptInvitation(token!);
         slug = result.orgSlug;
-      } catch (acceptErr: any) {
-        const msg: string = acceptErr?.message ?? "";
-        const code: string = acceptErr?.code ?? "";
+      } catch (acceptErr: unknown) {
+        const msg: string = (acceptErr instanceof Error ? acceptErr.message : String(acceptErr)) ?? "";
+        const code: string = (acceptErr as { code?: string })?.code ?? "";
         // "Already accepted" is fine — just proceed to success.
         // Match on Postgres error code P0001 (RAISE EXCEPTION) + message, or message alone as fallback.
         const isAlreadyAccepted =
@@ -123,7 +123,7 @@ export default function AcceptInvitePage() {
             .select("org_id, organizations(slug)")
             .eq("token", token!)
             .maybeSingle();
-          slug = (inv?.organizations as any)?.slug ?? null;
+          slug = (inv?.organizations as { slug: string | null } | null)?.slug ?? null;
         } catch {
           // Best-effort
         }

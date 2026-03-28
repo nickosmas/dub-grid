@@ -30,9 +30,11 @@ export function ActivityTab({
   roleHistory,
   invitations,
 }: ActivityTabProps) {
-  const statusDays = employee.statusChangedAt
+  /* eslint-disable react-hooks/purity -- Date.now() is intentionally impure; value is stable per mount */
+  const statusDays = useMemo(() => employee.statusChangedAt
     ? Math.floor((Date.now() - new Date(employee.statusChangedAt).getTime()) / 86400000)
-    : null;
+    : null, [employee.statusChangedAt]);
+  /* eslint-enable react-hooks/purity */
 
   const pendingInvite = invitations.find(i => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date()) ?? null;
 

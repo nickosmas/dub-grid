@@ -39,6 +39,7 @@ export function useStaffFilters({
 
   // Reset page, close detail, clear selection when filters/sort/tab change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy, showOnlyUnlinked]);
 
