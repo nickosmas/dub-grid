@@ -127,6 +127,7 @@ export async function middleware(req: NextRequest) {
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
+    if (subdomain === "gridmaster") console.error("[middleware:gm] No session — redirecting to /login", { pathname, host });
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -144,16 +145,22 @@ export async function middleware(req: NextRequest) {
       console.warn("[middleware] SUPABASE_JWT_SECRET not set — falling back to unverified JWT decode. Set SUPABASE_JWT_SECRET for production.");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
-  } catch {
+  } catch (jwtError) {
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
       // Don't trust gridmaster from unverified tokens — a forged JWT could
       // claim platform-level access. Org-level roles (super_admin/admin) are
       // safe to pass through because RLS enforces all data access anyway.
       if (claims.platform_role === "gridmaster") {
+        console.error("[middleware:gm] jwtVerify FAILED for gridmaster — blocking unverified token.", {
+          error: jwtError instanceof Error ? jwtError.message : jwtError,
+          secretLength: process.env.SUPABASE_JWT_SECRET?.length ?? 0,
+          tokenIss: (claims as Record<string, unknown>).iss,
+        });
         return NextResponse.redirect(new URL("/login", req.url));
       }
     } catch {
+      console.error("[middleware:gm] Both jwtVerify and decodeJwt failed", { error: jwtError instanceof Error ? jwtError.message : jwtError });
       return NextResponse.redirect(new URL("/login", req.url));
     }
   }
@@ -273,6 +280,9 @@ export async function middleware(req: NextRequest) {
 
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster" && !isImpersonating) {
+    console.error("[middleware:gm] Non-gridmaster on gridmaster subdomain — redirecting to /login", {
+      effectiveRole, platformRole: claims.platform_role, orgRole: claims.org_role, pathname,
+    });
     return NextResponse.redirect(new URL("/login", req.url));
   }
 

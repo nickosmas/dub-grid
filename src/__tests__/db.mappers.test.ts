@@ -407,3 +407,27 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     );
   });
 });
+
+// ── trimTime behavior via rowToShiftCode ─────────────────────────────────────
+
+describe("rowToShiftCode trimTime behavior", () => {
+  it("strips seconds from default_start_time: '07:00:00' → '07:00'", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_start_time: "07:00:00" });
+    expect(result.defaultStartTime).toBe("07:00");
+  });
+
+  it("keeps default_start_time already in HH:MM format: '07:00' → '07:00'", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_start_time: "07:00" });
+    expect(result.defaultStartTime).toBe("07:00");
+  });
+
+  it("maps default_start_time: null → null", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_start_time: null });
+    expect(result.defaultStartTime).toBeNull();
+  });
+
+  it("strips seconds from default_end_time: '15:30:45' → '15:30'", () => {
+    const result = rowToShiftCode({ ...baseShiftCodeRow, default_end_time: "15:30:45" });
+    expect(result.defaultEndTime).toBe("15:30");
+  });
+});
