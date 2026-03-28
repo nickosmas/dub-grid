@@ -19,9 +19,18 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
  * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
  */
 
-const SUPABASE_JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_JWT_SECRET
-);
+/**
+ * Encode the JWT secret lazily at request time, not module load time.
+ * On Vercel Edge, module-level code can execute before env vars are injected,
+ * which would encode `undefined` as the secret and break jwtVerify for all users.
+ * Gridmaster is uniquely affected because the catch-block blocks unverified tokens
+ * for platform-level access (non-gridmaster users fall back to decodeJwt safely).
+ */
+function getJwtSecret(): Uint8Array | null {
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret) return null;
+  return new TextEncoder().encode(secret);
+}
 
 /**
  * Role hierarchy levels for permission checks.
@@ -138,8 +147,9 @@ export async function middleware(req: NextRequest) {
   // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
   try {
-    if (process.env.SUPABASE_JWT_SECRET) {
-      const { payload } = await jwtVerify(session.access_token, SUPABASE_JWT_SECRET);
+    const jwtSecret = getJwtSecret();
+    if (jwtSecret) {
+      const { payload } = await jwtVerify(session.access_token, jwtSecret);
       claims = payload as JWTClaims;
     } else {
       console.warn("[middleware] SUPABASE_JWT_SECRET not set — falling back to unverified JWT decode. Set SUPABASE_JWT_SECRET for production.");
