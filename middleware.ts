@@ -1,6 +1,6 @@
 // middleware.ts
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify, decodeJwt } from "jose";
+import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 
@@ -10,7 +10,7 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
  * This middleware implements route-level access control at the CDN edge:
  * - Uses @supabase/ssr createServerClient to read the session from cookies
  *   (handles the sb-<project-ref>-auth-token format and multi-chunk cookies)
- * - Verifies the access token JWT with SUPABASE_JWT_SECRET
+ * - Verifies the access token JWT via Supabase's JWKS endpoint (supports ES256)
  * - Parses platform_role and org_role top-level claims from the JWT
  * - Calculates effective role based on role hierarchy
  * - Blocks unauthorized access to protected routes
@@ -20,16 +20,17 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
  */
 
 /**
- * Encode the JWT secret lazily at request time, not module load time.
- * On Vercel Edge, module-level code can execute before env vars are injected,
- * which would encode `undefined` as the secret and break jwtVerify for all users.
- * Gridmaster is uniquely affected because the catch-block blocks unverified tokens
- * for platform-level access (non-gridmaster users fall back to decodeJwt safely).
+ * JWKS keyset cached at module level.
+ * createRemoteJWKSet returns a function that lazily fetches and caches the
+ * public keys from Supabase's JWKS endpoint. Safe to cache at module scope
+ * on Vercel Edge — it contains no env-derived secrets, only public keys.
+ * Supports both ES256 (asymmetric) and HS256 (symmetric) Supabase projects.
  */
-function getJwtSecret(): Uint8Array | null {
-  const secret = process.env.SUPABASE_JWT_SECRET;
-  if (!secret) return null;
-  return new TextEncoder().encode(secret);
+function getJwks() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  const jwksUrl = new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
+  return createRemoteJWKSet(jwksUrl);
 }
 
 /**
@@ -147,12 +148,12 @@ export async function middleware(req: NextRequest) {
   // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
   try {
-    const jwtSecret = getJwtSecret();
-    if (jwtSecret) {
-      const { payload } = await jwtVerify(session.access_token, jwtSecret);
+    const jwks = getJwks();
+    if (jwks) {
+      const { payload } = await jwtVerify(session.access_token, jwks);
       claims = payload as JWTClaims;
     } else {
-      console.warn("[middleware] SUPABASE_JWT_SECRET not set — falling back to unverified JWT decode. Set SUPABASE_JWT_SECRET for production.");
+      console.warn("[middleware] NEXT_PUBLIC_SUPABASE_URL not set — falling back to unverified JWT decode.");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
   } catch (jwtError) {
@@ -164,7 +165,6 @@ export async function middleware(req: NextRequest) {
       if (claims.platform_role === "gridmaster") {
         console.error("[middleware:gm] jwtVerify FAILED for gridmaster — blocking unverified token.", {
           error: jwtError instanceof Error ? jwtError.message : jwtError,
-          secretLength: process.env.SUPABASE_JWT_SECRET?.length ?? 0,
           tokenIss: (claims as Record<string, unknown>).iss,
         });
         const loginUrl = new URL("/login", req.url);
