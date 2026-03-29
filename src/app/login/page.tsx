@@ -320,6 +320,19 @@ function GridmasterLogin() {
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const landingUrl = `${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
 
+  // Show an error toast if the middleware redirected back with ?error=session_invalid
+  // (happens when jwtVerify fails, e.g. SUPABASE_JWT_SECRET is wrong in production).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "session_invalid") {
+      toast.error("Your session could not be verified. Please sign in again.");
+      // Clean the URL so a refresh doesn't re-show the toast
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, []);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -330,6 +343,18 @@ function GridmasterLogin() {
         password,
       });
       if (error) throw error;
+
+      // Refresh the session so the custom_access_token_hook has a chance to
+      // bake platform_role=gridmaster into the new JWT before we navigate.
+      // Without this, the first request to /dashboard hits the middleware with
+      // the initial sign-in token which may have stale or missing claims,
+      // causing a silent redirect loop back to /login.
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error("[GridmasterLogin] refreshSession failed", refreshError);
+        // Non-fatal: the session is valid, role claims may still be present
+        // from the hook. Navigate anyway and let the middleware decide.
+      }
 
       window.location.replace("/dashboard");
 

@@ -167,7 +167,9 @@ export async function middleware(req: NextRequest) {
           secretLength: process.env.SUPABASE_JWT_SECRET?.length ?? 0,
           tokenIss: (claims as Record<string, unknown>).iss,
         });
-        return NextResponse.redirect(new URL("/login", req.url));
+        const loginUrl = new URL("/login", req.url);
+        loginUrl.searchParams.set("error", "session_invalid");
+        return NextResponse.redirect(loginUrl);
       }
     } catch {
       console.error("[middleware:gm] Both jwtVerify and decodeJwt failed", { error: jwtError instanceof Error ? jwtError.message : jwtError });
