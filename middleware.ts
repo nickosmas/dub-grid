@@ -261,8 +261,8 @@ export async function middleware(req: NextRequest) {
             path: "/",
             maxAge: 0,
           });
-        } else if (pathname.startsWith("/gridmaster") || subdomain === "gridmaster") {
-          // Safety escape: navigating to /gridmaster or gridmaster subdomain auto-ends impersonation
+        } else if (pathname.startsWith("/gridmaster")) {
+          // Safety escape: navigating to /gridmaster auto-ends impersonation
           res.cookies.set("dubgrid-impersonation", "", {
             path: "/",
             maxAge: 0,
