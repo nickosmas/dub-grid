@@ -64,7 +64,7 @@ Fill in your Supabase credentials:
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_JWT_SECRET=your-jwt-secret
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 3. **Start Supabase locally:**

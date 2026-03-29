@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { jwtVerify, decodeJwt } from "jose";
+import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -89,14 +89,16 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Authorization — only gridmaster can trigger impersonation notifications ──
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  // Use JWKS-based verification (supports ES256 asymmetric signing).
+  // Falls back to unverified decode in dev if JWKS is unavailable.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   try {
     let claims: { platform_role?: unknown };
-    if (jwtSecret) {
-      const { payload } = await jwtVerify(
-        session.access_token,
-        new TextEncoder().encode(jwtSecret),
+    if (supabaseUrl) {
+      const jwks = createRemoteJWKSet(
+        new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
       );
+      const { payload } = await jwtVerify(session.access_token, jwks);
       claims = payload as typeof claims;
     } else if (process.env.NODE_ENV === "production") {
       return NextResponse.json(

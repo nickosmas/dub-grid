@@ -6,7 +6,8 @@ import { z } from "zod";
  */
 
 const serverSchema = z.object({
-  SUPABASE_JWT_SECRET: z.string().min(32, "SUPABASE_JWT_SECRET must be at least 32 characters"),
+  // Note: SUPABASE_JWT_SECRET is no longer required — JWT verification uses JWKS
+  // (ES256 asymmetric keys fetched from Supabase's .well-known/jwks.json endpoint).
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
   RESEND_API_KEY: z.string().optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),

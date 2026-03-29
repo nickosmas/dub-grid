@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { jwtVerify, decodeJwt } from "jose";
+import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
 import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -89,20 +89,22 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Authorization check — only super_admin / gridmaster can send invites ──
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  // Use JWKS-based verification (supports ES256 asymmetric signing).
+  // Falls back to unverified decode in dev if JWKS is unavailable.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   type JwtClaims = { platform_role?: unknown; org_role?: unknown };
   let claims: JwtClaims | null = null;
 
-  // Try verified JWT first
-  if (jwtSecret) {
+  // Try verified JWT first via JWKS
+  if (supabaseUrl) {
     try {
-      const { payload } = await jwtVerify(
-        session.access_token,
-        new TextEncoder().encode(jwtSecret),
+      const jwks = createRemoteJWKSet(
+        new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
       );
+      const { payload } = await jwtVerify(session.access_token, jwks);
       claims = payload as JwtClaims;
     } catch {
-      // jwtVerify can fail in dev (secret mismatch) — fall through to unverified decode
+      // jwtVerify can fail in dev (JWKS unavailable) — fall through to unverified decode
     }
   }
 
@@ -110,8 +112,8 @@ export async function POST(req: NextRequest) {
   if (!claims) {
     if (process.env.NODE_ENV === "production") {
       return NextResponse.json(
-        { success: false, error: jwtSecret ? "Invalid session" : "Server misconfigured" },
-        { status: jwtSecret ? 401 : 500 },
+        { success: false, error: supabaseUrl ? "Invalid session" : "Server misconfigured" },
+        { status: supabaseUrl ? 401 : 500 },
       );
     }
     try {

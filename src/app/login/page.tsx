@@ -321,7 +321,7 @@ function GridmasterLogin() {
   const landingUrl = `${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
 
   // Show an error toast if the middleware redirected back with ?error=session_invalid
-  // (happens when jwtVerify fails, e.g. SUPABASE_JWT_SECRET is wrong in production).
+  // (happens when JWKS-based jwtVerify fails, e.g. token expired or JWKS endpoint unreachable).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);

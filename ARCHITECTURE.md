@@ -291,7 +291,7 @@ DubGrid uses Supabase Realtime for three purposes:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL | Client + Server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Client + Server |
 | `NEXT_PUBLIC_SITE_URL` | Public site URL (CSRF origin check) | Client + Server |
-| `SUPABASE_JWT_SECRET` | JWT verification secret | Server only (middleware) |
+| ~~`SUPABASE_JWT_SECRET`~~ | _Removed_ — JWT verification now uses JWKS (ES256) via Supabase's `.well-known/jwks.json` endpoint | — |
 | `RESEND_API_KEY` | Email sending via Resend | Server only (API routes) |
 | `UPSTASH_REDIS_REST_URL` | Rate limiting Redis backend | Server only (API routes) |
 | `UPSTASH_REDIS_REST_TOKEN` | Rate limiting Redis auth | Server only (API routes) |

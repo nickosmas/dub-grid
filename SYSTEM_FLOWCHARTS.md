@@ -64,7 +64,7 @@ sequenceDiagram
 
     Browser->>Middleware: GET /dashboard (with cookies)
     Middleware->>Middleware: Extract session from sb-*-auth-token cookies
-    Middleware->>Middleware: jwtVerify(access_token, JWT_SECRET)
+    Middleware->>Middleware: jwtVerify(access_token, JWKS)
     Middleware->>Middleware: Extract claims { platform_role, org_role, org_id, org_slug }
     Middleware->>Middleware: Calculate effective role + check route guards
     Middleware->>Middleware: Inject x-dubgrid-role, x-dubgrid-org-id headers
@@ -153,7 +153,7 @@ flowchart TD
         PUB{"Public route?<br/>/login, /api, /,<br/>/accept-invite"}
         SESS["Extract session<br/>from sb-*-auth-token cookies<br/>(multi-chunk reconstruction)"]
         NOSESS{"Session<br/>exists?"}
-        JWT["Verify JWT signature<br/>jwtVerify(token, JWT_SECRET)"]
+        JWT["Verify JWT signature<br/>jwtVerify(token, JWKS)"]
         CLAIMS["Extract claims:<br/>platform_role, org_role,<br/>org_id, org_slug"]
         FALLBACK{"Claims<br/>complete?"}
         DBFALLBACK["Fallback: Query DB<br/>profiles + organization_memberships<br/>+ organizations"]

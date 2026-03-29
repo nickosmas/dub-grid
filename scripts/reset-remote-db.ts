@@ -51,7 +51,27 @@ async function main() {
   for (const file of migrations) {
     const sql = readFileSync(file, "utf-8");
     console.log(`Running ${file}...`);
-    await db.query(sql);
+    try {
+      await db.query(sql);
+      console.log(`  ✓ ${file} completed successfully`);
+    } catch (err) {
+      const pgErr = err as { message: string; position?: string; detail?: string; hint?: string };
+      const pos = pgErr.position ? parseInt(pgErr.position, 10) : null;
+      let context = "";
+      if (pos !== null) {
+        const before = sql.substring(Math.max(0, pos - 200), pos);
+        const after = sql.substring(pos, pos + 200);
+        const lineNum = sql.substring(0, pos).split("\n").length;
+        context = `\n  Near line ${lineNum} in ${file}:\n  ...${before}⟨ERROR HERE⟩${after}...`;
+      }
+      console.error(`\n  ✗ ${file} FAILED`);
+      console.error(`  Error: ${pgErr.message}`);
+      if (pgErr.detail) console.error(`  Detail: ${pgErr.detail}`);
+      if (pgErr.hint) console.error(`  Hint: ${pgErr.hint}`);
+      if (context) console.error(context);
+      await db.end();
+      process.exit(1);
+    }
   }
 
   // Verify grants are correct — this catches the exact bug where
@@ -72,6 +92,44 @@ async function main() {
     process.exit(1);
   }
   console.log(`  ${grantCount} table grants for 'authenticated' — OK`);
+
+  // Force PostgREST to reload its schema cache so new functions are immediately available
+  await db.query("NOTIFY pgrst, 'reload schema'");
+  console.log("  PostgREST schema cache reloaded — OK");
+
+  // Verify critical functions exist
+  const { rows: fnRows } = await db.query(`
+    SELECT routine_name
+    FROM information_schema.routines
+    WHERE routine_schema = 'public'
+      AND routine_name IN (
+        'custom_access_token_hook',
+        'is_gridmaster',
+        'start_impersonation',
+        'end_impersonation',
+        'get_impersonation_history',
+        'get_notifications',
+        'switch_org'
+      )
+    ORDER BY routine_name
+  `);
+  const foundFns = fnRows.map((r: { routine_name: string }) => r.routine_name);
+  const expectedFns = [
+    "custom_access_token_hook",
+    "end_impersonation",
+    "get_impersonation_history",
+    "get_notifications",
+    "is_gridmaster",
+    "start_impersonation",
+    "switch_org",
+  ];
+  const missingFns = expectedFns.filter((f) => !foundFns.includes(f));
+  if (missingFns.length > 0) {
+    console.error(`\nWARNING: Missing critical functions: ${missingFns.join(", ")}`);
+    console.error("002_functions_triggers.sql may have partially failed. Check the SQL for errors.");
+  } else {
+    console.log(`  ${foundFns.length} critical functions verified — OK`);
+  }
 
   await db.end();
   console.log("\nRemote DB reset complete.");

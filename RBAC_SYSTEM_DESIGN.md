@@ -626,12 +626,18 @@ The middleware runs at the CDN edge — geographically closest to the user — b
 ```ts
 // middleware.ts (Vercel Edge Runtime)
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify, decodeJwt } from "jose";
+import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
 
-const SUPABASE_JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_JWT_SECRET
-);
+// JWKS keyset — fetches public keys from Supabase's JWKS endpoint.
+// Supports ES256 (asymmetric) JWT signing.
+function getJwks() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  return createRemoteJWKSet(
+    new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
+  );
+}
 
 const ROLE_HIERARCHY: Record<string, number> = {
   gridmaster: 4,
@@ -663,7 +669,6 @@ export async function middleware(req: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
-    pathname === "/gridmaster/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/accept-invite" ||
@@ -678,11 +683,16 @@ export async function middleware(req: NextRequest) {
 
   if (!session) return NextResponse.redirect(new URL("/login", req.url));
 
-  // Verify JWT — read top-level claims
+  // Verify JWT via JWKS — read top-level claims
   let claims: JWTClaims;
   try {
-    const { payload } = await jwtVerify(session.access_token, SUPABASE_JWT_SECRET);
-    claims = payload as JWTClaims;
+    const jwks = getJwks();
+    if (jwks) {
+      const { payload } = await jwtVerify(session.access_token, jwks);
+      claims = payload as JWTClaims;
+    } else {
+      claims = decodeJwt(session.access_token) as JWTClaims;
+    }
   } catch {
     // Fallback to unverified decode (RLS enforces real security)
     // Never trust gridmaster from unverified tokens
