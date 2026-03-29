@@ -37,10 +37,15 @@ vi.mock("next/server", () => ({
 // ── Mock jose ────────────────────────────────────────────────────────────────
 const mockJwtVerify = vi.fn();
 const mockDecodeJwt = vi.fn();
+// Stable mock keyset function returned by createRemoteJWKSet
+const mockJwks = vi.fn();
 
 vi.mock("jose", () => ({
   jwtVerify: (...args: unknown[]) => mockJwtVerify(...args),
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
+  // createRemoteJWKSet must be mocked — the middleware calls it at getJwks() time.
+  // Return a stable function so jwtVerify receives a consistent keyset argument.
+  createRemoteJWKSet: (_url: unknown) => mockJwks,
 }));
 
 // ── Mock @supabase/ssr ───────────────────────────────────────────────────────
@@ -57,7 +62,7 @@ vi.mock("@supabase/ssr", () => ({
 // ── Environment variables ────────────────────────────────────────────────────
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.SUPABASE_JWT_SECRET = "test-secret-key-32chars-minimum!";
+  // SUPABASE_JWT_SECRET is no longer used — middleware now verifies via JWKS.
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
   process.env.NEXT_PUBLIC_BASE_DOMAIN = "localhost";
