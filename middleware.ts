@@ -79,11 +79,14 @@ export async function middleware(req: NextRequest) {
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
-  // Generate a strict nonce-based CSP
-  const nonce = btoa(crypto.randomUUID());
+  // CSP — 'self' + 'unsafe-inline' for scripts.
+  // 'strict-dynamic' is intentionally NOT used because statically pre-rendered
+  // pages (landing, privacy, terms) have no nonce on their <script> tags, so
+  // 'strict-dynamic' would override 'self' and block all scripts, preventing
+  // React hydration (stuck loading spinner in production).
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com;
+    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com;
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
@@ -97,7 +100,6 @@ export async function middleware(req: NextRequest) {
   const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
 
   const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
   // Marketing pages should only render on the apex domain — redirect
