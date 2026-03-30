@@ -211,7 +211,7 @@ function SchedulerContent() {
     }
     setShifts(shiftData);
     setNotes(noteMap);
-  }, [org, absenceTypeMap, shiftCodeMap]);
+  }, [org, absenceTypeMap, shiftCodeMap, shiftFetchStart, shiftFetchEnd]);
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
@@ -1162,7 +1162,7 @@ function SchedulerContent() {
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
-    [org?.id, canEditShifts, shiftCodeMap, absenceTypeMap, broadcastDraftChanged],
+    [org?.id, canEditShifts, shiftCodeMap, absenceTypeMap, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
   );
 
   const getShiftStyle = useCallback(
@@ -1269,7 +1269,7 @@ function SchedulerContent() {
         setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
       }
     },
-    [editPanel, shifts, org, canEditShifts, setShift, shiftCodeMap, absenceTypeMap, broadcastDraftChanged],
+    [editPanel, shifts, org, canEditShifts, setShift, shiftCodeMap, absenceTypeMap, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
   );
 
   const handleConfirmSeriesDelete = useCallback(async () => {
@@ -1302,7 +1302,7 @@ function SchedulerContent() {
       unlockCell();
       setEditPanel(null);
     }
-  }, [pendingSeriesDelete, org, canEditShifts, shiftCodeMap, absenceTypeMap, shifts, broadcastDraftChanged, unlockCell]);
+  }, [pendingSeriesDelete, org, canEditShifts, shiftCodeMap, absenceTypeMap, shifts, broadcastDraftChanged, unlockCell, shiftFetchStart, shiftFetchEnd]);
 
   const handleRepeatConfirm = useCallback(
     async (
@@ -1351,7 +1351,7 @@ function SchedulerContent() {
         setEditPanel(null);
       }
     },
-    [editPanel, org, canEditShifts, shiftCodeMap, absenceTypeMap, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged],
+    [editPanel, org, canEditShifts, shiftCodeMap, absenceTypeMap, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
   );
 
   // ── Qualification check for drag/paste ──────────────────────────────────

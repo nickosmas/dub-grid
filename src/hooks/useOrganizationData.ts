@@ -235,10 +235,10 @@ export function useOrganizationData(): OrganizationData {
   );
 
   const allShiftCodesRef = useRef<ShiftCode[]>(allShiftCodes);
-  allShiftCodesRef.current = allShiftCodes;
+  useEffect(() => { allShiftCodesRef.current = allShiftCodes; }, [allShiftCodes]);
 
   const allAbsenceTypesRef = useRef<AbsenceType[]>(allAbsenceTypes);
-  allAbsenceTypesRef.current = allAbsenceTypes;
+  useEffect(() => { allAbsenceTypesRef.current = allAbsenceTypes; }, [allAbsenceTypes]);
 
   const shiftCodeMap = useMemo(
     () => new Map(allShiftCodes.map((sc) => [

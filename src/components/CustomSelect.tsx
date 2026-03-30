@@ -55,7 +55,6 @@ export default function CustomSelect<T extends string | number>({
     });
   }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useLayoutEffect(() => { if (open) updatePosition(); }, [open, updatePosition]);
 
   useEffect(() => {

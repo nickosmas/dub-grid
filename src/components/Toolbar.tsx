@@ -124,7 +124,6 @@ function ToolsMenu({
     });
   }, [triggerRef]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useLayoutEffect(() => { updatePosition(); }, [updatePosition]);
 
   useEffect(() => {

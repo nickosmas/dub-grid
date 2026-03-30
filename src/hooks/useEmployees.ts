@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchEmployees, insertEmployee, updateEmployee, deleteEmployee, benchEmployee, activateEmployee } from "@/lib/db";
 import { toast } from "sonner";
@@ -52,7 +52,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   // Ref for capturing current active employees in functional updaters
   const employeesRef = useRef<Employee[]>([]);
-  employeesRef.current = employees;
+  useEffect(() => { employeesRef.current = employees; }, [employees]);
 
   // Helper: invalidate the all-employees query so the next focus/navigation
   // picks up any server-side changes.
