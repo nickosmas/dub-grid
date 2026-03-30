@@ -33,6 +33,7 @@ export const metadata: Metadata = {
 
 
 import AuthProvider from "@/components/AuthProvider";
+import QueryProvider from "@/components/QueryProvider";
 import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
 import { Analytics } from "@vercel/analytics/next";
@@ -55,11 +56,13 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning>
         <AuthProvider>
-          <MobileSubNavProvider>
-            <TooltipProvider>
-              <AppShell>{children}</AppShell>
-            </TooltipProvider>
-          </MobileSubNavProvider>
+          <QueryProvider>
+            <MobileSubNavProvider>
+              <TooltipProvider>
+                <AppShell>{children}</AppShell>
+              </TooltipProvider>
+            </MobileSubNavProvider>
+          </QueryProvider>
         </AuthProvider>
         <Analytics />
       </body>

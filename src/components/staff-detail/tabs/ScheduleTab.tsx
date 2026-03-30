@@ -10,6 +10,7 @@ import type {
   ShiftRequest,
   RecurringShift,
   AbsenceType,
+  ShiftDisplayMode,
 } from "@/types";
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
@@ -31,6 +32,7 @@ interface ScheduleTabProps {
   auditNames: Map<string, string>;
   shiftRequests: ShiftRequest[];
   recurringShifts: RecurringShift[];
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 /** Format a full name as "F. LastName" for compact display. */
@@ -50,7 +52,9 @@ export function ScheduleTab({
   auditNames,
   shiftRequests,
   recurringShifts,
+  shiftDisplayMode = "code",
 }: ScheduleTabProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
 
@@ -222,7 +226,7 @@ export function ScheduleTab({
                                         }}
                                         className="px-1.5 py-0 h-5 text-[10px] w-fit"
                                       >
-                                        {absenceType.label}
+                                        {isNameMode ? (absenceType.name || absenceType.label) : absenceType.label}
                                       </Badge>
                                     ) : (
                                       <Badge variant="outline" className="px-1.5 py-0 h-5 text-[10px] w-fit text-muted-foreground">
@@ -242,9 +246,9 @@ export function ScheduleTab({
                                             }}
                                             className="px-1.5 py-0 h-5 text-[10px]"
                                           >
-                                            {sc.label}
+                                            {isNameMode ? (sc.name || sc.label) : sc.label}
                                           </Badge>
-                                          {isSplit && sc.name && (
+                                          {!isNameMode && isSplit && sc.name && (
                                             <span className="text-[11px] text-muted-foreground">{sc.name}</span>
                                           )}
                                         </div>
@@ -301,13 +305,13 @@ export function ScheduleTab({
                                 {isSplit && entry.isDraft && codes.some(c => c.isCodeDraft) && codes.some(c => !c.isCodeDraft) ? (
                                   <div className="flex flex-col gap-0.5">
                                     {codes.map(({ isCodeDraft }, idx) => (
-                                      <span key={idx} className={`text-[12px] font-semibold ${isCodeDraft ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                      <span key={idx} className={"text-[12px] font-semibold"} style={{ color: isCodeDraft ? 'var(--color-warning)' : 'var(--color-success)' }}>
                                         {isCodeDraft ? "Draft" : "Published"}
                                       </span>
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className={`text-[12px] font-semibold ${entry.isDraft ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  <span className="text-[12px] font-semibold" style={{ color: entry.isDraft ? 'var(--color-warning)' : 'var(--color-success)' }}>
                                     {entry.isDraft ? "Draft" : "Published"}
                                   </span>
                                 )}
@@ -395,11 +399,11 @@ export function ScheduleTab({
                       <TableCell className="text-[13px]">{req.requesterShiftDate}</TableCell>
                       <TableCell className="font-semibold text-[13px]">{req.requesterShiftLabel}</TableCell>
                       <TableCell>
-                        <span className={`text-[12px] font-semibold capitalize ${
-                          req.status === 'approved' ? 'text-emerald-600' :
-                          req.status === 'rejected' ? 'text-rose-600' :
-                          'text-amber-600'
-                        }`}>
+                        <span className="text-[12px] font-semibold capitalize" style={{ color:
+                          req.status === 'approved' ? 'var(--color-success)' :
+                          req.status === 'rejected' ? 'var(--color-danger)' :
+                          'var(--color-warning)'
+                        }}>
                           {req.status.replace("_", " ")}
                         </span>
                       </TableCell>

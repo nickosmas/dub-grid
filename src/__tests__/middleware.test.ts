@@ -45,7 +45,7 @@ vi.mock("jose", () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
   // createRemoteJWKSet must be mocked — the middleware calls it at getJwks() time.
   // Return a stable function so jwtVerify receives a consistent keyset argument.
-  createRemoteJWKSet: (_url: unknown) => mockJwks,
+  createRemoteJWKSet: () => mockJwks,
 }));
 
 // ── Mock @supabase/ssr ───────────────────────────────────────────────────────
@@ -57,6 +57,17 @@ vi.mock("@supabase/ssr", () => ({
     auth: { getSession: () => mockGetSession() },
     from: (table: string) => mockSupabaseFrom(table),
   }),
+}));
+
+// ── Mock @/lib/cache ────────────────────────────────────────────────────────
+// Pass-through mock: cacheThrough just calls the fetcher directly.
+vi.mock("@/lib/cache", () => ({
+  cacheThrough: async (_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher(),
+  CacheKey: {
+    mwProfile: (userId: string) => `dg:mw:profile:${userId}`,
+    mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
+  },
+  TTL: { MIDDLEWARE: 30 },
 }));
 
 // ── Environment variables ────────────────────────────────────────────────────

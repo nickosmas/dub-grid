@@ -114,7 +114,7 @@ function ToolsMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
-  useLayoutEffect(() => {
+  const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
@@ -123,6 +123,18 @@ function ToolsMenu({
       left: rect.right,
     });
   }, [triggerRef]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useLayoutEffect(() => { updatePosition(); }, [updatePosition]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [updatePosition]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

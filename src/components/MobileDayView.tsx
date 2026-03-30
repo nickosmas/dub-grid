@@ -4,9 +4,14 @@ import React, { useMemo } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies } from "@/lib/schedule-logic";
-import { Employee, ShiftCode, ShiftCategory, FocusArea, IndicatorType, NamedItem, DraftKind } from "@/types";
+import { Employee, ShiftCode, ShiftCategory, FocusArea, IndicatorType, NamedItem, DraftKind, ShiftDisplayMode } from "@/types";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
+
+function pillText(label: string, max: number): string {
+  if (label.length <= max) return label;
+  return label.slice(0, max - 1).trimEnd() + "\u2026";
+}
 
 interface MobileDayViewProps {
   filteredEmployees: Employee[];
@@ -27,6 +32,7 @@ interface MobileDayViewProps {
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 function getDraftBorderStyle(draftKind: DraftKind): string | undefined {
@@ -38,24 +44,20 @@ const GRID_COLS = "100px repeat(7, 1fr)";
 
 export default function MobileDayView({
   filteredEmployees,
-  allEmployees,
   dates,
-  shiftForKey,
   shiftCodeIdsForKey,
-  getShiftStyle,
   handleCellClick,
   today,
   focusAreas,
   shiftCodes,
-  shiftCategories,
-  indicatorTypes = [],
   isCellInteractive = false,
   activeIndicatorIdsForKey,
   activeFocusArea,
   certifications = [],
-  orgRoles = [],
   draftKindForKey,
+  shiftDisplayMode = "code",
 }: MobileDayViewProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const todayKey = formatDateKey(today);
 
   // Always show exactly 7 dates (navigation handled by parent chevrons)
@@ -313,7 +315,7 @@ export default function MobileDayView({
                       const foreignInitials = isForeign ? focusAreaInitials.get(sc.focusAreaId!) ?? null : null;
                       const homeFa = isForeign ? focusAreas.find((fa) => fa.id === sc.focusAreaId) : undefined;
                       return {
-                        label: sc.label,
+                        label: isNameMode ? (sc.name || sc.label) : sc.label,
                         bg: sc.color,
                         text: sc.text || borderColor(sc.color),
                         border: sc.border || borderColor(sc.color),
@@ -356,7 +358,7 @@ export default function MobileDayView({
                                   background: pill.foreignInitials ? "var(--color-surface)" : pill.bg,
                                   color: pill.text,
                                   borderRadius: pill.foreignInitials ? "0 0 2px 2px" : 3,
-                                  padding: pills.length > 1 ? "1px 2px" : "2px 2px",
+                                  padding: pills.length > 1 ? "2px 4px" : "2px 4px",
                                   width: pill.foreignInitials ? "100%" : "calc(100% - 2px)",
                                   textAlign: "center",
                                   lineHeight: 1.2,
@@ -368,7 +370,7 @@ export default function MobileDayView({
                                   display: "block",
                                 }}
                               >
-                                {pill.label}
+                                <span title={isNameMode ? pill.label : undefined} style={{ overflow: "hidden", display: "block", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isNameMode ? pillText(pill.label, 10) : pill.label}</span>
                               </span>
                             );
 
@@ -458,10 +460,12 @@ export default function MobileDayView({
               >
                 {Object.entries(tallies).map(([catId, tally]) =>
                   Object.entries(tally).map(([label, count]) => {
-                    const sc = shiftCodes.find((s) => s.label === label);
+                    const sc = shiftCodes.find((s) => s.label === label || s.name === label);
+                    const displayLabel = isNameMode && sc ? (sc.name || sc.label) : label;
                     return (
                       <span
                         key={`${catId}-${label}`}
+                        title={isNameMode ? `${displayLabel}: ${count}` : undefined}
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
@@ -469,9 +473,13 @@ export default function MobileDayView({
                           background: sc ? `${sc.color}30` : "var(--color-border-light)",
                           padding: "2px 8px",
                           borderRadius: 8,
+                          maxWidth: isNameMode ? 140 : undefined,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        {label}: {count}
+                        {displayLabel}: {count}
                       </span>
                     );
                   }),

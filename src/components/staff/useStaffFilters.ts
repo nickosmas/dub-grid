@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Employee, FocusArea } from "@/types";
+import { Employee } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
 export type EmployeeTab = "active" | "benched" | "terminated";
@@ -11,7 +11,6 @@ interface UseStaffFiltersOptions {
   employees: Employee[];
   benchedEmployees: Employee[];
   terminatedEmployees: Employee[];
-  focusAreas: FocusArea[];
   showOnlyUnlinked?: boolean;
 }
 
@@ -19,7 +18,6 @@ export function useStaffFilters({
   employees,
   benchedEmployees,
   terminatedEmployees,
-  focusAreas,
   showOnlyUnlinked = false,
 }: UseStaffFiltersOptions) {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");

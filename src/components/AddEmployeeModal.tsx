@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import Modal from "@/components/Modal";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
@@ -34,7 +34,10 @@ interface AddEmployeeModalProps {
 
 export default function AddEmployeeModal({ focusAreas, certifications, focusAreaLabel = "Focus Areas", certificationLabel = "Certification", onAdd, onClose }: AddEmployeeModalProps) {
   const defaultCertId: number | null = null;
-  const defaultFocusAreaIds = focusAreas.length > 0 ? [focusAreas[0].id] : [];
+  const defaultFocusAreaIds = useMemo(
+    () => focusAreas.length > 0 ? [focusAreas[0].id] : [],
+    [focusAreas]
+  );
 
   const [rows, setRows] = useState<RowEntry[]>(() => [
     makeRow(defaultCertId, defaultFocusAreaIds),

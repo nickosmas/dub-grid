@@ -229,16 +229,15 @@ export default function RootPage() {
         }}
       >
         <div
+          className="dg-spinner"
           style={{
             width: 32,
             height: 32,
             border: "3px solid var(--color-border)",
             borderTopColor: "var(--color-brand)",
             borderRadius: "50%",
-            animation: "spin 0.7s linear infinite",
           }}
         />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -344,7 +343,7 @@ export default function RootPage() {
             className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03]"
             style={{
               background:
-                "radial-gradient(circle, #2E9930 0%, transparent 70%)",
+                "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)",
             }}
           />
           <div
@@ -576,7 +575,7 @@ export default function RootPage() {
             href={typeof window !== "undefined" ? `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login` : "/login"}
             className="flex items-center gap-2.5"
           >
-            <DubGridLogo size={20} color="#94A3B8" />
+            <DubGridLogo size={20} color="var(--color-text-faint)" />
             <span className="text-xs text-slate-400">
               &copy; {new Date().getFullYear()} DubGrid
             </span>

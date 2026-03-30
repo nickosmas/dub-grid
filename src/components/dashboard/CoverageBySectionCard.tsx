@@ -3,15 +3,15 @@ import type { SectionCoverage } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
 
 const STATUS_COLORS = {
-  green: { bg: "#C6E0CB", text: "#1A4A25" },
-  amber: { bg: "#FDE68A", text: "#92400E" },
-  red: { bg: "#FECACA", text: "#B91C1C" },
+  green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
+  amber: { bg: "var(--color-warning-border)", text: "var(--color-warning-text)" },
+  red: { bg: "var(--color-danger-border)", text: "var(--color-danger-text)" },
 };
 
 const PCT_COLORS = {
-  green: "#2D6B3A",
-  amber: "#D97706",
-  red: "#DC2626",
+  green: "var(--color-brand)",
+  amber: "var(--color-warning)",
+  red: "var(--color-danger)",
 };
 
 interface CoverageBySectionCardProps {
@@ -31,11 +31,11 @@ export default function CoverageBySectionCard({
 }: CoverageBySectionCardProps) {
   if (sections.length === 0) {
     return (
-      <div style={cardStyle}>
-        <div style={headerStyle}>
+      <div className="dg-card">
+        <div className="dg-card-header">
           <div>
-            <div style={titleStyle}>Coverage by {focusAreaLabel.toLowerCase()}</div>
-            <div style={subStyle}>
+            <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
+            <div className="dg-card-subtitle">
               {hasRequirements
                 ? "All sections fully covered this week"
                 : "No coverage requirements configured"}
@@ -44,7 +44,7 @@ export default function CoverageBySectionCard({
           {!hasRequirements && (
             <a
               href="/settings/coverage"
-              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary, #2D6B3A)", cursor: "pointer", textDecoration: "none" }}
+              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
             >
               Configure &rarr;
             </a>
@@ -64,17 +64,17 @@ export default function CoverageBySectionCard({
   }
 
   return (
-    <div style={cardStyle}>
+    <div className="dg-card">
       {/* Header */}
-      <div style={headerStyle}>
+      <div className="dg-card-header">
         <div>
-          <div style={titleStyle}>Coverage by {focusAreaLabel.toLowerCase()}</div>
-          <div style={subStyle}>This week &middot; required vs scheduled</div>
+          <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
+          <div className="dg-card-subtitle">This week &middot; required vs scheduled</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <a
             href="/schedule"
-            style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary, #2D6B3A)", cursor: "pointer", textDecoration: "none" }}
+            style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
           >
             See schedule &rarr;
           </a>
@@ -82,7 +82,7 @@ export default function CoverageBySectionCard({
         </div>
       </div>
 
-      <div style={{ padding: "16px 18px" }}>
+      <div className="dg-card-body">
         {/* Coverage bars */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {sections.map((sec) => {
@@ -207,21 +207,3 @@ export default function CoverageBySectionCard({
     </div>
   );
 }
-
-const cardStyle = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 10,
-  overflow: "hidden" as const,
-};
-
-const headerStyle = {
-  padding: "14px 18px",
-  borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
-  display: "flex" as const,
-  alignItems: "center" as const,
-  justifyContent: "space-between" as const,
-};
-
-const titleStyle = { fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" };
-const subStyle = { fontSize: 11, color: "var(--color-text-subtle)", marginTop: 1 };

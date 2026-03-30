@@ -13,23 +13,10 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      // 'unsafe-inline' is required by Next.js App Router for inline script hydration
-      // without nonce-based CSP middleware. See: https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy
-      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} https://va.vercel-scripts.com`,
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data:",
-      "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co${process.env.NODE_ENV === "development" ? " http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""}`,
-      "frame-ancestors 'none'",
-    ].join("; "),
-  },
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async rewrites() {
     return [
       { source: "/settings/:section", destination: "/settings" },

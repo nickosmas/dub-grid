@@ -275,6 +275,7 @@ export default function OrganizationSetupWizard({
         focusAreaLabel: focusAreaLabel.trim() || "Focus Areas",
         certificationLabel: certificationLabel.trim() || "Certifications",
         roleLabel: roleLabel.trim() || "Roles",
+        shiftDisplayMode: "code",
         timezone: timezone || null,
       });
 

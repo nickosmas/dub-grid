@@ -139,7 +139,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     })();
 
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId, orgId, orgLoading, shiftCodeMap, absenceTypeMap, perms.isGridmaster]);
 
   const thisWeekHours = useMemo(() => {
@@ -251,6 +250,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 focusAreaById={focusAreaById}
                 certifications={certifications}
                 orgRoles={orgRoles}
+                shiftDisplayMode={org?.shiftDisplayMode}
               />
             </TabsContent>
 
@@ -266,6 +266,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 auditNames={auditNames}
                 shiftRequests={shiftRequests}
                 recurringShifts={recurringShifts}
+                shiftDisplayMode={org?.shiftDisplayMode}
               />
             </TabsContent>
 

@@ -18,18 +18,18 @@ export default function ExpandButton({ onClick, label = "Expand" }: ExpandButton
         borderRadius: 6,
         border: "none",
         background: "transparent",
-        color: "var(--color-text-subtle, #64748B)",
+        color: "var(--color-text-subtle)",
         cursor: "pointer",
         flexShrink: 0,
         transition: "background 0.15s, color 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--color-bg-secondary, #F1F5F9)";
-        e.currentTarget.style.color = "var(--color-text-primary, #212529)";
+        e.currentTarget.style.background = "var(--color-bg-secondary)";
+        e.currentTarget.style.color = "var(--color-text-primary)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "var(--color-text-subtle, #64748B)";
+        e.currentTarget.style.color = "var(--color-text-subtle)";
       }}
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

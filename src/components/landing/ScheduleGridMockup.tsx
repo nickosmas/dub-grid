@@ -118,7 +118,7 @@ function ShiftCell({ shiftIdx, isToday }: { shiftIdx: number | null; isToday: bo
   );
 }
 
-function CoverageCell({ label, actual, required, isToday }: { label: string; actual: number; required: number; isToday: boolean }) {
+function CoverageCell({ label, actual, required }: { label: string; actual: number; required: number }) {
   const met = actual >= required;
   return (
     <div
@@ -487,7 +487,6 @@ export default function ScheduleGridMockup() {
                         label={cov.label}
                         actual={actual}
                         required={cov.required}
-                        isToday={dayI === TODAY_INDEX}
                       />
                     </div>
                   )),

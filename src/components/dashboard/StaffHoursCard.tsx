@@ -33,20 +33,20 @@ export default function StaffHoursCard({
     .slice(0, maxVisible);
 
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>
+    <div className="dg-card">
+      <div className="dg-card-header">
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+          <div className="dg-card-title">
             Staff hours
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 1 }}>
+          <div className="dg-card-subtitle">
             This week &middot; {otThreshold}h limit
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Link
             href="/staff"
-            style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary, #2D6B3A)", cursor: "pointer", textDecoration: "none" }}
+            style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
           >
             All staff &rarr;
           </Link>
@@ -75,7 +75,7 @@ export default function StaffHoursCard({
                   alignItems: "center",
                   gap: 10,
                   padding: "9px 18px",
-                  borderBottom: "1px solid var(--color-bg, #F8FAFC)",
+                  borderBottom: "1px solid var(--color-bg)",
                 }}
               >
                 {/* Avatar */}
@@ -90,8 +90,8 @@ export default function StaffHoursCard({
                     fontSize: 10,
                     fontWeight: 700,
                     flexShrink: 0,
-                    background: h.isOvertime ? "#FEF2F2" : "var(--color-bg-secondary, #F1F5F9)",
-                    color: h.isOvertime ? "#DC2626" : "var(--color-text-secondary)",
+                    background: h.isOvertime ? "var(--color-danger-bg)" : "var(--color-bg-secondary)",
+                    color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
                   }}
                 >
                   {initials}
@@ -122,7 +122,7 @@ export default function StaffHoursCard({
                     style={{
                       fontSize: 12,
                       fontWeight: 700,
-                      color: h.isOvertime ? "#DC2626" : "var(--color-text-secondary)",
+                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
                     }}
                   >
                     {h.totalHours}h
@@ -130,7 +130,7 @@ export default function StaffHoursCard({
                   <div
                     style={{
                       fontSize: 10,
-                      color: h.isOvertime ? "#DC2626" : "var(--color-text-subtle)",
+                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
                     }}
                   >
                     {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}
@@ -144,18 +144,3 @@ export default function StaffHoursCard({
     </div>
   );
 }
-
-const cardStyle = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 10,
-  overflow: "hidden" as const,
-};
-
-const headerStyle = {
-  padding: "14px 18px",
-  borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
-  display: "flex" as const,
-  alignItems: "center" as const,
-  justifyContent: "space-between" as const,
-};

@@ -1,10 +1,10 @@
 "use client";
 
-import React, { memo, useMemo, useRef, useLayoutEffect, useState } from "react";
+import React, { memo, useMemo, useRef, useLayoutEffect, useState, useEffect } from "react";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { resolveRequirement, computeCoverageStatus } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType, ShiftDisplayMode } from "@/types";
 import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
 import DroppableCell from "./DroppableCell";
@@ -18,6 +18,12 @@ function getFocusAreaInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 3);
+}
+
+/** Truncate a shift name to fit inside a pill. Full text shown via title tooltip. */
+function pillText(label: string, max: number): string {
+  if (label.length <= max) return label;
+  return label.slice(0, max - 1).trimEnd() + "\u2026";
 }
 
 function fmt12hShort(time24: string): string {
@@ -91,6 +97,8 @@ interface ScheduleGridProps {
   absenceTypeMap?: Map<number, AbsenceType>;
   /** Returns the absence type ID for a given cell, or null/undefined if not an absence */
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 
@@ -133,11 +141,11 @@ interface SectionBlockProps {
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 const SectionBlock = memo(function SectionBlock({
   sectionName,
-  exclusiveCodeIds,
   employees,
   weekDates,
   todayKey,
@@ -145,7 +153,6 @@ const SectionBlock = memo(function SectionBlock({
   shiftCodeIdsForKey,
   getShiftStyle,
   handleCellClick,
-  colWidth,
   splitAtIndex,
   highlightEmpIds,
   focusAreas,
@@ -173,7 +180,9 @@ const SectionBlock = memo(function SectionBlock({
   coverageRequirements,
   absenceTypeMap,
   absenceTypeIdForKey,
+  shiftDisplayMode = "code",
 }: SectionBlockProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
 
   // Bind focus-area context so all label lookups within this section
@@ -224,12 +233,11 @@ const SectionBlock = memo(function SectionBlock({
     );
   }, [shiftCodes, sectionFocusArea]);
 
-  const shiftCodeIdsForKeyFn = shiftCodeIdsForKey ?? (() => []);
-
   // Coverage status per (date, category, shiftCode)
   // Shape: Record<categoryId, Record<shiftCodeLabel, CoverageStatus>>[]
   const dailyCoverageStatus = useMemo(() => {
     if (!coverageRequirements?.length || !sectionFocusArea) return null;
+    const fn = shiftCodeIdsForKey ?? (() => []);
     return weekDates.map((date) => {
       const dow = date.getDay();
       const statusByCategory: Record<number, Record<string, CoverageStatus>> = {};
@@ -240,12 +248,13 @@ const SectionBlock = memo(function SectionBlock({
         const resolved = resolveRequirement(coverageRequirements, sectionFocusArea.id, code.id, dow);
         if (!resolved) continue;
         statusByCategory[code.categoryId] ??= {};
+        const displayLabel = isNameMode ? (code.name || code.label) : code.label;
         // Only compute once per code (skip if already computed for this label)
-        if (statusByCategory[code.categoryId][code.label]) continue;
-        statusByCategory[code.categoryId][code.label] = computeCoverageStatus(
+        if (statusByCategory[code.categoryId][displayLabel]) continue;
+        statusByCategory[code.categoryId][displayLabel] = computeCoverageStatus(
           homeEmployees,
           date,
-          shiftCodeIdsForKeyFn,
+          fn,
           sectionCodeIds,
           code.id,
           resolved,
@@ -253,7 +262,7 @@ const SectionBlock = memo(function SectionBlock({
       }
       return statusByCategory;
     });
-  }, [weekDates, coverageRequirements, sectionFocusArea, homeEmployees, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds]);
+  }, [weekDates, coverageRequirements, sectionFocusArea, homeEmployees, shiftCodeIdsForKey, shiftCodeById, sectionCodeIds, isNameMode]);
 
   const renderCoverage = (coverageByLabel?: Record<string, CoverageStatus>) => {
     if (!coverageByLabel) return "-";
@@ -262,7 +271,7 @@ const SectionBlock = memo(function SectionBlock({
     return (
       <div style={{ display: "flex", flexDirection: "row", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
         {entries.map(([label, cov], ei) => (
-          <span key={label} style={{ whiteSpace: "nowrap" }}>
+          <span key={label} title={isNameMode ? `${label}: ${cov.actual}/${cov.required}` : undefined} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isNameMode ? 120 : undefined }}>
             {ei > 0 && <span style={{ color: "var(--color-text-faint)", margin: "0 0.3em" }}>|</span>}
             <span style={{ color: cov.isMet ? "var(--color-success-text)" : "var(--color-danger-dark)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 3 }}>
               {cov.isMet
@@ -292,11 +301,12 @@ const SectionBlock = memo(function SectionBlock({
       });
       if (!hasLocalOrGeneral) {
         const homeWing = focusAreas.find((w) => st.focusAreaId === w.id);
-        if (homeWing) map.set(st.label, homeWing.name);
+        const displayKey = isNameMode ? (st.name || st.label) : st.label;
+        if (homeWing) map.set(displayKey, homeWing.name);
       }
     }
     return map;
-  }, [shiftCodes, sectionName, focusAreas]);
+  }, [shiftCodes, sectionName, focusAreas, isNameMode]);
 
   // Coverage rows — only show categories that have coverage requirements configured
   const coverageRows = useMemo(() => {
@@ -614,7 +624,6 @@ const SectionBlock = memo(function SectionBlock({
                         }
                         if (e.shiftKey && e.key === "F10" && isCellInteractive && onCellContextMenu) {
                           e.preventDefault();
-                          const rect = e.currentTarget.getBoundingClientRect();
                           onCellContextMenu(e as unknown as React.MouseEvent, emp.id, date, sectionName);
                         }
                       }}
@@ -657,7 +666,7 @@ const SectionBlock = memo(function SectionBlock({
                             ? publishDiff!.kind === 'new'
                               ? { text: 'New', color: 'var(--color-success-text)' }
                               : publishDiff!.kind === 'modified'
-                                ? { text: `was: ${pubFrom.map(id => shiftCodeById.get(id)?.label ?? '?').join('/')}`, color: 'var(--color-primary)' }
+                                ? { text: `was: ${pubFrom.map(id => { const sc = shiftCodeById.get(id); return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?'; }).join('/')}`, color: 'var(--color-primary)' }
                                 : null
                             : null;
 
@@ -707,8 +716,9 @@ const SectionBlock = memo(function SectionBlock({
                                    flexDirection: "column",
                                    alignItems: "center",
                                    justifyContent: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "flex-start" : "center",
-                                   paddingTop: showDiffOverlay && draftKind && draftKind !== 'deleted' ? 4 : 0,
-                                   paddingLeft: isCross && crossHomeFa ? 18 : 0,
+                                   padding: isNameMode ? "2px 4px" : "2px 3px",
+                                   paddingTop: showDiffOverlay && draftKind && draftKind !== 'deleted' ? 4 : 2,
+                                   paddingLeft: isCross && crossHomeFa ? 18 : (isNameMode ? 4 : 3),
                                    overflow: "hidden",
                                    textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                  }}
@@ -736,8 +746,16 @@ const SectionBlock = memo(function SectionBlock({
                                      {getFocusAreaInitials(crossHomeFa.name)}
                                    </span>
                                  )}
-                                 <span style={{ fontSize: "var(--dg-fs-title)", fontWeight: 800, lineHeight: 1 }}>
-                                   {label}
+                                 <span
+                                   title={isNameMode ? label : undefined}
+                                   style={{
+                                     fontSize: isNameMode ? "var(--dg-fs-caption)" : "var(--dg-fs-title)",
+                                     fontWeight: 800,
+                                     lineHeight: isNameMode ? 1.15 : 1,
+                                     ...(isNameMode ? { textAlign: "center" as const } : {}),
+                                   }}
+                                 >
+                                   {isNameMode ? pillText(label, 14) : label}
                                    {!customTimes && isOvernight && (
                                      <sup style={{ fontSize: "0.5em", fontWeight: 700, opacity: 0.5, marginLeft: 1 }}>+1</sup>
                                    )}
@@ -756,7 +774,7 @@ const SectionBlock = memo(function SectionBlock({
                                    </span>
                                  )}
                                  {showDiffOverlay && draftKind === 'modified' && publishedLabel && shiftCode !== publishedLabel && (
-                                   <span style={{
+                                   <span title={isNameMode ? `was: ${publishedLabel}` : undefined} style={{
                                      position: "absolute",
                                      bottom: 2,
                                      left: "50%",
@@ -767,8 +785,11 @@ const SectionBlock = memo(function SectionBlock({
                                      whiteSpace: "nowrap",
                                      pointerEvents: "none",
                                      lineHeight: 1,
+                                     maxWidth: "calc(100% - 8px)",
+                                     overflow: "hidden",
+                                     textOverflow: "ellipsis",
                                    }}>
-                                     was: {publishedLabel}
+                                     was: {isNameMode ? pillText(publishedLabel!, 10) : publishedLabel}
                                    </span>
                                  )}
                                  {showDiffOverlay && draftKind === 'new' && (
@@ -939,7 +960,7 @@ const SectionBlock = memo(function SectionBlock({
                                       alignItems: "center",
                                       justifyContent: "center",
                                       gap: 1,
-                                      fontSize: "var(--dg-fs-caption)",
+                                      fontSize: isNameMode ? "var(--dg-fs-micro)" : "var(--dg-fs-caption)",
                                       fontWeight: 800,
                                       position: "relative",
                                       cursor: "pointer",
@@ -947,7 +968,8 @@ const SectionBlock = memo(function SectionBlock({
                                       lineHeight: 1,
                                       overflow: "hidden",
                                       minWidth: 0,
-                                      paddingLeft: isCross && crossHomeFaLi ? 14 : 0,
+                                      padding: isNameMode ? "2px 4px" : "2px 3px",
+                                      paddingLeft: isCross && crossHomeFaLi ? 16 : (isNameMode ? 4 : 3),
                                     }}
                                   >
                                     {isCross && crossHomeFaLi && (
@@ -973,8 +995,8 @@ const SectionBlock = memo(function SectionBlock({
                                         {getFocusAreaInitials(crossHomeFaLi.name)}
                                       </span>
                                     )}
-                                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-                                      {label}
+                                    <span title={isNameMode ? label : undefined} style={{ ...(isNameMode ? { textAlign: "center" as const, lineHeight: 1.15 } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }) }}>
+                                      {isNameMode ? pillText(label, 8) : label}
                                       {!hasTime && isPillOvernight && (
                                         <sup style={{ fontSize: "0.65em", fontWeight: 700, opacity: 0.5, marginLeft: 1 }}>+1</sup>
                                       )}
@@ -1047,7 +1069,7 @@ const SectionBlock = memo(function SectionBlock({
                               </span>
                             )}
                             {showDiffOverlay && draftKind === 'modified' && publishedLabel && shiftCode !== publishedLabel && (
-                              <span style={{
+                              <span title={isNameMode ? `was: ${publishedLabel}` : undefined} style={{
                                 position: "absolute",
                                 bottom: 2,
                                 left: "50%",
@@ -1059,8 +1081,11 @@ const SectionBlock = memo(function SectionBlock({
                                 pointerEvents: "none",
                                 lineHeight: 1,
                                 zIndex: 1,
+                                maxWidth: "calc(100% - 8px)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
                               }}>
-                                was: {publishedLabel}
+                                was: {isNameMode ? pillText(publishedLabel!, 8) : publishedLabel}
                               </span>
                             )}
                             {showDiffOverlay && draftKind === 'new' && (
@@ -1105,7 +1130,7 @@ const SectionBlock = memo(function SectionBlock({
                           const isDraftDelete = draftKind === 'deleted';
                           const deletedLabel = isDraftDelete
                             ? publishedLabel!
-                            : publishDiff!.from.map(id => shiftCodeById.get(id)?.label ?? '?').join('/');
+                            : publishDiff!.from.map(id => { const sc = shiftCodeById.get(id); return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?'; }).join('/');
                           return (
                             <>
                             <div
@@ -1359,10 +1384,22 @@ export default function ScheduleGrid({
   coverageRequirements,
   absenceTypeMap,
   absenceTypeIdForKey,
+  shiftDisplayMode = "code",
 }: ScheduleGridProps) {
-  const { user: currentUser } = useAuth();
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
+
+  // Dismiss tooltip on scroll/resize so it doesn't float detached
+  useEffect(() => {
+    if (!tooltip) return;
+    const dismiss = () => setTooltip(null);
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, [tooltip]);
 
   const sections = useMemo(() => {
     const allNames = focusAreas.map((w) => w.name);
@@ -1416,17 +1453,6 @@ export default function ScheduleGrid({
     );
   }, [sections, shiftCodes, focusAreaIdByName]);
 
-  // Shift labels that are "general" — not focus-area-specific
-  const generalShiftLabels = useMemo(
-    () =>
-      new Set(
-        shiftCodes
-          .filter((st) => st.isGeneral || st.focusAreaId == null)
-          .map((st) => st.label),
-      ),
-    [shiftCodes],
-  );
-
   const renderedSections = sections.filter(section => {
     const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
     const sectionId = focusAreaIdByName[section];
@@ -1452,7 +1478,7 @@ export default function ScheduleGrid({
   });
 
   return (
-    <div ref={containerRef} style={{ width: "100%", maxWidth: "100%", position: "relative" }}>
+    <div ref={containerRef} data-shift-display={shiftDisplayMode} style={{ width: "100%", maxWidth: "100%", position: "relative" }}>
       {renderedSections.length === 0 ? (
         <div
           style={{
@@ -1588,6 +1614,7 @@ export default function ScheduleGrid({
             coverageRequirements={coverageRequirements}
             absenceTypeMap={absenceTypeMap}
             absenceTypeIdForKey={absenceTypeIdForKey}
+            shiftDisplayMode={shiftDisplayMode}
           />
         );
       })}

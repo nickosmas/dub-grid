@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType } from "@/types";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType, ShiftDisplayMode } from "@/types";
 import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles } from "@/lib/db";
 import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
@@ -129,18 +129,8 @@ function Section({
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "7px 12px",
-  border: "1px solid var(--color-border)",
-  borderRadius: 10,
-  fontSize: "var(--dg-fs-label)",
-  outline: "none",
-  background: "var(--color-surface)",
-};
-
 const labelStyle = sharedLabelStyle;
+const inputStyle: React.CSSProperties = {};
 
 // ── Common IANA timezones ─────────────────────────────────────────────────────
 const TIMEZONES = [
@@ -215,11 +205,9 @@ function TimeInput12h({ value, onChange, disabled }: { value: string | null | un
 function OrganizationDetailsSettings({
   organization,
   onSave,
-  canManageOrgSettings,
 }: {
   organization: Organization;
   onSave: (o: Organization) => void;
-  canManageOrgSettings: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState({
@@ -281,7 +269,7 @@ function OrganizationDetailsSettings({
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             maxLength={60}
-            style={inputStyle}
+            className="dg-input"
           />
         </div>
         <div>
@@ -291,7 +279,7 @@ function OrganizationDetailsSettings({
             onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
             placeholder="(415) 555-0100"
             maxLength={20}
-            style={inputStyle}
+            className="dg-input"
           />
         </div>
         <div>
@@ -301,7 +289,7 @@ function OrganizationDetailsSettings({
             onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
             placeholder="123 Main St, City, State ZIP"
             maxLength={120}
-            style={inputStyle}
+            className="dg-input"
           />
         </div>
         <div>
@@ -321,7 +309,7 @@ function OrganizationDetailsSettings({
               }
             }}
             placeholder="e.g. 28"
-            style={inputStyle}
+            className="dg-input"
           />
         </div>
       </div>
@@ -371,11 +359,9 @@ function OrganizationDetailsSettings({
 function OrganizationLabelsSettings({
   organization,
   onSave,
-  canManageOrgLabels,
 }: {
   organization: Organization;
   onSave: (o: Organization) => void;
-  canManageOrgLabels: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState({
@@ -434,7 +420,7 @@ function OrganizationLabelsSettings({
             onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
             placeholder="Focus Areas"
             maxLength={30}
-            style={inputStyle}
+            className="dg-input"
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Focus Areas, Departments, Units
@@ -447,7 +433,7 @@ function OrganizationLabelsSettings({
             onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
             placeholder="Certifications"
             maxLength={30}
-            style={inputStyle}
+            className="dg-input"
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Certifications, Designations
@@ -460,7 +446,7 @@ function OrganizationLabelsSettings({
             onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
             placeholder="Roles"
             maxLength={30}
-            style={inputStyle}
+            className="dg-input"
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Responsibilities, Positions
@@ -498,6 +484,7 @@ function OrganizationLabelsSettings({
 // ── Focus Area row ────────────────────────────────────────────────────────────
 function FocusAreaRow({
   focusArea,
+  orgId,
   onDeleted,
   onFormChange,
   isDragging,
@@ -507,12 +494,11 @@ function FocusAreaRow({
   onDragOver,
   onDrop,
   onDragEnd,
-  canManageFocusAreas,
 }: {
   focusArea: FocusArea & { isNew?: boolean };
+  orgId: string;
   onDeleted: (id: number) => void;
   onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
-  canManageFocusAreas: boolean;
   isDragging: boolean;
   isDropTarget: boolean;
   isReordering: boolean;
@@ -543,7 +529,7 @@ function FocusAreaRow({
     }
     setDeleting(true);
     try {
-      await deleteFocusArea(focusArea.id);
+      await deleteFocusArea(focusArea.id, orgId);
       onDeleted(focusArea.id);
       toast.success("Focus area deleted");
     } catch (err) {
@@ -553,7 +539,7 @@ function FocusAreaRow({
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
-  }, [focusArea, onDeleted]);
+  }, [focusArea, orgId, onDeleted]);
 
   // Read-only display mode
   if (!isReordering) {
@@ -675,7 +661,8 @@ function FocusAreaRow({
           draggable={false}
           placeholder="Area name"
           maxLength={50}
-          style={{ ...inputStyle, flex: 1 }}
+          className="dg-input"
+          style={{ flex: 1 }}
         />
       </div>
 
@@ -885,6 +872,7 @@ function FocusAreasSettings({
                 <FocusAreaRow
                   key={focusArea.id}
                   focusArea={focusArea}
+                  orgId={orgId}
                   onDeleted={handleDeleted}
                   onFormChange={handleFormChange}
                   isReordering={isEditing}
@@ -894,7 +882,6 @@ function FocusAreasSettings({
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDrop={handleDrop}
                   onDragEnd={handleDragEnd}
-                  canManageFocusAreas={canManageFocusAreas}
                 />
               );
             })}
@@ -935,6 +922,8 @@ function ShiftCodeRow({
   onSaved,
   onDeleted,
   canManageShiftCodes,
+  shiftDisplayMode = "code",
+  existingLabels = new Set<string>(),
 }: {
   st: ShiftCode & { isNew?: boolean };
   focusAreas: FocusArea[];
@@ -947,7 +936,10 @@ function ShiftCodeRow({
   onSaved: (s: ShiftCode, prevId: number) => void;
   onDeleted: (id: number) => void;
   canManageShiftCodes: boolean;
+  shiftDisplayMode?: ShiftDisplayMode;
+  existingLabels?: Set<string>;
 }) {
+  const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState(() => {
     // Normalize: if custom times match the category exactly, clear them to inherit
@@ -1006,7 +998,7 @@ function ShiftCodeRow({
       defaultDurationHours: st.defaultDurationHours ?? null,
       defaultDurationMinutes: st.defaultDurationMinutes ?? null,
     });
-  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
+  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, st.requiredCertificationIds, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
 
   // Normalize times: if they match the category exactly, treat as null (inherit)
   const effectiveStartTime = (() => {
@@ -1040,10 +1032,10 @@ function ShiftCodeRow({
     form.defaultDurationHours !== (st.defaultDurationHours ?? null) ||
     form.defaultDurationMinutes !== (st.defaultDurationMinutes ?? null);
 
-  const canSave = isDirty && !!form.label.trim() && !!form.name.trim();
+  const canSave = isDirty && (isNameMode || !!form.label.trim()) && !!form.name.trim();
 
   const handleSave = useCallback(async () => {
-    if (!form.label.trim() || !form.name.trim()) return;
+    if ((!isNameMode && !form.label.trim()) || !form.name.trim()) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -1058,10 +1050,21 @@ function ShiftCodeRow({
           saveEndTime = null;
         }
       }
+      // In name mode, auto-generate label if not provided
+      let labelToSave = form.label.trim();
+      if (isNameMode && !labelToSave) {
+        const base = form.name.trim().split(/\s+/)[0].toUpperCase().slice(0, 4) || "SHFT";
+        labelToSave = base;
+        let suffix = 2;
+        while (existingLabels.has(labelToSave)) {
+          labelToSave = `${base}${suffix}`;
+          suffix++;
+        }
+      }
       const saved = await upsertShiftCode({
         id: st.isNew ? undefined : st.id,
         orgId: orgId,
-        label: form.label.trim(),
+        label: labelToSave,
         name: form.name.trim(),
         color: form.color,
         border: form.border,
@@ -1087,7 +1090,7 @@ function ShiftCodeRow({
     } finally {
       setSaving(false);
     }
-  }, [form, st, orgId, onSaved, shiftCategories]);
+  }, [form, st, orgId, onSaved, shiftCategories, isNameMode, existingLabels]);
 
   const handleDelete = useCallback(async () => {
     if (st.isNew) {
@@ -1096,7 +1099,7 @@ function ShiftCodeRow({
     }
     setDeleting(true);
     try {
-      await deleteShiftCode(st.id);
+      await deleteShiftCode(st.id, orgId);
       onDeleted(st.id);
       toast.success("Shift code deleted");
     } catch (err) {
@@ -1106,7 +1109,7 @@ function ShiftCodeRow({
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
-  }, [st, onDeleted]);
+  }, [st, orgId, onDeleted]);
 
   return (
     <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
@@ -1121,26 +1124,32 @@ function ShiftCodeRow({
         }}
         onClick={() => setExpanded((e) => !e)}
       >
-        <span
-          style={{
-            display: "inline-block",
-            minWidth: 44,
-            padding: "3px 8px",
-            background: form.color,
-            border: `1px solid ${borderColor(form.text)}`,
-            color: form.text,
-            borderRadius: 8,
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 700,
-            textAlign: "center",
-          }}
-        >
-          {form.label || "…"}
-        </span>
+        {!isNameMode && (
+          <span
+            style={{
+              display: "inline-block",
+              minWidth: 44,
+              padding: "3px 8px",
+              background: form.color,
+              border: `1px solid ${borderColor(form.text)}`,
+              color: form.text,
+              borderRadius: 8,
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 700,
+              textAlign: "center",
+            }}
+          >
+            {form.label || "…"}
+          </span>
+        )}
+        {isNameMode && (
+          <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: form.color, border: `1px solid ${borderColor(form.text)}`, flexShrink: 0 }} />
+        )}
         <span
           style={{
             fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-secondary)",
+            color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+            fontWeight: isNameMode ? 600 : 400,
             flex: 1,
           }}
         >
@@ -1212,25 +1221,27 @@ function ShiftCodeRow({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "120px 1fr",
+              gridTemplateColumns: isNameMode ? "1fr" : (isMobile ? "1fr" : "120px 1fr"),
               gap: 10,
             }}
           >
+            {!isNameMode && (
+              <div>
+                <label style={labelStyle}>CODE / LABEL</label>
+                <input
+                  value={form.label}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, label: e.target.value }))
+                  }
+                  placeholder="e.g. D"
+                  maxLength={6}
+                  className="dg-input"
+                  disabled={!canManageShiftCodes}
+                />
+              </div>
+            )}
             <div>
-              <label style={labelStyle}>CODE / LABEL</label>
-              <input
-                value={form.label}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, label: e.target.value }))
-                }
-                placeholder="e.g. D"
-                maxLength={6}
-                style={inputStyle}
-                disabled={!canManageShiftCodes}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>FULL NAME</label>
+              <label style={labelStyle}>{isNameMode ? "SHIFT NAME" : "FULL NAME"}</label>
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -1238,7 +1249,7 @@ function ShiftCodeRow({
                 }
                 placeholder="e.g. Day Shift"
                 maxLength={50}
-                style={inputStyle}
+                className="dg-input"
                 disabled={!canManageShiftCodes}
               />
             </div>
@@ -1695,7 +1706,7 @@ function AbsenceTypeRow({
   // M3: Re-sync form when parent prop changes (e.g., concurrent update)
   useEffect(() => {
     if (!at.isNew) setForm(resolveForm(at));
-  }, [at.id, at.label, at.name, at.color, at.border, at.text, at.isNew, resolveForm]);
+  }, [at, resolveForm]);
 
   const isDirty = at.isNew ||
     form.label !== at.label ||
@@ -1744,7 +1755,7 @@ function AbsenceTypeRow({
     if (at.isNew) { onDeleted(at.id); return; }
     setDeleting(true);
     try {
-      await deleteAbsenceType(at.id);
+      await deleteAbsenceType(at.id, orgId);
       onDeleted(at.id);
       toast.success("Off day type deleted");
     } catch (err) {
@@ -1754,7 +1765,7 @@ function AbsenceTypeRow({
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
-  }, [at, onDeleted]);
+  }, [at, orgId, onDeleted]);
 
   return (
     <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
@@ -1776,11 +1787,11 @@ function AbsenceTypeRow({
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: 10 }}>
             <div>
               <label style={labelStyle}>CODE / LABEL</label>
-              <input value={form.label} onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))} placeholder="e.g. X" maxLength={6} style={inputStyle} disabled={!canEdit} />
+              <input value={form.label} onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))} placeholder="e.g. X" maxLength={6} className="dg-input" disabled={!canEdit} />
             </div>
             <div>
               <label style={labelStyle}>FULL NAME</label>
-              <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sick Leave" maxLength={50} style={inputStyle} disabled={!canEdit} />
+              <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sick Leave" maxLength={50} className="dg-input" disabled={!canEdit} />
             </div>
           </div>
           <div>
@@ -1926,6 +1937,7 @@ function ShiftCodesSettings({
   canManageShiftCodes,
   absenceTypes,
   onAbsenceTypesChange,
+  shiftDisplayMode = "code",
 }: {
   shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
@@ -1938,10 +1950,15 @@ function ShiftCodesSettings({
   canManageShiftCodes: boolean;
   absenceTypes: AbsenceType[];
   onAbsenceTypesChange: (types: AbsenceType[]) => void;
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const [local, setLocal] =
     useState<(ShiftCode & { isNew?: boolean })[]>(shiftCodes);
   const nextTmpId = useRef(-1);
+  const existingLabels = useMemo(
+    () => new Set(local.map(s => s.label.toUpperCase())),
+    [local],
+  );
 
   // Sync local state when the parent shiftCodes prop changes (e.g. fresh DB
   // data replacing stale cache data). Only replaces items that haven't been
@@ -2008,31 +2025,15 @@ function ShiftCodesSettings({
         onSaved={handleSaved}
         onDeleted={handleDeleted}
         canManageShiftCodes={canManageShiftCodes}
+        shiftDisplayMode={shiftDisplayMode}
+        existingLabels={existingLabels}
       />
     ));
-
-  const sectionHeader = (label: string, colorBg?: string, _colorText?: string) => (
-    <div style={{
-      padding: "10px 20px",
-      background: "var(--color-bg)",
-      color: "var(--color-text-secondary)",
-      fontWeight: 700,
-      fontSize: "var(--dg-fs-label)",
-      borderTop: "1px solid var(--color-border-light)",
-      borderBottom: "1px solid var(--color-border-light)",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    }}>
-      {colorBg && <span style={{ width: 10, height: 10, borderRadius: "50%", background: colorBg, flexShrink: 0 }} />}
-      {label}
-    </div>
-  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
-        Click any row to expand and edit. The label (code) is used in the schedule grid.
+        Click any row to expand and edit.{shiftDisplayMode !== "name" && " The label (code) is used in the schedule grid."}
       </p>
 
       {/* Per-focus-area sections */}
@@ -2580,7 +2581,7 @@ function IndicatorTypesSettings({
     }
     setDeleting(indicator.id);
     try {
-      await deleteIndicatorType(indicator.id);
+      await deleteIndicatorType(indicator.id, orgId);
       const updated = local.filter((i) => i.id !== indicator.id);
       setLocal(updated);
       onChange(updated);
@@ -2877,7 +2878,7 @@ function ShiftCategoriesSettings({
     }
     setDeleting(cat.id);
     try {
-      await deleteShiftCategory(cat.id);
+      await deleteShiftCategory(cat.id, orgId);
       const updated = local.filter((c) => c.id !== cat.id);
       setLocal(updated);
       onChange(updated);
@@ -3270,6 +3271,7 @@ function CoverageRequirementsSettings({
   coverageRequirements,
   onCoverageRequirementsChange,
   canEdit,
+  shiftDisplayMode = "code",
 }: {
   orgId: string;
   focusAreas: FocusArea[];
@@ -3278,7 +3280,9 @@ function CoverageRequirementsSettings({
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
   canEdit: boolean;
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
+  const isNameMode = shiftDisplayMode === "name";
   // Expand key = "focusAreaId-categoryId"
   const [expanded, setExpanded] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -3623,7 +3627,7 @@ function CoverageRequirementsSettings({
                               marginBottom: 6,
                             }}
                           >
-                            {sc.label} — {sc.name}
+                            {isNameMode ? (sc.name || sc.label) : sc.label}
                           </div>
                           {/* Inputs */}
                           {draft.everyDay ? (
@@ -3723,7 +3727,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     setSaving(userId);
     setError(null);
     try {
-      await changeOrganizationUserRole(userId, newRole);
+      await changeOrganizationUserRole(userId, newRole, orgId);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
       if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
       toast.success("Role updated");
@@ -4162,56 +4166,226 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
   );
 }
 
-// ── Sidebar nav link ──────────────────────────────────────────────────────────
-function SidebarLink({
-  label,
-  icon,
-  active,
-  href,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  href: string;
-}) {
-  const [hovered, setHovered] = useState(false);
+// ── Display Mode Settings ─────────────────────────────────────────────────────
+
+const SAMPLE_SHIFTS = [
+  { label: "D", name: "Day Shift", color: "#DBEAFE", text: "#1E40AF", border: "#93C5FD" },
+  { label: "EVE", name: "Evening", color: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
+  { label: "N", name: "Night Shift", color: "#EDE9FE", text: "#5B21B6", border: "#C4B5FD" },
+];
+
+function DisplayModeSample({ mode, shiftCodes }: { mode: ShiftDisplayMode; shiftCodes: ShiftCode[] }) {
+  const samples = shiftCodes.length >= 3
+    ? shiftCodes.slice(0, 3).map(sc => ({
+        label: sc.label,
+        name: sc.name,
+        color: sc.color,
+        text: sc.text,
+        border: sc.border,
+      }))
+    : SAMPLE_SHIFTS;
+
   return (
-    <Link
-      href={href}
-      replace
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 9,
-        width: "100%",
-        padding: "7px 12px",
-        background: active
-          ? "var(--color-bg-secondary)"
-          : hovered
-          ? "var(--color-border-light)"
-          : "transparent",
-        borderRadius: 8,
-        cursor: "pointer",
-        fontSize: "var(--dg-fs-label)",
-        fontWeight: active ? 600 : 500,
-        color: active ? "var(--color-text-primary)" : hovered ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-        textAlign: "left",
-        fontFamily: "inherit",
-        textDecoration: "none",
-        transition: "background 150ms ease, color 150ms ease",
-        position: "relative",
-      }}
-    >
-      <span style={{
-        color: active ? "var(--color-text-secondary)" : "var(--color-text-muted)",
-        flexShrink: 0,
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: `80px repeat(3, 1fr)`,
+      gap: 1,
+      background: "var(--color-border)",
+      borderRadius: 8,
+      overflow: "hidden",
+      fontSize: 11,
+    }}>
+      {/* Header row */}
+      <div style={{ background: "var(--color-bg-secondary)", padding: "6px 8px", fontWeight: 600, color: "var(--color-text-faint)", fontSize: 10 }}>
+        Staff
+      </div>
+      {["Mon", "Tue", "Wed"].map(day => (
+        <div key={day} style={{ background: "var(--color-bg-secondary)", padding: "6px 4px", fontWeight: 600, color: "var(--color-text-faint)", fontSize: 10, textAlign: "center" }}>
+          {day}
+        </div>
+      ))}
+
+      {/* Employee row */}
+      <div style={{ background: "var(--color-surface)", padding: "8px 8px", fontWeight: 600, color: "var(--color-text-primary)", fontSize: 11, display: "flex", alignItems: "center" }}>
+        J. Smith
+      </div>
+      {samples.map((s, i) => (
+        <div key={i} style={{ background: "var(--color-surface)", padding: 3, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{
+            background: s.color,
+            color: s.text,
+            border: `1px solid ${s.border}`,
+            borderRadius: 6,
+            padding: "4px 6px",
+            fontWeight: 800,
+            fontSize: mode === "name" ? 9 : 11,
+            textAlign: "center",
+            width: "100%",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}>
+            {mode === "name" ? s.name : s.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DisplayModeSettings({
+  organization,
+  shiftCodes,
+  onSave,
+}: {
+  organization: Organization;
+  shiftCodes: ShiftCode[];
+  onSave: (org: Organization) => void;
+}) {
+  const [selected, setSelected] = useState<ShiftDisplayMode>(organization.shiftDisplayMode);
+  const [saving, setSaving] = useState(false);
+  const isModified = selected !== organization.shiftDisplayMode;
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      const updated = { ...organization, shiftDisplayMode: selected };
+      await updateOrganization(updated);
+      onSave(updated);
+      toast.success("Display mode updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update display mode");
+    } finally {
+      setSaving(false);
+    }
+  }, [organization, selected, onSave]);
+
+  const modes: { id: ShiftDisplayMode; title: string; description: string; details: string[] }[] = [
+    {
+      id: "code",
+      title: "Short Codes",
+      description: "Display abbreviations like D, EVE, N on the grid. Best for organizations that use standardized shift codes.",
+      details: [
+        "The schedule grid shows short codes in each cell",
+        "Both the code and full name are visible when creating shifts",
+        "Compact display fits well in all views including 2-week",
+      ],
+    },
+    {
+      id: "name",
+      title: "Full Names",
+      description: "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
+      details: [
+        "The schedule grid shows the full shift name in each cell",
+        "Short codes are hidden throughout the app",
+        "When creating shifts, you only need to provide a name",
+      ],
+    },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Mode selection cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {modes.map(mode => {
+          const isActive = selected === mode.id;
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => setSelected(mode.id)}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                padding: 16,
+                borderRadius: 12,
+                border: isActive ? "2px solid var(--color-brand)" : "1px solid var(--color-border)",
+                background: isActive ? "var(--color-brand-bg, rgba(59,130,246,0.06))" : "var(--color-surface)",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "border-color 150ms ease, background 150ms ease",
+              }}
+            >
+              {/* Radio indicator + title */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  border: isActive ? "2px solid var(--color-brand)" : "2px solid var(--color-border-strong, #94a3b8)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  {isActive && <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-brand)" }} />}
+                </div>
+                <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>
+                  {mode.title}
+                </span>
+              </div>
+
+              {/* Description */}
+              <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5, margin: 0 }}>
+                {mode.description}
+              </p>
+
+              {/* Sample grid */}
+              <DisplayModeSample mode={mode.id} shiftCodes={shiftCodes} />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* How it works section */}
+      <div style={{
+        background: "var(--color-bg-secondary)",
+        borderRadius: 10,
+        padding: 20,
       }}>
-        {icon}
-      </span>
-      {label}
-    </Link>
+        <h3 style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--color-text-faint)",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          margin: "0 0 12px",
+        }}>
+          How it works — {modes.find(m => m.id === selected)?.title}
+        </h3>
+        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+          {modes.find(m => m.id === selected)?.details.map((detail, i) => (
+            <li key={i} style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+              {detail}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Save button */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!isModified || saving}
+          style={{
+            padding: "10px 24px",
+            borderRadius: 8,
+            border: "none",
+            background: isModified ? "var(--color-brand)" : "var(--color-bg-secondary)",
+            color: isModified ? "#fff" : "var(--color-text-faint)",
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: isModified ? "pointer" : "not-allowed",
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -4246,7 +4420,7 @@ export default function SettingsPage({
   onAbsenceTypesChange,
 }: SettingsPageProps) {
   const pathname = usePathname();
-  const VALID_SECTIONS = ["organization", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "impersonation"];
+  const VALID_SECTIONS = ["organization", "display-mode", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "impersonation"];
   const sectionFromPath = pathname.split("/")[2];
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -4274,13 +4448,15 @@ export default function SettingsPage({
   const iconImpersonate = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 
   const iconIndicator = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>;
+  const iconDisplay = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>;
   const iconTag = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
   const iconCoverage = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 
   const orgLinks = canManageOrg ? [
     { id: "organization", label: "Organization", icon: iconBuilding },
+    ...(canManageOrgSettings ? [{ id: "display-mode", label: "Display Mode", icon: iconDisplay }] : []),
     { id: "shift-categories", label: "Shift Categories", icon: iconTag },
-    { id: "shift-codes", label: "Schedule Codes", icon: iconCalendar },
+    { id: "shift-codes", label: organization.shiftDisplayMode === "name" ? "Shifts" : "Schedule Codes", icon: iconCalendar },
     { id: "coverage", label: "Coverage", icon: iconCoverage },
     { id: "indicators", label: "Indicators", icon: iconIndicator },
     { id: "staff-config", label: "Designations", icon: iconDesignations },
@@ -4378,7 +4554,6 @@ export default function SettingsPage({
                 <OrganizationDetailsSettings
                   organization={organization}
                   onSave={onOrganizationSave}
-                  canManageOrgSettings={canManageOrgSettings}
                 />
               </Section>
             )}
@@ -4387,7 +4562,6 @@ export default function SettingsPage({
                 <OrganizationLabelsSettings
                   organization={organization}
                   onSave={onOrganizationSave}
-                  canManageOrgLabels={canManageOrgLabels}
                 />
               </Section>
             )}
@@ -4398,6 +4572,18 @@ export default function SettingsPage({
                 label={focusAreaLabel.replace(/s$/, "")}
                 onChange={onFocusAreasChange}
                 canManageFocusAreas={canManageFocusAreas}
+              />
+            </Section>
+          </div>
+        )}
+
+        {activeSection === "display-mode" && canManageOrgSettings && (
+          <div style={{ width: "100%", maxWidth: 860 }}>
+            <Section title="Shift Display Mode">
+              <DisplayModeSettings
+                organization={organization}
+                shiftCodes={shiftCodes}
+                onSave={onOrganizationSave}
               />
             </Section>
           </div>
@@ -4431,6 +4617,7 @@ export default function SettingsPage({
               canManageShiftCodes={canManageShiftCodes}
               absenceTypes={absenceTypes}
               onAbsenceTypesChange={onAbsenceTypesChange}
+              shiftDisplayMode={organization.shiftDisplayMode}
             />
           </div>
         )}
@@ -4445,6 +4632,7 @@ export default function SettingsPage({
               coverageRequirements={coverageRequirements}
               onCoverageRequirementsChange={onCoverageRequirementsChange}
               canEdit={canManageCoverageRequirements}
+              shiftDisplayMode={organization.shiftDisplayMode}
             />
           </div>
         )}

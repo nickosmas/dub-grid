@@ -15,7 +15,7 @@ import type {
   DayPatternEntry,
   FocusAreaDistributionEntry,
 } from "@/types";
-import { computeShiftDurationHours, resolveBreakMinutes } from "@/lib/dashboard-stats";
+import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -133,7 +133,6 @@ export function computeShiftDistribution(
 export function computeDayPattern(
   empId: string,
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
 ): DayPatternEntry[] {
   const dayCounts = new Array(7).fill(0);
   let total = 0;

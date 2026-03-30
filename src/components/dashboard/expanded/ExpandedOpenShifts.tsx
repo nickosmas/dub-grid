@@ -1,23 +1,21 @@
 import { useState, useMemo } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
-import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 
 const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; border: string; label: string }> = {
-  high: { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA", label: "Urgent" },
-  medium: { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A", label: "Open" },
-  low: { bg: "#F0F7F0", color: "#004501", border: "#BFDFBF", label: "Open" },
+  high: { bg: "var(--color-danger-bg)", color: "var(--color-danger)", border: "var(--color-danger-border)", label: "Urgent" },
+  medium: { bg: "var(--color-warning-bg)", color: "var(--color-warning)", border: "var(--color-warning-border)", label: "Open" },
+  low: { bg: "var(--color-success-bg)", color: "var(--color-success-text)", border: "var(--color-success-border)", label: "Open" },
 };
 
 const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
 
 interface ExpandedOpenShiftsProps {
   openShifts: OpenShift[];
-  focusAreas: FocusArea[];
   onClose: () => void;
 }
 
-export default function ExpandedOpenShifts({ openShifts, focusAreas, onClose }: ExpandedOpenShiftsProps) {
+export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpenShiftsProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
 
@@ -143,7 +141,7 @@ const itemStyle = {
   gap: 12,
   padding: "12px 14px",
   borderRadius: 8,
-  background: "var(--color-bg, #F8FAFC)",
+  background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
 };
 

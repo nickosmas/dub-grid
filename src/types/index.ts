@@ -1,5 +1,8 @@
 // ── App Domain Types ──────────────────────────────────────────────────────────
 
+/** Controls how shifts are displayed on the schedule grid. */
+export type ShiftDisplayMode = 'code' | 'name';
+
 /** A named entity with a full name and abbreviation (certifications & roles). */
 export interface NamedItem {
   id: number;
@@ -24,6 +27,8 @@ export interface Organization {
   certificationLabel: string;
   /** Custom display label for roles (e.g. "Responsibilities"). Defaults to "Roles". */
   roleLabel: string;
+  /** Controls grid display: 'code' shows short labels (D, EVE), 'name' shows full names (Day Shift, Evening). */
+  shiftDisplayMode: ShiftDisplayMode;
   /** IANA timezone for this organization, e.g. "America/New_York". Null = not set. */
   timezone: string | null;
   /** Non-null when the organization has been archived (soft-deleted). */

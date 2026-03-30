@@ -78,6 +78,7 @@ function StaffPageContent() {
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}
             orgName={org?.name}
+            shiftDisplayMode={org?.shiftDisplayMode}
           />
 
           {showAddModal && (

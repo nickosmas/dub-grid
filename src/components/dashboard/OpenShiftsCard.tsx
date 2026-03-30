@@ -2,9 +2,9 @@ import type { OpenShift } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
 
 const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; border: string; label: string }> = {
-  high: { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA", label: "Urgent" },
-  medium: { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A", label: "Open" },
-  low: { bg: "#F0F7F0", color: "#004501", border: "#BFDFBF", label: "Open" },
+  high: { bg: "var(--color-danger-bg)", color: "var(--color-danger)", border: "var(--color-danger-border)", label: "Urgent" },
+  medium: { bg: "var(--color-warning-bg)", color: "var(--color-warning)", border: "var(--color-warning-border)", label: "Open" },
+  low: { bg: "var(--color-success-bg)", color: "var(--color-success-text)", border: "var(--color-success-border)", label: "Open" },
 };
 
 interface OpenShiftsCardProps {
@@ -21,14 +21,14 @@ export default function OpenShiftsCard({
   const visible = openShifts.slice(0, maxVisible);
 
   return (
-    <div style={cardStyle}>
+    <div className="dg-card">
       {/* Header */}
-      <div style={headerStyle}>
+      <div className="dg-card-header">
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+          <div className="dg-card-title">
             Open shifts
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 1 }}>
+          <div className="dg-card-subtitle">
             {openShifts.length} unfilled this week
           </div>
         </div>
@@ -36,7 +36,7 @@ export default function OpenShiftsCard({
           {openShifts.length > maxVisible && (
             <a
               href="/schedule"
-              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary, #2D6B3A)", cursor: "pointer", textDecoration: "none" }}
+              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
             >
               View all &rarr;
             </a>
@@ -45,7 +45,7 @@ export default function OpenShiftsCard({
         </div>
       </div>
 
-      <div style={{ padding: "16px 18px" }}>
+      <div className="dg-card-body">
         {openShifts.length === 0 ? (
           <div style={{ fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", padding: "20px 0" }}>
             All shifts covered this week
@@ -63,7 +63,7 @@ export default function OpenShiftsCard({
                     gap: 10,
                     padding: "10px 12px",
                     borderRadius: 8,
-                    background: "var(--color-bg, #F8FAFC)",
+                    background: "var(--color-bg)",
                     border: "1px solid var(--color-border)",
                   }}
                 >
@@ -115,18 +115,3 @@ export default function OpenShiftsCard({
     </div>
   );
 }
-
-const cardStyle = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 10,
-  overflow: "hidden" as const,
-};
-
-const headerStyle = {
-  padding: "14px 18px",
-  borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
-  display: "flex" as const,
-  alignItems: "center" as const,
-  justifyContent: "space-between" as const,
-};

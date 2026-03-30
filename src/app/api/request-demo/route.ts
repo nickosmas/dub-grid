@@ -93,8 +93,10 @@ export async function POST(req: NextRequest) {
   const fromEmail =
     process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
 
-  if (!apiKey) {
-    console.error("[request-demo] RESEND_API_KEY not set");
+  const recipientEmail = process.env.DEMO_RECIPIENT_EMAIL;
+
+  if (!apiKey || !recipientEmail) {
+    console.error("[request-demo] RESEND_API_KEY or DEMO_RECIPIENT_EMAIL not set");
     return NextResponse.json(
       { success: false, error: "Email service not configured" },
       { status: 503 },
@@ -142,7 +144,7 @@ export async function POST(req: NextRequest) {
     const resend = new Resend(apiKey);
     await resend.emails.send({
       from: fromEmail,
-      to: process.env.DEMO_RECIPIENT_EMAIL || "nicokosmas.dev@gmail.com",
+      to: recipientEmail,
       replyTo: sanitizeHeaderValue(email),
       subject: sanitizeHeaderValue(`DubGrid Demo Request: ${orgName}`),
       html,

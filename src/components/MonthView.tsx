@@ -4,8 +4,13 @@ import React, { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallba
 import { createPortal } from "react-dom";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, DraftKind } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, DraftKind, ShiftDisplayMode } from "@/types";
 import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
+
+function pillText(label: string, max: number): string {
+  if (label.length <= max) return label;
+  return label.slice(0, max - 1).trimEnd() + "\u2026";
+}
 
 interface MonthViewProps {
   monthStart: Date;
@@ -20,6 +25,7 @@ interface MonthViewProps {
   shiftCategories: ShiftCategory[];
   activeFocusArea?: number | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 type DayCellData = {
@@ -45,10 +51,6 @@ function buildMonthCells(monthStart: Date): (Date | null)[] {
   return cells;
 }
 
-function fmtCount(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-}
-
 function shortName(name: string): string {
   const parts = name.trim().split(" ");
   return parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
@@ -60,11 +62,13 @@ function DayPopover({
   data,
   focusAreaColorMap,
   onClose,
+  isNameMode = false,
 }: {
   anchorEl: HTMLElement;
   data: DayCellData;
   focusAreaColorMap: Record<string, { bg: string; text: string }>;
   onClose: () => void;
+  isNameMode?: boolean;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -72,11 +76,10 @@ function DayPopover({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
-  useLayoutEffect(() => {
+  const updatePosition = useCallback(() => {
     const rect = anchorEl.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom - 12;
     const flipUp = spaceBelow < 260;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuStyle({
       position: "absolute",
       top: flipUp ? undefined : rect.bottom + window.scrollY + 4,
@@ -87,6 +90,18 @@ function DayPopover({
       zIndex: 9999,
     });
   }, [anchorEl]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useLayoutEffect(() => { updatePosition(); }, [updatePosition]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [updatePosition]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -108,7 +123,7 @@ function DayPopover({
 
   if (!mounted) return null;
 
-  const { date, activeCats, categoryCounts, focusAreaSections, byFocusArea } = data;
+  const { date, focusAreaSections, byFocusArea } = data;
 
   return createPortal(
     <div
@@ -165,14 +180,18 @@ function DayPopover({
                           background: s.color,
                           border: dk ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}` : `1px solid ${borderColor(s.text)}`,
                           borderRadius: 4,
-                          padding: dk ? "1px 5px" : "2px 6px",
+                          padding: isNameMode ? "3px 6px" : (dk ? "1px 5px" : "2px 6px"),
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           color: s.text,
                           opacity: dk === 'deleted' ? 0.5 : 1,
                           textDecoration: dk === 'deleted' ? 'line-through' : 'none',
+                          maxWidth: 120,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         }}>
-                          {shift}
+                          {isNameMode ? pillText(shift, 14) : shift}
                         </div>
                         <span style={{
                           fontSize: "var(--dg-fs-footnote)",
@@ -210,7 +229,9 @@ export default function MonthView({
   shiftCategories,
   activeFocusArea = null,
   draftKindForKey,
+  shiftDisplayMode = "code",
 }: MonthViewProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
   const focusAreaNames = focusAreas.map((w) => w.name);
@@ -236,12 +257,12 @@ export default function MonthView({
   }, [shiftCategories]);
 
   // Sort-order for a shift style: use its category's sortOrder, fall back to a high number
-  const shiftSortOrder = (style: ShiftCode): number => {
+  const shiftSortOrder = useCallback((style: ShiftCode): number => {
     if (style.categoryId != null) {
       return categoryMap.get(style.categoryId)?.sortOrder ?? 99;
     }
     return 99;
-  };
+  }, [categoryMap]);
 
   // Popover state
   const [popoverDateKey, setPopoverDateKey] = useState<string | null>(null);
@@ -331,7 +352,7 @@ export default function MonthView({
       map.set(dateKey, { date, dateKey, isToday, categoryCounts, byFocusArea, activeCats, focusAreaSections });
     }
     return map;
-  }, [cells, todayKey, filteredEmployees, shiftForKey, shiftCodeIdsForKey, isAbsenceForKey, getShiftStyle, focusAreas, shiftCodeById, shiftCategories, focusAreaNames, activeFocusArea, draftKindForKey, categoryMap]);
+  }, [cells, todayKey, filteredEmployees, shiftForKey, shiftCodeIdsForKey, isAbsenceForKey, getShiftStyle, focusAreas, shiftCodeById, shiftCategories, focusAreaNames, activeFocusArea, draftKindForKey, shiftSortOrder]);
 
   const popoverData = popoverDateKey ? dayDataMap.get(popoverDateKey) : null;
 
@@ -388,7 +409,7 @@ export default function MonthView({
 
           const dateKey = formatDateKey(date);
           const data = dayDataMap.get(dateKey)!;
-          const { isToday, activeCats, categoryCounts, focusAreaSections, byFocusArea } = data;
+          const { isToday, focusAreaSections, byFocusArea } = data;
           const isOpen = popoverDateKey === dateKey;
 
           return (
@@ -504,6 +525,7 @@ export default function MonthView({
           data={popoverData}
           focusAreaColorMap={focusAreaColorMap}
           onClose={closePopover}
+          isNameMode={isNameMode}
         />
       )}
       {/* eslint-enable react-hooks/refs */}

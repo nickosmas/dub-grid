@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
-import { EditModalState, ShiftCode, ShiftCategory, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind } from "@/types";
+import { EditModalState, ShiftCode, ShiftCategory, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode } from "@/types";
 import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm from "./RepeatForm";
@@ -71,6 +71,8 @@ interface ShiftEditPanelProps {
   currentAbsenceTypeId?: number | null;
   /** Cross-date overlap warnings to display (non-blocking). */
   overlapWarnings?: string[];
+  /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
@@ -314,18 +316,16 @@ function PillTimeEditor({
   const [localStart, setLocalStart] = useState<string | null>(customStart ?? defaultStart);
   const [localEnd, setLocalEnd] = useState<string | null>(customEnd ?? defaultEnd);
 
-  // Re-sync local state when parent props change (e.g. after undo or external update)
-  const prevStartRef = useRef(customStart);
-  const prevEndRef = useRef(customEnd);
-  useEffect(() => {
-    if (customStart !== prevStartRef.current || customEnd !== prevEndRef.current) {
-      prevStartRef.current = customStart;
-      prevEndRef.current = customEnd;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLocalStart(customStart ?? defaultStart);
-      setLocalEnd(customEnd ?? defaultEnd);
-    }
-  });
+  // Re-sync local state when parent props change (e.g. after undo or external update).
+  // Uses the "adjust state during render" pattern to avoid useEffect + setState.
+  const [prevStart, setPrevStart] = useState(customStart);
+  const [prevEnd, setPrevEnd] = useState(customEnd);
+  if (customStart !== prevStart || customEnd !== prevEnd) {
+    setPrevStart(customStart);
+    setPrevEnd(customEnd);
+    setLocalStart(customStart ?? defaultStart);
+    setLocalEnd(customEnd ?? defaultEnd);
+  }
 
   const s = parseTo12h(localStart);
   const e = parseTo12h(localEnd);
@@ -473,7 +473,9 @@ export default function ShiftEditPanel({
   onAbsenceSelect,
   currentAbsenceTypeId,
   overlapWarnings = [],
+  shiftDisplayMode = "code",
 }: ShiftEditPanelProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
@@ -526,7 +528,8 @@ export default function ShiftEditPanel({
       const resolveLabel = (shift: string | null, absId: number | null): string | null => {
         if (absId != null) {
           const at = absenceTypes.find(a => a.id === absId);
-          return at ? `${at.name} (${at.label})` : null;
+          if (!at) return null;
+          return isNameMode ? (at.name || at.label) : `${at.name} (${at.label})`;
         }
         return shift && shift !== "OFF" ? shift : null;
       };
@@ -538,8 +541,10 @@ export default function ShiftEditPanel({
       return null;
     }
 
-    const codeLabel = (id: number): string =>
-      shiftCodes.find(s => s.id === id)?.label ?? '?';
+    const codeLabel = (id: number): string => {
+      const sc = shiftCodes.find(s => s.id === id);
+      return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?';
+    };
 
     const initIds = initialShiftCodeIds;
     const curIds = currentShiftCodeIds;
@@ -574,8 +579,10 @@ export default function ShiftEditPanel({
     if (!hasTimeEdit) return null;
 
     const pillCount = currentShiftCodeIds.length;
-    const codeLabel = (id: number): string =>
-      shiftCodes.find(s => s.id === id)?.label ?? '?';
+    const codeLabel = (id: number): string => {
+      const sc = shiftCodes.find(s => s.id === id);
+      return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?';
+    };
 
     // Single pill
     if (pillCount <= 1) {
@@ -812,6 +819,7 @@ export default function ShiftEditPanel({
       if (!at) return null;
       const isCellNew = draftKind === 'new';
       const isCellModified = draftKind === 'modified';
+      const absenceLabel = isNameMode ? (at.name || at.label) : at.label;
       return (
         <div
           style={{
@@ -820,7 +828,8 @@ export default function ShiftEditPanel({
               ? `2px dashed ${darkenColor(at.color, 0.35)}`
               : `1.5px solid ${at.border === 'transparent' ? darkenColor(at.color, 0.25) : at.border}`,
             borderRadius: 10,
-            height: 72,
+            minHeight: 56,
+            padding: "12px 16px",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -851,12 +860,26 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span style={{ fontWeight: 800, fontSize: "var(--dg-fs-card-title)", color: at.text, lineHeight: 1 }}>
-            {at.label}
+          <span title={absenceLabel} style={{
+            fontWeight: 800,
+            fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
+            color: at.text,
+            lineHeight: isNameMode ? 1.3 : 1,
+            maxWidth: "90%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            textAlign: "center",
+            ...(isNameMode
+              ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
+              : { whiteSpace: "nowrap" }),
+          }}>
+            {absenceLabel}
           </span>
-          <span style={{ fontSize: "var(--dg-fs-footnote)", color: at.text, opacity: 0.7, lineHeight: 1 }}>
-            {at.name}
-          </span>
+          {!isNameMode && at.name && (
+            <span style={{ fontSize: "var(--dg-fs-footnote)", color: at.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {at.name}
+            </span>
+          )}
         </div>
       );
     }
@@ -878,14 +901,15 @@ export default function ShiftEditPanel({
               ? `2px dashed ${darkenColor(s.color, 0.35)}`
               : `1.5px solid ${darkenColor(s.color, 0.25)}`,
             borderRadius: 10,
-            height: 72,
+            minHeight: 56,
+            padding: isNameMode ? "12px 16px" : "10px 16px",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             position: "relative",
             marginBottom: 16,
-            gap: 2,
+            gap: 4,
           }}
         >
           {(isCellNew || isCellModified) && (
@@ -909,11 +933,23 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span style={{ fontWeight: 800, fontSize: "var(--dg-fs-card-title)", color: s.text, lineHeight: 1 }}>
+          <span title={label} style={{
+            fontWeight: 800,
+            fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
+            color: s.text,
+            lineHeight: isNameMode ? 1.3 : 1,
+            maxWidth: "90%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            textAlign: "center",
+            ...(isNameMode
+              ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
+              : { whiteSpace: "nowrap" }),
+          }}>
             {label}
           </span>
           {(fullName || faName) && (
-            <span style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1 }}>
+            <span title={[fullName, faName].filter(Boolean).join(" · ")} style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {fullName}{fullName && faName ? " · " : ""}{faName}
             </span>
           )}
@@ -982,7 +1018,8 @@ export default function ShiftEditPanel({
                 style={{
                   background: s.color,
                   borderBottom: `1px solid ${darkenColor(s.color, 0.2)}`,
-                  height: 56,
+                  minHeight: 44,
+                  padding: isNameMode ? "10px 12px" : "8px 12px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -991,12 +1028,23 @@ export default function ShiftEditPanel({
                   gap: 2,
                 }}
               >
-                <div style={{ textAlign: "center" }}>
-                  <span style={{ fontWeight: 800, fontSize: "var(--dg-fs-heading)", color: s.text, lineHeight: 1 }}>
+                <div style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}>
+                  <span title={label} style={{
+                    fontWeight: 800,
+                    fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
+                    color: s.text,
+                    lineHeight: isNameMode ? 1.3 : 1,
+                    display: isNameMode ? "-webkit-box" : "block",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    ...(isNameMode
+                      ? { WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
+                      : { whiteSpace: "nowrap" }),
+                  }}>
                     {label}
                   </span>
                   {(fullName || faName) && (
-                    <div style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 3 }}>
+                    <div title={[fullName, faName].filter(Boolean).join(" · ")} style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {fullName}{fullName && faName ? " · " : ""}{faName}
                     </div>
                   )}
@@ -1723,8 +1771,12 @@ export default function ShiftEditPanel({
                   onSelect={(_label, ids) => {
                     // Reconstruct label from full shiftCodes — the picker may have
                     // a filtered list that can't resolve the first shift's label.
+                    const isNameMode = shiftDisplayMode === "name";
                     const fullLabel = ids
-                      .map(id => shiftCodes.find(sc => sc.id === id)?.label)
+                      .map(id => {
+                        const sc = shiftCodes.find(c => c.id === id);
+                        return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : null;
+                      })
                       .filter((l): l is string => l != null && l !== "OFF")
                       .join("/") || _label;
                     onSelect(fullLabel, ids, seriesId ? seriesScope : undefined);
@@ -1739,6 +1791,7 @@ export default function ShiftEditPanel({
                   initialTab={modal.activeFocusAreaId}
                   multiSelect={true}
                   closeOnSelect={false}
+                  shiftDisplayMode={shiftDisplayMode}
                 />
               )}
             </>
@@ -1819,7 +1872,10 @@ export default function ShiftEditPanel({
               const removedIdx = pendingDelete.index;
               const remainingIds = currentShiftCodeIds.filter((_, j) => j !== removedIdx);
               const remainingLabels = remainingIds
-                .map(id => shiftCodes.find(sc => sc.id === id)?.label)
+                .map(id => {
+                  const sc = shiftCodes.find(s => s.id === id);
+                  return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : null;
+                })
                 .filter((l): l is string => l != null);
               onSelect(
                 remainingLabels.length > 0 ? remainingLabels.join("/") : "OFF",

@@ -54,7 +54,7 @@ function DomainSelector() {
     tapTimerRef.current = setTimeout(() => {
       tapCountRef.current = 0;
     }, 3000);
-  }, []);
+  }, [parsed]);
 
   async function handleContinue(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -96,15 +96,11 @@ function DomainSelector() {
         <Link
           href="/"
           onClick={handleLogoTap}
+          className="dg-auth-logo-block"
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "10px",
             marginBottom: "32px",
             userSelect: "none",
             WebkitTapHighlightColor: "transparent",
-            textDecoration: "none",
           }}
         >
           <DubGridLogo size={52} />
@@ -195,21 +191,12 @@ function DomainSelector() {
             <button
               type="submit"
               disabled={loading}
+              className="dg-auth-submit"
               style={{
-                background: "var(--color-brand)",
-                color: "var(--color-text-inverse)",
-                border: "none",
-                borderRadius: "999px",
                 padding: "12px 28px",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                cursor: loading ? "not-allowed" : "pointer",
+                width: "auto",
                 whiteSpace: "nowrap",
                 display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                opacity: loading ? 0.85 : 1,
               }}
             >
               <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Continue</ButtonLoading>
@@ -217,14 +204,10 @@ function DomainSelector() {
             <button
               type="button"
               onClick={() => setShowHelp(true)}
+              className="dg-auth-link"
               style={{
-                background: "none",
-                border: "none",
                 color: "var(--color-text-subtle)",
                 fontSize: "var(--dg-fs-body-sm)",
-                cursor: "pointer",
-                padding: 0,
-                textDecoration: "underline",
               }}
             >
               Need help with your subdomain?
@@ -385,14 +368,7 @@ function GridmasterLogin() {
       <Card>
         <a
           href={landingUrl}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "10px",
-            marginBottom: "28px",
-            textDecoration: "none",
-          }}
+          className="dg-auth-logo-block"
         >
           <DubGridLogo size={52} />
           <span
@@ -408,15 +384,7 @@ function GridmasterLogin() {
           </span>
         </a>
 
-        <h1
-          style={{
-            fontSize: "var(--dg-fs-card-title)",
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
-            textAlign: "center",
-            marginBottom: "24px",
-          }}
-        >
+        <h1 className="dg-auth-heading">
           Platform Admin Sign In
         </h1>
 
@@ -425,46 +393,21 @@ function GridmasterLogin() {
           style={{ display: "flex", flexDirection: "column", gap: "16px" }}
         >
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                marginBottom: "6px",
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <label className="dg-auth-field-label">
               Email
             </label>
             <input
               type="email"
               required
               autoComplete="email"
-              className="dg-standalone-input"
+              className="dg-auth-input dg-standalone-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "11px 13px",
-                border: "1.5px solid var(--color-border)",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body)",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
             />
           </div>
 
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                marginBottom: "6px",
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <label className="dg-auth-field-label">
               Password
             </label>
             <div style={{ position: "relative" }}>
@@ -472,17 +415,11 @@ function GridmasterLogin() {
                 type={showPassword ? "text" : "password"}
                 required
                 autoComplete="current-password"
-                className="dg-standalone-input"
+                className="dg-auth-input dg-standalone-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{
-                  width: "100%",
                   padding: "11px 40px 11px 13px",
-                  border: "1.5px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: "var(--dg-fs-body)",
-                  outline: "none",
-                  boxSizing: "border-box",
                 }}
               />
               <button
@@ -511,10 +448,9 @@ function GridmasterLogin() {
           <div style={{ textAlign: "right", marginTop: "2px" }}>
             <a
               href="/forgot-password"
+              className="dg-auth-link"
               style={{
-                fontSize: "var(--dg-fs-label)",
                 color: "var(--color-text-subtle)",
-                textDecoration: "underline",
               }}
             >
               Forgot password?
@@ -524,22 +460,9 @@ function GridmasterLogin() {
           <button
             type="submit"
             disabled={loading}
+            className="dg-auth-submit"
             style={{
               marginTop: "4px",
-              width: "100%",
-              padding: "13px",
-              background: "var(--color-brand)",
-              color: "var(--color-text-inverse)",
-              border: "none",
-              borderRadius: "999px",
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 600,
-              cursor: loading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              opacity: loading ? 0.85 : 1,
             }}
           >
             <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Access Portal</ButtonLoading>
@@ -558,29 +481,13 @@ function GridmasterLogin() {
         >
           <a
             href={`${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--color-text-faint)",
-              fontSize: "var(--dg-fs-label)",
-              cursor: "pointer",
-              padding: 0,
-              textDecoration: "underline",
-            }}
+            className="dg-auth-link"
           >
             Back to Standard Login
           </a>
           <a
             href={landingUrl}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--color-text-faint)",
-              fontSize: "var(--dg-fs-label)",
-              cursor: "pointer",
-              padding: 0,
-              textDecoration: "underline",
-            }}
+            className="dg-auth-link"
           >
             Back to Home
           </a>
@@ -720,14 +627,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         {/* Logo — links to apex landing page */}
         <a
           href={`${typeof window !== "undefined" ? window.location.protocol : "https:"}//${baseDomain}${parsed?.port ?? ""}/`}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "10px",
-            marginBottom: "28px",
-            textDecoration: "none",
-          }}
+          className="dg-auth-logo-block"
         >
           <DubGridLogo size={52} />
           <DubGridWordmark />
@@ -752,15 +652,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           </span>
         </div>
 
-        <h1
-          style={{
-            fontSize: "var(--dg-fs-card-title)",
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
-            textAlign: "center",
-            marginBottom: "24px",
-          }}
-        >
+        <h1 className="dg-auth-heading">
           Sign in to your workspace
         </h1>
 
@@ -769,46 +661,21 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           style={{ display: "flex", flexDirection: "column", gap: "16px" }}
         >
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                marginBottom: "6px",
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <label className="dg-auth-field-label">
               Email
             </label>
             <input
               type="email"
               required
               autoComplete="email"
-              className="dg-standalone-input"
+              className="dg-auth-input dg-standalone-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "11px 13px",
-                border: "1.5px solid var(--color-border)",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body)",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
             />
           </div>
 
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                marginBottom: "6px",
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <label className="dg-auth-field-label">
               Password
             </label>
             <div style={{ position: "relative" }}>
@@ -816,17 +683,11 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 type={showPassword ? "text" : "password"}
                 required
                 autoComplete="current-password"
-                className="dg-standalone-input"
+                className="dg-auth-input dg-standalone-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{
-                  width: "100%",
                   padding: "11px 40px 11px 13px",
-                  border: "1.5px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: "var(--dg-fs-body)",
-                  outline: "none",
-                  boxSizing: "border-box",
                 }}
               />
               <button
@@ -855,10 +716,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           <div style={{ textAlign: "right", marginTop: "2px" }}>
             <a
               href="/forgot-password"
+              className="dg-auth-link"
               style={{
-                fontSize: "var(--dg-fs-label)",
                 color: "var(--color-text-subtle)",
-                textDecoration: "underline",
               }}
             >
               Forgot password?
@@ -868,22 +728,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           <button
             type="submit"
             disabled={loading}
+            className="dg-auth-submit"
             style={{
               marginTop: "4px",
-              width: "100%",
-              padding: "13px",
-              background: "var(--color-brand)",
-              color: "var(--color-text-inverse)",
-              border: "none",
-              borderRadius: "999px",
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 600,
-              cursor: loading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              opacity: loading ? 0.85 : 1,
             }}
           >
             <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Sign In</ButtonLoading>
@@ -907,17 +754,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               const target = `${protocol}//${baseDomain}${portStr}/login`;
               window.location.href = target;
             }}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--color-text-faint)",
-              fontSize: "var(--dg-fs-label)",
-              cursor: "pointer",
-              padding: 0,
-              textDecoration: "underline",
-            }}
+            className="dg-auth-link"
           >
-            ← Use a different domain
+            &larr; Use a different domain
           </button>
         </div>
       </Card>

@@ -494,7 +494,6 @@ export function computeCoverageBySection(
   employees: Employee[],
   coverageRequirements: CoverageRequirement[],
   shiftCodes: ShiftCode[],
-  shiftCodeById: Map<number, ShiftCode>,
 ): SectionCoverage[] {
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
@@ -593,6 +592,7 @@ export function computeOpenShifts(
   employees: Employee[],
   shifts: ShiftMap,
   shiftCodeById: Map<number, ShiftCode>,
+  shiftCodeDisplayMap?: Map<number, string>,
 ): OpenShift[] {
   const openShifts: OpenShift[] = [];
 
@@ -658,7 +658,7 @@ export function computeOpenShifts(
           date,
           dayOfWeek: SHORT_DAYS[date.getDay()],
           dayOfMonth: date.getDate(),
-          shiftCodeLabel: sc.name || sc.label,
+          shiftCodeLabel: shiftCodeDisplayMap?.get(codeId) ?? (sc.name || sc.label),
           focusAreaName: fa.name,
           timeRange,
           needed,
@@ -683,6 +683,7 @@ export function computeShiftBreakdown(
   _shiftCategories: ShiftCategory[],
   focusAreas: FocusArea[],
   employees: Employee[],
+  shiftCodeDisplayMap?: Map<number, string>,
 ): ShiftTypeBreakdown {
   // Count by (focusAreaId, shiftCodeId) pair
   const faCounts = new Map<number, Map<number, number>>();
@@ -723,7 +724,7 @@ export function computeShiftBreakdown(
           const sc = shiftCodeById.get(codeId);
           return {
             shiftCodeId: codeId,
-            shiftCodeLabel: sc?.name || sc?.label || "Unknown",
+            shiftCodeLabel: shiftCodeDisplayMap?.get(codeId) ?? (sc?.name || sc?.label || "Unknown"),
             color: sc?.color || "#CED4DA",
             count,
           };

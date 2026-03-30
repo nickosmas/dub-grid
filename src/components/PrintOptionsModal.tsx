@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Printer, X } from "lucide-react";
 import { FocusArea } from "@/types";
 
 export interface PrintConfig {
@@ -64,52 +65,26 @@ export default function PrintOptionsModal({
     >
       <div className="dg-modal" style={{ maxWidth: 400 }}>
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 17,
-              fontWeight: 700,
-              color: "var(--color-text-primary)",
-            }}
-          >
-            Print / Export Options
-          </div>
+        <div className="dg-modal-header">
+          <div className="dg-modal-title">Print / Export Options</div>
           <button
             onClick={onClose}
             aria-label="Close print options"
-            className="dg-btn dg-btn-ghost"
-            style={{ padding: "4px 8px", fontSize: "var(--dg-fs-title)", lineHeight: 1 }}
+            className="dg-modal-close"
           >
-            ×
+            <X size={16} />
           </button>
         </div>
 
         {/* View */}
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 700,
-              color: "var(--color-text-subtle)",
-              letterSpacing: "0.07em",
-              marginBottom: 8,
-            }}
-          >
-            VIEW
-          </div>
-          <div className="dg-segment" style={{ display: "inline-flex" }}>
+        <div className="dg-modal-section">
+          <div className="dg-modal-section-label">VIEW</div>
+          <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
             {([1, 2, "month"] as const).map((n) => (
               <button
                 key={n}
                 onClick={() => setSpanWeeks(n)}
-                className={`dg-segment-btn${spanWeeks === n ? " active" : ""}`}
+                className={`dg-span-tab${spanWeeks === n ? " active" : ""}`}
                 style={{ minWidth: 72 }}
               >
                 {n === "month" ? "Month" : n === 1 ? "1 Week" : "2 Weeks"}
@@ -117,37 +92,21 @@ export default function PrintOptionsModal({
             ))}
           </div>
           {spanWeeks === "month" && (
-            <div
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
-                marginTop: 6,
-              }}
-            >
+            <div className="dg-form-hint" style={{ marginTop: 6 }}>
               Tip: Small font works best for month view
             </div>
           )}
         </div>
 
         {/* Font Size */}
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 700,
-              color: "var(--color-text-subtle)",
-              letterSpacing: "0.07em",
-              marginBottom: 8,
-            }}
-          >
-            FONT SIZE
-          </div>
-          <div className="dg-segment" style={{ display: "inline-flex" }}>
+        <div className="dg-modal-section">
+          <div className="dg-modal-section-label">FONT SIZE</div>
+          <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
             {FONT_SIZES.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setFontSizeKey(f.key)}
-                className={`dg-segment-btn${fontSizeKey === f.key ? " active" : ""}`}
+                className={`dg-span-tab${fontSizeKey === f.key ? " active" : ""}`}
                 style={{ minWidth: 72 }}
               >
                 {f.label}
@@ -159,70 +118,28 @@ export default function PrintOptionsModal({
         {/* Focus Areas */}
         {focusAreas.length > 0 && (
           <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                letterSpacing: "0.07em",
-                marginBottom: 8,
-              }}
-            >
+            <div className="dg-modal-section-label">
               {focusAreaLabel.toUpperCase()}
             </div>
-            <div
-              style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: 10,
-                overflow: "hidden",
-              }}
-            >
+            <div className="dg-checklist">
               {/* All toggle */}
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "9px 14px",
-                  cursor: "pointer",
-                  background: "var(--color-bg-secondary)",
-                  borderBottom: "1px solid var(--color-border)",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  color: "var(--color-text-secondary)",
-                }}
-              >
+              <label className="dg-checkbox-row dg-checkbox-row--header">
                 <input
                   type="checkbox"
+                  className="dg-checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  style={{ accentColor: "var(--color-text-primary)", width: 14, height: 14 }}
                 />
-                All Focus Areas
+                All {focusAreaLabel}
               </label>
               {/* Individual focus areas */}
-              {focusAreas.map((w, i) => (
-                <label
-                  key={w.name}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "9px 14px",
-                    cursor: "pointer",
-                    borderBottom:
-                      i < focusAreas.length - 1
-                        ? "1px solid var(--color-border-light)"
-                        : "none",
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-secondary)",
-                  }}
-                >
+              {focusAreas.map((w) => (
+                <label key={w.name} className="dg-checkbox-row">
                   <input
                     type="checkbox"
+                    className="dg-checkbox"
                     checked={selectedFocusAreas.includes(w.name)}
                     onChange={() => toggleFocusArea(w.name)}
-                    style={{ accentColor: "var(--color-text-primary)", width: 14, height: 14 }}
                   />
                   {w.name}
                 </label>
@@ -232,9 +149,7 @@ export default function PrintOptionsModal({
         )}
 
         {/* Actions */}
-        <div
-          style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
-        >
+        <div className="dg-modal-actions">
           <button onClick={onClose} className="dg-btn dg-btn-secondary">
             Cancel
           </button>
@@ -242,22 +157,9 @@ export default function PrintOptionsModal({
             onClick={handlePrint}
             disabled={selectedFocusAreas.length === 0}
             className="dg-btn dg-btn-primary"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ marginRight: 4 }}
-            >
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
+            <Printer size={13} />
             Preview & Print
           </button>
         </div>

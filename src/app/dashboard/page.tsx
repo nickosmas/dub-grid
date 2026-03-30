@@ -26,7 +26,6 @@ function DashboardPageContent() {
   } = useOrganizationData();
   const {
     employees,
-    benchedEmployees,
     loading: empLoading,
   } = useEmployees(perms.orgId ?? org?.id ?? null);
 
@@ -67,7 +66,6 @@ function DashboardPageContent() {
           shiftCodeMap={shiftCodeMap}
           shiftCodeById={shiftCodeById}
           employees={employees}
-          benchedCount={benchedEmployees.length}
           permissions={perms}
         />
       )}

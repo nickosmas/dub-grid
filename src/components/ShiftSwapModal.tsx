@@ -42,7 +42,6 @@ interface ShiftSwapModalProps {
 
 export default function ShiftSwapModal({
   requesterEmpId,
-  requesterName,
   shiftDate,
   shiftLabel,
   employees,
@@ -143,7 +142,7 @@ export default function ShiftSwapModal({
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 2 }}>
           Your shift
         </div>
-        <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
+        <div title={shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {shiftLabel}
           <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
             {shiftDate}
@@ -167,7 +166,7 @@ export default function ShiftSwapModal({
           >
             <div>
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You give</span>
-              <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
+              <div title={shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {shiftLabel}
                 <span
                   style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
@@ -178,7 +177,7 @@ export default function ShiftSwapModal({
             </div>
             <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You get</span>
-              <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
+              <div title={selectedTarget.shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedTarget.shiftLabel}
                 <span
                   style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}

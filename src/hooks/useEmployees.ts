@@ -1,27 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchEmployees, insertEmployee, updateEmployee, deleteEmployee, benchEmployee, activateEmployee } from "@/lib/db";
 import { toast } from "sonner";
+import { queryKeys } from "@/lib/query-keys";
 import type { Employee } from "@/types";
 
-// ── Module-level cache ──────────────────────────────────────────────────────
-// Same pattern as org data cache — keyed by orgId to prevent cross-org leaks.
-
-interface EmployeeCache {
-  orgId: string;
-  active: Employee[];
-  benched: Employee[];
-  terminated: Employee[];
-  lastFetchedAt: number;
-}
-
-let employeeCache: EmployeeCache | null = null;
-
-/** Clear the cache (call on logout to prevent cross-user data leaks). */
-export function clearEmployeeCache(): void {
-  employeeCache = null;
-}
-
-// ── Hook ────────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface EmployeesData {
   employees: Employee[];
@@ -33,70 +17,50 @@ export interface EmployeesData {
   handleDeleteEmployee: (empId: string) => Promise<void>;
   handleBenchEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
-  setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>;
-  setBenchedEmployees: React.Dispatch<React.SetStateAction<Employee[]>>;
-  setTerminatedEmployees: React.Dispatch<React.SetStateAction<Employee[]>>;
 }
 
-export function useEmployees(orgId: string | null): EmployeesData {
-  const cached = employeeCache?.orgId === orgId ? employeeCache : null;
-  const [employees, setEmployees] = useState<Employee[]>(cached?.active ?? []);
-  const [benchedEmployees, setBenchedEmployees] = useState<Employee[]>(cached?.benched ?? []);
-  const [terminatedEmployees, setTerminatedEmployees] = useState<Employee[]>(cached?.terminated ?? []);
-  const [loading, setLoading] = useState(!cached);
+// ── Hook ─────────────────────────────────────────────────────────────────────
 
+export function useEmployees(orgId: string | null): EmployeesData {
+  const queryClient = useQueryClient();
+
+  // Fetch all employees via React Query
+  const employeesQuery = useQuery({
+    queryKey: queryKeys.employees.all(orgId!),
+    queryFn: () => fetchEmployees(orgId!, ["active", "benched", "terminated"]),
+    enabled: !!orgId,
+    staleTime: 2 * 60_000, // 2 min — mutations invalidate immediately
+  });
+
+  // Single local state for optimistic updates. Synced from query data,
+  // mutated optimistically by handlers, rolled back on error.
+  const [allLocal, setAllLocal] = useState<Employee[]>([]);
+
+  // Sync from query data during render (1 setState instead of 4).
+  const [syncedData, setSyncedData] = useState<Employee[] | undefined>(undefined);
+  if (employeesQuery.data && employeesQuery.data !== syncedData) {
+    setSyncedData(employeesQuery.data);
+    setAllLocal(employeesQuery.data);
+  }
+
+  // Derive filtered arrays — no extra re-renders, no separate state.
+  const employees = useMemo(() => allLocal.filter((e) => e.status === "active"), [allLocal]);
+  const benchedEmployees = useMemo(() => allLocal.filter((e) => e.status === "benched"), [allLocal]);
+  const terminatedEmployees = useMemo(() => allLocal.filter((e) => e.status === "terminated"), [allLocal]);
+
+  const loading = employeesQuery.isLoading;
+
+  // Ref for capturing current active employees in functional updaters
   const employeesRef = useRef<Employee[]>([]);
   employeesRef.current = employees;
-  const benchedRef = useRef<Employee[]>([]);
-  benchedRef.current = benchedEmployees;
-  const terminatedRef = useRef<Employee[]>([]);
-  terminatedRef.current = terminatedEmployees;
 
-  // Sync state back to cache whenever it changes (covers mutations)
-  useEffect(() => {
-    if (orgId && !loading) {
-      employeeCache = {
-        orgId,
-        active: employees,
-        benched: benchedEmployees,
-        terminated: terminatedEmployees,
-        lastFetchedAt: employeeCache?.lastFetchedAt ?? Date.now(),
-      };
+  // Helper: invalidate the all-employees query so the next focus/navigation
+  // picks up any server-side changes.
+  const invalidateEmployees = useCallback(() => {
+    if (orgId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
     }
-  }, [orgId, loading, employees, benchedEmployees, terminatedEmployees]);
-
-  useEffect(() => {
-    if (!orgId) return;
-
-    // Skip re-fetch if cache is fresh (< 30s old) and matches this org
-    if (employeeCache?.orgId === orgId && Date.now() - employeeCache.lastFetchedAt < 30_000) {
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    async function load() {
-      try {
-        // Single query with all statuses, split by status in memory
-        const all = await fetchEmployees(orgId!, ["active", "benched", "terminated"]);
-        if (!cancelled) {
-          const active = all.filter((e) => e.status === "active");
-          const benched = all.filter((e) => e.status === "benched");
-          const terminated = all.filter((e) => e.status === "terminated");
-          setEmployees(active);
-          setBenchedEmployees(benched);
-          setTerminatedEmployees(terminated);
-          employeeCache = { orgId: orgId!, active, benched, terminated, lastFetchedAt: Date.now() };
-        }
-      } catch (err) {
-        console.error("Failed to load employees:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [orgId]);
+  }, [queryClient, orgId]);
 
   const handleAddEmployee = useCallback(
     async (dataList: Omit<Employee, "id" | "seniority">[]) => {
@@ -115,116 +79,100 @@ export function useEmployees(orgId: string | null): EmployeesData {
           );
           added.push(newEmp);
         }
-        setEmployees((prev) => [...prev, ...added]);
+        setAllLocal((prev) => [...prev, ...added]);
         toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
+        invalidateEmployees();
       } catch (err) {
         toast.error("Failed to add employee");
         console.error(err);
       }
     },
-    [orgId],
+    [orgId, invalidateEmployees],
   );
 
   const handleSaveEmployee = useCallback(
     async (emp: Employee) => {
       if (!orgId) return;
-      // Capture prev state via functional updater to avoid stale-ref race
-      // when multiple saves fire in rapid succession.
-      let prevEmployees: Employee[] = [];
-      setEmployees((prev) => {
-        prevEmployees = prev;
+      let prevAll: Employee[] = [];
+      setAllLocal((prev) => {
+        prevAll = prev;
         return prev.map((e) => (e.id === emp.id ? emp : e));
       });
       try {
         await updateEmployee(emp, orgId);
         toast.success("Employee saved");
+        invalidateEmployees();
       } catch (err) {
-        setEmployees(prevEmployees);
+        setAllLocal(prevAll);
         toast.error("Failed to save employee");
         console.error(err);
       }
     },
-    [orgId],
+    [orgId, invalidateEmployees],
   );
 
   const handleDeleteEmployee = useCallback(async (empId: string) => {
     const now = new Date().toISOString();
-    // Capture prev state via functional updaters to avoid stale-ref race
-    let prevActive: Employee[] = [];
-    let prevBenched: Employee[] = [];
-    let prevTerminated: Employee[] = [];
-    setEmployees((prev) => { prevActive = prev; return prev; });
-    setBenchedEmployees((prev) => { prevBenched = prev; return prev; });
-    setTerminatedEmployees((prev) => { prevTerminated = prev; return prev; });
-    const activeEmp = prevActive.find((e) => e.id === empId);
-    const benchedEmp = prevBenched.find((e) => e.id === empId);
-    const emp = activeEmp ?? benchedEmp;
-    if (emp) {
-      setTerminatedEmployees((t) => [...t, { ...emp, status: "terminated", statusChangedAt: now }]);
-    }
-    if (activeEmp) setEmployees((prev) => prev.filter((e) => e.id !== empId));
-    if (benchedEmp) setBenchedEmployees((prev) => prev.filter((e) => e.id !== empId));
+    let prevAll: Employee[] = [];
+    setAllLocal((prev) => {
+      prevAll = prev;
+      return prev.map((e) =>
+        e.id === empId ? { ...e, status: "terminated" as const, statusChangedAt: now } : e,
+      );
+    });
     try {
-      await deleteEmployee(empId);
+      await deleteEmployee(empId, orgId ?? undefined);
       toast.success("Employee terminated");
+      invalidateEmployees();
     } catch (err) {
-      setEmployees(prevActive);
-      setBenchedEmployees(prevBenched);
-      setTerminatedEmployees(prevTerminated);
+      setAllLocal(prevAll);
       toast.error("Failed to terminate employee");
       console.error(err);
     }
-  }, []);
+  }, [orgId, invalidateEmployees]);
 
   const handleBenchEmployee = useCallback(async (empId: string, note?: string) => {
-    let prevActive: Employee[] = [];
-    let prevBenched: Employee[] = [];
-    setEmployees((prev) => { prevActive = prev; return prev; });
-    setBenchedEmployees((prev) => { prevBenched = prev; return prev; });
-    const emp = prevActive.find((e) => e.id === empId);
-    if (emp) {
-      const benched: Employee = { ...emp, status: "benched", statusNote: note ?? "", statusChangedAt: new Date().toISOString() };
-      setBenchedEmployees((b) => [...b, benched]);
-      setEmployees((prev) => prev.filter((e) => e.id !== empId));
-    }
+    let prevAll: Employee[] = [];
+    setAllLocal((prev) => {
+      prevAll = prev;
+      return prev.map((e) =>
+        e.id === empId
+          ? { ...e, status: "benched" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() }
+          : e,
+      );
+    });
     try {
-      await benchEmployee(empId, note);
+      await benchEmployee(empId, note, orgId ?? undefined);
       toast.success("Employee benched");
+      invalidateEmployees();
     } catch (err) {
-      setEmployees(prevActive);
-      setBenchedEmployees(prevBenched);
+      setAllLocal(prevAll);
       toast.error("Failed to bench employee");
       console.error(err);
     }
-  }, []);
+  }, [orgId, invalidateEmployees]);
 
   const handleActivateEmployee = useCallback(async (empId: string) => {
     const now = new Date().toISOString();
-    let prevActive: Employee[] = [];
-    let prevBenched: Employee[] = [];
-    let prevTerminated: Employee[] = [];
-    setEmployees((prev) => { prevActive = prev; return prev; });
-    setBenchedEmployees((prev) => { prevBenched = prev; return prev; });
-    setTerminatedEmployees((prev) => { prevTerminated = prev; return prev; });
-    const benchedEmp = prevBenched.find((e) => e.id === empId);
-    const terminatedEmp = prevTerminated.find((e) => e.id === empId);
-    const emp = benchedEmp ?? terminatedEmp;
-    if (emp) {
-      setEmployees((a) => [...a, { ...emp, status: "active", statusNote: "", statusChangedAt: now }]);
-    }
-    if (benchedEmp) setBenchedEmployees((prev) => prev.filter((e) => e.id !== empId));
-    if (terminatedEmp) setTerminatedEmployees((prev) => prev.filter((e) => e.id !== empId));
+    let prevAll: Employee[] = [];
+    setAllLocal((prev) => {
+      prevAll = prev;
+      return prev.map((e) =>
+        e.id === empId
+          ? { ...e, status: "active" as const, statusNote: "", statusChangedAt: now }
+          : e,
+      );
+    });
     try {
-      await activateEmployee(empId);
+      await activateEmployee(empId, orgId ?? undefined);
       toast.success("Employee activated");
+      invalidateEmployees();
     } catch (err) {
-      setEmployees(prevActive);
-      setBenchedEmployees(prevBenched);
-      setTerminatedEmployees(prevTerminated);
+      setAllLocal(prevAll);
       toast.error("Failed to activate employee");
       console.error(err);
     }
-  }, []);
+  }, [orgId, invalidateEmployees]);
 
   return {
     employees,
@@ -236,8 +184,5 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleDeleteEmployee,
     handleBenchEmployee,
     handleActivateEmployee,
-    setEmployees,
-    setBenchedEmployees,
-    setTerminatedEmployees,
   };
 }

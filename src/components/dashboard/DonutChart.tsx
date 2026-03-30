@@ -57,7 +57,7 @@ export default function DonutChart({
         cy={cy}
         r={radius}
         fill="none"
-        stroke="var(--color-border, #E9ECEF)"
+        stroke="var(--color-border)"
         strokeWidth={strokeWidth}
       />
 
@@ -86,7 +86,7 @@ export default function DonutChart({
           textAnchor="middle"
           fontSize={18}
           fontWeight={700}
-          fill="var(--color-text-primary, #212529)"
+          fill="var(--color-text-primary)"
         >
           {centerLabel}
         </text>
@@ -97,7 +97,7 @@ export default function DonutChart({
           y={cy + 12}
           textAnchor="middle"
           fontSize={9}
-          fill="var(--color-text-subtle, #ADB5BD)"
+          fill="var(--color-text-subtle)"
         >
           {centerSubLabel}
         </text>

@@ -4,6 +4,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  DubGrid Design System — Responsive Strategy                      │
+  │                                                                    │
+  │  Breakpoints:                                                      │
+  │    Mobile:  ≤767px   — single column, stacked layout               │
+  │    Tablet:  768-1023px — hybrid layout (some sidebars collapse)    │
+  │    Desktop: ≥1024px  — full multi-column layout                    │
+  │                                                                    │
+  │  Two approaches coexist:                                           │
+  │    1. CSS @media queries in globals.css — for .dg-* classes        │
+  │    2. JS useMediaQuery hook — for component-level toggling         │
+  │       (e.g. sidebar visibility, mobile bottom sheets)              │
+  │                                                                    │
+  │  Prefer CSS @media for layout; JS for behavior changes.            │
+  └────────────────────────────────────────────────────────────────────┘
+*/
+
 @theme {
   --font-sans: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), 'DM Mono', monospace;
@@ -198,6 +216,27 @@
   /* Drag elevation */
   --shadow-drag: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
 
+  /* ----------------------------------------------------------
+     Animation durations
+  ---------------------------------------------------------- */
+  --dg-duration-fast: 150ms;
+  --dg-duration-standard: 200ms;
+
+  /* ----------------------------------------------------------
+     Border radius scale
+  ---------------------------------------------------------- */
+  --dg-radius-sm: 8px;     /* inner elements: menu items, ghost buttons, badges, skeletons */
+  --dg-radius-md: 10px;    /* standard controls: buttons, inputs, cards, segments */
+  --dg-radius-lg: 12px;    /* panels, drawers, menus */
+  --dg-radius-xl: 16px;    /* modals, auth cards */
+
+  /* ----------------------------------------------------------
+     Overlay backgrounds
+  ---------------------------------------------------------- */
+  --dg-overlay-light: rgba(0, 0, 0, 0.20);
+  --dg-overlay-heavy: rgba(10, 20, 40, 0.45);
+  --dg-overlay-blur: 4px;
+
   /* shadcn/ui tokens */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -264,7 +303,7 @@ textarea {
   font-weight: 600;
   line-height: 1;
   padding: 8px 16px;
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 80ms ease, opacity 150ms ease;
   white-space: nowrap;
   text-decoration: none;
@@ -287,17 +326,17 @@ textarea {
 
 /* Primary */
 .dg-btn-primary {
-  background: var(--color-dark);
+  background: var(--color-brand);
   color: var(--color-text-inverse);
   border: none;
 }
 
 .dg-btn-primary:hover {
-  background: var(--color-dark-elevated);
+  background: var(--color-brand-light);
 }
 
 .dg-btn-primary:active {
-  background: var(--color-dark-elevated);
+  background: var(--color-brand-light);
 }
 
 /* Secondary */
@@ -321,7 +360,7 @@ textarea {
   color: var(--color-text-muted);
   border: none;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--dg-radius-sm);
 }
 
 .dg-btn-ghost:hover {
@@ -358,6 +397,12 @@ textarea {
   background: var(--color-danger-text);
 }
 
+/* Small variant */
+.dg-btn-sm {
+  font-size: var(--dg-fs-caption);
+  padding: 6px 14px;
+}
+
 /* ── Input System ───────────────────────────────────────── */
 .dg-input {
   width: 100%;
@@ -365,7 +410,7 @@ textarea {
   height: var(--dg-toolbar-h);
   padding: 0 12px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -411,7 +456,7 @@ textarea {
   display: flex;
   height: var(--dg-toolbar-h);
   background: var(--color-surface);
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   border: 1px solid var(--color-border);
   overflow: hidden;
 }
@@ -449,7 +494,7 @@ textarea {
   align-items: stretch;
   height: var(--dg-toolbar-h);
   background: var(--color-dark);
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   padding: 3px;
   gap: 2px;
 }
@@ -614,7 +659,7 @@ textarea {
   padding: 5px 14px;
   font-size: 13px;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: var(--dg-radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
@@ -670,19 +715,19 @@ textarea {
   z-index: 201;
   box-shadow: var(--shadow-panel);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--dg-radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: panel-in 220ms ease-out;
+  animation: panel-in var(--dg-duration-standard) ease-out;
 }
 
 .dg-panel-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.20);
+  background: var(--dg-overlay-light);
   z-index: 200;
-  animation: fade-in 200ms ease;
+  animation: fade-in var(--dg-duration-standard) ease;
 }
 
 @keyframes panel-in {
@@ -709,7 +754,7 @@ textarea {
 .dg-menu {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--dg-radius-lg);
   box-shadow: var(--shadow-menu);
   padding: 4px;
   min-width: 160px;
@@ -729,7 +774,7 @@ textarea {
   font-weight: 500;
   color: var(--color-text-primary);
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--dg-radius-sm);
   border: none;
   background: none;
   width: 100%;
@@ -781,18 +826,18 @@ textarea {
 .dg-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 20, 40, 0.45);
-  backdrop-filter: blur(4px);
+  background: var(--dg-overlay-heavy);
+  backdrop-filter: blur(var(--dg-overlay-blur));
   z-index: 300;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fade-in 180ms ease;
+  animation: fade-in var(--dg-duration-standard) ease;
 }
 
 .dg-modal {
   background: var(--color-surface);
-  border-radius: 16px;
+  border-radius: var(--dg-radius-xl);
   padding: 28px 32px;
   min-width: 320px;
   max-width: 480px;
@@ -801,9 +846,124 @@ textarea {
   box-shadow: var(--shadow-modal);
   border: 1px solid var(--color-border);
   outline: none;
-  animation: modal-in 180ms ease-out;
+  animation: modal-in var(--dg-duration-standard) ease-out;
   display: flex;
   flex-direction: column;
+}
+
+/* Modal sub-elements */
+.dg-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.dg-modal-title {
+  font-size: var(--dg-fs-title);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.dg-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--dg-radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--dg-duration-fast) ease, color var(--dg-duration-fast) ease;
+}
+
+.dg-modal-close:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.dg-modal-section {
+  margin-bottom: 20px;
+}
+
+.dg-modal-section-label {
+  font-size: var(--dg-fs-footnote);
+  font-weight: 700;
+  color: var(--color-text-subtle);
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+
+.dg-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Custom checkbox — replaces native checkboxes for brand consistency */
+.dg-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--color-border-dark);
+  background: var(--color-surface);
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: background var(--dg-duration-fast) ease, border-color var(--dg-duration-fast) ease;
+}
+
+.dg-checkbox:checked {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+.dg-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.dg-checkbox:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.dg-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: var(--dg-fs-label);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.dg-checkbox-row:last-child {
+  border-bottom: none;
+}
+
+.dg-checkbox-row--header {
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.dg-checklist {
+  border: 1px solid var(--color-border);
+  border-radius: var(--dg-radius-md);
+  overflow: hidden;
 }
 
 @keyframes modal-in {
@@ -913,11 +1073,11 @@ textarea {
 .staff-detail-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.24);
+  background: var(--dg-overlay-light);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   z-index: 200;
-  animation: fade-in 200ms ease;
+  animation: fade-in var(--dg-duration-standard) ease;
 }
 
 .staff-detail-pane {
@@ -930,11 +1090,11 @@ textarea {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  border-radius: 14px;
+  border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08);
   z-index: 201;
-  animation: staff-detail-in 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: staff-detail-in var(--dg-duration-standard) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes staff-detail-in {
@@ -943,10 +1103,10 @@ textarea {
 }
 
 .staff-detail-pane.closing {
-  animation: staff-detail-out 200ms ease forwards;
+  animation: staff-detail-out var(--dg-duration-standard) ease forwards;
 }
 .staff-detail-overlay.closing {
-  animation: fade-out 150ms ease forwards;
+  animation: fade-out var(--dg-duration-fast) ease forwards;
 }
 @keyframes staff-detail-out {
   to { transform: translateX(24px) scale(0.98); opacity: 0; }
@@ -1014,7 +1174,7 @@ textarea {
 /* ── Staff Detail Hero ──────────────────────────────────── */
 .staff-hero {
   background: var(--color-surface);
-  border-radius: 12px;
+  border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
   overflow: hidden;
   box-shadow: var(--shadow-raised);
@@ -1050,7 +1210,7 @@ textarea {
 /* ── Staff Stat Widget ──────────────────────────────────── */
 .staff-stat {
   background: var(--color-surface);
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   border: 1px solid var(--color-border);
   padding: 16px 18px;
   box-shadow: var(--shadow-raised);
@@ -1092,7 +1252,7 @@ textarea {
   color: var(--color-text-inverse);
   font-size: var(--dg-fs-badge);
   font-weight: 700;
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   min-width: 18px;
   height: 18px;
   display: inline-flex;
@@ -1128,7 +1288,7 @@ textarea {
   margin: 8px 16px;
   background: var(--color-warning-bg);
   border: 1px solid var(--color-warning-border);
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
   font-size: 13px;
   font-weight: 600;
   color: var(--color-warning-text);
@@ -1156,12 +1316,88 @@ textarea {
   font-size: 12px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--dg-radius-md);
 }
 .dg-draft-chip--new { background: var(--color-success-bg); color: var(--color-success-text); }
 .dg-draft-chip--modified { background: var(--color-brand-bg); color: var(--color-brand); }
 .dg-draft-chip--deleted { background: var(--color-danger-bg); color: var(--color-danger); }
 .dg-draft-chip--notes { background: var(--color-brand-bg); color: var(--color-brand); }
+
+/* ── Dashboard Card ─────────────────────────────────────── */
+.dg-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--dg-radius-md);
+  overflow: hidden;
+}
+
+.dg-card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dg-card-title {
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.dg-card-subtitle {
+  font-size: var(--dg-fs-footnote);
+  color: var(--color-text-subtle);
+  margin-top: 1px;
+}
+
+.dg-card-body {
+  padding: 16px 18px;
+}
+
+/* ── Form Layout Helpers ───────────────────────────────── */
+.dg-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dg-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.dg-form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 767px) {
+  .dg-form-grid-2,
+  .dg-form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dg-form-hint {
+  font-size: var(--dg-fs-footnote);
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+.dg-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.dg-save-badge {
+  font-size: var(--dg-fs-label);
+  color: var(--color-brand);
+  font-weight: 600;
+}
 
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
 /* Vibrant, full-color banner toasts — no shadows */
@@ -1275,13 +1511,26 @@ textarea {
   flex-shrink: 0;
 }
 
-/* ── Skeleton Shimmer ──────────────────────────────────── */
+/* ── Loading Patterns ──────────────────────────────────── */
+/*
+  Four sanctioned loading patterns:
+  1. Page-level:   <ProgressBar loading={bool} />      — thin bar at top of viewport
+  2. Button-level: <ButtonLoading loading={bool}>      — spinner overlay preserving button size
+  3. Skeleton:     .dg-skeleton + size variants below  — shimmer placeholder while content loads
+  4. Spinner:      .dg-spinner                         — rotating icon for inline/blocking states
+*/
+
 .dg-skeleton {
   background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-border-light) 50%, var(--color-bg-secondary) 75%);
   background-size: 200% 100%;
   animation: dg-shimmer 1.5s ease-in-out infinite;
-  border-radius: 8px;
+  border-radius: var(--dg-radius-sm);
 }
+
+.dg-skeleton--text    { height: 14px; width: 60%; }
+.dg-skeleton--heading { height: 22px; width: 40%; }
+.dg-skeleton--avatar  { width: 36px; height: 36px; border-radius: 50%; }
+.dg-skeleton--card    { height: 120px; border-radius: var(--dg-radius-md); }
 
 @keyframes dg-shimmer {
   0% { background-position: 200% 0; }
@@ -1290,11 +1539,11 @@ textarea {
 
 /* ── Modal / Panel Exit Animations ─────────────────────── */
 .dg-modal-overlay.closing {
-  animation: fade-out 150ms ease forwards;
+  animation: fade-out var(--dg-duration-fast) ease forwards;
 }
 
 .dg-modal-overlay.closing .dg-modal {
-  animation: modal-out 150ms ease forwards;
+  animation: modal-out var(--dg-duration-fast) ease forwards;
 }
 
 @keyframes fade-out {
@@ -1306,7 +1555,7 @@ textarea {
 }
 
 .dg-panel.closing {
-  animation: panel-out 200ms ease forwards;
+  animation: panel-out var(--dg-duration-standard) ease forwards;
 }
 
 @keyframes panel-out {
@@ -1354,13 +1603,99 @@ textarea {
   color: #1E293B;
 }
 
+/* ── Auth Form System ──────────────────────────────────── */
+.dg-auth-shell {
+  min-height: 100vh;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.dg-auth-logo-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  text-decoration: none;
+}
+
+.dg-auth-heading {
+  font-size: var(--dg-fs-card-title);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.dg-auth-field-label {
+  display: block;
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--color-text-secondary);
+}
+
+.dg-auth-input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--dg-radius-sm);
+  font-size: var(--dg-fs-body);
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.dg-auth-input:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(46, 153, 48, 0.15);
+}
+
+.dg-auth-submit {
+  width: 100%;
+  padding: 13px;
+  background: var(--color-brand);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 999px;
+  font-size: var(--dg-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+}
+
+.dg-auth-submit:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+
+.dg-auth-link {
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  font-size: var(--dg-fs-label);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
 /* ── Auth card (responsive padding) ────────────────────── */
 .dg-auth-card {
   padding: 48px 44px 44px;
   width: 100%;
   max-width: 440px;
   background: var(--color-surface);
-  border-radius: 18px;
+  border-radius: var(--dg-radius-xl);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
 }
 
@@ -1378,6 +1713,11 @@ textarea {
     --dg-fs-page-title: 24px;
     --dg-fs-section-title: 22px;
   }
+}
+
+/* ── Shift Display: Name Mode (wider columns for full names) ── */
+[data-shift-display="name"] {
+  --dg-grid-col-min: 100px;
 }
 
 /* ── Responsive: Mobile ────────────────────────────────── */
@@ -1476,10 +1816,10 @@ textarea {
   .dg-mobile-drawer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 20, 40, 0.45);
-    backdrop-filter: blur(4px);
+    background: var(--dg-overlay-heavy);
+    backdrop-filter: blur(var(--dg-overlay-blur));
     z-index: 400;
-    animation: fade-in 200ms ease;
+    animation: fade-in var(--dg-duration-standard) ease;
   }
 
   .dg-mobile-drawer {
@@ -1494,7 +1834,7 @@ textarea {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    animation: drawer-in 220ms ease-out;
+    animation: drawer-in var(--dg-duration-standard) ease-out;
   }
 
   @keyframes drawer-in {
@@ -1545,10 +1885,10 @@ textarea {
   .dg-bottom-sheet-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    background: var(--dg-overlay-heavy);
+    backdrop-filter: blur(var(--dg-overlay-blur));
     z-index: 500;
-    animation: fade-in 200ms ease;
+    animation: fade-in var(--dg-duration-standard) ease;
   }
 
   .dg-bottom-sheet {
@@ -1561,7 +1901,7 @@ textarea {
     z-index: 501;
     max-height: 85dvh;
     overflow-y: auto;
-    animation: sheet-up 250ms cubic-bezier(0.32, 0.72, 0, 1);
+    animation: sheet-up var(--dg-duration-standard) cubic-bezier(0.32, 0.72, 0, 1);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     display: flex;
     flex-direction: column;

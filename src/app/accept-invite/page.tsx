@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { extractErrorMessage } from "@/lib/error-handling";
 import { acceptInvitation } from "@/lib/db";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -14,7 +13,7 @@ type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "e
 
 export default function AcceptInvitePage() {
   const [state, setState] = useState<PageState>("loading");
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
 
@@ -171,15 +170,7 @@ export default function AcceptInvitePage() {
         }}
       >
         {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "10px",
-            marginBottom: "32px",
-          }}
-        >
+        <div className="dg-auth-logo-block" style={{ marginBottom: "32px" }}>
           <DubGridLogo size={52} />
           <DubGridWordmark />
         </div>
@@ -207,13 +198,12 @@ export default function AcceptInvitePage() {
               <input
                 type="email"
                 placeholder="Email"
-                className="dg-standalone-input"
+                className="dg-auth-input dg-standalone-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 readOnly={emailFromUrl}
                 style={{
-                  ...inputStyle,
                   ...(emailFromUrl
                     ? { background: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" }
                     : {}),
@@ -248,13 +238,14 @@ export default function AcceptInvitePage() {
               <button
                 type="submit"
                 disabled={loading}
+                className="dg-auth-submit"
                 style={{
-                  ...primaryButtonStyle,
-                  opacity: loading ? 0.85 : 1,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  fontSize: "var(--dg-fs-title)",
+                  fontWeight: 700,
+                  transition: "transform 150ms ease, box-shadow 150ms ease",
+                  boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
                 }}
               >
                 <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Set Password & Accept</ButtonLoading>
@@ -318,7 +309,15 @@ function SuccessState({
       </p>
       <button
         onClick={() => (window.location.href = getLoginUrl(orgSlug))}
-        style={primaryButtonStyle}
+        className="dg-auth-submit"
+        style={{
+          borderRadius: "12px",
+          padding: "14px",
+          fontSize: "var(--dg-fs-title)",
+          fontWeight: 700,
+          transition: "transform 150ms ease, box-shadow 150ms ease",
+          boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
+        }}
       >
         Sign In Now
       </button>
@@ -358,20 +357,6 @@ const subtextStyle: React.CSSProperties = {
   marginBottom: "24px",
 };
 
-const primaryButtonStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "14px",
-  background: "var(--color-brand)",
-  color: "var(--color-text-inverse)",
-  border: "none",
-  borderRadius: "12px",
-  fontSize: "var(--dg-fs-title)",
-  fontWeight: 700,
-  cursor: "pointer",
-  transition: "transform 150ms ease, box-shadow 150ms ease",
-  boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
-};
-
 const secondaryButtonStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px",
@@ -383,17 +368,4 @@ const secondaryButtonStyle: React.CSSProperties = {
   fontWeight: 600,
   cursor: "pointer",
   transition: "background 150ms ease",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "14px 16px",
-  background: "var(--color-bg)",
-  border: "1px solid var(--color-border-light)",
-  borderRadius: "12px",
-  fontSize: "var(--dg-fs-body)",
-  color: "var(--color-text-primary)",
-  outline: "none",
-  transition: "border-color 150ms ease",
-  boxSizing: "border-box",
 };

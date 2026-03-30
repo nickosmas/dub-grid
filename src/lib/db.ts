@@ -2,13 +2,12 @@ import { supabase } from "@/lib/supabase";
 import { arraysEqual, formatDateKey, iterateDateRange } from "@/lib/utils";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { parseHost } from "@/lib/subdomain";
+import { cacheThrough, cacheDel, CacheKey, TTL } from "@/lib/cache";
 
 // ── PostgREST filter sanitization ──────────────────────────────────────────
 // Values interpolated into .or() filter strings must not contain PostgREST
 // operators that could alter query semantics.
 const POSTGREST_UNSAFE = /[(),."\\]/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function assertSafeFilterValue(value: string, label: string): void {
   if (POSTGREST_UNSAFE.test(value)) {
@@ -83,6 +82,7 @@ export interface DbOrganization {
   focus_area_label: string | null;
   certification_label: string | null;
   role_label: string | null;
+  shift_display_mode: string | null;
   timezone: string | null;
   archived_at: string | null;
 }
@@ -228,6 +228,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     focusAreaLabel: row.focus_area_label ?? 'Focus Areas',
     certificationLabel: row.certification_label ?? 'Certifications',
     roleLabel: row.role_label ?? 'Roles',
+    shiftDisplayMode: (row.shift_display_mode as import("@/types").ShiftDisplayMode) ?? 'code',
     timezone: row.timezone ?? null,
     archivedAt: row.archived_at ?? null,
   };
@@ -387,15 +388,17 @@ export async function fetchUserOrganization(): Promise<Organization | null> {
 
 /** Fetch a single organization by its ID (used during impersonation). */
 export async function fetchOrganizationById(orgId: string): Promise<Organization | null> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .eq("id", orgId)
-    .maybeSingle();
+  return cacheThrough(CacheKey.organization(orgId), TTL.STABLE, async () => {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", orgId)
+      .maybeSingle();
 
-  if (error) throw new Error(`fetchOrganizationById error: ${error.message}`);
-  if (!data) return null;
-  return rowToOrganization(data as DbOrganization);
+    if (error) throw new Error(`fetchOrganizationById error: ${error.message}`);
+    if (!data) return null;
+    return rowToOrganization(data as DbOrganization);
+  });
 }
 
 export async function updateOrganization(org: Organization): Promise<void> {
@@ -409,20 +412,33 @@ export async function updateOrganization(org: Organization): Promise<void> {
       focus_area_label: org.focusAreaLabel || null,
       certification_label: org.certificationLabel || null,
       role_label: org.roleLabel || null,
+      shift_display_mode: org.shiftDisplayMode || 'code',
       timezone: org.timezone || null,
     })
     .eq("id", org.id);
   if (error) throw error;
+  await cacheDel(CacheKey.organization(org.id), CacheKey.allOrganizations());
 }
 
 // ── Certifications ───────────────────────────────────────────────────────────
 
 export async function fetchCertifications(orgId: string, includeArchived = false): Promise<NamedItem[]> {
-  let query = supabase
+  if (!includeArchived) {
+    return cacheThrough(CacheKey.certifications(orgId), TTL.STABLE, async () => {
+      const { data, error } = await supabase
+        .from("certifications")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order");
+      if (error) throw error;
+      return (data as DbNamedItem[]).map(rowToNamedItem);
+    });
+  }
+  const query = supabase
     .from("certifications")
     .select("*")
     .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return (data as DbNamedItem[]).map(rowToNamedItem);
@@ -477,17 +493,29 @@ export async function saveCertifications(
     if (error) throw error;
   }
 
+  await cacheDel(CacheKey.certifications(orgId), CacheKey.shiftCodes(orgId), CacheKey.shiftCodes(orgId, true));
   return fetchCertifications(orgId);
 }
 
 // ── Organization Roles ──────────────────────────────────────────────────────
 
 export async function fetchOrganizationRoles(orgId: string, includeArchived = false): Promise<NamedItem[]> {
-  let query = supabase
+  if (!includeArchived) {
+    return cacheThrough(CacheKey.orgRoles(orgId), TTL.STABLE, async () => {
+      const { data, error } = await supabase
+        .from("organization_roles")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order");
+      if (error) throw error;
+      return (data as DbNamedItem[]).map(rowToNamedItem);
+    });
+  }
+  const query = supabase
     .from("organization_roles")
     .select("*")
     .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return (data as DbNamedItem[]).map(rowToNamedItem);
@@ -542,27 +570,30 @@ export async function saveOrganizationRoles(
     if (error) throw error;
   }
 
+  await cacheDel(CacheKey.orgRoles(orgId));
   return fetchOrganizationRoles(orgId);
 }
 
 // ── Organization Users (for user management panel) ──────────────────────────
 
 export async function fetchOrganizationUsers(orgId: string): Promise<OrganizationUser[]> {
-  const { data, error } = await supabase.rpc("get_org_users", {
-    p_org_id: orgId,
+  return cacheThrough(CacheKey.orgUsers(orgId), TTL.MODERATE, async () => {
+    const { data, error } = await supabase.rpc("get_org_users", {
+      p_org_id: orgId,
+    });
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      email: (row.email as string | null) ?? null,
+      firstName: (row.first_name as string | null) ?? null,
+      lastName: (row.last_name as string | null) ?? null,
+      orgRole: (row.org_role as string ?? "user") as import("@/types").OrganizationRole,
+      platformRole: (row.platform_role as string) as import("@/types").PlatformRole,
+      adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
+      createdAt: row.created_at as string,
+      lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+    }));
   });
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    email: (row.email as string | null) ?? null,
-    firstName: (row.first_name as string | null) ?? null,
-    lastName: (row.last_name as string | null) ?? null,
-    orgRole: (row.org_role as string ?? "user") as import("@/types").OrganizationRole,
-    platformRole: (row.platform_role as string) as import("@/types").PlatformRole,
-    adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
-    createdAt: row.created_at as string,
-    lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
-  }));
 }
 
 export async function updateAdminPermissions(
@@ -576,11 +607,13 @@ export async function updateAdminPermissions(
     .eq("user_id", userId)
     .eq("org_id", orgId);
   if (error) throw error;
+  await cacheDel(CacheKey.orgUsers(orgId));
 }
 
 export async function changeOrganizationUserRole(
   targetUserId: string,
-  newRole: import("@/types").OrganizationRole
+  newRole: import("@/types").OrganizationRole,
+  orgId?: string,
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -591,18 +624,32 @@ export async function changeOrganizationUserRole(
     p_idempotency_key: `${targetUserId}-${newRole}-${Date.now()}`,
   });
   if (error) throw error;
+  const keys = [CacheKey.allUsers(), CacheKey.mwProfile(targetUserId)];
+  if (orgId) keys.push(CacheKey.orgUsers(orgId));
+  await cacheDel(...keys);
 }
 
 
 // ── Focus Areas ──────────────────────────────────────────────────────────────
 
 export async function fetchFocusAreas(orgId: string, includeArchived = false): Promise<FocusArea[]> {
-  let query = supabase
+  if (!includeArchived) {
+    return cacheThrough(CacheKey.focusAreas(orgId), TTL.STABLE, async () => {
+      const { data, error } = await supabase
+        .from("focus_areas")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order");
+      if (error) throw error;
+      return (data as DbFocusArea[]).map(rowToFocusArea);
+    });
+  }
+  const { data, error } = await supabase
     .from("focus_areas")
     .select("*")
-    .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
-  const { data, error } = await query.order("sort_order");
+    .eq("org_id", orgId)
+    .order("sort_order");
   if (error) throw error;
   return (data as DbFocusArea[]).map(rowToFocusArea);
 }
@@ -623,6 +670,7 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
       .select()
       .single();
     if (error) throw error;
+    await cacheDel(CacheKey.focusAreas(focusArea.orgId));
     return rowToFocusArea(data as DbFocusArea);
   }
   const { data, error } = await supabase
@@ -631,10 +679,11 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
     .select()
     .single();
   if (error) throw error;
+  await cacheDel(CacheKey.focusAreas(focusArea.orgId));
   return rowToFocusArea(data as DbFocusArea);
 }
 
-export async function deleteFocusArea(focusAreaId: number): Promise<void> {
+export async function deleteFocusArea(focusAreaId: number, orgId: string): Promise<void> {
   const now = new Date().toISOString();
 
   // Archive dependent shift_codes for this focus area
@@ -675,28 +724,48 @@ export async function deleteFocusArea(focusAreaId: number): Promise<void> {
     .update({ archived_at: now })
     .eq("id", focusAreaId);
   if (error) throw error;
+  await cacheDel(
+    CacheKey.focusAreas(orgId),
+    CacheKey.shiftCodes(orgId), CacheKey.shiftCodes(orgId, true),
+    CacheKey.shiftCategories(orgId),
+    CacheKey.employees(orgId),
+    CacheKey.coverageReqs(orgId),
+  );
 }
 
 // ── Shift Codes ───────────────────────────────────────────────────────────────
 
 export async function fetchShiftCodes(orgId: string, includeArchived = false): Promise<ShiftCode[]> {
-  let query = supabase
-    .from("shift_codes")
-    .select("*")
-    .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
-  const { data, error } = await query.order("sort_order");
-  if (error) throw error;
-  return (data as DbShiftCode[]).map(rowToShiftCode);
+  return cacheThrough(CacheKey.shiftCodes(orgId, includeArchived), TTL.STABLE, async () => {
+    let query = supabase
+      .from("shift_codes")
+      .select("*")
+      .eq("org_id", orgId);
+    if (!includeArchived) query = query.is("archived_at", null);
+    const { data, error } = await query.order("sort_order");
+    if (error) throw error;
+    return (data as DbShiftCode[]).map(rowToShiftCode);
+  });
 }
 
 export async function fetchShiftCategories(orgId: string, includeArchived = false): Promise<ShiftCategory[]> {
-  let query = supabase
+  if (!includeArchived) {
+    return cacheThrough(CacheKey.shiftCategories(orgId), TTL.STABLE, async () => {
+      const { data, error } = await supabase
+        .from("shift_categories")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order");
+      if (error) throw error;
+      return (data as DbShiftCategory[]).map(rowToShiftCategory);
+    });
+  }
+  const { data, error } = await supabase
     .from("shift_categories")
     .select("*")
-    .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
-  const { data, error } = await query.order("sort_order");
+    .eq("org_id", orgId)
+    .order("sort_order");
   if (error) throw error;
   return (data as DbShiftCategory[]).map(rowToShiftCategory);
 }
@@ -722,6 +791,7 @@ export async function upsertShiftCategory(
       .select()
       .single();
     if (error) throw error;
+    await cacheDel(CacheKey.shiftCategories(cat.orgId));
     return rowToShiftCategory(data as DbShiftCategory);
   }
   const { data, error } = await supabase
@@ -730,26 +800,30 @@ export async function upsertShiftCategory(
     .select()
     .single();
   if (error) throw error;
+  await cacheDel(CacheKey.shiftCategories(cat.orgId));
   return rowToShiftCategory(data as DbShiftCategory);
 }
 
-export async function deleteShiftCategory(id: number): Promise<void> {
+export async function deleteShiftCategory(id: number, orgId: string): Promise<void> {
   const { error } = await supabase
     .from("shift_categories")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+  await cacheDel(CacheKey.shiftCategories(orgId));
 }
 
 // ── Coverage Requirements ─────────────────────────────────────────────────────
 
 export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
-  const { data, error } = await supabase
-    .from("coverage_requirements")
-    .select("*")
-    .eq("org_id", orgId);
-  if (error) throw error;
-  return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
+  return cacheThrough(CacheKey.coverageReqs(orgId), TTL.STABLE, async () => {
+    const { data, error } = await supabase
+      .from("coverage_requirements")
+      .select("*")
+      .eq("org_id", orgId);
+    if (error) throw error;
+    return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
+  });
 }
 
 /**
@@ -782,13 +856,17 @@ export async function saveCoverageRequirements(
       min_staff: r.minStaff,
     }));
 
-  if (rows.length === 0) return [];
+  if (rows.length === 0) {
+    await cacheDel(CacheKey.coverageReqs(orgId));
+    return [];
+  }
 
   const { data, error } = await supabase
     .from("coverage_requirements")
     .insert(rows)
     .select();
   if (error) throw error;
+  await cacheDel(CacheKey.coverageReqs(orgId));
   return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
 }
 
@@ -835,28 +913,32 @@ export async function upsertShiftCode(
     saved = data as DbShiftCode;
   }
 
+  await cacheDel(CacheKey.shiftCodes(st.orgId), CacheKey.shiftCodes(st.orgId, true), CacheKey.coverageReqs(st.orgId));
   return rowToShiftCode(saved);
 }
 
-export async function deleteShiftCode(id: number): Promise<void> {
+export async function deleteShiftCode(id: number, orgId: string): Promise<void> {
   const { error } = await supabase
     .from("shift_codes")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+  await cacheDel(CacheKey.shiftCodes(orgId), CacheKey.shiftCodes(orgId, true), CacheKey.coverageReqs(orgId));
 }
 
 // ── Absence Types ─────────────────────────────────────────────────────────────
 
 export async function fetchAbsenceTypes(orgId: string, includeArchived = false): Promise<AbsenceType[]> {
-  let query = supabase
-    .from("absence_types")
-    .select("*")
-    .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
-  const { data, error } = await query.order("sort_order");
-  if (error) throw error;
-  return (data as DbAbsenceType[]).map(rowToAbsenceType);
+  return cacheThrough(CacheKey.absenceTypes(orgId, includeArchived), TTL.STABLE, async () => {
+    let query = supabase
+      .from("absence_types")
+      .select("*")
+      .eq("org_id", orgId);
+    if (!includeArchived) query = query.is("archived_at", null);
+    const { data, error } = await query.order("sort_order");
+    if (error) throw error;
+    return (data as DbAbsenceType[]).map(rowToAbsenceType);
+  });
 }
 
 export async function upsertAbsenceType(
@@ -892,15 +974,17 @@ export async function upsertAbsenceType(
     saved = data as DbAbsenceType;
   }
 
+  await cacheDel(CacheKey.absenceTypes(at.orgId), CacheKey.absenceTypes(at.orgId, true));
   return rowToAbsenceType(saved);
 }
 
-export async function deleteAbsenceType(id: number): Promise<void> {
+export async function deleteAbsenceType(id: number, orgId: string): Promise<void> {
   const { error } = await supabase
     .from("absence_types")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+  await cacheDel(CacheKey.absenceTypes(orgId), CacheKey.absenceTypes(orgId, true));
 }
 
 // ── Employees ─────────────────────────────────────────────────────────────────
@@ -936,6 +1020,7 @@ export async function insertEmployee(
     .select()
     .single();
   if (error) throw error;
+  await cacheDel(CacheKey.employees(orgId), CacheKey.tenantStats());
   return rowToEmployee(row as DbEmployee);
 }
 
@@ -945,18 +1030,22 @@ export async function updateEmployee(emp: Employee, orgId: string): Promise<void
     .update(employeeToRow(emp, orgId))
     .eq("id", emp.id);
   if (error) throw error;
+  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(emp.id));
 }
 
-export async function deleteEmployee(empId: string): Promise<void> {
+export async function deleteEmployee(empId: string, orgId?: string): Promise<void> {
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("employees")
     .update({ archived_at: now, status: 'terminated' as EmployeeStatus, status_changed_at: now })
     .eq("id", empId);
   if (error) throw error;
+  const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
+  if (orgId) keys.push(CacheKey.employees(orgId));
+  await cacheDel(...keys);
 }
 
-export async function benchEmployee(empId: string, note?: string): Promise<void> {
+export async function benchEmployee(empId: string, note?: string, orgId?: string): Promise<void> {
   const { error } = await supabase
     .from("employees")
     .update({
@@ -966,9 +1055,12 @@ export async function benchEmployee(empId: string, note?: string): Promise<void>
     })
     .eq("id", empId);
   if (error) throw error;
+  const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
+  if (orgId) keys.push(CacheKey.employees(orgId));
+  await cacheDel(...keys);
 }
 
-export async function activateEmployee(empId: string): Promise<void> {
+export async function activateEmployee(empId: string, orgId?: string): Promise<void> {
   const { error } = await supabase
     .from("employees")
     .update({
@@ -979,6 +1071,9 @@ export async function activateEmployee(empId: string): Promise<void> {
     })
     .eq("id", empId);
   if (error) throw error;
+  const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
+  if (orgId) keys.push(CacheKey.employees(orgId));
+  await cacheDel(...keys);
 }
 
 // ── Single Employee Fetch ──────────────────────────────────────────────────────
@@ -987,15 +1082,17 @@ export async function fetchEmployeeById(
   empId: string,
   orgId: string,
 ): Promise<Employee | null> {
-  const { data, error } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("id", empId)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  return rowToEmployee(data as DbEmployee);
+  return cacheThrough(CacheKey.employeeDetail(empId), TTL.MODERATE, async () => {
+    const { data, error } = await supabase
+      .from("employees")
+      .select("*")
+      .eq("id", empId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return rowToEmployee(data as DbEmployee);
+  });
 }
 
 // ── Employee Shifts (date-range scoped) ──────────────────────────────────────
@@ -1151,11 +1248,16 @@ export async function fetchShifts(
   isScheduler: boolean,
   shiftCodeMap: Map<number, string>,
   absenceTypeMap?: Map<number, string>,
+  startDate?: string,
+  endDate?: string,
 ): Promise<ShiftMap> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("shifts")
     .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, version, series_id, from_recurring, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, created_by, updated_by, created_at, updated_at, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
+  if (startDate) query = query.gte("date", startDate);
+  if (endDate) query = query.lte("date", endDate);
+  const { data, error } = await query;
   if (error) throw error;
 
   const atMap = absenceTypeMap ?? new Map<number, string>();
@@ -1607,12 +1709,23 @@ function rowToIndicatorType(row: DbIndicatorType): IndicatorType {
 }
 
 export async function fetchIndicatorTypes(orgId: string, includeArchived = false): Promise<IndicatorType[]> {
-  let query = supabase
+  if (!includeArchived) {
+    return cacheThrough(CacheKey.indicatorTypes(orgId), TTL.STABLE, async () => {
+      const { data, error } = await supabase
+        .from("indicator_types")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order");
+      if (error) throw error;
+      return (data as DbIndicatorType[]).map(rowToIndicatorType);
+    });
+  }
+  const { data, error } = await supabase
     .from("indicator_types")
     .select("*")
-    .eq("org_id", orgId);
-  if (!includeArchived) query = query.is("archived_at", null);
-  const { data, error } = await query.order("sort_order");
+    .eq("org_id", orgId)
+    .order("sort_order");
   if (error) throw error;
   return (data as DbIndicatorType[]).map(rowToIndicatorType);
 }
@@ -1634,6 +1747,7 @@ export async function upsertIndicatorType(
       .select()
       .single();
     if (error) throw error;
+    await cacheDel(CacheKey.indicatorTypes(indicator.orgId));
     return rowToIndicatorType(data as DbIndicatorType);
   }
   const { data, error } = await supabase
@@ -1642,15 +1756,17 @@ export async function upsertIndicatorType(
     .select()
     .single();
   if (error) throw error;
+  await cacheDel(CacheKey.indicatorTypes(indicator.orgId));
   return rowToIndicatorType(data as DbIndicatorType);
 }
 
-export async function deleteIndicatorType(id: number): Promise<void> {
+export async function deleteIndicatorType(id: number, orgId: string): Promise<void> {
   const { error } = await supabase
     .from("indicator_types")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+  await cacheDel(CacheKey.indicatorTypes(orgId));
 }
 
 
@@ -1667,6 +1783,7 @@ export async function assignOrgRoleByEmail(
     p_org_role: role,
   });
   if (error) throw error;
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.allUsers());
 }
 
 export async function fetchUserSessions() {
@@ -1824,32 +1941,35 @@ export async function sendInvitation(
 }
 
 export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
-  const { data, error } = await supabase
-    .from("invitations")
-    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    orgId: row.org_id as string,
-    invitedBy: (row.invited_by as string) ?? null,
-    email: row.email as string,
-    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-    expiresAt: row.expires_at as string,
-    acceptedAt: (row.accepted_at as string) ?? null,
-    revokedAt: (row.revoked_at as string) ?? null,
-    createdAt: row.created_at as string,
-    employeeId: (row.employee_id as string) ?? null,
-  }));
+  return cacheThrough(CacheKey.invitations(orgId), TTL.MODERATE, async () => {
+    const { data, error } = await supabase
+      .from("invitations")
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      orgId: row.org_id as string,
+      invitedBy: (row.invited_by as string) ?? null,
+      email: row.email as string,
+      roleToAssign: row.role_to_assign as AssignableOrganizationRole,
+      expiresAt: row.expires_at as string,
+      acceptedAt: (row.accepted_at as string) ?? null,
+      revokedAt: (row.revoked_at as string) ?? null,
+      createdAt: row.created_at as string,
+      employeeId: (row.employee_id as string) ?? null,
+    }));
+  });
 }
 
-export async function revokeInvitation(invitationId: string): Promise<void> {
+export async function revokeInvitation(invitationId: string, orgId?: string): Promise<void> {
   const { error } = await supabase
     .from("invitations")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", invitationId);
   if (error) throw error;
+  if (orgId) await cacheDel(CacheKey.invitations(orgId));
 }
 
 export async function linkEmployeeToUser(
@@ -1863,6 +1983,7 @@ export async function linkEmployeeToUser(
     p_org_id: orgId,
   });
   if (error) throw error;
+  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(employeeId), CacheKey.orgUsers(orgId));
   return { status: data.status };
 }
 
@@ -2068,39 +2189,6 @@ export async function deleteRecurringDraft(orgId: string): Promise<void> {
 
 // ── Shift Series ──────────────────────────────────────────────────────────────
 
-interface DbShiftSeries {
-  id: string;
-  emp_id: string;
-  org_id: string;
-  shift_code_id: number;
-  frequency: SeriesFrequency;
-  days_of_week: number[] | null;
-  start_date: string;
-  end_date: string | null;
-  max_occurrences: number | null;
-  created_at: string;
-  updated_at: string;
-  archived_at: string | null;
-}
-
-function rowToShiftSeries(row: DbShiftSeries, codeMap: Map<number, string>): ShiftSeries {
-  return {
-    id: row.id,
-    empId: row.emp_id,
-    orgId: row.org_id,
-    shiftCodeId: row.shift_code_id,
-    shiftLabel: codeMap.get(row.shift_code_id) ?? '?',
-    frequency: row.frequency,
-    daysOfWeek: row.days_of_week,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    maxOccurrences: row.max_occurrences,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    archivedAt: row.archived_at ?? null,
-  };
-}
-
 function generateSeriesDates(
   frequency: SeriesFrequency,
   daysOfWeek: number[] | null,
@@ -2249,12 +2337,14 @@ export async function deleteShiftSeries(seriesId: string): Promise<number> {
 // ── Gridmaster: Tenant Management ─────────────────────────────────────────────
 
 export async function fetchAllOrganizations(): Promise<Organization[]> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  return (data ?? []).map((row: unknown) => rowToOrganization(row as DbOrganization));
+  return cacheThrough(CacheKey.allOrganizations(), TTL.STABLE, async () => {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .order("name");
+    if (error) throw error;
+    return (data ?? []).map((row: unknown) => rowToOrganization(row as DbOrganization));
+  });
 }
 
 export interface TenantStats {
@@ -2280,6 +2370,7 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
     .select()
     .single();
   if (error) throw error;
+  await cacheDel(CacheKey.allOrganizations(), CacheKey.tenantStats());
   return rowToOrganization(row as DbOrganization);
 }
 
@@ -2289,6 +2380,7 @@ export async function archiveOrganization(orgId: string): Promise<void> {
     .update({ archived_at: new Date().toISOString() })
     .eq("id", orgId);
   if (error) throw error;
+  await cacheDel(CacheKey.organization(orgId), CacheKey.allOrganizations(), CacheKey.tenantStats());
 }
 
 export async function restoreOrganization(orgId: string): Promise<void> {
@@ -2297,24 +2389,27 @@ export async function restoreOrganization(orgId: string): Promise<void> {
     .update({ archived_at: null })
     .eq("id", orgId);
   if (error) throw error;
+  await cacheDel(CacheKey.organization(orgId), CacheKey.allOrganizations(), CacheKey.tenantStats());
 }
 
 export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]> {
-  const { data, error } = await supabase.rpc("get_all_users_with_profiles");
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    email: (row.email as string | null) ?? null,
-    firstName: null, // auth.users doesn't expose first_name; profiles may be joined separately
-    lastName: null,
-    platformRole: (row.platform_role as string ?? 'none') as import("@/types").PlatformRole,
-    orgRole: (row.org_role as string | null) as import("@/types").OrganizationRole | null,
-    orgId: (row.org_id as string | null) ?? null,
-    orgName: (row.org_name as string | null) ?? null,
-    orgSlug: (row.org_slug as string | null) ?? null,
-    createdAt: row.created_at as string,
-    lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
-  }));
+  return cacheThrough(CacheKey.allUsers(), TTL.MODERATE, async () => {
+    const { data, error } = await supabase.rpc("get_all_users_with_profiles");
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      email: (row.email as string | null) ?? null,
+      firstName: null,
+      lastName: null,
+      platformRole: (row.platform_role as string ?? 'none') as import("@/types").PlatformRole,
+      orgRole: (row.org_role as string | null) as import("@/types").OrganizationRole | null,
+      orgId: (row.org_id as string | null) ?? null,
+      orgName: (row.org_name as string | null) ?? null,
+      orgSlug: (row.org_slug as string | null) ?? null,
+      createdAt: row.created_at as string,
+      lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+    }));
+  });
 }
 
 export async function fetchAuditLog(options?: {
@@ -2352,36 +2447,39 @@ export async function removeUserFromOrganization(
     .eq("user_id", userId)
     .eq("org_id", orgId);
   if (error) throw error;
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.employees(orgId), CacheKey.allUsers(), CacheKey.tenantStats());
 }
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {
-  const [{ data: memberData, error: mErr }, { data: empData, error: eErr }] =
-    await Promise.all([
-      supabase.from("organization_memberships").select("org_id"),
-      supabase.from("employees").select("org_id").is("archived_at", null),
-    ]);
-  if (mErr) throw mErr;
-  if (eErr) throw eErr;
+  return cacheThrough(CacheKey.tenantStats(), TTL.MODERATE, async () => {
+    const [{ data: memberData, error: mErr }, { data: empData, error: eErr }] =
+      await Promise.all([
+        supabase.from("organization_memberships").select("org_id"),
+        supabase.from("employees").select("org_id").is("archived_at", null),
+      ]);
+    if (mErr) throw mErr;
+    if (eErr) throw eErr;
 
-  const statsMap = new Map<string, TenantStats>();
+    const statsMap = new Map<string, TenantStats>();
 
-  for (const row of memberData ?? []) {
-    const cid = row.org_id;
-    if (!cid) continue;
-    const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
-    entry.userCount++;
-    statsMap.set(cid, entry);
-  }
+    for (const row of memberData ?? []) {
+      const cid = row.org_id;
+      if (!cid) continue;
+      const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
+      entry.userCount++;
+      statsMap.set(cid, entry);
+    }
 
-  for (const row of empData ?? []) {
-    const cid = row.org_id;
-    if (!cid) continue;
-    const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
-    entry.employeeCount++;
-    statsMap.set(cid, entry);
-  }
+    for (const row of empData ?? []) {
+      const cid = row.org_id;
+      if (!cid) continue;
+      const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
+      entry.employeeCount++;
+      statsMap.set(cid, entry);
+    }
 
-  return Array.from(statsMap.values());
+    return Array.from(statsMap.values());
+  });
 }
 
 

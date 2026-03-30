@@ -163,6 +163,7 @@ export function computeDailyTallies(
   shiftCodeIdsForKey: (empId: string, date: Date) => number[],
   shiftCodeById: Map<number, ShiftCode>,
   sectionCodeIds: Set<number>,
+  labelResolver?: (code: ShiftCode) => string,
 ): DailyTallies {
   const tallies: DailyTallies = {};
 
@@ -175,8 +176,9 @@ export function computeDailyTallies(
       const code = shiftCodeById.get(codeId);
       if (!code || code.categoryId == null) continue;
       tallies[code.categoryId] ??= {};
-      tallies[code.categoryId][code.label] =
-        (tallies[code.categoryId][code.label] || 0) + 1;
+      const label = labelResolver ? labelResolver(code) : code.label;
+      tallies[code.categoryId][label] =
+        (tallies[code.categoryId][label] || 0) + 1;
     }
   }
 
@@ -278,6 +280,7 @@ export function computeCoverageGaps(
   shiftCodeIdsForKey: (empId: string, date: Date) => number[],
   shiftCodeById: Map<number, ShiftCode>,
   shiftCodeIdsByFocusArea: Map<number, Set<number>>,
+  shiftCodeDisplayMap?: Map<number, string>,
 ): CoverageGap[] {
   const gaps: CoverageGap[] = [];
   const categoryById = new Map(shiftCategories.map((c) => [c.id, c]));
@@ -312,7 +315,7 @@ export function computeCoverageGaps(
             focusAreaId: fa.id,
             focusAreaName: fa.name,
             shiftCodeId: codeId,
-            shiftCodeLabel: code.label,
+            shiftCodeLabel: shiftCodeDisplayMap?.get(codeId) ?? code.label,
             shiftCategoryId: cat?.id ?? 0,
             shiftCategoryName: cat?.name ?? "Uncategorized",
             date,

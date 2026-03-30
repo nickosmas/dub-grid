@@ -1,14 +1,14 @@
 import { useState, useMemo } from "react";
-import type { ActivityItem, ActivityIconVariant, OTAlert } from "@/lib/dashboard-stats";
+import type { ActivityIconVariant, OTAlert } from "@/lib/dashboard-stats";
 import { buildActivityFeed } from "@/lib/dashboard-stats";
 import type { PublishHistoryEntry, ShiftRequest } from "@/types";
 import Modal from "@/components/Modal";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "#F0F7F0", stroke: "#004501" },
-  danger: { bg: "#FEF2F2", stroke: "#DC2626" },
-  warning: { bg: "#FFFBEB", stroke: "#D97706" },
-  neutral: { bg: "var(--color-bg-secondary, #F1F5F9)", stroke: "var(--color-text-secondary, #495057)" },
+  success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
+  danger: { bg: "var(--color-danger-bg)", stroke: "var(--color-danger)" },
+  warning: { bg: "var(--color-warning-bg)", stroke: "var(--color-warning)" },
+  neutral: { bg: "var(--color-bg-secondary)", stroke: "var(--color-text-secondary)" },
 };
 
 function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
@@ -104,8 +104,8 @@ export default function ExpandedActivity({
                   padding: "5px 12px",
                   borderRadius: 6,
                   border: "1px solid",
-                  borderColor: active ? "var(--color-primary, #005F02)" : "var(--color-border)",
-                  background: active ? "var(--color-primary, #005F02)" : "transparent",
+                  borderColor: active ? "var(--color-primary)" : "var(--color-border)",
+                  background: active ? "var(--color-primary)" : "transparent",
                   color: active ? "#fff" : "var(--color-text-secondary)",
                   cursor: "pointer",
                   transition: "all 0.15s",
@@ -132,7 +132,7 @@ export default function ExpandedActivity({
                   display: "flex",
                   gap: 12,
                   padding: "11px 4px",
-                  borderBottom: i < filtered.length - 1 ? "1px solid var(--color-border-light, #E2E8F0)" : "none",
+                  borderBottom: i < filtered.length - 1 ? "1px solid var(--color-border-light)" : "none",
                 }}
               >
                 <ActivityIcon variant={item.iconVariant} />

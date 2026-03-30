@@ -24,7 +24,6 @@ interface ReportsTabProps {
   employee: Employee;
   shifts: ShiftMap;
   shiftCodeById: Map<number, ShiftCode>;
-  shiftCodes: ShiftCode[];
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
@@ -39,7 +38,6 @@ export function ReportsTab({
   employee,
   shifts,
   shiftCodeById,
-  shiftCodes,
   focusAreas,
   certifications,
   orgRoles,
@@ -56,8 +54,8 @@ export function ReportsTab({
     [employee.id, shifts, shiftCodeById],
   );
   const dayPattern = useMemo(
-    () => computeDayPattern(employee.id, shifts, shiftCodeById),
-    [employee.id, shifts, shiftCodeById],
+    () => computeDayPattern(employee.id, shifts),
+    [employee.id, shifts],
   );
   const faDist = useMemo(
     () => computeFocusAreaDistribution(employee.id, shifts, shiftCodeById, focusAreas),

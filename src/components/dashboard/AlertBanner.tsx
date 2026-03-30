@@ -15,8 +15,8 @@ export default function AlertBanner({ alerts, onReview }: AlertBannerProps) {
   return (
     <div
       style={{
-        background: "#FFFBEB",
-        border: "1px solid #FDE68A",
+        background: "var(--color-warning-bg)",
+        border: "1px solid var(--color-warning-border)",
         borderRadius: 9,
         padding: "11px 16px",
         display: "flex",
@@ -29,12 +29,12 @@ export default function AlertBanner({ alerts, onReview }: AlertBannerProps) {
         style={{
           width: 8,
           height: 8,
-          background: "#D97706",
+          background: "var(--color-warning)",
           borderRadius: "50%",
           flexShrink: 0,
         }}
       />
-      <span style={{ color: "#92400E", flex: 1 }}>
+      <span style={{ color: "var(--color-warning-text)", flex: 1 }}>
         <strong style={{ fontWeight: 600 }}>
           {alerts.length} overtime alert{alerts.length !== 1 ? "s" : ""}
         </strong>
@@ -46,7 +46,7 @@ export default function AlertBanner({ alerts, onReview }: AlertBannerProps) {
         style={{
           fontSize: 12,
           fontWeight: 600,
-          color: "#D97706",
+          color: "var(--color-warning)",
           cursor: "pointer",
           whiteSpace: "nowrap",
         }}

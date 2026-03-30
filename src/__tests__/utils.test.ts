@@ -142,9 +142,6 @@ describe("addDays — property tests", () => {
       fc.property(arbDate, fc.integer({ min: -365, max: 365 }), (date, n) => {
         const base = addDays(date, 0);
         const shifted = addDays(date, n);
-        // Compare calendar days using date components to avoid DST issues
-        const baseDay = base.getFullYear() * 10000 + base.getMonth() * 100 + base.getDate();
-        const shiftedDay = shifted.getFullYear() * 10000 + shifted.getMonth() * 100 + shifted.getDate();
         // Use millisecond diff but round to nearest day to handle DST transitions
         const diffMs = shifted.getTime() - base.getTime();
         const diffDays = Math.round(diffMs / 86_400_000);

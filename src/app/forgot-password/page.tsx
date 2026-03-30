@@ -46,15 +46,7 @@ function ForgotPasswordContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "28px",
-          }}
-        >
+        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -83,13 +75,8 @@ function ForgotPasswordContent() {
               </div>
             </div>
             <h1
-              style={{
-                fontSize: "var(--dg-fs-card-title)",
-                fontWeight: 700,
-                color: "var(--color-text-primary)",
-                marginBottom: "12px",
-                textAlign: "center",
-              }}
+              className="dg-auth-heading"
+              style={{ marginBottom: "12px" }}
             >
               Check Your Email
             </h1>
@@ -107,12 +94,11 @@ function ForgotPasswordContent() {
             </p>
             <Link
               href="/login"
+              className="dg-auth-link"
               style={{
                 display: "block",
                 textAlign: "center",
-                fontSize: "var(--dg-fs-label)",
                 color: "var(--color-text-subtle)",
-                textDecoration: "underline",
               }}
             >
               Back to login
@@ -121,13 +107,8 @@ function ForgotPasswordContent() {
         ) : (
           <>
             <h1
-              style={{
-                fontSize: "var(--dg-fs-card-title)",
-                fontWeight: 700,
-                color: "var(--color-text-primary)",
-                marginBottom: "8px",
-                textAlign: "center",
-              }}
+              className="dg-auth-heading"
+              style={{ marginBottom: "8px" }}
             >
               Forgot Password
             </h1>
@@ -153,15 +134,7 @@ function ForgotPasswordContent() {
               }}
             >
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 600,
-                    marginBottom: "6px",
-                    color: "var(--color-text-secondary)",
-                  }}
-                >
+                <label className="dg-auth-field-label">
                   Email
                 </label>
                 <input
@@ -170,41 +143,19 @@ function ForgotPasswordContent() {
                   autoComplete="email"
                   autoFocus
                   disabled={loading}
-                  className="dg-standalone-input"
+                  className="dg-auth-input dg-standalone-input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  style={{
-                    width: "100%",
-                    padding: "11px 13px",
-                    border: "1.5px solid var(--color-border)",
-                    borderRadius: "8px",
-                    fontSize: "var(--dg-fs-body)",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
+                className="dg-auth-submit"
                 style={{
                   marginTop: "4px",
-                  width: "100%",
-                  padding: "13px",
-                  background: "var(--color-brand)",
-                  color: "var(--color-text-inverse)",
-                  border: "none",
-                  borderRadius: "999px",
-                  fontSize: "var(--dg-fs-body)",
-                  fontWeight: 600,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  opacity: loading ? 0.85 : 1,
                 }}
               >
                 <ButtonLoading
@@ -225,10 +176,9 @@ function ForgotPasswordContent() {
             >
               <Link
                 href="/login"
+                className="dg-auth-link"
                 style={{
-                  fontSize: "var(--dg-fs-label)",
                   color: "var(--color-text-subtle)",
-                  textDecoration: "underline",
                 }}
               >
                 Back to login

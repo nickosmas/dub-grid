@@ -82,8 +82,8 @@ export default function ExpandedStaffHours({
                     padding: "5px 10px",
                     borderRadius: 6,
                     border: "1px solid",
-                    borderColor: active ? "var(--color-primary, #005F02)" : "var(--color-border)",
-                    background: active ? "var(--color-primary, #005F02)" : "transparent",
+                    borderColor: active ? "var(--color-primary)" : "var(--color-border)",
+                    background: active ? "var(--color-primary)" : "transparent",
                     color: active ? "#fff" : "var(--color-text-secondary)",
                     cursor: "pointer",
                   }}
@@ -132,7 +132,7 @@ export default function ExpandedStaffHours({
                     alignItems: "center",
                     gap: 12,
                     padding: "10px 6px",
-                    borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
+                    borderBottom: "1px solid var(--color-border-light)",
                   }}
                 >
                   {/* Avatar */}
@@ -147,8 +147,8 @@ export default function ExpandedStaffHours({
                       fontSize: 11,
                       fontWeight: 700,
                       flexShrink: 0,
-                      background: h.isOvertime ? "#FEF2F2" : "var(--color-bg-secondary, #F1F5F9)",
-                      color: h.isOvertime ? "#DC2626" : "var(--color-text-secondary)",
+                      background: h.isOvertime ? "var(--color-danger-bg)" : "var(--color-bg-secondary)",
+                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
                     }}
                   >
                     {initials}
@@ -170,7 +170,7 @@ export default function ExpandedStaffHours({
                       style={{
                         fontSize: 10,
                         fontWeight: 600,
-                        color: delta > 0 ? "#DC2626" : "#2D6B3A",
+                        color: delta > 0 ? "var(--color-danger)" : "var(--color-brand)",
                       }}
                     >
                       {delta > 0 ? "+" : ""}{delta}h
@@ -183,7 +183,7 @@ export default function ExpandedStaffHours({
                       style={{
                         fontSize: 13,
                         fontWeight: 700,
-                        color: h.isOvertime ? "#DC2626" : "var(--color-text-primary)",
+                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-primary)",
                       }}
                     >
                       {h.totalHours}h
@@ -191,7 +191,7 @@ export default function ExpandedStaffHours({
                     <div
                       style={{
                         fontSize: 10,
-                        color: h.isOvertime ? "#DC2626" : "var(--color-text-subtle)",
+                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
                       }}
                     >
                       {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}

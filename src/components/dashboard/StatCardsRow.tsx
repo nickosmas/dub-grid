@@ -16,33 +16,33 @@ export default function StatCardsRow({ stats, showOT, isMobile, hasRequirements,
     <StatCard
       key="shifts"
       label="Total shifts"
-      dotColor="var(--color-success, #2E9930)"
+      dotColor="var(--color-success)"
       value={stats.totalShifts.value}
       subtext={`vs ${stats.totalShifts.prevValue} ${prevPeriodLabel}`}
       progress={stats.totalShifts.prevValue > 0 ? (stats.totalShifts.value / stats.totalShifts.prevValue) * 100 : 100}
-      progressColor="var(--color-success, #2E9930)"
+      progressColor="var(--color-success)"
       delta={stats.totalShifts.delta}
       deltaLabel={`${stats.totalShifts.delta > 0 ? "+" : ""}${stats.totalShifts.delta}`}
     />,
     <StatCard
       key="coverage"
       label="Coverage"
-      dotColor="#2563EB"
+      dotColor="var(--color-info)"
       value={hasRequirements ? `${stats.coverage.pct}%` : "\u2014"}
       subtext={hasRequirements ? `${stats.coverage.openSlots} open slot${stats.coverage.openSlots !== 1 ? "s" : ""}` : "Not configured"}
       progress={hasRequirements ? stats.coverage.pct : 0}
-      progressColor="#2563EB"
+      progressColor="var(--color-info)"
       delta={hasRequirements ? stats.coverage.delta : 0}
       deltaLabel={hasRequirements ? `${stats.coverage.delta}%` : ""}
     />,
     <StatCard
       key="staff"
       label="Staff scheduled"
-      dotColor="var(--color-text-subtle, #64748B)"
+      dotColor="var(--color-text-subtle)"
       value={stats.staffScheduled.scheduled}
       subtext={`of ${stats.staffScheduled.total} active`}
       progress={stats.staffScheduled.total > 0 ? (stats.staffScheduled.scheduled / stats.staffScheduled.total) * 100 : 100}
-      progressColor="var(--color-text-subtle, #64748B)"
+      progressColor="var(--color-text-subtle)"
       delta={stats.staffScheduled.delta}
       deltaLabel={`${stats.staffScheduled.delta}`}
     />,
@@ -53,11 +53,11 @@ export default function StatCardsRow({ stats, showOT, isMobile, hasRequirements,
       <StatCard
         key="ot"
         label="OT alerts"
-        dotColor="var(--color-danger, #DC2626)"
+        dotColor="var(--color-danger)"
         value={stats.otAlerts.count}
         subtext="over 40h limit"
         progress={stats.otAlerts.count > 0 ? (stats.otAlerts.count / stats.staffScheduled.total) * 100 : 0}
-        progressColor="var(--color-danger, #DC2626)"
+        progressColor="var(--color-danger)"
         delta={stats.otAlerts.delta}
         deltaLabel={`${stats.otAlerts.delta}`}
         variant="danger"

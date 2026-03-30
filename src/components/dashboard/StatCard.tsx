@@ -43,10 +43,10 @@ export default function StatCard({
     padding: "2px 7px",
     borderRadius: 4,
     ...(isGood
-      ? { background: "var(--color-success-bg, #F0F7F0)", color: "var(--color-success, #2E9930)" }
+      ? { background: "var(--color-success-bg)", color: "var(--color-success)" }
       : isBad
-        ? { background: "var(--color-danger-bg, #FEF2F2)", color: "var(--color-danger, #DC2626)" }
-        : { background: "var(--color-bg-secondary, #F1F5F9)", color: "var(--color-text-subtle, #64748B)" }),
+        ? { background: "var(--color-danger-bg)", color: "var(--color-danger)" }
+        : { background: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" }),
   };
 
   // For OT alerts, "up" is bad (more OT), so swap the delta badge colors
@@ -55,17 +55,7 @@ export default function StatCard({
     : `${isUp ? "\u2191" : "\u2193"} ${isUp ? "+" : ""}${delta}${typeof delta === "number" && deltaLabel.includes("%") ? "%" : ""}`;
 
   return (
-    <div
-      style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 10,
-        padding: "16px 18px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
+    <div className="dg-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
       {/* Label */}
       <div
         style={{
@@ -96,7 +86,7 @@ export default function StatCard({
           fontWeight: 700,
           color:
             variant === "danger"
-              ? "var(--color-danger, #DC2626)"
+              ? "var(--color-danger)"
               : "var(--color-text-primary)",
           lineHeight: 1,
           letterSpacing: "-0.02em",

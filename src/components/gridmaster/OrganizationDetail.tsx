@@ -20,7 +20,7 @@ import type {
 } from "@/types";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
-import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
+import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 
 type Tab = "overview" | "users" | "employees" | "config" | "activity";
@@ -32,28 +32,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "config", label: "Configuration" },
   { id: "activity", label: "Activity" },
 ];
-
-function RoleBadge({ role }: { role: string }) {
-  const c = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: "var(--dg-fs-footnote)",
-        fontWeight: 600,
-        padding: "2px 8px",
-        borderRadius: 4,
-        background: c.bg,
-        color: c.text,
-        border: `1px solid ${c.border}`,
-        textTransform: "uppercase",
-        letterSpacing: "0.03em",
-      }}
-    >
-      {role.replace("_", " ")}
-    </span>
-  );
-}
 
 function StatusDot({ status }: { status: string }) {
   const color =
@@ -574,7 +552,7 @@ function UsersTab({
   async function handleRoleChange(userId: string, newRole: OrganizationRole) {
     setChangingRole(userId);
     try {
-      await changeOrganizationUserRole(userId, newRole);
+      await changeOrganizationUserRole(userId, newRole, orgId);
       toast.success("Role updated");
       onUsersChanged();
     } catch (err: unknown) {

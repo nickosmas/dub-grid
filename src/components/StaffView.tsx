@@ -3,14 +3,12 @@
 import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
+import { getInitials, getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
-import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType } from "@/types";
+import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
-import { isEmployeeQualified } from "@/lib/schedule-logic";
-import InlineEditEmployee from "@/components/EditEmployeePanel";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { fetchInvitations, revokeInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
@@ -61,6 +59,7 @@ interface StaffViewProps {
   certificationLabel?: string;
   roleLabel?: string;
   orgName?: string;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 function hashCode(s: string): number {
@@ -171,15 +170,14 @@ function MembersSection({
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
-  const { user: currentUser } = useAuth();
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
 
   // ── Extracted hooks ──
-  const filters = useStaffFilters({ employees, benchedEmployees, terminatedEmployees, focusAreas, showOnlyUnlinked });
-  const { activeTab, setActiveTab, searchQuery, setSearchQuery, sortBy, setSortBy, filterFocusArea, setFilterFocusArea, filterRole, setFilterRole, hasActiveFilters, clearFilters: clearFiltersBase, rawList, sorted, paginatedList: filterPaginatedList, page, setPage, totalPages, totalCount, pageSize: PAGE_SIZE, tabCounts, unlinkedCount, unlinkedNoEmail } = filters;
+  const filters = useStaffFilters({ employees, benchedEmployees, terminatedEmployees, showOnlyUnlinked });
+  const { activeTab, setActiveTab, searchQuery, setSearchQuery, sortBy, setSortBy, filterFocusArea, setFilterFocusArea, filterRole, setFilterRole, hasActiveFilters, clearFilters: clearFiltersBase, rawList, sorted, paginatedList: filterPaginatedList, page, setPage, totalPages, totalCount, pageSize: PAGE_SIZE, unlinkedCount } = filters;
   const clearFilters = useCallback(() => { clearFiltersBase(); setShowOnlyUnlinked(false); }, [clearFiltersBase]);
   const selection = useStaffSelection();
   const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } = selection;
@@ -236,7 +234,7 @@ function MembersSection({
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     setRevokingId(invitationId);
     try {
-      await revokeInvitation(invitationId);
+      await revokeInvitation(invitationId, orgId);
       refreshInvitations();
       toast.success("Invitation revoked");
       return true;
@@ -508,6 +506,7 @@ function ShiftCellPopover({
   absenceTypes,
   onAbsenceSelect,
   currentAbsenceTypeId,
+  shiftDisplayMode,
 }: {
   anchorRef: HTMLElement | null;
   shiftCodes: ShiftCode[];
@@ -520,6 +519,7 @@ function ShiftCellPopover({
   absenceTypes?: AbsenceType[];
   onAbsenceSelect?: (absenceType: AbsenceType) => void;
   currentAbsenceTypeId?: number | null;
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -538,25 +538,29 @@ function ShiftCellPopover({
     const spaceBelow = window.innerHeight - rect.bottom - 12;
     const flipUp = spaceBelow < 260;
     setFlippedUp(flipUp);
-    const popoverWidth = Math.min(440, window.innerWidth - 16);
     const isMobileView = window.innerWidth < 768;
     const GAP = 8; // space between cell and popover (room for arrow)
-    const popoverLeft = isMobileView ? 8 : Math.max(8, Math.min(rect.left + window.scrollX - 40, window.innerWidth - popoverWidth - 8));
+    const maxW = window.innerWidth - 16;
+    // Measure the popover's natural width so positioning is accurate
+    const naturalWidth = menuRef.current ? Math.min(menuRef.current.scrollWidth, maxW) : Math.min(440, maxW);
+    const popoverLeft = isMobileView ? 8 : Math.max(8, Math.min(rect.left + window.scrollX - 40, window.innerWidth - naturalWidth - 8));
     setMenuStyle({
       position: "absolute",
       top: flipUp ? undefined : rect.bottom + window.scrollY + GAP,
       bottom: flipUp ? window.innerHeight - rect.top - window.scrollY + GAP : undefined,
       left: isMobileView ? 8 : popoverLeft,
-      width: isMobileView ? undefined : popoverWidth,
+      width: isMobileView ? undefined : "auto",
+      minWidth: isMobileView ? undefined : 320,
+      maxWidth: maxW,
       right: isMobileView ? 8 : undefined,
-      maxHeight: Math.min(flipUp ? rect.top - 12 : spaceBelow, 600),
+      maxHeight: flipUp ? rect.top - 12 : spaceBelow,
       zIndex: 9999,
     });
     // Arrow: center on the anchor cell, relative to popover left
     const anchorCenterX = rect.left + window.scrollX + rect.width / 2;
     setArrowLeft(isMobileView
       ? anchorCenterX - 8
-      : Math.max(16, Math.min(anchorCenterX - popoverLeft, popoverWidth - 16)));
+      : Math.max(16, Math.min(anchorCenterX - popoverLeft, naturalWidth - 16)));
   }, [anchorRef]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -585,7 +589,7 @@ function ShiftCellPopover({
 
   const currentShiftCodeIds = useMemo(() => {
     if (!currentLabel || currentLabel === "OFF") return [];
-    return currentLabel.split("/").map(l => shiftCodes.find(sc => sc.label === l)?.id).filter((id): id is number => id != null);
+    return currentLabel.split("/").map(l => shiftCodes.find(sc => sc.label === l || sc.name === l)?.id).filter((id): id is number => id != null);
   }, [currentLabel, shiftCodes]);
 
   if (!mounted || !anchorRef) return null;
@@ -657,6 +661,7 @@ function ShiftCellPopover({
             empCertificationId={empCertificationId}
             multiSelect={false}
             closeOnSelect={true}
+            shiftDisplayMode={shiftDisplayMode}
           />
           {(currentLabel || currentAbsenceTypeId) && (
             <button
@@ -710,6 +715,7 @@ function RecurringScheduleSection({
   focusAreas,
   certifications,
   absenceTypes = [],
+  shiftDisplayMode = "code",
 }: {
   employees: Employee[];
   orgId: string;
@@ -719,10 +725,12 @@ function RecurringScheduleSection({
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   absenceTypes?: AbsenceType[];
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const isMobile = useMediaQuery(MOBILE);
+  const isNameMode = shiftDisplayMode === "name";
   // ── Lookup maps (by ID) for rendering ──
-  const absenceTypeMap = useMemo(() => new Map(absenceTypes.map(at => [at.id, at.label])), [absenceTypes]);
+  const absenceTypeMap = useMemo(() => new Map(absenceTypes.map(at => [at.id, isNameMode ? (at.name || at.label) : at.label])), [absenceTypes, isNameMode]);
   const absenceTypeIdMap = useMemo(() => new Map(absenceTypes.map(at => [at.id, at])), [absenceTypes]);
   const shiftCodeIdMap = useMemo(() => new Map(shiftCodes.map(sc => [sc.id, sc])), [shiftCodes]);
   // ── Data state ──
@@ -799,7 +807,7 @@ function RecurringScheduleSection({
 
     load();
     return () => { cancelled = true; };
-  }, [orgId, shiftCodeMap, absenceTypeMap]);
+  }, [orgId, shiftCodeMap, absenceTypeMap, shiftCodes, absenceTypes]);
 
   // ── Derived state ──
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
@@ -966,11 +974,6 @@ function RecurringScheduleSection({
     { value: "" as const, label: "All Focus Areas" },
     ...focusAreas.map((fa) => ({ value: fa.id, label: fa.name })),
   ], [focusAreas]);
-
-  // ── Get qualified shift codes per employee ──
-  function getQualifiedCodes(emp: Employee) {
-    return shiftCodes.filter((st) => isEmployeeQualified(emp, st));
-  }
 
   // ── Find the employee for the active cell popover ──
   const activeCellEmp = activeCell ? employees.find((e) => e.id === activeCell.empId) : null;
@@ -1226,7 +1229,11 @@ function RecurringScheduleSection({
                   const at = parsed?.type === 'absence' ? absenceTypeIdMap.get(parsed.id) ?? null : null;
                   const isDirty = !!(dirtySchedules[emp.id] && dayIdx in dirtySchedules[emp.id]);
                   const isActive = activeCell?.empId === emp.id && activeCell?.dayIndex === dayIdx;
-                  const cellLabel = st?.label ?? at?.label ?? null;
+                  const stDisplay = st ? (isNameMode ? (st.name || st.label) : st.label) : null;
+                  const atDisplay = at ? (isNameMode ? (at.name || at.label) : at.label) : null;
+                  const cellLabel = stDisplay ?? atDisplay ?? null;
+                  const nameModeFs = isMobile ? "var(--dg-fs-micro)" : "var(--dg-fs-caption)";
+                  const codeModeFs = isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)";
 
                   return (
                     <div
@@ -1250,32 +1257,40 @@ function RecurringScheduleSection({
                       }}
                     >
                       {st ? (
-                        <div style={{
+                        <div title={isNameMode ? stDisplay! : undefined} style={{
                           position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
                           background: st.color,
                           border: isDirty ? `2px dashed ${st.text}` : `1px solid ${borderColor(st.text)}`,
                           borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
                           color: st.text,
-                          fontSize: isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)",
+                          fontSize: isNameMode ? nameModeFs : codeModeFs,
                           fontWeight: 800,
+                          padding: "2px 4px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                           transition: "box-shadow 150ms ease",
                           boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
                         }}>
-                          {st.label}
+                          {stDisplay}
                         </div>
                       ) : at ? (
-                        <div style={{
+                        <div title={isNameMode ? atDisplay! : undefined} style={{
                           position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
                           background: at.color,
                           border: isDirty ? `2px dashed ${at.text}` : `1px solid ${borderColor(at.text)}`,
                           borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
                           color: at.text,
-                          fontSize: isMobile ? "var(--dg-fs-label)" : "var(--dg-fs-title)",
+                          fontSize: isNameMode ? nameModeFs : codeModeFs,
                           fontWeight: 800,
+                          padding: "2px 4px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                           transition: "box-shadow 150ms ease",
                           boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
                         }}>
-                          {at.label}
+                          {atDisplay}
                         </div>
                       ) : (
                         <div style={{
@@ -1313,7 +1328,8 @@ function RecurringScheduleSection({
       {activeCell && activeCellEmp && (() => {
         const rawValue = getEffectiveLabel(activeCell.empId, activeCell.dayIndex);
         const parsed = rawValue ? parseRecurringValue(rawValue) : null;
-        const currentShiftLabel = parsed?.type === 'shift' ? (shiftCodeIdMap.get(parsed.id)?.label ?? "") : "";
+        const stObj = parsed?.type === 'shift' ? shiftCodeIdMap.get(parsed.id) : undefined;
+        const currentShiftLabel = stObj ? (isNameMode ? (stObj.name || stObj.label) : stObj.label) : "";
         const currentAtId = parsed?.type === 'absence' ? parsed.id : null;
         return (
           <ShiftCellPopover
@@ -1331,6 +1347,7 @@ function RecurringScheduleSection({
             onClose={() => { setActiveCell(null); setActiveCellEl(null); }}
             empFocusAreaIds={activeCellEmp.focusAreaIds}
             empCertificationId={activeCellEmp.certificationId}
+            shiftDisplayMode={shiftDisplayMode}
           />
         );
       })()}
@@ -1593,8 +1610,8 @@ export default function StaffView({
   certificationLabel = "Certifications",
   roleLabel = "Roles",
   orgName,
+  shiftDisplayMode = "code",
 }: StaffViewProps) {
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
   const VALID_SECTIONS: StaffSection[] = ["members", "recurring-schedule", "focus-areas", "certifications", "roles"];
@@ -1734,6 +1751,7 @@ export default function StaffView({
                 focusAreas={focusAreas}
                 certifications={certifications}
                 absenceTypes={absenceTypes}
+                shiftDisplayMode={shiftDisplayMode}
               />
             )}
 

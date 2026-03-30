@@ -11,13 +11,13 @@ export default function ShiftBreakdownCard({
   onExpand,
 }: ShiftBreakdownCardProps) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>
+    <div className="dg-card">
+      <div className="dg-card-header">
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+          <div className="dg-card-title">
             Shift breakdown
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 1 }}>
+          <div className="dg-card-subtitle">
             {breakdown.totalShifts} total shifts this week
           </div>
         </div>
@@ -40,7 +40,7 @@ export default function ShiftBreakdownCard({
                 padding: "9px 18px",
                 borderBottom:
                   i < breakdown.byFocusArea.length - 1
-                    ? "1px solid var(--color-bg, #F8FAFC)"
+                    ? "1px solid var(--color-bg)"
                     : "none",
               }}
             >
@@ -88,18 +88,3 @@ export default function ShiftBreakdownCard({
     </div>
   );
 }
-
-const cardStyle = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 10,
-  overflow: "hidden" as const,
-};
-
-const headerStyle = {
-  padding: "14px 18px",
-  borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
-  display: "flex" as const,
-  alignItems: "center" as const,
-  justifyContent: "space-between" as const,
-};

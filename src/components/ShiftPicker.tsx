@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, Fragment } from "react";
-import { ShiftCode, AbsenceType, FocusArea } from "@/types";
+import { Check } from "lucide-react";
+import { ShiftCode, AbsenceType, FocusArea, ShiftDisplayMode } from "@/types";
 import { isEmployeeQualified } from "@/lib/schedule-logic";
 import ScrollableTabs from "@/components/ScrollableTabs";
 
@@ -21,20 +22,7 @@ interface ShiftPickerProps {
   /** If true, closes the picker immediately on select (usually for single-select). */
   closeOnSelect?: boolean;
   onClose?: () => void;
-}
-
-function parseTo12h(time24: string | null | undefined): { hour: string; minute: string; period: "AM" | "PM" } {
-  if (!time24) return { hour: "", minute: "00", period: "AM" };
-  const [h, m] = time24.split(":").map(Number);
-  const period: "AM" | "PM" = h >= 12 ? "PM" : "AM";
-  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return { hour: String(hour12), minute: String(m).padStart(2, "0"), period };
-}
-
-function fmt12h(time24: string | null | undefined): string {
-  if (!time24) return "";
-  const { hour, minute, period } = parseTo12h(time24);
-  return `${hour}:${minute} ${period}`;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export default function ShiftPicker({
@@ -51,7 +39,9 @@ export default function ShiftPicker({
   multiSelect = false,
   closeOnSelect = true,
   onClose,
+  shiftDisplayMode = "code",
 }: ShiftPickerProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const [pickerTab, setPickerTab] = useState<number>(() => {
     if (initialTab != null) return initialTab;
     if (currentShiftCodeIds.length > 0) {
@@ -107,9 +97,12 @@ export default function ShiftPicker({
       }
 
       const newLabels = newIds
-        .map((id) => shiftCodes.find((sc) => sc.id === id)?.label)
+        .map((id) => {
+          const sc = shiftCodes.find((c) => c.id === id);
+          return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : null;
+        })
         .filter((l): l is string => l != null && l !== "OFF");
-      
+
       const newShift = newLabels.length > 0 ? newLabels.join("/") : "OFF";
       onSelect(newShift, newIds);
       
@@ -128,7 +121,7 @@ export default function ShiftPicker({
           background: isActive ? s.color : `${s.color}40`,
           border: `1.5px solid ${isActive ? s.border : s.text}`,
           borderRadius: 8,
-          padding: "6px 8px 4px",
+          padding: "8px 10px 6px",
           cursor: "pointer",
           textAlign: "left",
           transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease",
@@ -165,36 +158,59 @@ export default function ShiftPicker({
               justifyContent: "center",
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+            <Check size={10} color="#fff" strokeWidth={3.5} />
           </div>
         )}
 
-        <div
-          style={{
-            fontWeight: 800,
-            fontSize: "var(--dg-fs-caption)",
-            color: s.text,
-            opacity: isActive ? 1 : 0.75,
-            transition: "opacity 150ms ease",
-            display: "flex",
-            alignItems: "center",
-            gap: 3,
-          }}
-        >
-          {s.label}
-        </div>
-
-        <div
-          style={{
-            fontSize: "var(--dg-fs-micro)",
-            color: "var(--color-text-subtle)",
-            marginTop: 1,
-          }}
-        >
-          {s.name}
-        </div>
+        {isNameMode ? (
+          <div
+            title={s.name || s.label}
+            style={{
+              fontWeight: 700,
+              fontSize: "var(--dg-fs-caption)",
+              color: s.text,
+              opacity: isActive ? 1 : 0.75,
+              lineHeight: 1.3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              paddingRight: isActive ? 20 : 0,
+            }}
+          >
+            {s.name || s.label}
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: "var(--dg-fs-caption)",
+                color: s.text,
+                opacity: isActive ? 1 : 0.75,
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+                paddingRight: isActive ? 20 : 0,
+              }}
+            >
+              {s.label}
+            </div>
+            <div
+              title={s.name}
+              style={{
+                fontSize: "var(--dg-fs-micro)",
+                color: "var(--color-text-subtle)",
+                marginTop: 2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                paddingRight: isActive ? 20 : 0,
+              }}
+            >
+              {s.name}
+            </div>
+          </>
+        )}
 
       </button>
     );
@@ -317,7 +333,7 @@ export default function ShiftPicker({
                       background: isActive ? at.color : `${at.color}40`,
                       border: `1.5px solid ${isActive ? at.border : at.text}`,
                       borderRadius: 8,
-                      padding: "6px 8px 4px",
+                      padding: "8px 10px 6px",
                       cursor: "pointer",
                       textAlign: "left",
                       transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease",
@@ -354,28 +370,47 @@ export default function ShiftPicker({
                           justifyContent: "center",
                         }}
                       >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
+                        <Check size={10} color="#fff" strokeWidth={3.5} />
                       </div>
                     )}
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        fontSize: "var(--dg-fs-caption)",
-                        color: at.text,
-                        opacity: isActive ? 1 : 0.75,
-                        transition: "opacity 150ms ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 3,
-                      }}
-                    >
-                      {at.label}
-                    </div>
-                    <div style={{ fontSize: "var(--dg-fs-micro)", color: "var(--color-text-subtle)", marginTop: 1 }}>
-                      {at.name}
-                    </div>
+                    {isNameMode ? (
+                      <div
+                        title={at.name || at.label}
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: at.text,
+                          opacity: isActive ? 1 : 0.75,
+                          lineHeight: 1.3,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          paddingRight: isActive ? 20 : 0,
+                        }}
+                      >
+                        {at.name || at.label}
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            fontSize: "var(--dg-fs-caption)",
+                            color: at.text,
+                            opacity: isActive ? 1 : 0.75,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 3,
+                            paddingRight: isActive ? 20 : 0,
+                          }}
+                        >
+                          {at.label}
+                        </div>
+                        <div title={at.name} style={{ fontSize: "var(--dg-fs-micro)", color: "var(--color-text-subtle)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: isActive ? 20 : 0 }}>
+                          {at.name}
+                        </div>
+                      </>
+                    )}
                   </button>
                 );
               })}

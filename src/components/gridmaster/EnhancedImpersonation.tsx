@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchOrganizationUsers, startImpersonation, endImpersonation } from "@/lib/db";
 import { setImpersonationCookie, clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "@/hooks/usePermissions";
-import { clearOrgDataCache } from "@/hooks/useOrganizationData";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -19,6 +19,7 @@ export default function EnhancedImpersonation({
   initialOrgId?: string;
   initialTargetId?: string;
 }) {
+  const queryClient = useQueryClient();
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(initialOrgId ?? null);
   const [orgSearch, setOrgSearch] = useState("");
   const [users, setUsers] = useState<OrganizationUser[]>([]);
@@ -132,7 +133,7 @@ export default function EnhancedImpersonation({
         expiresAt: result.expires_at,
       });
       clearPermsCache();
-      clearOrgDataCache();
+      queryClient.clear();
       fetch("/api/notify-impersonation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,7 +163,7 @@ export default function EnhancedImpersonation({
     }
     clearImpersonationCookie();
     clearPermsCache();
-    clearOrgDataCache();
+    queryClient.clear();
     setSessionId(null);
     setExpiresAt(null);
     setSelectedUser(null);

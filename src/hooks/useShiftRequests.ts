@@ -104,6 +104,8 @@ export function useShiftRequests(
     } finally {
       setLoading(false);
     }
+  // shiftCodeMapKey is intentional: stabilization proxy for Map reference (read via shiftCodeMapRef.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, shiftCodeMapKey]);
 
   // Initial fetch

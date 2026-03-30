@@ -55,7 +55,6 @@ export default function ExpandedStats({
   focusAreas,
   shiftCodes,
   shiftCodeById,
-  shiftCategories,
   coverageRequirements,
   categoryById,
   focusAreaById,
@@ -100,14 +99,14 @@ export default function ExpandedStats({
     return rows;
   }, [
     allShifts, currentWeekStart, periodDays, activeEmployees, focusAreas, shiftCodes,
-    shiftCodeById, shiftCategories, coverageRequirements, categoryById, focusAreaById,
+    shiftCodeById, coverageRequirements, categoryById, focusAreaById,
   ]);
 
   const columns = [
-    { key: "totalShifts", label: "Total shifts", color: "var(--color-success, #2E9930)" },
-    ...(hasRequirements ? [{ key: "coveragePct", label: "Coverage", color: "#2563EB" }] : []),
-    { key: "staffScheduled", label: "Staff", color: "var(--color-text-subtle, #64748B)" },
-    ...(showOT ? [{ key: "otCount", label: "OT alerts", color: "var(--color-danger, #DC2626)" }] : []),
+    { key: "totalShifts", label: "Total shifts", color: "var(--color-success)" },
+    ...(hasRequirements ? [{ key: "coveragePct", label: "Coverage", color: "var(--color-info)" }] : []),
+    { key: "staffScheduled", label: "Staff", color: "var(--color-text-subtle)" },
+    ...(showOT ? [{ key: "otCount", label: "OT alerts", color: "var(--color-danger)" }] : []),
   ];
 
   const periodLabel = periodDays === 1 ? "Day" : periodDays === 7 ? "Week" : "Period";
@@ -152,13 +151,13 @@ export default function ExpandedStats({
                   <tr
                     key={row.label}
                     style={{
-                      background: isCurrent ? "var(--color-bg, #F8FAFC)" : "transparent",
+                      background: isCurrent ? "var(--color-bg)" : "transparent",
                     }}
                   >
                     <td style={{ ...tdStyle, textAlign: "left", fontWeight: isCurrent ? 600 : 400 }}>
                       {row.label}
                       {isCurrent && (
-                        <span style={{ fontSize: 9, color: "var(--color-primary, #2D6B3A)", marginLeft: 6, fontWeight: 600 }}>
+                        <span style={{ fontSize: 9, color: "var(--color-primary)", marginLeft: 6, fontWeight: 600 }}>
                           CURRENT
                         </span>
                       )}
@@ -179,8 +178,8 @@ export default function ExpandedStats({
                                 fontWeight: 600,
                                 marginLeft: 6,
                                 color: col.key === "otCount"
-                                  ? (delta > 0 ? "#DC2626" : "#2D6B3A")
-                                  : (delta > 0 ? "#2D6B3A" : "#DC2626"),
+                                  ? (delta > 0 ? "var(--color-danger)" : "var(--color-brand)")
+                                  : (delta > 0 ? "var(--color-brand)" : "var(--color-danger)"),
                               }}
                             >
                               {delta > 0 ? "\u2191" : "\u2193"}{Math.abs(delta)}
@@ -222,6 +221,6 @@ const thStyle = {
 const tdStyle = {
   padding: "10px 12px",
   textAlign: "center" as const,
-  borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
+  borderBottom: "1px solid var(--color-border-light)",
   color: "var(--color-text-primary)",
 };

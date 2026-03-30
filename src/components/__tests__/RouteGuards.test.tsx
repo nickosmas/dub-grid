@@ -7,9 +7,9 @@
  * Validates: Requirements 2.1, 2.2, 2.3, 4.1, 4.2, 4.3
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { PublicRoute, ProtectedRoute } from "@/components/RouteGuards";
+import { PublicRoute } from "@/components/RouteGuards";
 
 vi.mock("@/components/AuthProvider", () => ({
   useAuth: vi.fn(),

@@ -8,6 +8,7 @@ import type {
   ShiftCategory,
   FocusArea,
   NamedItem,
+  ShiftDisplayMode,
 } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { BarChart3, User, Layers } from "lucide-react";
@@ -27,6 +28,7 @@ interface OverviewTabProps {
   focusAreaById: Map<number, FocusArea>;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export function OverviewTab({
@@ -37,7 +39,9 @@ export function OverviewTab({
   focusAreaById,
   certifications,
   orgRoles,
+  shiftDisplayMode,
 }: OverviewTabProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const hoursHistory = useMemo(
     () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById, focusAreaById),
     [employee.id, shifts, shiftCodeById, categoryById, focusAreaById]
@@ -88,7 +92,7 @@ export function OverviewTab({
               danger={otSummary.weeksWithOT > 0}
             />
             <MetricCell
-              value={topCode ? topCode.label : "—"}
+              value={topCode ? (isNameMode ? (topCode.name || topCode.label) : topCode.label) : "—"}
               label={topCode ? `${topCode.percentage}% of shifts` : "Top Code"}
             />
           </div>
@@ -141,7 +145,7 @@ export function OverviewTab({
           <CardHeader className="border-b pb-3">
             <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
               <Layers className="w-4 h-4 text-muted-foreground" />
-              Shift Codes
+              {isNameMode ? "Shift Types" : "Shift Codes"}
             </CardTitle>
           </CardHeader>
           <CardContent>

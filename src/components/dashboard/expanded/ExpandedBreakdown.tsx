@@ -119,7 +119,7 @@ const modalStyle = { maxWidth: 900, width: "90vw" };
 const cardStyle = {
   padding: 16,
   borderRadius: 8,
-  background: "var(--color-bg, #F8FAFC)",
+  background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
 };
 

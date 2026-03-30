@@ -227,13 +227,13 @@ function EventIcon({ type }: { type: TimelineEvent["type"] }) {
   const cls = "w-3.5 h-3.5 shrink-0";
   switch (type) {
     case "role_change":
-      return <UserPlus className={`${cls} text-emerald-700`} />;
+      return <UserPlus className={cls} style={{ color: 'var(--color-success)' }} />;
     case "invitation_sent":
       return <Mail className={`${cls} text-muted-foreground`} />;
     case "invitation_accepted":
-      return <UserCheck className={`${cls} text-emerald-600`} />;
+      return <UserCheck className={cls} style={{ color: 'var(--color-success)' }} />;
     case "invitation_revoked":
-      return <UserX className={`${cls} text-rose-600`} />;
+      return <UserX className={cls} style={{ color: 'var(--color-danger)' }} />;
     case "invitation_expired":
       return <Clock className={`${cls} text-muted-foreground/60`} />;
   }

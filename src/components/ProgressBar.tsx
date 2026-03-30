@@ -41,7 +41,7 @@ export default function ProgressBar({ loading }: { loading: boolean }) {
     return () => {
       if (trickleRef.current) clearInterval(trickleRef.current);
     };
-  }, [loading]);
+  }, [loading, visible]);
 
   if (!visible) return null;
 

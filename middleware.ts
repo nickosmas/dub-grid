@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
+import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 
 /**
  * Vercel Edge Middleware for RBAC Route Protection
@@ -78,6 +79,27 @@ export async function middleware(req: NextRequest) {
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
+  // Generate a strict nonce-based CSP
+  const nonce = btoa(crypto.randomUUID());
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
+    frame-ancestors 'none';
+    object-src 'none';
+    base-uri 'none';
+    form-action 'self';
+    upgrade-insecure-requests;
+  `;
+  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
+
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+
   // Marketing pages should only render on the apex domain — redirect
   // any subdomain (including nonsense slugs) back to the bare domain.
   if (subdomain && subdomain !== "gridmaster") {
@@ -85,12 +107,14 @@ export async function middleware(req: NextRequest) {
     if (isMarketingPage) {
       const url = new URL(req.url);
       url.host = `${parsedHost.rootDomain}${parsedHost.port}`;
-      return NextResponse.redirect(url);
+      const res = NextResponse.redirect(url);
+      res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+      return res;
     }
   }
 
   // Public routes — accessible without authentication.
-  // Note: /api routes are also excluded at the matcher level (line 191),
+  // Note: /api routes are also excluded at the matcher level (line 400),
   // so the /api check here is a safety net for if the matcher changes.
   if (
     pathname === "/" ||
@@ -105,13 +129,19 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api")
   ) {
-    return NextResponse.next();
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+    return res;
   }
 
   // Create a mutable response so @supabase/ssr can refresh session cookies
+  // and pass the modified request headers forward for Next.js SSR hydration
   const res = NextResponse.next({
-    request: { headers: req.headers },
+    request: { headers: requestHeaders },
   });
+
+  // Apply CSP to the response sent to the browser
+  res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
   // Use @supabase/ssr to read the session from cookies. This correctly handles
   // the sb-<project-ref>-auth-token cookie format and multi-chunk cookie
@@ -191,25 +221,39 @@ export async function middleware(req: NextRequest) {
   ) {
     const userId = session.user.id;
 
-    // 1. Fetch platform role from profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("platform_role, org_id")
-      .eq("id", userId)
-      .maybeSingle();
+    // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
+    const profile = await cacheThrough(
+      CacheKey.mwProfile(userId),
+      TTL.MIDDLEWARE,
+      async () => {
+        const { data } = await supabase
+          .from("profiles")
+          .select("platform_role, org_id")
+          .eq("id", userId)
+          .maybeSingle();
+        return data;
+      },
+    );
 
-    // 2. Fetch org-specific role for the current subdomain
+    // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
     let resolvedOrgRole = "user";
     let resolvedOrgId = profile?.org_id;
-    let resolvedOrgSlug = undefined;
+    let resolvedOrgSlug: string | undefined = undefined;
 
     if (subdomain && subdomain !== "gridmaster") {
-      const { data: membership } = await supabase
-        .from("organization_memberships")
-        .select("org_role, org_id, organizations!inner(slug)")
-        .eq("user_id", userId)
-        .eq("organizations.slug", subdomain)
-        .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
+      const membership = await cacheThrough(
+        CacheKey.mwMembership(userId, subdomain),
+        TTL.MIDDLEWARE,
+        async () => {
+          const { data } = await supabase
+            .from("organization_memberships")
+            .select("org_role, org_id, organizations!inner(slug)")
+            .eq("user_id", userId)
+            .eq("organizations.slug", subdomain)
+            .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
+          return data;
+        },
+      );
 
       if (membership) {
         resolvedOrgRole = membership.org_role;
@@ -356,5 +400,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|favicon\\.ico|api|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot)$).*)"],
+  matcher: ["/((?!_next/static|favicon\\.ico|api|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)"],
 };

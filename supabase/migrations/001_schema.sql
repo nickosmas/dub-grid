@@ -46,6 +46,8 @@ CREATE TABLE public.organizations (
   focus_area_label     TEXT,
   certification_label  TEXT,
   role_label           TEXT,
+  shift_display_mode   TEXT DEFAULT 'code'
+    CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
   timezone             TEXT,
   archived_at          TIMESTAMPTZ,
   created_by           UUID,

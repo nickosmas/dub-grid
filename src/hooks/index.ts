@@ -11,10 +11,10 @@ export type {
 
 export { useLogout } from "./useLogout";
 
-export { useOrganizationData, clearOrgDataCache } from "./useOrganizationData";
+export { useOrganizationData } from "./useOrganizationData";
 export type { OrganizationData, SetupStatus } from "./useOrganizationData";
 
-export { useEmployees, clearEmployeeCache } from "./useEmployees";
+export { useEmployees } from "./useEmployees";
 export type { EmployeesData } from "./useEmployees";
 
 export { useCellLocks } from "./useCellLocks";

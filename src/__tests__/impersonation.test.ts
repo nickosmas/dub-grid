@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   getImpersonationFromCookie,
   setImpersonationCookie,
@@ -46,35 +46,40 @@ describe("getImpersonationFromCookie", () => {
 
   it("returns null when sessionId is missing", () => {
     const data = makeImpersonationData();
-    const { sessionId: _, ...noSession } = data;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { sessionId, ...noSession } = data;
     const cookieStr = `${IMPERSONATION_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(noSession))}`;
     expect(getImpersonationFromCookie(cookieStr)).toBeNull();
   });
 
   it("returns null when targetUserId is missing", () => {
     const data = makeImpersonationData();
-    const { targetUserId: _, ...partial } = data;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { targetUserId, ...partial } = data;
     const cookieStr = `${IMPERSONATION_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(partial))}`;
     expect(getImpersonationFromCookie(cookieStr)).toBeNull();
   });
 
   it("returns null when targetOrgId is missing", () => {
     const data = makeImpersonationData();
-    const { targetOrgId: _, ...partial } = data;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { targetOrgId, ...partial } = data;
     const cookieStr = `${IMPERSONATION_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(partial))}`;
     expect(getImpersonationFromCookie(cookieStr)).toBeNull();
   });
 
   it("returns null when targetOrgRole is missing", () => {
     const data = makeImpersonationData();
-    const { targetOrgRole: _, ...partial } = data;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { targetOrgRole, ...partial } = data;
     const cookieStr = `${IMPERSONATION_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(partial))}`;
     expect(getImpersonationFromCookie(cookieStr)).toBeNull();
   });
 
   it("returns null when expiresAt is missing", () => {
     const data = makeImpersonationData();
-    const { expiresAt: _, ...partial } = data;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { expiresAt, ...partial } = data;
     const cookieStr = `${IMPERSONATION_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(partial))}`;
     expect(getImpersonationFromCookie(cookieStr)).toBeNull();
   });

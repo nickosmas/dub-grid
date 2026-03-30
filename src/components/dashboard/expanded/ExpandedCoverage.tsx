@@ -4,15 +4,15 @@ import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 
 const STATUS_COLORS = {
-  green: { bg: "#C6E0CB", text: "#1A4A25" },
-  amber: { bg: "#FDE68A", text: "#92400E" },
-  red: { bg: "#FECACA", text: "#B91C1C" },
+  green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
+  amber: { bg: "var(--color-warning-border)", text: "var(--color-warning-text)" },
+  red: { bg: "var(--color-danger-border)", text: "var(--color-danger-text)" },
 };
 
 const PCT_COLORS = {
-  green: "#2D6B3A",
-  amber: "#D97706",
-  red: "#DC2626",
+  green: "var(--color-brand)",
+  amber: "var(--color-warning)",
+  red: "var(--color-danger)",
 };
 
 interface ExpandedCoverageProps {
@@ -188,7 +188,7 @@ const summaryBadgeStyle = {
   fontSize: 13,
   padding: "6px 12px",
   borderRadius: 8,
-  background: "var(--color-bg, #F8FAFC)",
+  background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
 };
 

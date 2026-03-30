@@ -62,7 +62,6 @@ interface DashboardViewProps {
   shiftCodeMap: Map<number, string>;
   shiftCodeById: Map<number, ShiftCode>;
   employees: Employee[];
-  benchedCount: number;
   permissions: Permissions;
 }
 
@@ -75,7 +74,6 @@ export default function DashboardView({
   shiftCodeMap,
   shiftCodeById,
   employees,
-  benchedCount,
   permissions,
 }: DashboardViewProps) {
   const { user: authUser } = useAuth();
@@ -140,8 +138,11 @@ export default function DashboardView({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShiftsLoading(true);
 
+    // Fetch only the date range needed: previous period start → current period end
+    const fetchStart = formatDateKey(prevPeriodStart);
+    const fetchEnd = formatDateKey(periodEnd);
     Promise.all([
-      fetchShifts(orgId, isScheduler, shiftCodeMapRef.current),
+      fetchShifts(orgId, isScheduler, shiftCodeMapRef.current, undefined, fetchStart, fetchEnd),
       fetchLatestPublishHistory(orgId),
     ]).then(([shifts, pub]) => {
       if (cancelled) return;
@@ -153,7 +154,7 @@ export default function DashboardView({
     });
 
     return () => { cancelled = true; };
-  }, [orgId, isScheduler]);
+  }, [orgId, isScheduler, prevPeriodStart, periodEnd]);
 
   // Shift requests
   const currentEmpId = useMemo(
@@ -222,9 +223,9 @@ export default function DashboardView({
     () =>
       computeCoverageBySection(
         focusAreas, periodDates, currentPeriodShifts,
-        activeEmployees, coverageRequirements, shiftCodes, shiftCodeById,
+        activeEmployees, coverageRequirements, shiftCodes,
       ),
-    [focusAreas, periodDates, currentPeriodShifts, activeEmployees, coverageRequirements, shiftCodes, shiftCodeById],
+    [focusAreas, periodDates, currentPeriodShifts, activeEmployees, coverageRequirements, shiftCodes],
   );
 
   // Stat cards
@@ -263,15 +264,15 @@ export default function DashboardView({
     () =>
       computeOpenShifts(
         focusAreas, shiftCodes, coverageRequirements,
-        periodDates, activeEmployees, currentPeriodShifts, shiftCodeById,
+        periodDates, activeEmployees, currentPeriodShifts, shiftCodeById, shiftCodeMap,
       ),
-    [focusAreas, shiftCodes, coverageRequirements, periodDates, activeEmployees, currentPeriodShifts, shiftCodeById],
+    [focusAreas, shiftCodes, coverageRequirements, periodDates, activeEmployees, currentPeriodShifts, shiftCodeById, shiftCodeMap],
   );
 
   // Shift breakdown
   const shiftBreakdown = useMemo(
-    () => computeShiftBreakdown(currentPeriodShifts, shiftCodeById, shiftCategories, focusAreas, activeEmployees),
-    [currentPeriodShifts, shiftCodeById, shiftCategories, focusAreas, activeEmployees],
+    () => computeShiftBreakdown(currentPeriodShifts, shiftCodeById, shiftCategories, focusAreas, activeEmployees, shiftCodeMap),
+    [currentPeriodShifts, shiftCodeById, shiftCategories, focusAreas, activeEmployees, shiftCodeMap],
   );
 
   // Activity feed
@@ -438,7 +439,6 @@ export default function DashboardView({
       {expandedPanel === "openShifts" && (
         <ExpandedOpenShifts
           openShifts={openShifts}
-          focusAreas={focusAreas}
           onClose={closeExpanded}
         />
       )}

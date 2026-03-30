@@ -75,15 +75,7 @@ function VerifyEmailContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "28px",
-          }}
-        >
+        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -111,13 +103,8 @@ function VerifyEmailContent() {
         </div>
 
         <h1
-          style={{
-            fontSize: "var(--dg-fs-card-title)",
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
-            marginBottom: "12px",
-            textAlign: "center",
-          }}
+          className="dg-auth-heading"
+          style={{ marginBottom: "12px" }}
         >
           Verify Your Email
         </h1>
@@ -148,28 +135,16 @@ function VerifyEmailContent() {
           <button
             onClick={handleResend}
             disabled={resending || cooldown > 0}
+            className="dg-auth-submit"
             style={{
-              width: "100%",
-              padding: "13px",
               background:
                 cooldown > 0
                   ? "var(--color-bg-secondary)"
-                  : "var(--color-brand)",
+                  : undefined,
               color:
                 cooldown > 0
                   ? "var(--color-text-muted)"
-                  : "var(--color-text-inverse)",
-              border: "none",
-              borderRadius: "999px",
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 600,
-              cursor:
-                resending || cooldown > 0 ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              opacity: resending ? 0.85 : 1,
+                  : undefined,
               marginBottom: "16px",
             }}
           >
@@ -199,10 +174,9 @@ function VerifyEmailContent() {
         <div style={{ textAlign: "center" }}>
           <Link
             href="/login"
+            className="dg-auth-link"
             style={{
-              fontSize: "var(--dg-fs-label)",
               color: "var(--color-text-subtle)",
-              textDecoration: "underline",
             }}
           >
             Back to login

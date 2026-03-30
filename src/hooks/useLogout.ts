@@ -1,9 +1,8 @@
 // src/hooks/useLogout.ts
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { parseHost } from "@/lib/subdomain";
 import { clearImpersonationCookie } from "@/lib/impersonation";
-import { clearOrgDataCache } from "./useOrganizationData";
-import { clearEmployeeCache } from "./useEmployees";
 import { clearPermsCache } from "./usePermissions";
 
 /**
@@ -12,10 +11,11 @@ import { clearPermsCache } from "./usePermissions";
  * - signOutOthers: all other devices
  */
 export function useLogout() {
+  const queryClient = useQueryClient();
+
   async function signOutLocal(redirectTo?: string): Promise<void> {
-    clearOrgDataCache();
-    clearEmployeeCache();
-    clearPermsCache();
+    queryClient.clear(); // Clears all React Query caches (org data, employees, etc.)
+    clearPermsCache(); // usePermissions still uses module-level cache
     clearImpersonationCookie();
 
     // Clean up any active impersonation sessions for this user

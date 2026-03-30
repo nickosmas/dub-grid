@@ -16,6 +16,7 @@ describe("rowToOrganization", () => {
       focus_area_label: null,
       certification_label: null,
       role_label: null,
+      shift_display_mode: null,
       timezone: null,
       archived_at: null,
     };
@@ -40,6 +41,7 @@ describe("rowToOrganization", () => {
       focus_area_label: null,
       certification_label: null,
       role_label: null,
+      shift_display_mode: null,
       timezone: null,
       archived_at: null,
     };

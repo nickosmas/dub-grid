@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 export interface SelectOption<T extends string | number> {
@@ -38,23 +38,35 @@ export default function CustomSelect<T extends string | number>({
 
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
 
-  useLayoutEffect(() => {
-    if (open && ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom - 12;
-      const maxH = Math.max(spaceBelow, 160);
-      setMenuStyle({
-        position: "absolute",
-        top: rect.bottom + window.scrollY + 6,
-        left: rect.left + window.scrollX,
-        minWidth: rect.width,
-        width: "max-content",
-        maxWidth: "min(350px, 90vw)",
-        maxHeight: maxH,
-        zIndex: 9999,
-      });
-    }
-  }, [open]);
+  const updatePosition = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const maxH = Math.max(spaceBelow, 160);
+    setMenuStyle({
+      position: "absolute",
+      top: rect.bottom + window.scrollY + 6,
+      left: rect.left + window.scrollX,
+      minWidth: rect.width,
+      width: "max-content",
+      maxWidth: "min(350px, 90vw)",
+      maxHeight: maxH,
+      zIndex: 9999,
+    });
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useLayoutEffect(() => { if (open) updatePosition(); }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, updatePosition]);
 
   // Reset focusedIndex when dropdown closes
   useEffect(() => {

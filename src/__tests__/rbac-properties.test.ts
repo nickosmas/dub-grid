@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import * as fc from "fast-check";
 
 /**
@@ -107,7 +107,8 @@ function createMockRoleChangeSystem() {
    */
   function updateAuditLogEntry(
     idempotencyKey: string,
-    _newValues: Partial<RoleChangeLogEntry>
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _newValues?: Partial<RoleChangeLogEntry>
   ): void {
     // Check if entry exists
     const existingEntry = roleChangeLog.find(
@@ -769,7 +770,7 @@ describe("RBAC Property Tests", () => {
                 adminCallerId,
                 idempotencyKey
               );
-            } catch (e) {
+            } catch {
               // Expected to throw
             }
 
@@ -996,7 +997,7 @@ describe("RBAC Property Tests", () => {
                 to_role: attemptedNewRole,
                 target_user_id: attemptedNewTargetId,
               });
-            } catch (e) {
+            } catch {
               // Expected to throw
             }
 
@@ -1040,7 +1041,7 @@ describe("RBAC Property Tests", () => {
             // Attempt to delete the audit log entry (should throw)
             try {
               mockSystem.deleteAuditLogEntry(idempotencyKey);
-            } catch (e) {
+            } catch {
               // Expected to throw
             }
 
@@ -1089,13 +1090,13 @@ describe("RBAC Property Tests", () => {
             for (const [, , idempotencyKey] of roleChanges) {
               try {
                 mockSystem.updateAuditLogEntry(idempotencyKey, { to_role: "user" });
-              } catch (e) {
+              } catch {
                 // Expected to throw
               }
 
               try {
                 mockSystem.deleteAuditLogEntry(idempotencyKey);
-              } catch (e) {
+              } catch {
                 // Expected to throw
               }
             }
@@ -1593,7 +1594,7 @@ describe("RBAC Property Tests", () => {
             // Attempt second session (should fail)
             try {
               mockSystem.startImpersonation(gridmasterId, targetUserId);
-            } catch (e) {
+            } catch {
               // Expected to throw
             }
 
@@ -1757,7 +1758,7 @@ describe("RBAC Property Tests", () => {
             mockSystem.setUserProfile(targetUserId, targetOrgId);
 
             // First impersonation session
-            const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
+            mockSystem.startImpersonation(gridmasterId, targetUserId);
 
             // Capture session state before duplicate attempt
             const sessionBefore = mockSystem.getSessionByTargetUser(gridmasterId, targetUserId);
@@ -1765,7 +1766,7 @@ describe("RBAC Property Tests", () => {
             // Attempt second session (should fail)
             try {
               mockSystem.startImpersonation(gridmasterId, targetUserId);
-            } catch (e) {
+            } catch {
               // Expected to throw
             }
 
@@ -1793,9 +1794,6 @@ describe("RBAC Property Tests", () => {
   function createMockInvitationSystem() {
     // Valid roles that can be assigned via invitation
     type InvitableRole = "scheduler" | "supervisor" | "user";
-    type RestrictedRole = "admin" | "gridmaster";
-    type AnyRole = InvitableRole | RestrictedRole;
-
     interface Invitation {
       id: string;
       org_id: string;
@@ -2214,7 +2212,7 @@ describe("RBAC Property Tests", () => {
             // Attempt to create invitation with restricted role
             try {
               mockSystem.sendInvitation(adminId, email, restrictedRole, orgId);
-            } catch (e) {
+            } catch {
               // Expected to throw
             }
 
@@ -3058,7 +3056,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
 
   it("generateIdempotencyKey produces valid UUID v4 format", () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
+      fc.property(fc.integer({ min: 1, max: 100 }), () => {
         const key = generateIdempotencyKey();
 
         // Verify the key matches UUID v4 format
@@ -3088,7 +3086,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
 
   it("two consecutive calls never produce the same key", () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
+      fc.property(fc.integer({ min: 1, max: 100 }), () => {
         const key1 = generateIdempotencyKey();
         const key2 = generateIdempotencyKey();
 
@@ -3124,7 +3122,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
 
   it("keys have correct UUID structure (36 characters with hyphens)", () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
+      fc.property(fc.integer({ min: 1, max: 100 }), () => {
         const key = generateIdempotencyKey();
 
         // UUID should be 36 characters (32 hex + 4 hyphens)
@@ -3142,7 +3140,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
 
   it("keys are lowercase hex strings", () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
+      fc.property(fc.integer({ min: 1, max: 100 }), () => {
         const key = generateIdempotencyKey();
 
         // Remove hyphens and check all characters are valid lowercase hex
@@ -3209,15 +3207,7 @@ describe("Property 27: Middleware Route Protection", () => {
     fc.stringMatching(/^\/settings\/[a-z]+$/)
   );
 
-  // Arbitrary for schedule paths
-  const arbSchedulePath = fc.oneof(
-    fc.constant("/schedule"),
-    fc.constant("/schedule/"),
-    fc.constant("/schedule/week"),
-    fc.constant("/schedule/month"),
-    fc.constant("/schedule/day"),
-    fc.stringMatching(/^\/schedule\/[a-z]+$/)
-  );
+
 
   // Arbitrary for staff paths
   const arbStaffPath = fc.oneof(
@@ -3303,7 +3293,7 @@ describe("Property 27: Middleware Route Protection", () => {
   describe("getRoleLevel helper function", () => {
     it("returns correct level for all known roles", () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 100 }), (_iteration) => {
+        fc.property(fc.integer({ min: 1, max: 100 }), () => {
           expect(getRoleLevel("gridmaster")).toBe(4);
           expect(getRoleLevel("super_admin")).toBe(3);
           expect(getRoleLevel("admin")).toBe(2);
@@ -4212,7 +4202,7 @@ describe("Property 6: Shift Version Increment", () => {
           // Attempt update with wrong version
           try {
             mockSystem.updateShiftV2(shiftId, { empId: "emp-1" }, actualVersion + 1);
-          } catch (e) {
+          } catch {
             // Expected to throw
           }
 
@@ -5552,14 +5542,14 @@ describe("Property 21: Shift RLS Enforcement", () => {
           // Attempt update (should fail)
           try {
             mockSystem.updateShift(shiftId, { empId: "emp-999" });
-          } catch (e) {
+          } catch {
             // Expected
           }
 
           // Attempt delete (should fail)
           try {
             mockSystem.deleteShift(shiftId);
-          } catch (e) {
+          } catch {
             // Expected
           }
 

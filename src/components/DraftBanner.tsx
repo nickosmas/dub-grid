@@ -1,6 +1,8 @@
 "use client";
 
 import type { DraftBreakdown } from "@/lib/draft-utils";
+import ButtonSpinner from "@/components/ButtonSpinner";
+import { Eye, EyeOff } from "lucide-react";
 
 interface DraftBannerProps {
   onPublish: () => void;
@@ -64,29 +66,20 @@ export default function DraftBanner({
         {onToggleDiff && (
           <button
             onClick={onToggleDiff}
-            className="dg-btn dg-btn-secondary"
+            className="dg-btn dg-btn-secondary dg-btn-sm"
             style={{
-              fontSize: "var(--dg-fs-caption)",
-              padding: "6px 14px",
               background: showDiff ? "var(--color-brand-bg)" : undefined,
               color: showDiff ? "var(--color-accent-text)" : undefined,
             }}
           >
             {showDiff ? (
               <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
+                <EyeOff size={12} style={{ marginRight: 4 }} />
                 Hide Changes
               </>
             ) : (
               <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
+                <Eye size={12} style={{ marginRight: 4 }} />
                 Show Changes
               </>
             )}
@@ -95,14 +88,12 @@ export default function DraftBanner({
         <button
           onClick={onCancel}
           disabled={isDisabled}
-          className="dg-btn dg-btn-secondary"
-          style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 14px", color: "var(--color-danger-dark)" }}
+          className="dg-btn dg-btn-secondary dg-btn-sm"
+          style={{ color: "var(--color-danger-dark)" }}
         >
           {isCanceling ? (
             <>
-              <svg className="dg-spinner" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-              </svg>
+              <ButtonSpinner size={12} />
               Discarding…
             </>
           ) : "Discard"}
@@ -111,14 +102,11 @@ export default function DraftBanner({
           <button
             onClick={onPublish}
             disabled={isDisabled}
-            className="dg-btn dg-btn-primary"
-            style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+            className="dg-btn dg-btn-primary dg-btn-sm"
           >
             {isPublishing ? (
               <>
-                <svg className="dg-spinner" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                </svg>
+                <ButtonSpinner size={12} />
                 Publishing…
               </>
             ) : "Publish"}

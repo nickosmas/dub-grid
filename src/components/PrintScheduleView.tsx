@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem, ShiftDisplayMode } from "@/types";
 import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
@@ -21,6 +21,11 @@ function getFocusAreaInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 3);
+}
+
+function pillText(label: string, max: number): string {
+  if (label.length <= max) return label;
+  return label.slice(0, max - 1).trimEnd() + "\u2026";
 }
 
 function fmt12hShort(time24: string): string {
@@ -47,6 +52,7 @@ interface PrintSectionProps {
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   splitAtIndex?: number;
   fontSize: number;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 function PrintSection({
@@ -65,7 +71,9 @@ function PrintSection({
   getCustomShiftTimes,
   splitAtIndex,
   fontSize,
+  shiftDisplayMode = "code",
 }: PrintSectionProps) {
+  const isNameMode = shiftDisplayMode === "name";
   // Bind focus-area context so label lookups resolve the section-specific definition first.
   const contextualGetShiftStyle = useMemo(
     () => (label: string) => getShiftStyle(label, sectionName),
@@ -97,11 +105,17 @@ function PrintSection({
     );
   }, [shiftCodes, focusAreaId]);
 
-  const shiftCodeIdsForKeyFn = shiftCodeIdsForKey ?? (() => []);
+  const tallyLabelResolver = useMemo(
+    () => isNameMode ? (code: ShiftCode) => code.name || code.label : undefined,
+    [isNameMode],
+  );
 
   const dailyTallies = useMemo(
-    () => dates.map((date) => computeDailyTallies(employees, date, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds)),
-    [dates, employees, shiftCodeIdsForKeyFn, shiftCodeById, sectionCodeIds],
+    () => {
+      const fn = shiftCodeIdsForKey ?? (() => []);
+      return dates.map((date) => computeDailyTallies(employees, date, fn, shiftCodeById, sectionCodeIds, tallyLabelResolver));
+    },
+    [dates, employees, shiftCodeIdsForKey, shiftCodeById, sectionCodeIds, tallyLabelResolver],
   );
 
   // Derive tally rows from actual data so tallies always show when categorized shifts exist
@@ -306,6 +320,7 @@ function PrintSection({
                                 alignItems: "center",
                                 justifyContent: "center",
                                 overflow: "hidden",
+                                padding: isNameMode ? "2px 4px" : "2px 3px",
                               }}
                             >
                               {isCross && crossHomeFa && (
@@ -330,7 +345,7 @@ function PrintSection({
                                   {getFocusAreaInitials(crossHomeFa.name)}
                                 </span>
                               )}
-                              <span style={{ fontWeight: 800, lineHeight: 1 }}>{label}</span>
+                              <span title={isNameMode ? label : undefined} style={{ fontWeight: 800, lineHeight: 1, ...(isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : {}) }}>{isNameMode ? pillText(label, 14) : label}</span>
                               {customTimes && (
                                 <span style={{
                                   fontSize: "0.75em",
@@ -391,6 +406,7 @@ function PrintSection({
                                     position: "relative",
                                     lineHeight: 1,
                                     overflow: "hidden",
+                                    padding: isNameMode ? "1px 3px" : "1px 2px",
                                   }}
                                 >
                                   {isCross && crossHomeFaLi && (
@@ -415,7 +431,7 @@ function PrintSection({
                                       {getFocusAreaInitials(crossHomeFaLi.name)}
                                     </span>
                                   )}
-                                  <span>{label}</span>
+                                  <span title={isNameMode ? label : undefined} style={isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : undefined}>{isNameMode ? pillText(label, 8) : label}</span>
                                   {hasTime && (
                                     <span style={{ fontSize: "0.7em", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
                                       {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
@@ -455,6 +471,7 @@ function PrintSection({
             splitAtIndex={splitAtIndex}
             dailyTallies={dailyTallies.map((t) => t[row.id] ?? {})}
             isFirst={ci === 0}
+            isNameMode={isNameMode}
           />
         ))}
       </div>
@@ -470,6 +487,7 @@ function TallyRow({
   splitAtIndex,
   dailyTallies,
   isFirst,
+  isNameMode = false,
 }: {
   label: string;
   bgColor: string;
@@ -478,6 +496,7 @@ function TallyRow({
   splitAtIndex?: number;
   dailyTallies: Record<string, number>[];
   isFirst?: boolean;
+  isNameMode?: boolean;
 }) {
   return (
     <div
@@ -529,7 +548,7 @@ function TallyRow({
             {entries.length === 0
               ? "-"
               : entries.map(([lbl, cnt], ei) => (
-                  <span key={lbl} style={{ whiteSpace: "nowrap" }}>
+                  <span key={lbl} title={`${lbl}: ${cnt}`} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isNameMode ? 90 : undefined, display: isNameMode ? "inline-block" : undefined, verticalAlign: isNameMode ? "middle" : undefined }}>
                     {ei > 0 && <span style={{ color:"#94A3B8", margin: "0 0.3em" }}>|</span>}
                     {lbl}: {cnt}
                   </span>
@@ -562,6 +581,7 @@ interface PrintScheduleViewProps {
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   onClose: () => void;
   focusAreaLabel?: string;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export default function PrintScheduleView({
@@ -581,7 +601,9 @@ export default function PrintScheduleView({
   getCustomShiftTimes,
   onClose,
   focusAreaLabel = "Focus Areas",
+  shiftDisplayMode = "code",
 }: PrintScheduleViewProps) {
+  const isNameMode = shiftDisplayMode === "name";
   const { fontSize, selectedFocusAreas: selectedWings, spanWeeks } = config;
 
   // Build date array
@@ -868,6 +890,7 @@ export default function PrintScheduleView({
                 getCustomShiftTimes={getCustomShiftTimes}
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
+                shiftDisplayMode={shiftDisplayMode}
               />
             );
           })}
@@ -889,7 +912,7 @@ export default function PrintScheduleView({
                   marginBottom: "0.7em",
                 }}
               >
-                Shift Code Key
+                {isNameMode ? "Shift Key" : "Shift Code Key"}
               </div>
               <div
                 style={{
@@ -913,15 +936,17 @@ export default function PrintScheduleView({
                         fontSize: "0.9em",
                         fontWeight: 700,
                         flexShrink: 0,
-                        minWidth: "2.5em",
+                        minWidth: isNameMode ? undefined : "2.5em",
                         textAlign: "center",
                       }}
                     >
-                      {s.label}
+                      {isNameMode ? (s.name || s.label) : s.label}
                     </span>
-                    <span style={{ fontSize: "0.9em", color:"#334766" }}>
-                      {s.name}
-                    </span>
+                    {!isNameMode && (
+                      <span style={{ fontSize: "0.9em", color:"#334766" }}>
+                        {s.name}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getImpersonationFromCookie,
@@ -9,11 +10,11 @@ import {
 } from "@/lib/impersonation";
 import { endImpersonation } from "@/lib/db";
 import { clearPermsCache } from "@/hooks/usePermissions";
-import { clearOrgDataCache } from "@/hooks/useOrganizationData";
 
 const BANNER_HEIGHT = 40;
 
 export default function ImpersonationBanner() {
+  const queryClient = useQueryClient();
   const [imp, setImp] = useState<ImpersonationData | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
@@ -34,18 +35,19 @@ export default function ImpersonationBanner() {
 
   // Countdown timer
   useEffect(() => {
-    if (!imp?.expiresAt) {
+    const expiresAt = imp?.expiresAt;
+    if (!expiresAt) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setCountdown(null);
       return;
     }
     function tick() {
-      const diff = new Date(imp!.expiresAt).getTime() - Date.now();
+      const diff = new Date(expiresAt!).getTime() - Date.now();
       if (diff <= 0) {
         setCountdown(null);
         clearImpersonationCookie();
         clearPermsCache();
-        clearOrgDataCache();
+        queryClient.clear();
         setImp(null);
         window.location.replace("/dashboard");
         return;
@@ -57,7 +59,7 @@ export default function ImpersonationBanner() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [imp?.expiresAt]);
+  }, [imp?.expiresAt, queryClient]);
 
   async function handleEnd() {
     if (!imp || ending) return;
@@ -80,7 +82,7 @@ export default function ImpersonationBanner() {
     }
     clearImpersonationCookie();
     clearPermsCache();
-    clearOrgDataCache();
+    queryClient.clear();
     toast.success("Impersonation ended");
     window.location.replace("/dashboard");
   }

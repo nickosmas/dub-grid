@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
@@ -54,7 +53,6 @@ export function StaffDetailPanel({
   onInvite,
   onRevoke,
 }: StaffDetailPanelProps) {
-  const router = useRouter();
   const hue = hashCode(employee.id) % 360;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);

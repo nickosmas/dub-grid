@@ -2,10 +2,10 @@ import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "#F0F7F0", stroke: "#004501" },
-  danger: { bg: "#FEF2F2", stroke: "#DC2626" },
-  warning: { bg: "#FFFBEB", stroke: "#D97706" },
-  neutral: { bg: "var(--color-bg-secondary, #F1F5F9)", stroke: "var(--color-text-secondary, #495057)" },
+  success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
+  danger: { bg: "var(--color-danger-bg)", stroke: "var(--color-danger)" },
+  warning: { bg: "var(--color-warning-bg)", stroke: "var(--color-warning)" },
+  neutral: { bg: "var(--color-bg-secondary)", stroke: "var(--color-text-secondary)" },
 };
 
 function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
@@ -67,13 +67,13 @@ export default function ActivityFeed({
   const visible = items.slice(0, maxVisible);
 
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>
+    <div className="dg-card">
+      <div className="dg-card-header">
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+          <div className="dg-card-title">
             Recent activity
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 1 }}>
+          <div className="dg-card-subtitle">
             Latest events
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function ActivityFeed({
                 padding: "9px 18px",
                 borderBottom:
                   i < visible.length - 1
-                    ? "1px solid var(--color-bg, #F8FAFC)"
+                    ? "1px solid var(--color-bg)"
                     : "none",
               }}
             >
@@ -127,18 +127,3 @@ export default function ActivityFeed({
     </div>
   );
 }
-
-const cardStyle = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 10,
-  overflow: "hidden" as const,
-};
-
-const headerStyle = {
-  padding: "14px 18px",
-  borderBottom: "1px solid var(--color-border-light, #E2E8F0)",
-  display: "flex" as const,
-  alignItems: "center" as const,
-  justifyContent: "space-between" as const,
-};
