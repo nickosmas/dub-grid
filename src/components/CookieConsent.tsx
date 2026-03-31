@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const STORAGE_KEY = "dubgrid-cookie-consent";
 
@@ -33,11 +33,7 @@ export function hasAnalyticsConsent(): boolean {
 }
 
 export default function CookieConsent() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (!getStoredConsent()) setVisible(true);
-  }, []);
+  const [visible, setVisible] = useState(() => !getStoredConsent());
 
   function acceptAll() {
     setStoredConsent({ essential: true, analytics: true });
