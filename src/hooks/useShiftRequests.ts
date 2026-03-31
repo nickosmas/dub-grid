@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fetchShiftRequests, createShiftRequest, claimShiftRequest, respondToShiftRequest, resolveShiftRequest, cancelShiftRequest } from "@/lib/db";
 import { toast } from "sonner";
+import * as Sentry from "@sentry/nextjs";
 import type {
   ShiftRequest,
   ShiftRequestType,
@@ -97,7 +98,7 @@ export function useShiftRequests(
       }
     } catch (err: unknown) {
       const msg = errMsg(err, "Failed to fetch shift requests");
-      console.error("Failed to fetch shift requests:", msg);
+      Sentry.captureException(err);
       if (orgIdRef.current === orgId) {
         setError(msg);
       }
@@ -144,7 +145,7 @@ export function useShiftRequests(
           fetchRequestsRef.current();
         } else if (status === 'CHANNEL_ERROR') {
           hadError = true;
-          console.warn('[Realtime] shift_requests channel error (auto-retrying):', err ?? 'unknown');
+          Sentry.captureException(err ?? new Error('shift_requests channel error'));
         }
       });
 

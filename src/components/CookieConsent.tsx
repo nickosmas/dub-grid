@@ -1,70 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const COOKIE_NAME = "dubgrid-cookie-consent";
-const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
+const STORAGE_KEY = "dubgrid-cookie-consent";
 
 interface CookiePreferences {
   essential: boolean;
   analytics: boolean;
 }
 
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function getRootDomain(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  const hostname = window.location.hostname;
-  // No domain attribute needed for localhost / IP addresses
-  if (hostname === "localhost" || hostname === "127.0.0.1") return undefined;
-  const parts = hostname.split(".");
-  if (parts.length >= 2) {
-    // "org.dubgrid.com" -> ".dubgrid.com"
-    return "." + parts.slice(-2).join(".");
-  }
-  return undefined;
-}
-
-function setCookie(name: string, value: string, maxAge: number) {
-  const domain = getRootDomain();
-  const domainPart = domain ? `; domain=${domain}` : "";
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
-}
-
-export function getCookieConsent(): CookiePreferences | null {
-  const raw = getCookie(COOKIE_NAME);
-  if (!raw) return null;
+function getStoredConsent(): CookiePreferences | null {
+  if (typeof window === "undefined") return null;
   try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
     return JSON.parse(raw) as CookiePreferences;
   } catch {
     return null;
   }
 }
 
+function setStoredConsent(prefs: CookiePreferences) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+}
+
+export function getCookieConsent(): CookiePreferences | null {
+  return getStoredConsent();
+}
+
 export function hasAnalyticsConsent(): boolean {
-  return getCookieConsent()?.analytics === true;
+  return getStoredConsent()?.analytics === true;
 }
 
 export default function CookieConsent() {
-  const [visible, setVisible] = useState(() => {
-    // SSR-safe: default hidden, checked on mount via key below
-    if (typeof document === "undefined") return false;
-    return !getCookie(COOKIE_NAME);
-  });
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!getStoredConsent()) setVisible(true);
+  }, []);
 
   function acceptAll() {
-    const prefs: CookiePreferences = { essential: true, analytics: true };
-    setCookie(COOKIE_NAME, JSON.stringify(prefs), COOKIE_MAX_AGE);
+    setStoredConsent({ essential: true, analytics: true });
     setVisible(false);
   }
 
   function acceptEssential() {
-    const prefs: CookiePreferences = { essential: true, analytics: false };
-    setCookie(COOKIE_NAME, JSON.stringify(prefs), COOKIE_MAX_AGE);
+    setStoredConsent({ essential: true, analytics: false });
     setVisible(false);
   }
 

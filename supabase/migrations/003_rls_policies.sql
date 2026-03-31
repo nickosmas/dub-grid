@@ -671,7 +671,7 @@ CREATE POLICY "shift_requests_select"
   ON public.shift_requests FOR SELECT TO authenticated
   USING (org_id = public.caller_org_id() OR public.is_gridmaster());
 
--- INSERT/UPDATE blocked for direct client access. All mutations go through
+-- INSERT/UPDATE/DELETE blocked for direct client access. All mutations go through
 -- SECURITY DEFINER functions (create_shift_request, respond_to_shift_request,
 -- resolve_shift_request, cancel_shift_request) which bypass RLS.
 CREATE POLICY "shift_requests_insert"
@@ -680,6 +680,10 @@ CREATE POLICY "shift_requests_insert"
 
 CREATE POLICY "shift_requests_update"
   ON public.shift_requests FOR UPDATE TO authenticated
+  USING (FALSE);
+
+CREATE POLICY "shift_requests_delete"
+  ON public.shift_requests FOR DELETE TO authenticated
   USING (FALSE);
 
 
@@ -715,10 +719,15 @@ CREATE POLICY "gridmaster_all_notifications"
 
 ALTER TABLE public.cookie_consents ENABLE ROW LEVEL SECURITY;
 
--- Anyone can insert a consent record (including anonymous visitors)
-CREATE POLICY "anyone_can_insert_cookie_consent"
-  ON public.cookie_consents FOR INSERT TO anon, authenticated
-  WITH CHECK (true);
+-- Authenticated users can insert their own consent record
+CREATE POLICY "authenticated_insert_cookie_consent"
+  ON public.cookie_consents FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- Anonymous visitors can insert a consent record (no user_id check — not logged in)
+CREATE POLICY "anon_insert_cookie_consent"
+  ON public.cookie_consents FOR INSERT TO anon
+  WITH CHECK (user_id IS NULL);
 
 -- Users can read their own consent records
 CREATE POLICY "users_read_own_cookie_consent"
@@ -771,6 +780,19 @@ CREATE POLICY "gridmaster_all_subscriptions"
   ON public.subscriptions FOR ALL TO authenticated
   USING (public.is_gridmaster())
   WITH CHECK (public.is_gridmaster());
+
+-- Non-gridmaster users cannot insert/update/delete subscriptions
+CREATE POLICY "subscriptions_insert_blocked"
+  ON public.subscriptions FOR INSERT TO authenticated
+  WITH CHECK (FALSE);
+
+CREATE POLICY "subscriptions_update_blocked"
+  ON public.subscriptions FOR UPDATE TO authenticated
+  USING (FALSE);
+
+CREATE POLICY "subscriptions_delete_blocked"
+  ON public.subscriptions FOR DELETE TO authenticated
+  USING (FALSE);
 
 -- Service role manages subscriptions via webhooks (bypasses RLS)
 

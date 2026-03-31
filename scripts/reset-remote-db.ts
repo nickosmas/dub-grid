@@ -5,7 +5,7 @@ import { Client } from "pg";
  * Resets the remote Supabase database by dropping the public schema
  * and re-running all 4 consolidated migration files.
  *
- * Called by `npm run db:reset:remote` which auto-pulls remote env via `vercel env pull`.
+ * Called by `npm run db:reset:remote` which loads .env.remote via --env-file.
  */
 async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -21,9 +21,9 @@ async function main() {
     connectionString = process.env.DATABASE_URL;
   } else if (process.env.SUPABASE_DB_PASSWORD) {
     const ref = new URL(supabaseUrl).hostname.split(".")[0];
-    connectionString = `postgresql://postgres:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD)}@db.${ref}.supabase.co:5432/postgres`;
+    connectionString = `postgresql://postgres.${ref}:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD)}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
   } else {
-    console.error("ERROR: DATABASE_URL or SUPABASE_DB_PASSWORD not found. Ensure these are set in Vercel env vars.");
+    console.error("ERROR: DATABASE_URL or SUPABASE_DB_PASSWORD not found in .env.local.");
     process.exit(1);
   }
 
