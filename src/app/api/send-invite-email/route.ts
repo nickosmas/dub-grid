@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
+import logger from "@/lib/logger";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
   if (!process.env.RESEND_FROM_EMAIL) {
-    console.warn("[send-invite-email] RESEND_FROM_EMAIL not set — using test domain (onboarding@resend.dev)");
+    logger.warn("RESEND_FROM_EMAIL not set — using test domain (onboarding@resend.dev)");
   }
 
   if (!apiKey) {
@@ -178,7 +179,7 @@ export async function POST(req: NextRequest) {
       : null) ||
     "http://localhost:3000";
   if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_VERCEL_URL) {
-    console.warn("[send-invite-email] No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links");
+    logger.warn("No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links");
   }
 
   const acceptUrl = `${emailBaseUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
@@ -230,7 +231,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[send-invite-email] Resend error:", err instanceof Error ? err.message : "Unknown error");
+    logger.error({ err, path: "/api/send-invite-email" }, "Failed to send invite email");
     return NextResponse.json(
       { success: false, error: "Failed to send email" },
       { status: 500 },

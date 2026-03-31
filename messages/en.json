@@ -1,0 +1,69 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "success": "Success",
+    "search": "Search",
+    "noResults": "No results found",
+    "required": "Required"
+  },
+  "nav": {
+    "schedule": "Schedule",
+    "staff": "Staff",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Log Out"
+  },
+  "auth": {
+    "login": "Log In",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "loginError": "Invalid email or password",
+    "locked": "Too many attempts. Try again in {minutes} minutes."
+  },
+  "schedule": {
+    "publish": "Publish",
+    "discard": "Discard",
+    "published": "Schedule published",
+    "emptyState": "No shifts scheduled for this week",
+    "draftBanner": "{count, plural, =1 {# unpublished change} other {# unpublished changes}}"
+  },
+  "staff": {
+    "addEmployee": "Add Employee",
+    "importEmployees": "Import Employees",
+    "exportStaff": "Export Staff",
+    "emptyState": "No employees added yet",
+    "searchPlaceholder": "Search by name..."
+  },
+  "settings": {
+    "organization": "Organization",
+    "shiftCodes": "Schedule Codes",
+    "indicators": "Indicators",
+    "staffConfig": "Staff Config",
+    "displayMode": "Display Mode",
+    "users": "Users"
+  },
+  "profile": {
+    "title": "Profile",
+    "security": "Security",
+    "notifications": "Notifications",
+    "sessions": "Active Sessions",
+    "dangerZone": "Danger Zone",
+    "deleteAccount": "Delete Account"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "No notifications",
+    "unread": "{count, plural, =1 {# unread} other {# unread}}"
+  }
+}

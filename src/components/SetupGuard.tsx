@@ -25,6 +25,9 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
   const isLoading = orgLoading || empLoading || perms.isLoading;
   const hasEmployees = employees.length > 0;
   const isComplete = setupStatus.isComplete && hasEmployees;
+  // If org data exists from cache, treat setup as complete during revalidation
+  // to avoid blanking the screen on every navigation.
+  const hasCachedOrgData = !!org && !orgLoading;
   const isGridmasterBypass = perms.isGridmaster && !perms.isImpersonating;
 
   useEffect(() => {
@@ -43,8 +46,10 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
     return <>{children}</>;
   }
 
+  // Show children immediately if setup is complete, or if we have cached org
+  // data and are just revalidating (avoids blank screen on navigation).
+  if (isComplete || (isLoading && hasCachedOrgData && hasEmployees)) return <>{children}</>;
   if (isLoading) return null;
-  if (isComplete) return <>{children}</>;
 
   // Regular user — show waiting message
   if (!perms.isSuperAdmin && !perms.canManageOrg) {

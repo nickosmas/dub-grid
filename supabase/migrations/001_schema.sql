@@ -49,6 +49,11 @@ CREATE TABLE public.organizations (
   shift_display_mode   TEXT DEFAULT 'code'
     CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
   timezone             TEXT,
+  stripe_customer_id   TEXT UNIQUE,
+  subscription_status  TEXT NOT NULL DEFAULT 'trialing',
+  trial_ends_at        TIMESTAMPTZ,
+  subscription_seats   INTEGER,
+  data_retention_days  INTEGER NOT NULL DEFAULT 365,
   archived_at          TIMESTAMPTZ,
   created_by           UUID,
   updated_by           UUID,
@@ -56,6 +61,9 @@ CREATE TABLE public.organizations (
   updated_at           TIMESTAMPTZ DEFAULT now()
 );
 
+COMMENT ON COLUMN public.organizations.data_retention_days IS 'Number of days to retain archived/deleted data before permanent purge (default 365)';
+COMMENT ON COLUMN public.organizations.stripe_customer_id IS 'Stripe customer ID for billing';
+COMMENT ON COLUMN public.organizations.subscription_status IS 'Stripe subscription status: trialing, active, past_due, canceled, unpaid';
 COMMENT ON COLUMN public.organizations.logo_url IS 'URL to the organization custom logo image';
 COMMENT ON COLUMN public.organizations.app_name IS 'Custom display name for the application';
 COMMENT ON COLUMN public.organizations.meta_description IS 'Custom SEO meta description';
@@ -71,6 +79,9 @@ CREATE TABLE public.profiles (
   platform_role  public.platform_role NOT NULL DEFAULT 'none',
   version        BIGINT NOT NULL DEFAULT 0,
   role_locked    BOOLEAN NOT NULL DEFAULT false,
+  mfa_enabled    BOOLEAN NOT NULL DEFAULT false,
+  terms_accepted_at TIMESTAMPTZ,
+  terms_version  TEXT,
   first_name     TEXT,
   last_name      TEXT,
   created_at     TIMESTAMPTZ DEFAULT now(),
@@ -481,7 +492,13 @@ CREATE TABLE public.notifications (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL,
   org_id     UUID,
-  type       TEXT NOT NULL CHECK (type IN ('impersonation_start', 'impersonation_end', 'system')),
+  type       TEXT NOT NULL CHECK (type IN (
+    'impersonation_start', 'impersonation_end', 'system',
+    'shift_change', 'schedule_published', 'shift_request_new',
+    'shift_request_approved', 'shift_request_rejected'
+  )),
+  channel    TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
+  category   TEXT,
   title      TEXT NOT NULL,
   message    TEXT NOT NULL,
   metadata   JSONB DEFAULT '{}'::JSONB,
@@ -489,7 +506,20 @@ CREATE TABLE public.notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE public.notifications IS 'In-app notifications for users (e.g. impersonation notices, system messages)';
+COMMENT ON TABLE public.notifications IS 'In-app and email notifications for users';
+
+
+-- ── notification_preferences ────────────────────────────────────────────────
+
+CREATE TABLE public.notification_preferences (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    UUID NOT NULL UNIQUE,
+  prefs      JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.notification_preferences IS 'Per-user notification channel preferences (in_app/email toggles per category)';
 
 
 -- ── user_sessions ─────────────────────────────────────────────────────────────
@@ -789,6 +819,14 @@ ALTER TABLE public.publish_history
   ADD CONSTRAINT publish_history_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT publish_history_user_fkey FOREIGN KEY (published_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
+-- terms_acceptances
+ALTER TABLE public.terms_acceptances
+  ADD CONSTRAINT terms_acceptances_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- subscriptions
+ALTER TABLE public.subscriptions
+  ADD CONSTRAINT subscriptions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 4. INDEXES
@@ -859,6 +897,7 @@ CREATE INDEX idx_shifts_published_code_ids ON public.shifts USING gin(published_
 -- schedule_notes
 CREATE INDEX idx_schedule_notes_org ON public.schedule_notes(org_id);
 CREATE INDEX idx_schedule_notes_emp ON public.schedule_notes(emp_id);
+CREATE INDEX idx_schedule_notes_emp_date ON public.schedule_notes(emp_id, date);
 
 -- indicator_types
 CREATE UNIQUE INDEX indicator_types_org_name_active_unique ON public.indicator_types(org_id, name) WHERE archived_at IS NULL;
@@ -913,6 +952,82 @@ CREATE INDEX idx_shift_requests_requester ON public.shift_requests(requester_emp
 CREATE INDEX idx_shift_requests_target ON public.shift_requests(target_emp_id, status) WHERE target_emp_id IS NOT NULL;
 CREATE INDEX idx_shift_requests_org_open_pickups ON public.shift_requests(org_id) WHERE type = 'pickup' AND status = 'open';
 CREATE INDEX idx_shift_requests_expiry ON public.shift_requests(expires_at) WHERE status IN ('open', 'pending_approval');
+
+
+-- ── cookie_consents ─────────────────────────────────────────────────────────
+
+CREATE TABLE public.cookie_consents (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    UUID,
+  ip_hash    TEXT NOT NULL,
+  consent    JSONB NOT NULL DEFAULT '{"essential": true, "analytics": false}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.cookie_consents IS 'Stores cookie consent records for compliance';
+
+
+-- ── terms_acceptances ───────────────────────────────────────────────────────
+
+CREATE TABLE public.terms_acceptances (
+  id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id        UUID NOT NULL,
+  terms_version  TEXT NOT NULL,
+  accepted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ip_address     INET,
+  user_agent     TEXT
+);
+
+CREATE INDEX idx_terms_acceptances_user ON public.terms_acceptances(user_id);
+
+COMMENT ON TABLE public.terms_acceptances IS 'Immutable audit trail of terms and conditions acceptances';
+
+
+-- ── subscriptions ───────────────────────────────────────────────────────────
+
+CREATE TABLE public.subscriptions (
+  id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id                UUID NOT NULL UNIQUE,
+  stripe_subscription_id TEXT UNIQUE,
+  stripe_customer_id    TEXT,
+  status                TEXT NOT NULL DEFAULT 'trialing',
+  price_id              TEXT,
+  quantity              INTEGER NOT NULL DEFAULT 1,
+  current_period_start  TIMESTAMPTZ,
+  current_period_end    TIMESTAMPTZ,
+  cancel_at             TIMESTAMPTZ,
+  canceled_at           TIMESTAMPTZ,
+  trial_end             TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_subscriptions_stripe_id ON public.subscriptions(stripe_subscription_id);
+
+COMMENT ON TABLE public.subscriptions IS 'Stripe subscription tracking per organization';
+
+
+-- ── audit_log ──────────────────────────────────────────────────────────────
+
+CREATE TABLE public.audit_log (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id        UUID,
+  actor_id      UUID,
+  actor_email   TEXT,
+  action        TEXT NOT NULL,
+  resource_type TEXT NOT NULL,
+  resource_id   TEXT,
+  details       JSONB NOT NULL DEFAULT '{}',
+  ip_address    INET,
+  user_agent    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_audit_log_org_created ON public.audit_log(org_id, created_at DESC);
+CREATE INDEX idx_audit_log_actor ON public.audit_log(actor_id);
+CREATE INDEX idx_audit_log_resource ON public.audit_log(resource_type, resource_id);
+
+COMMENT ON TABLE public.audit_log IS 'Comprehensive audit trail for all mutations across the platform';
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   // ── Rate limit by IP ──────────────────────────────────────────────────
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    console.error("[validate-domain] Supabase error:", error.message);
+    logger.error({ err: error.message, path: "/api/validate-domain" }, "Supabase query failed");
     return NextResponse.json({ valid: false }, { status: 503, headers: cacheHeaders });
   }
 

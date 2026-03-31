@@ -40,9 +40,12 @@ export default function ConfirmDialog({
       ? { background: "var(--color-warning)", border: "none" }
       : undefined;
 
+  const descId = "confirm-dialog-desc";
+
   return (
-    <Modal title={title} onClose={onCancel} style={{ maxWidth: 420 }}>
+    <Modal title={title} onClose={onCancel} style={{ maxWidth: 420 }} aria-describedby={descId}>
       <div
+        id={descId}
         style={{
           fontSize: "var(--dg-fs-body-sm)",
           color: "var(--color-text-secondary)",

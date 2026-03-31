@@ -6,6 +6,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
+import logger from "@/lib/logger";
 
 const bodySchema = z.object({
   targetEmail: z.string().email(),
@@ -212,7 +213,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[notify-impersonation] Resend error:", err instanceof Error ? err.message : "Unknown error");
+    logger.error({ err, path: "/api/notify-impersonation" }, "Failed to send impersonation notification email");
     return NextResponse.json(
       { success: false, error: "Failed to send email" },
       { status: 500 },

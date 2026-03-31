@@ -1,5 +1,3 @@
-import { AnimatedDubGridLogo } from "@/components/Logo";
-
 export default function GridmasterLoading() {
   return (
     <div
@@ -8,21 +6,20 @@ export default function GridmasterLoading() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        flexDirection: "column",
-        gap: 12,
         background: "var(--color-dark)",
       }}
     >
-      <AnimatedDubGridLogo size={48} color="#94A3B8" />
-      <span
+      <div
         style={{
-          fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-subtle)",
-          fontWeight: 500,
+          width: 32,
+          height: 32,
+          border: "3px solid rgba(148, 163, 184, 0.3)",
+          borderTopColor: "#94A3B8",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
         }}
-      >
-        Loading...
-      </span>
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }

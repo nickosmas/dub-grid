@@ -11,7 +11,10 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import type { User } from "@supabase/supabase-js";
-import { ChevronDown, Pencil, X, Check } from "lucide-react";
+import { ChevronDown, Pencil, X, Check, Trash2, Calendar, Copy } from "lucide-react";
+import { MFASetup } from "@/components/profile/MFASetup";
+import { NotificationPreferences } from "@/components/profile/NotificationPreferences";
+import { SessionList } from "@/components/profile/SessionList";
 
 interface ProfileData {
   first_name: string | null;
@@ -104,8 +107,16 @@ function ProfilePageContent() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // MFA
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+
   // Session management
   const [signingOut, setSigningOut] = useState<"others" | "global" | null>(null);
+
+  // Account deletion
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,10 +126,13 @@ function ProfilePageContent() {
       setUser(data.session.user);
       const { data: prof } = await supabase
         .from("profiles")
-        .select("first_name, last_name")
+        .select("first_name, last_name, mfa_enabled")
         .eq("id", data.session.user.id)
         .single();
-      if (!cancelled) setProfile(prof ?? null);
+      if (!cancelled) {
+        setProfile(prof ? { first_name: prof.first_name, last_name: prof.last_name } : null);
+        setMfaEnabled(prof?.mfa_enabled ?? false);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -231,6 +245,28 @@ function ProfilePageContent() {
     } catch {
       toast.error("Failed to sign out. Please try again.");
       setSigningOut(null);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== "DELETE MY ACCOUNT") return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/auth/delete-account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "DELETE MY ACCOUNT" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to delete account");
+        return;
+      }
+      window.location.replace("/login");
+    } catch {
+      toast.error("Failed to delete account. Please try again.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -506,8 +542,89 @@ function ProfilePageContent() {
                     </ButtonLoading>
                   </button>
                 </form>
+
+                {/* Two-factor authentication */}
+                <div style={{
+                  marginTop: 24,
+                  paddingTop: 20,
+                  borderTop: "1px solid var(--color-border-light)",
+                }}>
+                  <label style={{
+                    display: "block",
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    marginBottom: 12,
+                  }}>
+                    Two-Factor Authentication
+                  </label>
+                  <MFASetup
+                    mfaEnabled={mfaEnabled}
+                    onStatusChange={setMfaEnabled}
+                  />
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Notifications card */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <span style={cardHeaderLabelStyle}>Notifications</span>
+            </div>
+            <div style={{ padding: "20px 24px" }}>
+              <NotificationPreferences />
+            </div>
+          </div>
+
+          {/* Calendar Subscription card */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <span style={cardHeaderLabelStyle}>Calendar Subscription</span>
+            </div>
+            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
+                Subscribe to your shift schedule in any calendar app (Google Calendar, Apple Calendar, Outlook).
+              </p>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Calendar size={16} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
+                <code
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-text-secondary)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {typeof window !== "undefined" ? `${window.location.origin}/api/calendar` : "/api/calendar"}
+                </code>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/api/calendar`;
+                    navigator.clipboard.writeText(url).then(
+                      () => toast.success("Calendar URL copied to clipboard"),
+                      () => toast.error("Failed to copy URL"),
+                    );
+                  }}
+                  className="dg-btn dg-btn-secondary"
+                  style={{ padding: "6px 10px", flexShrink: 0 }}
+                  aria-label="Copy calendar URL"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+              <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", margin: 0 }}>
+                Note: You must be logged in for the calendar feed to work. This URL returns your shifts for the next 4 weeks.
+              </p>
+            </div>
           </div>
 
           {/* Sessions card */}
@@ -539,6 +656,73 @@ function ProfilePageContent() {
                   </ButtonLoading>
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Active Sessions */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <span style={cardHeaderLabelStyle}>Active Sessions</span>
+            </div>
+            <SessionList />
+          </div>
+
+          {/* Danger Zone */}
+          <div style={{ ...cardStyle, borderColor: "var(--color-danger)" }}>
+            <div style={{ ...cardHeaderStyle, borderBottomColor: "var(--color-danger-bg)" }}>
+              <span style={{ ...cardHeaderLabelStyle, color: "var(--color-danger)" }}>Danger Zone</span>
+            </div>
+            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {!showDeleteConfirm ? (
+                <>
+                  <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                  </p>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="dg-btn dg-btn-danger"
+                    style={{ alignSelf: "flex-start" }}
+                  >
+                    <Trash2 size={14} style={{ marginRight: 4 }} />
+                    Delete Account
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-danger)", margin: 0, fontWeight: 600 }}>
+                    This will permanently delete your account, remove you from all organizations, and sign you out of all devices.
+                  </p>
+                  <div>
+                    <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 5 }}>
+                      Type <strong>DELETE MY ACCOUNT</strong> to confirm
+                    </label>
+                    <input
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="DELETE MY ACCOUNT"
+                      style={{ ...inputFieldStyle, borderColor: "var(--color-danger)" }}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleting || deleteConfirmText !== "DELETE MY ACCOUNT"}
+                      className="dg-btn dg-btn-danger"
+                    >
+                      <ButtonLoading loading={deleting} spinnerSize={14}>
+                        Permanently Delete
+                      </ButtonLoading>
+                    </button>
+                    <button
+                      onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+                      className="dg-btn dg-btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

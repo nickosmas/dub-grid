@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 
 export interface SelectOption<T extends string | number> {
@@ -27,14 +27,20 @@ export default function CustomSelect<T extends string | number>({
   style,
   fontSize = 13,
 }: CustomSelectProps<T>) {
-  const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [open, setOpenRaw] = useState(false);
+  const [mounted] = useState(typeof window !== "undefined");
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setMounted(true); }, []);
+
+  const setOpen = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setOpenRaw((prev) => {
+      const next = typeof v === "function" ? v(prev) : v;
+      if (!next) setFocusedIndex(-1);
+      return next;
+    });
+  }, []);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const selected = options.find((o) => o.value === value) ?? options[0];
+  const selected = useMemo(() => options.find((o) => o.value === value) ?? options[0], [options, value]);
 
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
 
@@ -67,10 +73,11 @@ export default function CustomSelect<T extends string | number>({
     };
   }, [open, updatePosition]);
 
-  // Reset focusedIndex when dropdown closes
+  // Focus menu when it opens
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!open) setFocusedIndex(-1);
+    if (open && menuRef.current) {
+      menuRef.current.focus();
+    }
   }, [open]);
 
   useEffect(() => {
@@ -94,6 +101,7 @@ export default function CustomSelect<T extends string | number>({
         type="button"
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-disabled={disabled || undefined}
         onClick={() => !disabled && setOpen((o) => !o)}
         onKeyDown={(e) => {
           if (disabled) return;
@@ -160,6 +168,8 @@ export default function CustomSelect<T extends string | number>({
       ref={menuRef}
       role="listbox"
       tabIndex={-1}
+      aria-label={`${selected?.label ?? "Select"} options`}
+      aria-activedescendant={focusedIndex >= 0 ? `option-${String(options[focusedIndex]?.value)}` : undefined}
       className="dg-menu"
       onKeyDown={(e) => {
         if (e.key === "ArrowDown") {
@@ -192,6 +202,7 @@ export default function CustomSelect<T extends string | number>({
         return (
           <button
             key={String(opt.value)}
+            id={`option-${String(opt.value)}`}
             type="button"
             role="option"
             aria-selected={isActive}

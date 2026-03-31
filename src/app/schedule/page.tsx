@@ -193,12 +193,18 @@ function SchedulerContent() {
   currentUserRef.current = currentUser;
   const canEditShiftsRef = useRef(canEditShifts);
   canEditShiftsRef.current = canEditShifts;
+  // Stable refs for map objects — avoids recreating callbacks when maps get new
+  // references (which happens on every React Query revalidation).
+  const shiftCodeMapRef = useRef(shiftCodeMap);
+  shiftCodeMapRef.current = shiftCodeMap;
+  const absenceTypeMapRef = useRef(absenceTypeMap);
+  absenceTypeMapRef.current = absenceTypeMap;
 
   // ── Shared refetch helper (eliminates 4x duplication) ──────────────────────
   const refetchScheduleData = useCallback(async () => {
     if (!org) return;
     const [shiftData, noteRows] = await Promise.all([
-      fetchShifts(org.id, canEditShiftsRef.current, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd),
+      fetchShifts(org.id, canEditShiftsRef.current, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd),
       fetchScheduleNotes(org.id),
     ]);
     const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
@@ -211,7 +217,8 @@ function SchedulerContent() {
     }
     setShifts(shiftData);
     setNotes(noteMap);
-  }, [org, absenceTypeMap, shiftCodeMap, shiftFetchStart, shiftFetchEnd]);
+    lastRefetchAtRef.current = Date.now();
+  }, [org, shiftFetchStart, shiftFetchEnd]);
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
@@ -463,6 +470,8 @@ function SchedulerContent() {
   handleUnlockBroadcastRef.current = handleUnlockBroadcast;
   const refetchScheduleDataRef = useRef(refetchScheduleData);
   refetchScheduleDataRef.current = refetchScheduleData;
+  // Tracks when data was last fetched — used to throttle tab-visibility refetches
+  const lastRefetchAtRef = useRef(0);
 
   // Subscribe to real-time schedule broadcasts so other tabs/users see
   // published and draft changes immediately without a manual refresh.
@@ -592,11 +601,13 @@ function SchedulerContent() {
         }
       }
 
-      // Always refetch to catch any missed broadcasts
-      refetchScheduleDataRef.current().catch((err) => {
-        console.error("Tab refetch failed:", err);
-        toast.error("Failed to refresh schedule — try reloading the page");
-      });
+      // Refetch to catch any missed broadcasts — skip if data is fresh (<10s old)
+      if (Date.now() - lastRefetchAtRef.current > 10_000) {
+        refetchScheduleDataRef.current().catch((err) => {
+          console.error("Tab refetch failed:", err);
+          toast.error("Failed to refresh schedule — try reloading the page");
+        });
+      }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -613,7 +624,7 @@ function SchedulerContent() {
 
     (async () => {
       try {
-        const draftShifts = await fetchShifts(org.id, true, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd);
+        const draftShifts = await fetchShifts(org.id, true, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
         setShifts(draftShifts);
       } catch (err) {
         console.error("Draft check failed:", err);
@@ -1074,7 +1085,7 @@ function SchedulerContent() {
 
       const handleConflict = async () => {
         toast.error("Shift was modified by another user — refreshing");
-        const freshShifts = await fetchShifts(orgId, canEditShifts, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd);
+        const freshShifts = await fetchShifts(orgId, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
         setShifts(freshShifts);
       };
 
@@ -1121,7 +1132,7 @@ function SchedulerContent() {
         }
       } else {
         // Filter out any stale/archived shift code IDs
-        const validCodeIds = shiftCodeIds.filter((id) => shiftCodeMap.has(id));
+        const validCodeIds = shiftCodeIds.filter((id) => shiftCodeMapRef.current.has(id));
         if (validCodeIds.length === 0) {
           toast.error("Selected shift code is no longer available");
           return;
@@ -1162,7 +1173,7 @@ function SchedulerContent() {
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
-    [org?.id, canEditShifts, shiftCodeMap, absenceTypeMap, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
+    [org?.id, canEditShifts, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
   );
 
   const getShiftStyle = useCallback(
@@ -1249,7 +1260,7 @@ function SchedulerContent() {
         try {
           await updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
           const prevShifts = shifts;
-          const shiftData = await fetchShifts(org!.id, canEditShifts, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd);
+          const shiftData = await fetchShifts(org!.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
           setShifts(shiftData);
           const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
           for (const [k, v] of Object.entries(shiftData)) {
@@ -1269,7 +1280,7 @@ function SchedulerContent() {
         setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
       }
     },
-    [editPanel, shifts, org, canEditShifts, setShift, shiftCodeMap, absenceTypeMap, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
+    [editPanel, shifts, org, canEditShifts, setShift, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
   );
 
   const handleConfirmSeriesDelete = useCallback(async () => {
@@ -1277,7 +1288,7 @@ function SchedulerContent() {
     try {
       const prevShifts = shifts;
       const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId);
-      const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd);
+      const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
       // Detect removed shifts
@@ -1302,7 +1313,7 @@ function SchedulerContent() {
       unlockCell();
       setEditPanel(null);
     }
-  }, [pendingSeriesDelete, org, canEditShifts, shiftCodeMap, absenceTypeMap, shifts, broadcastDraftChanged, unlockCell, shiftFetchStart, shiftFetchEnd]);
+  }, [pendingSeriesDelete, org, canEditShifts, shifts, broadcastDraftChanged, unlockCell, shiftFetchStart, shiftFetchEnd]);
 
   const handleRepeatConfirm = useCallback(
     async (
@@ -1330,7 +1341,7 @@ function SchedulerContent() {
           maxOccurrences,
         );
         const prevShifts = shifts;
-        const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd);
+        const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
         setShifts(shiftData);
         // Broadcast new/changed shifts to other editors
         const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
@@ -1351,7 +1362,7 @@ function SchedulerContent() {
         setEditPanel(null);
       }
     },
-    [editPanel, org, canEditShifts, shiftCodeMap, absenceTypeMap, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
+    [editPanel, org, canEditShifts, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
   );
 
   // ── Qualification check for drag/paste ──────────────────────────────────
@@ -1375,13 +1386,13 @@ function SchedulerContent() {
         if (!code) continue;
         if (!isEmployeeQualified(emp, code)) {
           const reasons = getDisqualificationReasons(emp, code, focusAreaNameMap, certificationNameMap);
-          const displayLabel = shiftCodeMap.get(codeId) ?? code.label;
+          const displayLabel = shiftCodeMapRef.current.get(codeId) ?? code.label;
           return `${getEmployeeDisplayName(emp)} cannot be assigned ${displayLabel}: ${reasons.join(", ")}`;
         }
       }
       return null;
     },
-    [employees, shiftCodes, focusAreaNameMap, certificationNameMap, shiftCodeMap],
+    [employees, shiftCodes, focusAreaNameMap, certificationNameMap],
   );
 
   // ── Drag & Drop handlers ──────────────────────────────────────────────────
@@ -1570,7 +1581,7 @@ function SchedulerContent() {
     const { startDate, endDate } = getAutoFillRange();
 
     // Fetch fresh recurring shifts to get an accurate count
-    const freshRecurringShifts = await fetchRecurringShifts(org.id, undefined, shiftCodeMap, false, absenceTypeMap);
+    const freshRecurringShifts = await fetchRecurringShifts(org.id, undefined, shiftCodeMapRef.current, false, absenceTypeMapRef.current);
     setRecurringShifts(freshRecurringShifts);
 
     // Count empty slots that would be filled (matches server-side RPC logic)
@@ -1610,7 +1621,7 @@ function SchedulerContent() {
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     setAutoFillPreview({ count, dateRange });
     setShowAutoFillConfirm(true);
-  }, [org, getAutoFillRange, shiftCodes, absenceTypes, absenceTypeMap, shiftCodeMap, shifts]);
+  }, [org, getAutoFillRange, shiftCodes, absenceTypes, shifts]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {

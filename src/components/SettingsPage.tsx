@@ -10,6 +10,8 @@ import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEf
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
+import HelpTooltip from "@/components/HelpTooltip";
+import { helpText } from "@/lib/help-content";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
@@ -104,11 +106,13 @@ function Section({
   children,
   maxWidth = 860,
   noPadding = false,
+  helpText,
 }: {
   title: string;
   children: React.ReactNode;
   maxWidth?: number;
   noPadding?: boolean;
+  helpText?: string;
 }) {
   return (
     <div
@@ -120,9 +124,10 @@ function Section({
       }}
     >
       <div
-        style={sectionHeaderStyle}
+        style={{ ...sectionHeaderStyle, display: "flex", alignItems: "center", gap: 8 }}
       >
         {title}
+        {helpText && <HelpTooltip text={helpText} side="right" />}
       </div>
       {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}
     </div>
@@ -4558,14 +4563,14 @@ export default function SettingsPage({
               </Section>
             )}
             {(isSuperAdmin || canManageOrgLabels) && (
-              <Section title="Custom Labels">
+              <Section title="Custom Labels" helpText={helpText.settings.orgLabels}>
                 <OrganizationLabelsSettings
                   organization={organization}
                   onSave={onOrganizationSave}
                 />
               </Section>
             )}
-            <Section title={focusAreaLabel} noPadding>
+            <Section title={focusAreaLabel} noPadding helpText={helpText.staff.focusAreas}>
               <FocusAreasSettings
                 focusAreas={focusAreas}
                 orgId={organization.id}
@@ -4650,7 +4655,7 @@ export default function SettingsPage({
 
         {activeSection === "staff-config" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
-            <Section title={certificationLabel} noPadding>
+            <Section title={certificationLabel} noPadding helpText={helpText.staff.certification}>
               <StringListSettings
                 label={`Define the ${certificationLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
                 items={certifications}
@@ -4668,7 +4673,7 @@ export default function SettingsPage({
                 canEdit={canManageOrgLabels}
               />
             </Section>
-            <Section title={roleLabel} noPadding>
+            <Section title={roleLabel} noPadding helpText={helpText.staff.roles}>
               <StringListSettings
                 label={`Define the ${roleLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
                 items={orgRoles}

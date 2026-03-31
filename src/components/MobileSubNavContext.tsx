@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
 
 export interface SubNavItem {
   id: string;
@@ -23,8 +23,9 @@ const MobileSubNavContext = createContext<MobileSubNavContextValue>({
 
 export function MobileSubNavProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<SubNavItem[]>([]);
+  const contextValue = useMemo(() => ({ items, setItems }), [items]);
   return (
-    <MobileSubNavContext.Provider value={{ items, setItems }}>
+    <MobileSubNavContext.Provider value={contextValue}>
       {children}
     </MobileSubNavContext.Provider>
   );

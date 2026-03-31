@@ -385,6 +385,24 @@ export interface Profile {
   platformRole: PlatformRole;
   version: number;
   roleLocked: boolean;
+  mfaEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Subscription {
+  id: number;
+  orgId: string;
+  stripeSubscriptionId: string | null;
+  stripeCustomerId: string | null;
+  status: string;
+  priceId: string | null;
+  quantity: number;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAt: string | null;
+  canceledAt: string | null;
+  trialEnd: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -449,16 +467,31 @@ export interface ImpersonationHistoryEntry {
   expiresAt: string;
 }
 
-export type NotificationType = 'impersonation_start' | 'impersonation_end' | 'system';
+export type NotificationType =
+  | 'impersonation_start'
+  | 'impersonation_end'
+  | 'system'
+  | 'shift_change'
+  | 'schedule_published'
+  | 'shift_request_new'
+  | 'shift_request_approved'
+  | 'shift_request_rejected';
 
 export interface Notification {
   id: string;
   type: NotificationType;
+  channel: 'in_app' | 'email';
+  category: string | null;
   title: string;
   message: string;
   metadata: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;
+}
+
+export interface NotificationPreferences {
+  /** Per-category toggles: { "shift_change": { in_app: true, email: true }, ... } */
+  [category: string]: { in_app: boolean; email: boolean };
 }
 
 export interface Invitation {
@@ -552,6 +585,19 @@ export interface AuditLogEntry {
   createdAt: string;
   orgId: string | null;
   orgName: string | null;
+}
+
+/** A comprehensive audit log entry from the audit_log table. */
+export interface FullAuditLogEntry {
+  id: number;
+  orgId: string | null;
+  actorId: string | null;
+  actorEmail: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
 }
 
 /** An organization membership row with denormalized user info for display. */

@@ -90,7 +90,7 @@ export async function middleware(req: NextRequest) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
     frame-ancestors 'none';
     object-src 'none';
     base-uri 'none';
@@ -169,7 +169,6 @@ export async function middleware(req: NextRequest) {
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
-    if (subdomain === "gridmaster") console.error("[middleware:gm] No session — redirecting to /login", { pathname, host });
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -185,26 +184,20 @@ export async function middleware(req: NextRequest) {
       const { payload } = await jwtVerify(session.access_token, jwks);
       claims = payload as JWTClaims;
     } else {
-      console.warn("[middleware] NEXT_PUBLIC_SUPABASE_URL not set — falling back to unverified JWT decode.");
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
-  } catch (jwtError) {
+  } catch {
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
       // Don't trust gridmaster from unverified tokens — a forged JWT could
       // claim platform-level access. Org-level roles (super_admin/admin) are
       // safe to pass through because RLS enforces all data access anyway.
       if (claims.platform_role === "gridmaster") {
-        console.error("[middleware:gm] jwtVerify FAILED for gridmaster — blocking unverified token.", {
-          error: jwtError instanceof Error ? jwtError.message : jwtError,
-          tokenIss: (claims as Record<string, unknown>).iss,
-        });
         const loginUrl = new URL("/login", req.url);
         loginUrl.searchParams.set("error", "session_invalid");
         return NextResponse.redirect(loginUrl);
       }
     } catch {
-      console.error("[middleware:gm] Both jwtVerify and decodeJwt failed", { error: jwtError instanceof Error ? jwtError.message : jwtError });
       return NextResponse.redirect(new URL("/login", req.url));
     }
   }
@@ -338,9 +331,6 @@ export async function middleware(req: NextRequest) {
 
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster" && !isImpersonating) {
-    console.error("[middleware:gm] Non-gridmaster on gridmaster subdomain — redirecting to /login", {
-      effectiveRole, platformRole: claims.platform_role, orgRole: claims.org_role, pathname,
-    });
     return NextResponse.redirect(new URL("/login", req.url));
   }
 

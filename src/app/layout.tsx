@@ -39,6 +39,10 @@ import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
 import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import CookieConsent from "@/components/CookieConsent";
+import TermsAcceptanceGate from "@/components/TermsAcceptanceGate";
+
+import PostHogProvider from "@/components/PostHogProvider";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -52,18 +56,22 @@ export default function RootLayout({
     <html
       lang="en"
       className={cn(dmSans.variable, dmMono.variable, "font-sans", geist.variable)}
-      suppressHydrationWarning
     >
-      <body suppressHydrationWarning>
+      <body>
         <AuthProvider>
-          <QueryProvider>
-            <MobileSubNavProvider>
-              <TooltipProvider>
-                <AppShell>{children}</AppShell>
-              </TooltipProvider>
-            </MobileSubNavProvider>
-          </QueryProvider>
-        </AuthProvider>
+            <PostHogProvider>
+            <QueryProvider>
+              <TermsAcceptanceGate>
+                <MobileSubNavProvider>
+                  <TooltipProvider>
+                    <AppShell>{children}</AppShell>
+                  </TooltipProvider>
+                </MobileSubNavProvider>
+              </TermsAcceptanceGate>
+            </QueryProvider>
+            </PostHogProvider>
+          </AuthProvider>
+        <CookieConsent />
         <Analytics />
       </body>
     </html>

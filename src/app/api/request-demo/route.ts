@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { demoLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
+import logger from "@/lib/logger";
 
 const bodySchema = z.object({
   contactName: z.string().trim().min(1, "Name is required").max(100),
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
   const recipientEmail = process.env.DEMO_RECIPIENT_EMAIL;
 
   if (!apiKey || !recipientEmail) {
-    console.error("[request-demo] RESEND_API_KEY or DEMO_RECIPIENT_EMAIL not set");
+    logger.error("RESEND_API_KEY or DEMO_RECIPIENT_EMAIL not set");
     return NextResponse.json(
       { success: false, error: "Email service not configured" },
       { status: 503 },
@@ -151,10 +152,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error(
-      "[request-demo] Resend error:",
-      err instanceof Error ? err.message : "Unknown error",
-    );
+    logger.error({ err, path: "/api/request-demo" }, "Failed to send demo request email");
     return NextResponse.json(
       { success: false, error: "Failed to send email" },
       { status: 500 },

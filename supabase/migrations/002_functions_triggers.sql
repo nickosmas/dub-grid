@@ -2644,3 +2644,215 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.expire_shift_requests() TO authenticated;
+
+
+-- ── Shift Code Time Overlap Check ─────────────────────────────────────────────
+-- Trigger function: prevents saving a shift with multiple codes whose default
+-- time ranges overlap. Handles overnight shifts (end_time < start_time).
+
+CREATE OR REPLACE FUNCTION public.check_shift_code_time_overlap()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL STABLE
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_code_ids BIGINT[];
+  v_overlap RECORD;
+BEGIN
+  v_code_ids := NEW.draft_shift_code_ids;
+
+  -- Nothing to check if fewer than 2 codes
+  IF array_length(v_code_ids, 1) IS NULL OR array_length(v_code_ids, 1) < 2 THEN
+    RETURN NEW;
+  END IF;
+
+  -- Find the first pair of codes with overlapping time ranges.
+  -- Normalise each code's time range to minutes-from-midnight:
+  --   start_min = extract(hour)*60 + extract(minute)
+  --   end_min   = same, but if end <= start (overnight), add 1440 (24h)
+  -- Standard overlap: start_a < end_b AND start_b < end_a
+  SELECT a.label AS label_a, b.label AS label_b
+  INTO v_overlap
+  FROM shift_codes a
+  CROSS JOIN shift_codes b
+  WHERE a.id = ANY(v_code_ids)
+    AND b.id = ANY(v_code_ids)
+    AND a.id < b.id
+    AND a.default_start_time IS NOT NULL
+    AND a.default_end_time IS NOT NULL
+    AND b.default_start_time IS NOT NULL
+    AND b.default_end_time IS NOT NULL
+    AND (
+      (extract(hour FROM a.default_start_time) * 60 + extract(minute FROM a.default_start_time))
+      <
+      (extract(hour FROM b.default_end_time) * 60 + extract(minute FROM b.default_end_time)
+       + CASE WHEN b.default_end_time <= b.default_start_time THEN 1440 ELSE 0 END)
+    )
+    AND (
+      (extract(hour FROM b.default_start_time) * 60 + extract(minute FROM b.default_start_time))
+      <
+      (extract(hour FROM a.default_end_time) * 60 + extract(minute FROM a.default_end_time)
+       + CASE WHEN a.default_end_time <= a.default_start_time THEN 1440 ELSE 0 END)
+    )
+  LIMIT 1;
+
+  IF FOUND THEN
+    RAISE EXCEPTION 'Shift codes "%" and "%" have overlapping time ranges',
+      v_overlap.label_a, v_overlap.label_b
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_check_shift_code_overlap
+  BEFORE INSERT OR UPDATE OF draft_shift_code_ids ON public.shifts
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_shift_code_time_overlap();
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- DATA RETENTION CLEANUP
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Purges archived data older than the organization's retention period.
+-- Designed to be called by a cron job (e.g. pg_cron or Supabase Edge Function).
+CREATE OR REPLACE FUNCTION public.purge_expired_data()
+RETURNS TABLE(org_id UUID, employees_purged BIGINT, shifts_purged BIGINT, audit_purged BIGINT, invitations_purged BIGINT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  org RECORD;
+  e_count BIGINT;
+  s_count BIGINT;
+  a_count BIGINT;
+  i_count BIGINT;
+BEGIN
+  FOR org IN
+    SELECT o.id, o.data_retention_days
+    FROM organizations o
+    WHERE o.archived_at IS NULL
+      AND o.data_retention_days > 0
+  LOOP
+    -- Purge archived employees past retention
+    WITH deleted AS (
+      DELETE FROM employees e
+      WHERE e.org_id = org.id
+        AND e.archived_at IS NOT NULL
+        AND e.archived_at < now() - (org.data_retention_days || ' days')::INTERVAL
+      RETURNING 1
+    )
+    SELECT count(*) INTO e_count FROM deleted;
+
+    -- Purge old shifts (beyond retention period from their date)
+    WITH deleted AS (
+      DELETE FROM shifts s
+      WHERE s.org_id = org.id
+        AND s.date < (CURRENT_DATE - org.data_retention_days)::TEXT
+      RETURNING 1
+    )
+    SELECT count(*) INTO s_count FROM deleted;
+
+    -- Purge old audit log entries
+    WITH deleted AS (
+      DELETE FROM audit_log al
+      WHERE al.org_id = org.id
+        AND al.created_at < now() - (org.data_retention_days || ' days')::INTERVAL
+      RETURNING 1
+    )
+    SELECT count(*) INTO a_count FROM deleted;
+
+    -- Purge expired invitations (older than retention + 30 days)
+    WITH deleted AS (
+      DELETE FROM invitations inv
+      WHERE inv.org_id = org.id
+        AND inv.created_at < now() - ((org.data_retention_days + 30) || ' days')::INTERVAL
+      RETURNING 1
+    )
+    SELECT count(*) INTO i_count FROM deleted;
+
+    org_id := org.id;
+    employees_purged := e_count;
+    shifts_purged := s_count;
+    audit_purged := a_count;
+    invitations_purged := i_count;
+
+    IF e_count > 0 OR s_count > 0 OR a_count > 0 OR i_count > 0 THEN
+      RETURN NEXT;
+    END IF;
+  END LOOP;
+END;
+$$;
+
+COMMENT ON FUNCTION public.purge_expired_data IS 'Purges archived/old data per organization retention policy. Call via cron.';
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- GDPR DATA ERASURE
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Anonymizes a user's personal data across the platform (GDPR Right to Erasure).
+-- Does NOT delete the auth.users row — caller must do that separately via admin API.
+CREATE OR REPLACE FUNCTION public.gdpr_erase_user_data(p_user_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  result JSONB := '{}'::JSONB;
+  emp_count BIGINT;
+BEGIN
+  -- 1. Anonymize profile
+  UPDATE profiles
+    SET first_name = 'Deleted', last_name = 'User', mfa_enabled = false
+    WHERE id = p_user_id;
+
+  -- 2. Remove org memberships
+  DELETE FROM organization_memberships WHERE user_id = p_user_id;
+
+  -- 3. Anonymize linked employees (keep record structure, remove PII)
+  UPDATE employees
+    SET first_name = 'Deleted', last_name = 'User',
+        email = '', phone = '', contact_notes = '',
+        user_id = NULL
+    WHERE user_id = p_user_id;
+  GET DIAGNOSTICS emp_count = ROW_COUNT;
+
+  -- 4. Anonymize audit log entries
+  UPDATE audit_log SET actor_email = NULL WHERE actor_id = p_user_id;
+
+  -- 5. Delete notifications
+  DELETE FROM notifications WHERE user_id = p_user_id;
+
+  -- 6. Delete notification preferences
+  DELETE FROM notification_preferences WHERE user_id = p_user_id;
+
+  -- 7. Delete user sessions
+  DELETE FROM user_sessions WHERE user_id = p_user_id;
+
+  -- 8. Delete terms acceptances
+  DELETE FROM terms_acceptances WHERE user_id = p_user_id;
+
+  -- 9. Anonymize role change log entries
+  UPDATE role_change_log
+    SET target_user_id = '00000000-0000-0000-0000-000000000000'
+    WHERE target_user_id = p_user_id;
+  UPDATE role_change_log
+    SET changed_by_id = '00000000-0000-0000-0000-000000000000'
+    WHERE changed_by_id = p_user_id;
+
+  result := jsonb_build_object(
+    'user_id', p_user_id,
+    'employees_anonymized', emp_count,
+    'status', 'erased'
+  );
+
+  RETURN result;
+END;
+$$;
+
+COMMENT ON FUNCTION public.gdpr_erase_user_data IS 'Anonymizes all PII for a user across the platform (GDPR Article 17 compliance).';
