@@ -1,5 +1,3 @@
-import { AnimatedDubGridLogo } from "@/components/Logo";
-
 export default function LoginLoading() {
   return (
     <div
@@ -8,20 +6,19 @@ export default function LoginLoading() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        flexDirection: "column",
-        gap: 12,
       }}
     >
-      <AnimatedDubGridLogo size={48} />
-      <span
+      <div
         style={{
-          fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-faint)",
-          fontWeight: 500,
+          width: 32,
+          height: 32,
+          border: "3px solid var(--color-border-light)",
+          borderTopColor: "var(--color-primary)",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
         }}
-      >
-        Loading...
-      </span>
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }

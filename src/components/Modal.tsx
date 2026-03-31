@@ -7,14 +7,28 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const headerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 20,
+};
+
+const titleStyle: React.CSSProperties = {
+  fontWeight: 700,
+  fontSize: "var(--dg-fs-title)",
+  color: "var(--color-text-primary)",
+};
+
 interface ModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   style?: React.CSSProperties;
+  "aria-describedby"?: string;
 }
 
-export default function Modal({ title, onClose, children, style }: ModalProps) {
+export default function Modal({ title, onClose, children, style, "aria-describedby": ariaDescribedby }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -94,25 +108,13 @@ export default function Modal({ title, onClose, children, style }: ModalProps) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        aria-describedby={ariaDescribedby}
         className="dg-modal"
         style={style}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
-          }}
-        >
-          <span
-            style={{
-              fontWeight: 700,
-              fontSize: "var(--dg-fs-title)",
-              color: "var(--color-text-primary)",
-            }}
-          >
+        <div style={headerStyle}>
+          <span style={titleStyle}>
             {title}
           </span>
           <button

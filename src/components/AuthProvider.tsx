@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "sonner";
 import { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { setSentryUser } from "@/lib/sentry";
 
 interface AuthContextType {
   user: User | null;
@@ -53,8 +54,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
       setIsLoading(false);
+      // Update Sentry user context
+      setSentryUser(currentUser ? { id: currentUser.id, email: currentUser.email } : null);
       // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
       // and ProtectedRoute handles session-expiry redirects to /login.
     });
@@ -64,12 +68,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut({ scope: "local" });
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({ user, signOut, isLoading }),
+    [user, signOut, isLoading],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, signOut, isLoading }}>
+    <AuthContext.Provider value={contextValue}>
       <Toaster
         position="top-center"
         closeButton

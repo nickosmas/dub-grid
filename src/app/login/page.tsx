@@ -13,6 +13,7 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { Eye, EyeOff } from "lucide-react";
+import { MFAVerify } from "@/components/profile/MFAVerify";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -299,6 +300,7 @@ function GridmasterLogin() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const landingUrl = `${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
@@ -321,23 +323,47 @@ function GridmasterLogin() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Use server-side login route for brute-force protection
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (error) throw error;
+      const result = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          toast.error(result.error || "Too many login attempts. Please try again later.");
+          setLoading(false);
+          return;
+        }
+        if (res.status === 401) {
+          toast.error("Invalid email or password.");
+          setLoading(false);
+          return;
+        }
+        toast.error(result.error || "Unable to sign in. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Set the session in the client using the tokens from the server
+      const { error: setError } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+      if (setError) throw setError;
+
+      // Check if MFA is required before proceeding
+      if (result.mfa_required) {
+        setMfaRequired(true);
+        setLoading(false);
+        return;
+      }
 
       // Refresh the session so the custom_access_token_hook has a chance to
       // bake platform_role=gridmaster into the new JWT before we navigate.
-      // Without this, the first request to /dashboard hits the middleware with
-      // the initial sign-in token which may have stale or missing claims,
-      // causing a silent redirect loop back to /login.
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.error("[GridmasterLogin] refreshSession failed", refreshError);
-        // Non-fatal: the session is valid, role claims may still be present
-        // from the hook. Navigate anyway and let the middleware decide.
-      }
+      await supabase.auth.refreshSession();
 
       window.location.replace("/dashboard");
 
@@ -347,11 +373,7 @@ function GridmasterLogin() {
       }, 8000);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
-        toast.error("Invalid email or password.");
-      } else if (msg.includes("hook") || msg.includes("unexpected") || msg.includes("hook_payload")) {
-        toast.error("Something went wrong during sign in. Please try again.");
-      } else if (msg.includes("fetch") || msg.includes("network")) {
+      if (msg.includes("fetch") || msg.includes("network")) {
         toast.error("Network error — please check your connection.");
       } else {
         toast.error("Unable to sign in. Please try again.");
@@ -360,8 +382,27 @@ function GridmasterLogin() {
     }
   }
 
-  // Gridmaster login has no Toaster of its own — it's rendered inside PublicRoute
-  // which is inside AuthProvider (which has the Toaster).
+  function handleMFAVerified() {
+    // After MFA verification, refresh session and navigate
+    supabase.auth.refreshSession().then(() => {
+      window.location.replace("/dashboard");
+    });
+  }
+
+  function handleMFACancel() {
+    supabase.auth.signOut({ scope: "local" });
+    setMfaRequired(false);
+    setLoading(false);
+  }
+
+  if (mfaRequired) {
+    return (
+      <MFAVerify
+        onVerified={handleMFAVerified}
+        onCancel={handleMFACancel}
+      />
+    );
+  }
 
   return (
     <PageShell footerCenteredOnly>
@@ -504,6 +545,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
   // Validate subdomain in the background — never block form render.
   // DomainSelector already validates before redirecting here (?verified=1),
   // and the post-login JWT check catches org mismatches regardless.
@@ -535,61 +577,93 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setLoading(true);
 
     try {
-      // Sign in — the response already includes the session (no extra getSession() needed)
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Use server-side login route for brute-force protection
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (error) throw error;
+      const result = await res.json();
 
-      const session = data.session;
-      if (session) {
-        const claims = decodeJwt(session.access_token);
-        const isGridmaster = claims.platform_role === "gridmaster";
+      if (!res.ok) {
+        if (res.status === 429) {
+          toast.error(result.error || "Too many login attempts. Please try again later.");
+          setLoading(false);
+          return;
+        }
+        if (res.status === 401) {
+          toast.error("Invalid email or password. Please try again.");
+          setLoading(false);
+          return;
+        }
+        toast.error(result.error || "Unable to sign in. Please try again.");
+        setLoading(false);
+        return;
+      }
 
-        if (!isGridmaster) {
-          const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+      // Check if email is confirmed
+      if (!result.user.email_confirmed_at) {
+        window.location.replace(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
 
-          if (userSlug !== orgSlug) {
-            // Slug mismatch — check membership. If JWT had no slug, the hook may
-            // not be configured; fall back to DB via get_my_organizations.
-            const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
+      // Set the session in the client using the tokens from the server
+      const { error: setError } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+      if (setError) throw setError;
 
-            if (rpcError || !orgs) {
+      // Check if MFA is required before proceeding
+      if (result.mfa_required) {
+        setMfaRequired(true);
+        setLoading(false);
+        return;
+      }
+
+      const claims = decodeJwt(result.session.access_token);
+      const isGridmaster = claims.platform_role === "gridmaster";
+
+      if (!isGridmaster) {
+        const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+
+        if (userSlug !== orgSlug) {
+          // Slug mismatch — check membership
+          const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
+
+          if (rpcError || !orgs) {
+            await supabase.auth.signOut({ scope: "local" });
+            toast.error("Unable to verify workspace access. Please try again.");
+            setLoading(false);
+            return;
+          }
+
+          const targetOrg = orgs.find((o: { org_slug: string }) => o.org_slug === orgSlug);
+
+          if (targetOrg) {
+            const { error: switchError } = await supabase.rpc("switch_org", {
+              target_org_id: targetOrg.org_id,
+            });
+
+            if (switchError) {
               await supabase.auth.signOut({ scope: "local" });
-              toast.error("Unable to verify workspace access. Please try again.");
+              toast.error("Failed to switch workspace. Please try again.");
               setLoading(false);
               return;
             }
 
-            const targetOrg = orgs.find((o: { org_slug: string }) => o.org_slug === orgSlug);
-
-            if (targetOrg) {
-              // Switch org + refresh JWT in parallel-ish (switch must complete first)
-              const { error: switchError } = await supabase.rpc("switch_org", {
-                target_org_id: targetOrg.org_id,
-              });
-
-              if (switchError) {
-                await supabase.auth.signOut({ scope: "local" });
-                toast.error("Failed to switch workspace. Please try again.");
-                setLoading(false);
-                return;
-              }
-
-              const { error: refreshError } = await supabase.auth.refreshSession();
-              if (refreshError) {
-                await supabase.auth.signOut({ scope: "local" });
-                toast.error("Failed to switch workspace. Please sign in again.");
-                setLoading(false);
-                return;
-              }
-            } else {
+            const { error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
               await supabase.auth.signOut({ scope: "local" });
-              toast.error("Your account is not associated with this workspace.");
+              toast.error("Failed to switch workspace. Please sign in again.");
               setLoading(false);
               return;
             }
+          } else {
+            await supabase.auth.signOut({ scope: "local" });
+            toast.error("Your account is not associated with this workspace.");
+            setLoading(false);
+            return;
           }
         }
       }
@@ -602,14 +676,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
       }, 8000);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("invalid login") || msg.includes("invalid email") || msg.includes("invalid credentials")) {
-        toast.error("Invalid email or password. Please try again.");
-      } else if (msg.includes("email not confirmed")) {
-        window.location.replace(`/verify-email?email=${encodeURIComponent(email)}`);
-        return;
-      } else if (msg.includes("hook") || msg.includes("unexpected")) {
-        toast.error("Something went wrong during sign in. Please try again.");
-      } else if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
+      if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
         toast.error("Network error — please check your connection and try again.");
       } else {
         toast.error("Unable to sign in. Please try again.");
@@ -618,8 +685,77 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
   }
 
+  function handleMFAVerified() {
+    // After MFA verification, proceed with the org slug verification and dashboard redirect
+    async function proceed() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error("Session expired. Please sign in again.");
+          setMfaRequired(false);
+          return;
+        }
+
+        const claims = decodeJwt(session.access_token);
+        const isGridmaster = claims.platform_role === "gridmaster";
+
+        if (!isGridmaster) {
+          const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+          if (userSlug !== orgSlug) {
+            const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
+            if (rpcError || !orgs) {
+              await supabase.auth.signOut({ scope: "local" });
+              toast.error("Unable to verify workspace access. Please try again.");
+              setMfaRequired(false);
+              return;
+            }
+            const targetOrg = orgs.find((o: { org_slug: string }) => o.org_slug === orgSlug);
+            if (targetOrg) {
+              const { error: switchError } = await supabase.rpc("switch_org", { target_org_id: targetOrg.org_id });
+              if (switchError) {
+                await supabase.auth.signOut({ scope: "local" });
+                toast.error("Failed to switch workspace.");
+                setMfaRequired(false);
+                return;
+              }
+              await supabase.auth.refreshSession();
+            } else {
+              await supabase.auth.signOut({ scope: "local" });
+              toast.error("Your account is not associated with this workspace.");
+              setMfaRequired(false);
+              return;
+            }
+          }
+        }
+
+        window.location.replace("/dashboard");
+      } catch {
+        toast.error("Unable to complete sign in. Please try again.");
+        setMfaRequired(false);
+      }
+    }
+    proceed();
+  }
+
+  function handleMFACancel() {
+    supabase.auth.signOut({ scope: "local" });
+    setMfaRequired(false);
+    setLoading(false);
+  }
+
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const baseDomain = parsed?.rootDomain ?? "localhost";
+
+  if (mfaRequired) {
+    return (
+      <MFAVerify
+        onVerified={handleMFAVerified}
+        onCancel={handleMFACancel}
+        orgSlug={orgSlug}
+        baseDomain={baseDomain}
+      />
+    );
+  }
 
   return (
     <PageShell>

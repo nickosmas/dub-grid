@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+
+const AnalyticsCharts = dynamic(() => import("@/components/dashboard/AnalyticsCharts"), { ssr: false });
 import type { Permissions } from "@/hooks";
 import type {
   Organization,
@@ -464,6 +467,16 @@ export default function DashboardView({
           otAlerts={otAlerts}
           onClose={closeExpanded}
         />
+      )}
+
+      {/* Historical Analytics — admin+ only */}
+      {permissions.level >= 2 && org.id && !expandedPanel && (
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: "var(--dg-fs-title)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 16 }}>
+            Analytics
+          </h2>
+          <AnalyticsCharts orgId={org.id} />
+        </div>
       )}
       </div>
     </div>

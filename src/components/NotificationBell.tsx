@@ -59,14 +59,26 @@ export default function NotificationBell() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // Close on outside click
+  // Close on outside click or Escape key
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        // Return focus to bell button
+        const btn = ref.current?.querySelector("button");
+        btn?.focus();
+      }
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
 
   // Load notifications when dropdown opens
@@ -115,6 +127,8 @@ export default function NotificationBell() {
       <button
         onClick={handleToggle}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-expanded={open}
+        aria-haspopup="true"
         style={{
           display: "flex",
           alignItems: "center",
@@ -173,6 +187,8 @@ export default function NotificationBell() {
 
       {open && (
         <div
+          role="region"
+          aria-label="Notifications"
           style={{
             position: "absolute",
             top: "calc(100% + 6px)",
@@ -205,6 +221,7 @@ export default function NotificationBell() {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
+                aria-label="Mark all notifications as read"
                 style={{
                   background: "none",
                   border: "none",
@@ -238,6 +255,7 @@ export default function NotificationBell() {
                   <button
                     key={n.id}
                     onClick={() => { if (isUnread) handleMarkRead(n.id); }}
+                    aria-label={`${n.title}: ${n.message}${isUnread ? " (unread — click to mark as read)" : ""}`}
                     style={{
                       display: "flex",
                       gap: 12,

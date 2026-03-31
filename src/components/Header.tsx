@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import NotificationBell from "@/components/NotificationBell";
 
+
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
   {
     id: "dashboard",
@@ -441,10 +442,12 @@ export default function Header({ orgName }: HeaderProps) {
         )}
       </div>
 
-      {/* Notifications + User Menu */}
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-        {!isGridmaster && <NotificationBell />}
-      </div>
+      {/* Notifications */}
+      {!isGridmaster && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <NotificationBell />
+        </div>
+      )}
       <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
         <button
           onClick={() => setMenuOpen((o) => !o)}

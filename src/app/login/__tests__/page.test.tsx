@@ -6,14 +6,16 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import LoginPage from "@/app/login/page";
 
-// Mock supabase module so we can control signInWithPassword per-test
-const mockSignInWithPassword = vi.fn();
+// Mock supabase module — setSession is called after server-side auth succeeds
+const mockSetSession = vi.fn();
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
-      signInWithPassword: (...args: unknown[]) => mockSignInWithPassword(...args),
+      setSession: (...args: unknown[]) => mockSetSession(...args),
       signOut: vi.fn().mockResolvedValue({}),
+      refreshSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
     },
+    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
   },
 }));
 
@@ -51,13 +53,14 @@ describe("Login page submit states", () => {
       writable: true,
       configurable: true,
     });
-    mockSignInWithPassword.mockReset();
+    mockSetSession.mockReset();
     mockToastError.mockReset();
+    vi.restoreAllMocks();
   });
 
   it("successful sign-in: button stays disabled and shows spinner", async () => {
-    // Arrange: signInWithPassword never resolves so loading stays true
-    mockSignInWithPassword.mockReturnValue(new Promise(() => {}));
+    // Arrange: fetch never resolves so loading stays true
+    vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
 
     const { container } = render(<LoginPage />);
     submitForm(container);
@@ -71,8 +74,13 @@ describe("Login page submit states", () => {
   });
 
   it("failed sign-in: loading resets to false and error message is displayed", async () => {
-    // Arrange: signInWithPassword resolves with an error
-    mockSignInWithPassword.mockResolvedValue({ error: { message: "Invalid login credentials" } });
+    // Arrange: fetch returns 401 (invalid credentials)
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: "Invalid email or password" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
 
     const { container } = render(<LoginPage />);
     submitForm(container);

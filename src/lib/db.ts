@@ -3,6 +3,7 @@ import { arraysEqual, formatDateKey, iterateDateRange } from "@/lib/utils";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { parseHost } from "@/lib/subdomain";
 import { cacheThrough, cacheDel, CacheKey, TTL } from "@/lib/cache";
+import { logAudit } from "@/lib/audit";
 
 // ── PostgREST filter sanitization ──────────────────────────────────────────
 // Values interpolated into .or() filter strings must not contain PostgREST
@@ -418,6 +419,7 @@ export async function updateOrganization(org: Organization): Promise<void> {
     .eq("id", org.id);
   if (error) throw error;
   await cacheDel(CacheKey.organization(org.id), CacheKey.allOrganizations());
+  void logAudit("org.updated", "organization", org.id, { name: org.name }, org.id);
 }
 
 // ── Certifications ───────────────────────────────────────────────────────────
@@ -608,6 +610,7 @@ export async function updateAdminPermissions(
     .eq("org_id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.orgUsers(orgId));
+  void logAudit("permissions.updated", "permissions", userId, { permissions }, orgId);
 }
 
 export async function changeOrganizationUserRole(
@@ -627,6 +630,7 @@ export async function changeOrganizationUserRole(
   const keys = [CacheKey.allUsers(), CacheKey.mwProfile(targetUserId)];
   if (orgId) keys.push(CacheKey.orgUsers(orgId));
   await cacheDel(...keys);
+  void logAudit("role.changed", "role", targetUserId, { newRole }, orgId);
 }
 
 
@@ -671,6 +675,7 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
       .single();
     if (error) throw error;
     await cacheDel(CacheKey.focusAreas(focusArea.orgId));
+    void logAudit("focus_area.upserted", "focus_area", String(focusArea.id), { name: focusArea.name }, focusArea.orgId);
     return rowToFocusArea(data as DbFocusArea);
   }
   const { data, error } = await supabase
@@ -680,7 +685,9 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
     .single();
   if (error) throw error;
   await cacheDel(CacheKey.focusAreas(focusArea.orgId));
-  return rowToFocusArea(data as DbFocusArea);
+  const result = rowToFocusArea(data as DbFocusArea);
+  void logAudit("focus_area.upserted", "focus_area", String(result.id), { name: focusArea.name }, focusArea.orgId);
+  return result;
 }
 
 export async function deleteFocusArea(focusAreaId: number, orgId: string): Promise<void> {
@@ -731,6 +738,7 @@ export async function deleteFocusArea(focusAreaId: number, orgId: string): Promi
     CacheKey.employees(orgId),
     CacheKey.coverageReqs(orgId),
   );
+  void logAudit("focus_area.archived", "focus_area", String(focusAreaId), {}, orgId);
 }
 
 // ── Shift Codes ───────────────────────────────────────────────────────────────
@@ -1021,7 +1029,9 @@ export async function insertEmployee(
     .single();
   if (error) throw error;
   await cacheDel(CacheKey.employees(orgId), CacheKey.tenantStats());
-  return rowToEmployee(row as DbEmployee);
+  const result = rowToEmployee(row as DbEmployee);
+  void logAudit("employee.created", "employee", result.id, { firstName: data.firstName, lastName: data.lastName }, orgId);
+  return result;
 }
 
 export async function updateEmployee(emp: Employee, orgId: string): Promise<void> {
@@ -1031,6 +1041,7 @@ export async function updateEmployee(emp: Employee, orgId: string): Promise<void
     .eq("id", emp.id);
   if (error) throw error;
   await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(emp.id));
+  void logAudit("employee.updated", "employee", emp.id, { firstName: emp.firstName, lastName: emp.lastName }, orgId);
 }
 
 export async function deleteEmployee(empId: string, orgId?: string): Promise<void> {
@@ -1043,6 +1054,7 @@ export async function deleteEmployee(empId: string, orgId?: string): Promise<voi
   const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
   if (orgId) keys.push(CacheKey.employees(orgId));
   await cacheDel(...keys);
+  void logAudit("employee.archived", "employee", empId, {}, orgId);
 }
 
 export async function benchEmployee(empId: string, note?: string, orgId?: string): Promise<void> {
@@ -1058,6 +1070,7 @@ export async function benchEmployee(empId: string, note?: string, orgId?: string
   const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
   if (orgId) keys.push(CacheKey.employees(orgId));
   await cacheDel(...keys);
+  void logAudit("employee.benched", "employee", empId, { note }, orgId);
 }
 
 export async function activateEmployee(empId: string, orgId?: string): Promise<void> {
@@ -1074,6 +1087,7 @@ export async function activateEmployee(empId: string, orgId?: string): Promise<v
   const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
   if (orgId) keys.push(CacheKey.employees(orgId));
   await cacheDel(...keys);
+  void logAudit("employee.activated", "employee", empId, {}, orgId);
 }
 
 // ── Single Employee Fetch ──────────────────────────────────────────────────────
@@ -1347,6 +1361,54 @@ export async function fetchShifts(
   return map;
 }
 
+/**
+ * Checks if any shift codes in the array have overlapping default time ranges.
+ * Returns the first overlapping pair or null if no conflicts.
+ * Mirrors the DB trigger logic for immediate client-side feedback.
+ */
+export async function checkShiftCodeOverlap(
+  shiftCodeIds: number[],
+): Promise<{ labelA: string; labelB: string } | null> {
+  if (shiftCodeIds.length < 2) return null;
+
+  const { data: codes, error } = await supabase
+    .from("shift_codes")
+    .select("id, label, default_start_time, default_end_time")
+    .in("id", shiftCodeIds);
+
+  if (error || !codes) return null;
+
+  // Convert TIME string "HH:MM:SS" to minutes from midnight
+  function toMinutes(time: string | null): number | null {
+    if (!time) return null;
+    const parts = time.split(":");
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  const parsed = codes
+    .map((c: { id: number; label: string; default_start_time: string | null; default_end_time: string | null }) => ({
+      id: c.id,
+      label: c.label,
+      start: toMinutes(c.default_start_time),
+      end: toMinutes(c.default_end_time),
+    }))
+    .filter((c: { start: number | null; end: number | null }) => c.start !== null && c.end !== null);
+
+  for (let i = 0; i < parsed.length; i++) {
+    for (let j = i + 1; j < parsed.length; j++) {
+      const a = parsed[i];
+      const b = parsed[j];
+      // Normalise overnight shifts: if end <= start, add 24h
+      const aEnd = a.end! <= a.start! ? a.end! + 1440 : a.end!;
+      const bEnd = b.end! <= b.start! ? b.end! + 1440 : b.end!;
+      if (a.start! < bEnd && b.start! < aEnd) {
+        return { labelA: a.label, labelB: b.label };
+      }
+    }
+  }
+  return null;
+}
+
 export async function upsertShift(
   empId: string,
   date: string,
@@ -1357,6 +1419,16 @@ export async function upsertShift(
   expectedVersion?: number,
   absenceTypeId?: number | null,
 ): Promise<void> {
+  // Client-side overlap check for immediate feedback
+  if (shiftCodeIds.length >= 2 && absenceTypeId == null) {
+    const overlap = await checkShiftCodeOverlap(shiftCodeIds);
+    if (overlap) {
+      throw new Error(
+        `Shift codes "${overlap.labelA}" and "${overlap.labelB}" have overlapping time ranges`,
+      );
+    }
+  }
+
   const payload: Record<string, unknown> = {
     emp_id: empId,
     date,
@@ -1405,6 +1477,8 @@ export async function upsertShift(
       .upsert(payload, { onConflict: "emp_id,date" });
     if (error) throw error;
   }
+  const action = expectedVersion !== undefined ? "shift.updated" : "shift.created";
+  void logAudit(action, "shift", `${empId}:${date}`, { shiftCodeIds, absenceTypeId }, orgId);
 }
 
 /** Updates only the draft custom start/end time for an existing shift row. */
@@ -1433,6 +1507,7 @@ export async function deleteShift(empId: string, date: string): Promise<void> {
     .eq("emp_id", empId)
     .eq("date", date);
   if (error) throw error;
+  void logAudit("shift.deleted", "shift", `${empId}:${date}`, {});
 }
 
 /**
@@ -1466,6 +1541,7 @@ export async function moveShift(
     }
     throw error;
   }
+  void logAudit("shift.moved", "shift", `${sourceEmpId}:${sourceDate}`, { targetEmpId, targetDate, shiftCodeIds }, orgId);
 }
 
 export async function publishSchedule(
@@ -1479,6 +1555,10 @@ export async function publishSchedule(
     p_end_date: endDate.toISOString().split("T")[0],
   });
   if (error) throw error;
+  void logAudit("schedule.published", "schedule", orgId, {
+    startDate: startDate.toISOString().split("T")[0],
+    endDate: endDate.toISOString().split("T")[0],
+  }, orgId);
   return data as string | null;
 }
 
@@ -1829,7 +1909,9 @@ export async function startImpersonation(
     p_target_org_id: targetOrgId ?? null,
   });
   if (error) throw error;
-  return data as { session_id: string; expires_at: string };
+  const result = data as { session_id: string; expires_at: string };
+  void logAudit("impersonation.started", "impersonation_session", result.session_id, { targetUserId, justification }, targetOrgId);
+  return result;
 }
 
 export async function endImpersonation(sessionId: string, reason: string = 'manual'): Promise<void> {
@@ -1838,6 +1920,7 @@ export async function endImpersonation(sessionId: string, reason: string = 'manu
     p_reason: reason,
   });
   if (error) throw error;
+  void logAudit("impersonation.ended", "impersonation_session", sessionId, { reason });
 }
 
 export async function fetchImpersonationHistory(options?: {
@@ -1933,6 +2016,7 @@ export async function sendInvitation(
     p_employee_id: employeeId ?? null,
   });
   if (error) throw error;
+  void logAudit("invitation.sent", "invitation", data.invitation_id, { email, role }, orgId);
   return {
     invitationId: data.invitation_id,
     token: data.token,
@@ -1970,6 +2054,7 @@ export async function revokeInvitation(invitationId: string, orgId?: string): Pr
     .eq("id", invitationId);
   if (error) throw error;
   if (orgId) await cacheDel(CacheKey.invitations(orgId));
+  void logAudit("invitation.revoked", "invitation", invitationId, {}, orgId);
 }
 
 export async function linkEmployeeToUser(
@@ -2371,7 +2456,9 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
     .single();
   if (error) throw error;
   await cacheDel(CacheKey.allOrganizations(), CacheKey.tenantStats());
-  return rowToOrganization(row as DbOrganization);
+  const result = rowToOrganization(row as DbOrganization);
+  void logAudit("org.created", "organization", result.id, { name: data.name });
+  return result;
 }
 
 export async function archiveOrganization(orgId: string): Promise<void> {
@@ -2381,6 +2468,7 @@ export async function archiveOrganization(orgId: string): Promise<void> {
     .eq("id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.organization(orgId), CacheKey.allOrganizations(), CacheKey.tenantStats());
+  void logAudit("org.archived", "organization", orgId, {}, orgId);
 }
 
 export async function restoreOrganization(orgId: string): Promise<void> {
@@ -2390,6 +2478,7 @@ export async function restoreOrganization(orgId: string): Promise<void> {
     .eq("id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.organization(orgId), CacheKey.allOrganizations(), CacheKey.tenantStats());
+  void logAudit("org.restored", "organization", orgId, {}, orgId);
 }
 
 export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]> {
@@ -2437,6 +2526,39 @@ export async function fetchAuditLog(options?: {
   }));
 }
 
+export async function fetchFullAuditLog(options?: {
+  orgId?: string;
+  action?: string;
+  resourceType?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<import("@/types").FullAuditLogEntry[]> {
+  let query = supabase
+    .from("audit_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .range(
+      options?.offset ?? 0,
+      (options?.offset ?? 0) + (options?.limit ?? 50) - 1,
+    );
+  if (options?.orgId) query = query.eq("org_id", options.orgId);
+  if (options?.action) query = query.eq("action", options.action);
+  if (options?.resourceType) query = query.eq("resource_type", options.resourceType);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as number,
+    orgId: (row.org_id as string | null) ?? null,
+    actorId: (row.actor_id as string | null) ?? null,
+    actorEmail: (row.actor_email as string | null) ?? null,
+    action: row.action as string,
+    resourceType: row.resource_type as string,
+    resourceId: (row.resource_id as string | null) ?? null,
+    details: (row.details ?? {}) as Record<string, unknown>,
+    createdAt: row.created_at as string,
+  }));
+}
+
 export async function removeUserFromOrganization(
   userId: string,
   orgId: string,
@@ -2448,6 +2570,7 @@ export async function removeUserFromOrganization(
     .eq("org_id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.orgUsers(orgId), CacheKey.employees(orgId), CacheKey.allUsers(), CacheKey.tenantStats());
+  void logAudit("user.removed_from_org", "role", userId, {}, orgId);
 }
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {

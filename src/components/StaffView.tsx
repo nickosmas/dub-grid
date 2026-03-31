@@ -10,6 +10,7 @@ import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
+import { BulkImportModal } from "@/components/staff/BulkImportModal";
 import { fetchInvitations, revokeInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -222,6 +223,14 @@ function MembersSection({
     return map;
   }, [pendingInvitations]);
 
+  // Bulk import state
+  const [showImport, setShowImport] = useState(false);
+
+  function handleExport() {
+    if (!orgId) return;
+    window.open(`/api/export?type=staff&orgId=${orgId}`, "_blank");
+  }
+
   function refreshInvitations() {
     if (!orgId) return;
     fetchInvitations(orgId).then((invites) => {
@@ -301,6 +310,8 @@ function MembersSection({
         canManageEmployees={canManageEmployees}
         showAdd={activeTab === "active"}
         onAdd={onAdd}
+        onImport={canManageEmployees && orgId ? () => setShowImport(true) : undefined}
+        onExport={orgId ? handleExport : undefined}
         onFilterToggle={() => setFilterOpen((v) => !v)}
         filterOpen={filterOpen}
         filterBtnRef={filterBtnRef}
@@ -444,6 +455,15 @@ function MembersSection({
             activeTab={activeTab}
             hasFilters={!!(searchQuery || filterFocusArea || filterRole || showOnlyUnlinked)}
             onClearFilters={clearFilters}
+          />
+        )}
+
+        {/* Bulk Import Modal */}
+        {showImport && orgId && (
+          <BulkImportModal
+            orgId={orgId}
+            onClose={() => setShowImport(false)}
+            onImported={() => { setShowImport(false); window.location.reload(); }}
           />
         )}
 

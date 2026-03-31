@@ -20,12 +20,6 @@ function getFocusAreaInitials(name: string): string {
     .slice(0, 3);
 }
 
-/** Truncate a shift name to fit inside a pill. Full text shown via title tooltip. */
-function pillText(label: string, max: number): string {
-  if (label.length <= max) return label;
-  return label.slice(0, max - 1).trimEnd() + "\u2026";
-}
-
 function fmt12hShort(time24: string): string {
   const [h, m] = time24.split(":").map(Number);
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
@@ -363,6 +357,8 @@ const SectionBlock = memo(function SectionBlock({
         }}
       >
         <div
+          role="grid"
+          aria-label={`${sectionName} schedule grid`}
           style={{
             display: "grid",
             gridTemplateColumns: gridTemplate,
@@ -371,9 +367,11 @@ const SectionBlock = memo(function SectionBlock({
         >
           {/* Header row */}
           <div
+            role="row"
             style={{ ...rowGrid, borderBottom: "2px solid var(--color-dark)" }}
           >
             <div
+              role="columnheader"
               style={{
                 position: "sticky",
                 left: 0,
@@ -397,6 +395,7 @@ const SectionBlock = memo(function SectionBlock({
               return (
                 <div
                   key={key}
+                  role="columnheader"
                   style={{
                     textAlign: "center",
                     padding: "8px 0",
@@ -453,6 +452,7 @@ const SectionBlock = memo(function SectionBlock({
             return (
               <div
                 key={emp.id}
+                role="row"
                 style={{
                   ...rowGrid,
                   background: rowBg,
@@ -463,6 +463,7 @@ const SectionBlock = memo(function SectionBlock({
               >
                 {/* Name cell */}
                 <div
+                  role="rowheader"
                   style={{
                     position: "sticky",
                     left: 0,
@@ -716,9 +717,9 @@ const SectionBlock = memo(function SectionBlock({
                                    flexDirection: "column",
                                    alignItems: "center",
                                    justifyContent: showDiffOverlay && draftKind && draftKind !== 'deleted' ? "flex-start" : "center",
-                                   padding: isNameMode ? "2px 4px" : "2px 3px",
+                                   padding: isNameMode ? "2px 6px" : "2px 3px",
                                    paddingTop: showDiffOverlay && draftKind && draftKind !== 'deleted' ? 4 : 2,
-                                   paddingLeft: isCross && crossHomeFa ? 18 : (isNameMode ? 4 : 3),
+                                   paddingLeft: isCross && crossHomeFa ? 20 : (isNameMode ? 6 : 3),
                                    overflow: "hidden",
                                    textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
                                  }}
@@ -748,14 +749,24 @@ const SectionBlock = memo(function SectionBlock({
                                  )}
                                  <span
                                    title={isNameMode ? label : undefined}
-                                   style={{
-                                     fontSize: isNameMode ? "var(--dg-fs-caption)" : "var(--dg-fs-title)",
+                                   style={isNameMode ? {
+                                     fontSize: "var(--dg-fs-caption)",
                                      fontWeight: 800,
-                                     lineHeight: isNameMode ? 1.15 : 1,
-                                     ...(isNameMode ? { textAlign: "center" as const } : {}),
+                                     lineHeight: 1.2,
+                                     textAlign: "center" as const,
+                                     maxWidth: "100%",
+                                     overflowWrap: "break-word" as const,
+                                     display: "-webkit-box",
+                                     WebkitBoxOrient: "vertical" as const,
+                                     WebkitLineClamp: customTimes ? 1 : 2,
+                                     overflow: "hidden",
+                                   } : {
+                                     fontSize: "var(--dg-fs-title)",
+                                     fontWeight: 800,
+                                     lineHeight: 1,
                                    }}
                                  >
-                                   {isNameMode ? pillText(label, 14) : label}
+                                   {label}
                                    {!customTimes && isOvernight && (
                                      <sup style={{ fontSize: "0.5em", fontWeight: 700, opacity: 0.5, marginLeft: 1 }}>+1</sup>
                                    )}
@@ -789,7 +800,7 @@ const SectionBlock = memo(function SectionBlock({
                                      overflow: "hidden",
                                      textOverflow: "ellipsis",
                                    }}>
-                                     was: {isNameMode ? pillText(publishedLabel!, 10) : publishedLabel}
+                                     was: {publishedLabel}
                                    </span>
                                  )}
                                  {showDiffOverlay && draftKind === 'new' && (
@@ -965,11 +976,11 @@ const SectionBlock = memo(function SectionBlock({
                                       position: "relative",
                                       cursor: "pointer",
                                       textDecoration: draftKind === 'deleted' ? 'line-through' : 'none',
-                                      lineHeight: 1,
+                                      lineHeight: isNameMode ? 1.2 : 1,
                                       overflow: "hidden",
                                       minWidth: 0,
                                       padding: isNameMode ? "2px 4px" : "2px 3px",
-                                      paddingLeft: isCross && crossHomeFaLi ? 16 : (isNameMode ? 4 : 3),
+                                      paddingLeft: isCross && crossHomeFaLi ? 18 : (isNameMode ? 4 : 3),
                                     }}
                                   >
                                     {isCross && crossHomeFaLi && (
@@ -995,8 +1006,17 @@ const SectionBlock = memo(function SectionBlock({
                                         {getFocusAreaInitials(crossHomeFaLi.name)}
                                       </span>
                                     )}
-                                    <span title={isNameMode ? label : undefined} style={{ ...(isNameMode ? { textAlign: "center" as const, lineHeight: 1.15 } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }) }}>
-                                      {isNameMode ? pillText(label, 8) : label}
+                                    <span title={isNameMode ? label : undefined} style={isNameMode ? {
+                                      textAlign: "center" as const,
+                                      maxWidth: "100%",
+                                      overflowWrap: "break-word" as const,
+                                      display: "-webkit-box",
+                                      WebkitBoxOrient: "vertical" as const,
+                                      WebkitLineClamp: hasTime ? 1 : 2,
+                                      overflow: "hidden",
+                                      lineHeight: 1.2,
+                                    } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                                      {label}
                                       {!hasTime && isPillOvernight && (
                                         <sup style={{ fontSize: "0.65em", fontWeight: 700, opacity: 0.5, marginLeft: 1 }}>+1</sup>
                                       )}
@@ -1085,7 +1105,7 @@ const SectionBlock = memo(function SectionBlock({
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                               }}>
-                                was: {isNameMode ? pillText(publishedLabel!, 8) : publishedLabel}
+                                was: {publishedLabel}
                               </span>
                             )}
                             {showDiffOverlay && draftKind === 'new' && (
@@ -1347,7 +1367,7 @@ const SectionBlock = memo(function SectionBlock({
   );
 });
 
-export default function ScheduleGrid({
+const ScheduleGrid = memo(function ScheduleGrid({
   filteredEmployees,
   allEmployees,
   week1,
@@ -1478,7 +1498,7 @@ export default function ScheduleGrid({
   });
 
   return (
-    <div ref={containerRef} data-shift-display={shiftDisplayMode} style={{ width: "100%", maxWidth: "100%", position: "relative" }}>
+    <div ref={containerRef} data-shift-display={shiftDisplayMode} style={{ width: "100%", maxWidth: "100%", position: "relative", "--dg-grid-col-min": shiftDisplayMode === "name" ? "160px" : "72px" } as React.CSSProperties}>
       {renderedSections.length === 0 ? (
         <div
           style={{
@@ -1622,4 +1642,6 @@ export default function ScheduleGrid({
       )}
     </div>
   );
-}
+});
+
+export default ScheduleGrid;

@@ -709,3 +709,116 @@ CREATE POLICY "gridmaster_all_notifications"
 -- No direct INSERT policy — notifications are system-generated via SECURITY DEFINER functions
 
 
+-- ══════════════════════════════════════════════════════════════════════════════
+-- cookie_consents
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.cookie_consents ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can insert a consent record (including anonymous visitors)
+CREATE POLICY "anyone_can_insert_cookie_consent"
+  ON public.cookie_consents FOR INSERT TO anon, authenticated
+  WITH CHECK (true);
+
+-- Users can read their own consent records
+CREATE POLICY "users_read_own_cookie_consent"
+  ON public.cookie_consents FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+-- Gridmaster can read all
+CREATE POLICY "gridmaster_all_cookie_consents"
+  ON public.cookie_consents FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- terms_acceptances
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.terms_acceptances ENABLE ROW LEVEL SECURITY;
+
+-- Users can insert their own acceptance records
+CREATE POLICY "users_insert_own_terms_acceptance"
+  ON public.terms_acceptances FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- Users can read their own acceptances
+CREATE POLICY "users_read_own_terms_acceptance"
+  ON public.terms_acceptances FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+-- Gridmaster can read all
+CREATE POLICY "gridmaster_all_terms_acceptances"
+  ON public.terms_acceptances FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- subscriptions
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Org members can read their org's subscription
+CREATE POLICY "org_members_read_subscription"
+  ON public.subscriptions FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+-- Gridmaster can manage all
+CREATE POLICY "gridmaster_all_subscriptions"
+  ON public.subscriptions FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+-- Service role manages subscriptions via webhooks (bypasses RLS)
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- notification_preferences
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+
+-- Users can manage their own preferences
+CREATE POLICY "users_manage_own_notification_prefs"
+  ON public.notification_preferences FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- Gridmaster can read all
+CREATE POLICY "gridmaster_all_notification_prefs"
+  ON public.notification_preferences FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- audit_log
+-- ══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+-- Super admins can read their org's audit log
+CREATE POLICY "super_admin_read_org_audit_log"
+  ON public.audit_log FOR SELECT TO authenticated
+  USING (
+    org_id IS NOT NULL
+    AND org_id = public.caller_org_id()
+    AND public.caller_org_role() = 'super_admin'
+  );
+
+-- Authenticated users can insert audit entries (for client-side logging)
+CREATE POLICY "authenticated_insert_audit_log"
+  ON public.audit_log FOR INSERT TO authenticated
+  WITH CHECK (actor_id = auth.uid());
+
+-- Gridmaster can read all
+CREATE POLICY "gridmaster_all_audit_log"
+  ON public.audit_log FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+-- Service role bypasses RLS for server-side audit logging
+
