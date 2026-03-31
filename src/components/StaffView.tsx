@@ -13,6 +13,7 @@ import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { BulkImportModal } from "@/components/staff/BulkImportModal";
 import { fetchInvitations, revokeInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
+import * as Sentry from "@sentry/nextjs";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
@@ -210,7 +211,7 @@ function MembersSection({
         invites.filter((inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date())
       );
     }).catch((err) => {
-      console.error("[StaffView] Failed to fetch invitations:", err);
+      Sentry.captureException(err);
     });
     return () => { cancelled = true; };
   }, [orgId]);
@@ -958,7 +959,7 @@ function RecurringScheduleSection({
       setSavedDraftTimestamp(new Date().toISOString());
       toast.success("Draft saved");
     } catch (err: unknown) {
-      console.error("Draft save error:", err);
+      Sentry.captureException(err);
       toast.error(`Failed to save draft: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   }

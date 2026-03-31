@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { SeriesFrequency, ShiftCode, AbsenceType } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
+import * as Sentry from "@sentry/nextjs";
 import { iterateDateRange } from "@/lib/utils";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -134,7 +135,7 @@ export default function RepeatForm({
         .gte("date", minDate)
         .lte("date", maxDate);
       if (cancelled) return;
-      if (error) { console.error("Overwrite check failed:", error.message); return; }
+      if (error) { Sentry.captureException(error); return; }
       const overlap = (data ?? []).filter((row: { date: string }) => datesToCheck.has(row.date)).length;
       setOverwrites(overlap);
     })();

@@ -27,21 +27,26 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initial session check
+    // Initial session check with timeout — stale cookies from a different
+    // Supabase instance (e.g. remote→local switch) can cause getSession()
+    // to hang indefinitely on token refresh. The timeout clears the dead
+    // session so the app doesn't spin forever.
     const checkSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("session_timeout")), 5000),
+        );
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         if (error) {
-          // Stale or revoked refresh token (e.g. after DB reset, server restart,
-          // or another browser signed out globally). Clear the dead session
-          // silently so the user just sees the login page.
           await supabase.auth.signOut({ scope: "local" });
           setUser(null);
           return;
         }
         setUser(session?.user ?? null);
       } catch {
-        // Network errors etc. — treat as no session
+        // Timeout or network error — clear any stale cookies
+        try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
         setUser(null);
       } finally {
         setIsLoading(false);

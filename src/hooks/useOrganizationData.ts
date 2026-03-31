@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
+import * as Sentry from "@sentry/nextjs";
 import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchCoverageRequirements } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
@@ -358,7 +359,7 @@ export function useOrganizationData(): OrganizationData {
     try {
       await queryClient.invalidateQueries({ queryKey: queryKeys.org.shiftCodes(effectiveOrgId) });
     } catch (err) {
-      console.error("Failed to refresh shift codes after cert change:", err);
+      Sentry.captureException(err);
       toast.error("Failed to refresh shift codes");
     }
   }, [queryClient, effectiveOrgId]);

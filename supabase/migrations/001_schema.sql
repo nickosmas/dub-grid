@@ -819,13 +819,8 @@ ALTER TABLE public.publish_history
   ADD CONSTRAINT publish_history_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT publish_history_user_fkey FOREIGN KEY (published_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
--- terms_acceptances
-ALTER TABLE public.terms_acceptances
-  ADD CONSTRAINT terms_acceptances_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
--- subscriptions
-ALTER TABLE public.subscriptions
-  ADD CONSTRAINT subscriptions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+-- terms_acceptances (FK added after table definition, see below)
+-- subscriptions (FK added after table definition, see below)
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -982,6 +977,9 @@ CREATE INDEX idx_terms_acceptances_user ON public.terms_acceptances(user_id);
 
 COMMENT ON TABLE public.terms_acceptances IS 'Immutable audit trail of terms and conditions acceptances';
 
+ALTER TABLE public.terms_acceptances
+  ADD CONSTRAINT terms_acceptances_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
 
 -- ── subscriptions ───────────────────────────────────────────────────────────
 
@@ -1005,6 +1003,9 @@ CREATE TABLE public.subscriptions (
 CREATE INDEX idx_subscriptions_stripe_id ON public.subscriptions(stripe_subscription_id);
 
 COMMENT ON TABLE public.subscriptions IS 'Stripe subscription tracking per organization';
+
+ALTER TABLE public.subscriptions
+  ADD CONSTRAINT subscriptions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 -- ── audit_log ──────────────────────────────────────────────────────────────
