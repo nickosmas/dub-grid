@@ -5,13 +5,13 @@ import { Client } from "pg";
  * Resets the remote Supabase database by dropping the public schema
  * and re-running all 4 consolidated migration files.
  *
- * Expects .env.local to be pointed at the remote project (via `npm run use:remote`).
+ * Called by `npm run db:reset:remote` which auto-pulls remote env via `vercel env pull`.
  */
 async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl?.includes("supabase.co")) {
     console.error("ERROR: .env.local is not pointing to a remote Supabase project.");
-    console.error("Run `npm run use:remote` first, or use `npm run db:reset` for local.");
+    console.error("Run `npm run db:reset:remote` (auto-pulls from Vercel), or `npm run db:reset` for local.");
     process.exit(1);
   }
 
@@ -23,7 +23,7 @@ async function main() {
     const ref = new URL(supabaseUrl).hostname.split(".")[0];
     connectionString = `postgresql://postgres:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD)}@db.${ref}.supabase.co:5432/postgres`;
   } else {
-    console.error("ERROR: Set DATABASE_URL or SUPABASE_DB_PASSWORD in .env.remote");
+    console.error("ERROR: DATABASE_URL or SUPABASE_DB_PASSWORD not found. Ensure these are set in Vercel env vars.");
     process.exit(1);
   }
 

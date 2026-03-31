@@ -417,8 +417,8 @@ async function main() {
     const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
     const password = process.env.SUPABASE_DB_PASSWORD;
     if (!password) {
-      console.error("ERROR: Set SUPABASE_DB_PASSWORD in .env.remote to seed remote DB.");
-      console.error("Find it in Supabase Dashboard → Settings → Database → Database password");
+      console.error("ERROR: SUPABASE_DB_PASSWORD not found for remote DB.");
+      console.error("Ensure it's set in Vercel env vars, or use `npm run db:reset:remote` which handles this automatically.");
       process.exit(1);
     }
     connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;

@@ -8,6 +8,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
+import { acceptTerms } from "@/lib/terms";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
 
@@ -25,6 +26,7 @@ export default function AcceptInvitePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [emailFromUrl, setEmailFromUrl] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Extract token and email from URL on mount
   useEffect(() => {
@@ -126,6 +128,16 @@ export default function AcceptInvitePage() {
         } catch {
           // Best-effort
         }
+      }
+
+      // 2b. Record terms acceptance (best-effort — user is already authenticated)
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession) {
+          await acceptTerms(currentSession.user.id);
+        }
+      } catch {
+        // Non-blocking — TermsAcceptanceGate will catch this on next login
       }
 
       // 3. Sign out so user re-authenticates with fresh JWT claims.
@@ -235,9 +247,41 @@ export default function AcceptInvitePage() {
                 </p>
               )}
 
+              <label style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                cursor: "pointer",
+                fontSize: "var(--dg-fs-body-sm)",
+                color: "var(--color-text-secondary)",
+              }}>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    marginTop: 2,
+                    accentColor: "var(--color-brand)",
+                    cursor: "pointer",
+                  }}
+                />
+                <span>
+                  I agree to the{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-brand)", textDecoration: "underline" }}>
+                    Terms of Service
+                  </a>
+                  {" "}and{" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-brand)", textDecoration: "underline" }}>
+                    Privacy Policy
+                  </a>
+                </span>
+              </label>
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !termsAccepted}
                 className="dg-auth-submit"
                 style={{
                   borderRadius: "12px",

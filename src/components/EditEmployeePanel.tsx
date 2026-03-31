@@ -6,6 +6,7 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { validateEmail, validatePhone } from "@/components/FormField";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
@@ -69,6 +70,18 @@ export default function EditEmployeePanel({
   const [showBenchConfirm, setShowBenchConfirm] = useState(false);
   const [benchNote, setBenchNote] = useState(employee.statusNote || "");
   const [revoking, setRevoking] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const fieldErrors = useMemo(() => ({
+    firstName: touched.firstName && !form.firstName.trim() ? "First name is required" : null,
+    focusAreaIds: touched.focusAreaIds && form.focusAreaIds.length === 0 ? `At least one ${focusAreaLabel.toLowerCase()} is required` : null,
+    email: touched.email ? validateEmail(form.email) : null,
+    phone: touched.phone ? validatePhone(form.phone) : null,
+  }), [form, touched, focusAreaLabel]);
+
+  const markTouched = useCallback((field: string) => {
+    setTouched((prev) => prev[field] ? prev : { ...prev, [field]: true });
+  }, []);
 
   useEffect(() => {
     setForm({
@@ -85,6 +98,7 @@ export default function EditEmployeePanel({
     setShowDeleteConfirm(false);
     setShowBenchConfirm(false);
     setRevoking(false);
+    setTouched({});
   }, [employee]);
 
   const isModified = useMemo(() => {
@@ -103,8 +117,14 @@ export default function EditEmployeePanel({
   }, [form, employee]);
 
   const handleSave = useCallback(() => {
-    if (!form.firstName.trim()) return;
-    if (form.focusAreaIds.length === 0) return;
+    if (!form.firstName.trim() || form.focusAreaIds.length === 0) {
+      setTouched({ firstName: true, focusAreaIds: true, email: true, phone: true });
+      return;
+    }
+    if (validateEmail(form.email) || validatePhone(form.phone)) {
+      setTouched({ firstName: true, focusAreaIds: true, email: true, phone: true });
+      return;
+    }
     onSave({
       ...employee,
       firstName: form.firstName.trim(),
@@ -177,16 +197,21 @@ export default function EditEmployeePanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               <div>
-                <label style={fieldLabel}>First name</label>
+                <label style={fieldLabel}>First name <span style={{ color: "var(--color-danger)" }}>*</span></label>
                 <input
                   className="dg-input"
                   value={form.firstName}
                   onChange={(e) =>
                     setForm((p) => ({ ...p, firstName: e.target.value }))
                   }
+                  onBlur={() => markTouched("firstName")}
                   placeholder="e.g. Maria"
                   readOnly={readOnly}
+                  style={fieldErrors.firstName ? { borderColor: "var(--color-danger)" } : undefined}
                 />
+                {fieldErrors.firstName && (
+                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }} role="alert">{fieldErrors.firstName}</div>
+                )}
               </div>
               <div>
                 <label style={fieldLabel}>Last name</label>
@@ -211,9 +236,14 @@ export default function EditEmployeePanel({
                   onChange={(e) =>
                     setForm((p) => ({ ...p, phone: e.target.value }))
                   }
+                  onBlur={() => markTouched("phone")}
                   placeholder="(415) 555-0100"
                   readOnly={readOnly}
+                  style={fieldErrors.phone ? { borderColor: "var(--color-danger)" } : undefined}
                 />
+                {fieldErrors.phone && (
+                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }} role="alert">{fieldErrors.phone}</div>
+                )}
               </div>
               <div>
                 <label style={fieldLabel}>Email</label>
@@ -224,13 +254,18 @@ export default function EditEmployeePanel({
                   onChange={(e) =>
                     setForm((p) => ({ ...p, email: e.target.value }))
                   }
+                  onBlur={() => markTouched("email")}
                   placeholder="name@example.com"
                   readOnly={readOnly}
+                  style={fieldErrors.email ? { borderColor: "var(--color-danger)" } : undefined}
                 />
                 {employee.userId && form.email !== employee.email && (
                   <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-warning)", margin: "4px 0 0", lineHeight: 1.3 }}>
                     Changing the contact email does not change their login email.
                   </p>
+                )}
+                {fieldErrors.email && (
+                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }} role="alert">{fieldErrors.email}</div>
                 )}
               </div>
             </div>
@@ -274,14 +309,14 @@ export default function EditEmployeePanel({
             </div>
 
             <div>
-              <label style={fieldLabel}>{focusAreaLabel}</label>
+              <label style={fieldLabel}>{focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span></label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {focusAreas.map((focusArea) => {
                   const active = form.focusAreaIds.includes(focusArea.id);
                   return (
                     <button
                       key={focusArea.id}
-                      onClick={() => toggleFocusArea(focusArea.id)}
+                      onClick={() => { toggleFocusArea(focusArea.id); markTouched("focusAreaIds"); }}
                       disabled={readOnly}
                       style={{
                         display: "inline-flex",
@@ -311,6 +346,9 @@ export default function EditEmployeePanel({
                   );
                 })}
               </div>
+              {fieldErrors.focusAreaIds && (
+                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }} role="alert">{fieldErrors.focusAreaIds}</div>
+              )}
             </div>
 
             <div>

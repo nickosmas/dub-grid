@@ -5,10 +5,7 @@
 
 export const COLORS = {
   light: "#005F02",
-  dark: "#F1F5F9",
 } as const;
-
-export type LogoTheme = keyof typeof COLORS;
 
 interface GridProps {
   size: number;
