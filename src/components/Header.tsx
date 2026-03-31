@@ -8,6 +8,7 @@ import { useLogout, usePermissions, useMediaQuery, MOBILE, TABLET } from "@/hook
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import MobileNavSheet from "@/components/MobileNavSheet";
+import * as Sentry from "@sentry/nextjs";
 import NotificationBell from "@/components/NotificationBell";
 
 
@@ -255,7 +256,7 @@ export default function Header({ orgName }: HeaderProps) {
   const roleLabel = ROLE_LABELS[role] ?? "User";
 
   const handleSignOut = useCallback(() => {
-    signOutLocal().catch(console.error);
+    signOutLocal().catch((err) => Sentry.captureException(err));
   }, [signOutLocal]);
 
   /* ── Mobile Header ─────────────────────────────────────── */

@@ -213,7 +213,9 @@ export default function RootPage() {
         setReady(true);
       }
     };
-    checkSession();
+
+    const timeout = setTimeout(() => setReady(true), 5000);
+    checkSession().finally(() => clearTimeout(timeout));
   }, [router]);
 
   /* Loading state */

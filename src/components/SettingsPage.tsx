@@ -13,6 +13,7 @@ import ImpersonationPanel from "@/components/ImpersonationPanel";
 import HelpTooltip from "@/components/HelpTooltip";
 import { helpText } from "@/lib/help-content";
 import { toast } from "sonner";
+import * as Sentry from "@sentry/nextjs";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { useAuth } from "@/components/AuthProvider";
@@ -259,7 +260,7 @@ function OrganizationDetailsSettings({
       toast.success("Settings saved");
     } catch (err) {
       toast.error("Failed to save settings");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setSaving(false);
     }
@@ -406,7 +407,7 @@ function OrganizationLabelsSettings({
       toast.success("Labels saved");
     } catch (err) {
       toast.error("Failed to save labels");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setSaving(false);
     }
@@ -539,7 +540,7 @@ function FocusAreaRow({
       toast.success("Focus area deleted");
     } catch (err) {
       toast.error("Failed to delete focus area");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -973,6 +974,13 @@ function ShiftCodeRow({
   const [expanded, setExpanded] = useState(!!st.isNew);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [customizeTime, setCustomizeTime] = useState(() => {
+    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
+    const timesMatchCategory = cat != null
+      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
+      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
+    return !timesMatchCategory && (st.defaultStartTime != null || st.defaultEndTime != null);
+  });
 
   // Re-sync form from prop when the parent data changes (e.g. fresh fetch
   // after cert deletion trigger cleans up IDs).
@@ -1003,6 +1011,7 @@ function ShiftCodeRow({
       defaultDurationHours: st.defaultDurationHours ?? null,
       defaultDurationMinutes: st.defaultDurationMinutes ?? null,
     });
+    setCustomizeTime(!timesMatch && (st.defaultStartTime != null || st.defaultEndTime != null));
   }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, st.requiredCertificationIds, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
 
   // Normalize times: if they match the category exactly, treat as null (inherit)
@@ -1086,10 +1095,11 @@ function ShiftCodeRow({
       });
       onSaved(saved, st.id);
       setExpanded(false);
+      setCustomizeTime(false);
       toast.success("Shift code saved");
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? JSON.stringify(err) ?? "Unknown error";
-      console.error("Save shift code error:", msg, err);
+      Sentry.captureException(err);
       setSaveError(msg);
       toast.error("Failed to save shift code");
     } finally {
@@ -1109,7 +1119,7 @@ function ShiftCodeRow({
       toast.success("Shift code deleted");
     } catch (err) {
       toast.error("Failed to delete shift code");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -1315,7 +1325,7 @@ function ShiftCodeRow({
 
           {/* Default Times vs Duration — inherit from category, customize on demand */}
           {(() => {
-            const hasCustomTimes = effectiveStartTime != null || effectiveEndTime != null;
+            const hasCustomTimes = effectiveStartTime != null || effectiveEndTime != null || customizeTime;
             const hasDuration = form.defaultDurationHours != null || form.defaultDurationMinutes != null;
             const isGeneral = form.focusAreaId == null;
             const selectedCategory = form.categoryId != null
@@ -1406,7 +1416,7 @@ function ShiftCodeRow({
                     {hasCategoryTime && canManageShiftCodes && (
                       <button
                         type="button"
-                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null }))}
+                        onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
                         style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0, textDecoration: "underline" }}
                       >
                         Revert to category default
@@ -1415,7 +1425,7 @@ function ShiftCodeRow({
                     {!hasCategoryTime && canManageShiftCodes && (
                       <button
                         type="button"
-                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null }))}
+                        onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
                         style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0, textDecoration: "underline" }}
                       >
                         Remove custom time
@@ -1424,7 +1434,7 @@ function ShiftCodeRow({
                     {isGeneral && canManageShiftCodes && (
                       <button
                         type="button"
-                        onClick={() => setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
+                        onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 })); }}
                         style={{ background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
                       >
                         Use duration instead
@@ -1469,11 +1479,14 @@ function ShiftCodeRow({
                   <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
                     <button
                       type="button"
-                      onClick={() => setForm((p) => ({
-                        ...p,
-                        defaultStartTime: categoryStart ?? "07:00",
-                        defaultEndTime: categoryEnd ?? "15:00",
-                      }))}
+                      onClick={() => {
+                        setCustomizeTime(true);
+                        setForm((p) => ({
+                          ...p,
+                          defaultStartTime: categoryStart ?? "07:00",
+                          defaultEndTime: categoryEnd ?? "15:00",
+                        }));
+                      }}
                       style={{
                         background: "var(--color-bg-subtle)",
                         border: "1px solid var(--color-border)",
@@ -1611,6 +1624,11 @@ function ShiftCodeRow({
                 if (st.isNew) {
                   onDeleted(st.id);
                 } else {
+                  const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
+                  const timesMatchCat = cat
+                    && st.defaultStartTime != null && st.defaultEndTime != null
+                    && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
+                    && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
                   setForm({
                     label: st.label,
                     name: st.name,
@@ -1620,11 +1638,12 @@ function ShiftCodeRow({
                     categoryId: st.categoryId ?? null,
                     focusAreaId: st.focusAreaId ?? null,
                     requiredCertificationIds: st.requiredCertificationIds ?? [],
-                    defaultStartTime: st.defaultStartTime ?? null,
-                    defaultEndTime: st.defaultEndTime ?? null,
+                    defaultStartTime: timesMatchCat ? null : (st.defaultStartTime ?? null),
+                    defaultEndTime: timesMatchCat ? null : (st.defaultEndTime ?? null),
                     defaultDurationHours: st.defaultDurationHours ?? null,
                     defaultDurationMinutes: st.defaultDurationMinutes ?? null,
                   });
+                  setCustomizeTime(false);
                   setExpanded(false);
                 }
               }}
@@ -1748,7 +1767,7 @@ function AbsenceTypeRow({
       toast.success("Off day type saved");
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? "Unknown error";
-      console.error("Save absence type error:", msg, err);
+      Sentry.captureException(err);
       setSaveError(msg);
       toast.error("Failed to save off day type");
     } finally {
@@ -1765,7 +1784,7 @@ function AbsenceTypeRow({
       toast.success("Off day type deleted");
     } catch (err) {
       toast.error("Failed to delete off day type");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -2571,7 +2590,7 @@ function IndicatorTypesSettings({
       toast.success("Indicator saved");
     } catch (err) {
       toast.error("Failed to save indicator");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setSaving(null);
     }
@@ -2593,7 +2612,7 @@ function IndicatorTypesSettings({
       toast.success("Indicator deleted");
     } catch (err) {
       toast.error("Failed to delete indicator");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setDeleting(null);
       setConfirmDeleteId(null);
@@ -2867,7 +2886,7 @@ function ShiftCategoriesSettings({
       toast.success("Category saved");
     } catch (err) {
       toast.error("Failed to save category");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setSaving(null);
     }
@@ -2891,7 +2910,7 @@ function ShiftCategoriesSettings({
       toast.success("Category deleted");
     } catch (err) {
       toast.error("Failed to delete category");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setDeleting(null);
       setConfirmDeleteId(null);
@@ -3434,7 +3453,7 @@ function CoverageRequirementsSettings({
         });
         toast.success("Coverage requirements saved");
       } catch (e) {
-        console.error(e);
+        Sentry.captureException(e);
         toast.error("Failed to save coverage requirements");
       } finally {
         setSavingKey(null);
@@ -4259,7 +4278,7 @@ function DisplayModeSettings({
       onSave(updated);
       toast.success("Display mode updated");
     } catch (err) {
-      console.error(err);
+      Sentry.captureException(err);
       toast.error("Failed to update display mode");
     } finally {
       setSaving(false);

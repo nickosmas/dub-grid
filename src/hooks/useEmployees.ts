@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchEmployees, insertEmployee, updateEmployee, deleteEmployee, benchEmployee, activateEmployee } from "@/lib/db";
 import { toast } from "sonner";
+import * as Sentry from "@sentry/nextjs";
 import { queryKeys } from "@/lib/query-keys";
 import type { Employee } from "@/types";
 
@@ -84,7 +85,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         invalidateEmployees();
       } catch (err) {
         toast.error("Failed to add employee");
-        console.error(err);
+        Sentry.captureException(err);
       }
     },
     [orgId, invalidateEmployees],
@@ -105,7 +106,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       } catch (err) {
         setAllLocal(prevAll);
         toast.error("Failed to save employee");
-        console.error(err);
+        Sentry.captureException(err);
       }
     },
     [orgId, invalidateEmployees],
@@ -127,7 +128,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     } catch (err) {
       setAllLocal(prevAll);
       toast.error("Failed to terminate employee");
-      console.error(err);
+      Sentry.captureException(err);
     }
   }, [orgId, invalidateEmployees]);
 
@@ -148,7 +149,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     } catch (err) {
       setAllLocal(prevAll);
       toast.error("Failed to bench employee");
-      console.error(err);
+      Sentry.captureException(err);
     }
   }, [orgId, invalidateEmployees]);
 
@@ -170,7 +171,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     } catch (err) {
       setAllLocal(prevAll);
       toast.error("Failed to activate employee");
-      console.error(err);
+      Sentry.captureException(err);
     }
   }, [orgId, invalidateEmployees]);
 

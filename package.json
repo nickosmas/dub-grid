@@ -13,7 +13,7 @@
     "test:e2e:ui": "playwright test --ui",
     "seed": "npx tsx --env-file=.env.local seed.ts",
     "db:reset": "supabase db reset && FORCE_LOCAL_DB=1 npm run seed",
-    "db:reset:remote": "cp .env.local .env.local.bak && vercel env pull .env.local --yes && npx tsx --env-file=.env.local scripts/reset-remote-db.ts && npm run seed; mv .env.local.bak .env.local",
+    "db:reset:remote": "npx tsx --env-file=.env.remote scripts/reset-remote-db.ts && npx tsx --env-file=.env.remote seed.ts",
     "test:load": "k6 run load-tests/schedule-load.js",
     "test:load:auth": "k6 run load-tests/auth-flow.js",
     "test:load:stress": "SCENARIO=stress k6 run load-tests/schedule-load.js",
@@ -52,6 +52,7 @@
     "zod": "^3.25.76"
   },
   "overrides": {
+    "axios": "1.14.0",
     "tar": "^7.5.13",
     "tmp": ">=0.2.3"
   },

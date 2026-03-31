@@ -12,6 +12,7 @@ import {
   saveOrganizationRoles,
 } from "@/lib/db";
 import type { Organization, AssignableOrganizationRole } from "@/types";
+import * as Sentry from "@sentry/nextjs";
 import CustomSelect from "@/components/CustomSelect";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
@@ -309,7 +310,7 @@ export default function OrganizationSetupWizard({
           }, org.id);
           employeeId = emp.id;
         } catch (empErr: unknown) {
-          console.error("Failed to create employee for super admin:", empErr);
+          Sentry.captureException(empErr);
           // Non-blocking — continue with assignment/invitation without employee link
         }
 

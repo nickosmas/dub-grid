@@ -9,7 +9,7 @@ export const options = {
   thresholds,
 };
 
-export default function () {
+export default function authFlow() {
   // Login via the API route
   const loginRes = http.post(
     `${BASE_URL}/api/auth/login`,

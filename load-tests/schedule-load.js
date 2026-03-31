@@ -9,7 +9,7 @@ export const options = {
   thresholds,
 };
 
-export default function () {
+export default function scheduleLoad() {
   // Health check
   const healthRes = http.get(`${BASE_URL}/api/health`);
   check(healthRes, {
