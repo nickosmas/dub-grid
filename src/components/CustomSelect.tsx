@@ -93,7 +93,7 @@ export default function CustomSelect<T extends string | number>({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [open, setOpen]);
 
   const trigger = (
     <div ref={ref} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
