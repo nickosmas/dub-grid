@@ -1,5 +1,6 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import logger from "@/lib/logger";
 
 const hasRedisEnv =
   !!process.env.UPSTASH_REDIS_REST_URL &&
@@ -44,15 +45,19 @@ export const passwordResetLimiter = redis
   ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, "15 m") })
   : null;
 
+/**
+ * Login rate limiter — 5 attempts per 15 minutes per key (email hash).
+ * Provides brute-force protection at the application level.
+ */
+export const loginLimiter = redis
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, "15 m") })
+  : null;
+
 if (!hasRedisEnv) {
   if (process.env.NODE_ENV === "production") {
-    console.error(
-      "[rate-limit] CRITICAL: UPSTASH_REDIS_REST_URL / TOKEN not set in production — requests will be blocked",
-    );
+    logger.error("UPSTASH_REDIS_REST_URL / TOKEN not set in production — requests will be blocked");
   } else {
-    console.warn(
-      "[rate-limit] UPSTASH_REDIS_REST_URL / TOKEN not set — rate limiting disabled (dev)",
-    );
+    logger.warn("UPSTASH_REDIS_REST_URL / TOKEN not set — rate limiting disabled (dev)");
   }
 }
 
