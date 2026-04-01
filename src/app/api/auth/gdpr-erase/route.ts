@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 
 function getUserClient(req: NextRequest) {
@@ -33,6 +34,10 @@ function getServiceClient() {
  * Body: { confirmation: "ERASE MY DATA" }
  */
 export async function POST(req: NextRequest) {
+  // ── CSRF: validate Origin header ──────────────────────────────────
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const userClient = getUserClient(req);
     const { data: { session } } = await userClient.auth.getSession();

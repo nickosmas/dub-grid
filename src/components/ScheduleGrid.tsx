@@ -30,8 +30,11 @@ function fmt12hShort(time24: string): string {
  *  An end time of "00:00" means midnight (end of day), not start of next day. */
 function isOvernightTimes(start: string | null | undefined, end: string | null | undefined): boolean {
   if (!start || !end) return false;
-  const effectiveEnd = end === "00:00" ? "24:00" : end;
-  return start > effectiveEnd;
+  // Normalize to HH:MM — DB TIME columns may include seconds ("00:00:00")
+  const s = start.slice(0, 5);
+  const e = end.slice(0, 5);
+  const effectiveEnd = e === "00:00" ? "24:00" : e;
+  return s > effectiveEnd;
 }
 
 function getDraftBorder(draftKind: DraftKind, fallback: string): string {
@@ -73,7 +76,9 @@ interface ScheduleGridProps {
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   /** Returns true if the cell's custom times differ from published times. */
   hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
-  publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
+  publishDiffForKey?: (empId: string, date: Date) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  /** Set of cell keys (empId_date) that were recently published since user's last view */
+  recentlyPublishedKeys?: Set<string>;
   cellLocks?: Map<string, { userName: string }>;
   /** When true, show who created each shift below the cell */
   showAudit?: boolean;
@@ -93,6 +98,8 @@ interface ScheduleGridProps {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
+  /** Resolves a user UUID to a display name for publish tooltips */
+  resolvePublisherName?: (userId: string) => string | null;
 }
 
 
@@ -123,7 +130,8 @@ interface SectionBlockProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
   hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
-  publishDiffForKey?: (empId: string, date: Date) => PublishChange | null;
+  publishDiffForKey?: (empId: string, date: Date) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  recentlyPublishedKeys?: Set<string>;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   cellLocks?: Map<string, { userName: string }>;
@@ -136,6 +144,7 @@ interface SectionBlockProps {
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   shiftDisplayMode?: ShiftDisplayMode;
+  resolvePublisherName?: (userId: string) => string | null;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -163,6 +172,7 @@ const SectionBlock = memo(function SectionBlock({
   publishedShiftCodeIdsForKey,
   hasTimeChangesForKey,
   publishDiffForKey,
+  recentlyPublishedKeys,
   certifications,
   orgRoles,
   cellLocks,
@@ -175,6 +185,7 @@ const SectionBlock = memo(function SectionBlock({
   absenceTypeMap,
   absenceTypeIdForKey,
   shiftDisplayMode = "code",
+  resolvePublisherName,
 }: SectionBlockProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
@@ -553,6 +564,7 @@ const SectionBlock = memo(function SectionBlock({
                   const cellAbsenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
                   const cellAbsenceType = cellAbsenceTypeId != null ? absenceTypeMap?.get(cellAbsenceTypeId) ?? null : null;
 
+                  const isRecentlyPublished = !draftKind && recentlyPublishedKeys?.has(`${emp.id}_${dateKey}`);
                   const hasDraggableShift = isCellInteractive && !isLocked && shiftCode && shiftCode !== "OFF" && draftKind !== 'deleted' && !cellAbsenceType;
                   const firstStyle = hasDraggableShift ? getStyleByIdOrLabel(shiftCode.split("/")[0], cellCodeIds[0]) : null;
 
@@ -589,14 +601,16 @@ const SectionBlock = memo(function SectionBlock({
                           ? "rgba(46, 153, 48, 0.08)"
                           : isToday
                             ? "var(--color-today-bg)"
-                            : "transparent",
+                            : isRecentlyPublished
+                              ? "rgba(59, 130, 246, 0.06)"
+                              : "transparent",
                       }}
                       onMouseEnter={(e) => {
                         onCellHover?.(emp.id, date, sectionName);
                         if (shiftCode && shiftCode !== "OFF") {
                           const rect = e.currentTarget.getBoundingClientRect();
                           const content = cellAbsenceType
-                            ? cellAbsenceType.name
+                            ? (isNameMode ? cellAbsenceType.name : cellAbsenceType.label)
                             : shiftCode.split("/").map((l, li) => {
                                 const style = getStyleByIdOrLabel(l, cellCodeIds[li]);
                                 const codeEntry = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
@@ -662,14 +676,57 @@ const SectionBlock = memo(function SectionBlock({
                             return 'unchanged';                      // same code at same position
                           }
 
-                          // Cell-level label below the pill(s)
-                          const publishBadge = isPubDiff
-                            ? publishDiff!.kind === 'new'
-                              ? { text: 'New', color: 'var(--color-success-text)' }
-                              : publishDiff!.kind === 'modified'
-                                ? { text: `was: ${pubFrom.map(id => { const sc = shiftCodeById.get(id); return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?'; }).join('/')}`, color: 'var(--color-primary)' }
-                                : null
-                            : null;
+                          // Cell-level label below the pill(s) with temporal tooltip
+                          const publishTooltip = isPubDiff && publishDiff ? (() => {
+                            const diff = Date.now() - new Date(publishDiff.publishedAt).getTime();
+                            const mins = Math.floor(diff / 60000);
+                            let timeAgo: string;
+                            if (mins < 1) timeAgo = "just now";
+                            else if (mins < 60) timeAgo = `${mins} min ago`;
+                            else { const hrs = Math.floor(mins / 60); if (hrs < 24) timeAgo = `${hrs} hr ago`; else { const days = Math.floor(hrs / 24); timeAgo = `${days} day${days !== 1 ? 's' : ''} ago`; } }
+                            const name = publishDiff.publishedBy ? resolvePublisherName?.(publishDiff.publishedBy) : null;
+                            return `Published ${timeAgo}${name ? ` by ${name}` : ''}`;
+                          })() : undefined;
+
+                          const resolveOldLabel = (): string => {
+                            if (publishDiff?.fromAbsenceTypeId != null) {
+                              const at = absenceTypeMap?.get(Number(publishDiff.fromAbsenceTypeId));
+                              return at ? (isNameMode ? at.name : at.label) : '?';
+                            }
+                            return pubFrom.map(id => { const sc = shiftCodeById.get(id); return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?'; }).join('/');
+                          };
+
+                          // Detect time-only changes (same shift/absence, only custom times differ)
+                          const sameContent = isPubDiff && publishDiff && (
+                            (publishDiff.fromAbsenceTypeId ?? null) === (publishDiff.toAbsenceTypeId ?? null)
+                            && publishDiff.from.length === publishDiff.to.length
+                            && publishDiff.from.every((id, idx) => id === publishDiff.to[idx])
+                          );
+                          const hadTime = publishDiff?.fromCustomStart || publishDiff?.fromCustomEnd;
+                          const hasTime = publishDiff?.toCustomStart || publishDiff?.toCustomEnd;
+                          const timeAdded = !hadTime && hasTime;
+                          const timeEdited = hadTime && hasTime
+                            && (publishDiff?.fromCustomStart !== publishDiff?.toCustomStart
+                              || publishDiff?.fromCustomEnd !== publishDiff?.toCustomEnd);
+                          const timeRemoved = hadTime && !hasTime;
+
+                          let publishBadge: { text: string; color: string; tooltip?: string } | null = null;
+                          if (isPubDiff) {
+                            if (publishDiff!.kind === 'new') {
+                              publishBadge = { text: 'New', color: 'var(--color-success-text)', tooltip: publishTooltip };
+                            } else if (publishDiff!.kind === 'modified') {
+                              if (sameContent) {
+                                // Only times changed — show time-specific badge
+                                const timeBadge = timeAdded ? 'Added time'
+                                  : timeEdited ? 'Edited time'
+                                  : timeRemoved ? 'Time removed'
+                                  : 'Updated';
+                                publishBadge = { text: timeBadge, color: 'var(--color-primary)', tooltip: publishTooltip };
+                              } else {
+                                publishBadge = { text: `was: ${resolveOldLabel()}`, color: 'var(--color-primary)', tooltip: publishTooltip };
+                              }
+                            }
+                          }
 
                           if (labels.length === 1) {
                             const label = labels[0];
@@ -876,6 +933,7 @@ const SectionBlock = memo(function SectionBlock({
                                )}
                                {publishBadge && (
                                  <span
+                                   title={publishBadge.tooltip}
                                    style={{
                                      position: "absolute",
                                      bottom: 2,
@@ -885,7 +943,7 @@ const SectionBlock = memo(function SectionBlock({
                                      fontWeight: 700,
                                      lineHeight: 1,
                                      color: publishBadge.color,
-                                     pointerEvents: "none",
+                                     pointerEvents: publishBadge.tooltip ? "auto" : "none",
                                      whiteSpace: "nowrap",
                                    }}
                                  >
@@ -1125,7 +1183,7 @@ const SectionBlock = memo(function SectionBlock({
                               </span>
                             )}
                             {publishBadge && (
-                              <span style={{
+                              <span title={publishBadge.tooltip} style={{
                                 position: "absolute",
                                 bottom: 2,
                                 left: "50%",
@@ -1134,7 +1192,7 @@ const SectionBlock = memo(function SectionBlock({
                                 fontWeight: 700,
                                 color: publishBadge.color,
                                 whiteSpace: "nowrap",
-                                pointerEvents: "none",
+                                pointerEvents: publishBadge.tooltip ? "auto" : "none",
                                 lineHeight: 1,
                                 zIndex: 1,
                               }}>
@@ -1145,12 +1203,14 @@ const SectionBlock = memo(function SectionBlock({
                           );
                         })()}
                         </DraggableShift>
-                      ) : (showDiffOverlay && draftKind === 'deleted' && publishedLabel) || (publishDiff?.kind === 'deleted' && publishDiff.from.length > 0) ? (
+                      ) : (showDiffOverlay && draftKind === 'deleted' && publishedLabel) || (publishDiff?.kind === 'deleted' && (publishDiff.from.length > 0 || publishDiff.fromAbsenceTypeId != null)) ? (
                         (() => {
                           const isDraftDelete = draftKind === 'deleted';
                           const deletedLabel = isDraftDelete
                             ? publishedLabel!
-                            : publishDiff!.from.map(id => { const sc = shiftCodeById.get(id); return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?'; }).join('/');
+                            : publishDiff!.fromAbsenceTypeId != null
+                              ? (() => { const at = absenceTypeMap?.get(Number(publishDiff!.fromAbsenceTypeId)); return at ? (isNameMode ? at.name : at.label) : '?'; })()
+                              : publishDiff!.from.map(id => { const sc = shiftCodeById.get(id); return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?'; }).join('/');
                           return (
                             <>
                             <div
@@ -1225,17 +1285,16 @@ const SectionBlock = memo(function SectionBlock({
                         })()
                       ) : (
                         <>
+                          {shiftCode === "OFF" && (
                           <div
                             style={{
                               width: 16,
                               height: 2,
-                              background:
-                                shiftCode === "OFF"
-                                  ? "var(--color-border)"
-                                  : "var(--color-border-light)",
+                              background: "var(--color-border)",
                               borderRadius: 2,
                             }}
                           />
+                          )}
                           {noteTypes.length > 0 && (
                             <div
                               style={{
@@ -1328,14 +1387,14 @@ const SectionBlock = memo(function SectionBlock({
               >
                 {row.name}
               </div>
-              {weekDates.map((_, i) => {
+              {weekDates.map((d, i) => {
                 const coverageByLabel = dailyCoverageStatus?.[i]?.[row.id];
                 const coverageValues = coverageByLabel ? Object.values(coverageByLabel) : [];
                 const allMet = coverageValues.every((c) => !c.hasRequirement || c.isMet);
                 const cellBg = allMet ? "rgba(22, 163, 74, 0.10)" : "rgba(220, 38, 38, 0.10)";
                 return (
                   <div
-                    key={i}
+                    key={`${row.id}-${d.toISOString()}`}
                     style={{
                       textAlign: "center",
                       padding: "8px 4px",
@@ -1395,6 +1454,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
   publishedShiftCodeIdsForKey,
   hasTimeChangesForKey,
   publishDiffForKey,
+  recentlyPublishedKeys,
   cellLocks,
   showAudit,
   createdByNameForKey,
@@ -1405,6 +1465,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
   absenceTypeMap,
   absenceTypeIdForKey,
   shiftDisplayMode = "code",
+  resolvePublisherName,
 }: ScheduleGridProps) {
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
@@ -1623,6 +1684,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
             publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
             hasTimeChangesForKey={hasTimeChangesForKey}
             publishDiffForKey={publishDiffForKey}
+            recentlyPublishedKeys={recentlyPublishedKeys}
             certifications={certifications}
             orgRoles={orgRoles}
             cellLocks={cellLocks}
@@ -1635,6 +1697,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
             absenceTypeMap={absenceTypeMap}
             absenceTypeIdForKey={absenceTypeIdForKey}
             shiftDisplayMode={shiftDisplayMode}
+            resolvePublisherName={resolvePublisherName}
           />
         );
       })}

@@ -48,7 +48,7 @@ CREATE TABLE public.organizations (
   role_label           TEXT,
   shift_display_mode   TEXT DEFAULT 'code'
     CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
-  timezone             TEXT,
+  timezone             TEXT NOT NULL DEFAULT 'UTC',
   stripe_customer_id   TEXT UNIQUE,
   subscription_status  TEXT NOT NULL DEFAULT 'trialing',
   trial_ends_at        TIMESTAMPTZ,
@@ -84,8 +84,11 @@ CREATE TABLE public.profiles (
   terms_version  TEXT,
   first_name     TEXT,
   last_name      TEXT,
-  created_at     TIMESTAMPTZ DEFAULT now(),
-  updated_at     TIMESTAMPTZ DEFAULT now(),
+  created_at             TIMESTAMPTZ DEFAULT now(),
+  updated_at             TIMESTAMPTZ DEFAULT now(),
+  last_sign_in_at        TIMESTAMPTZ,
+  scheduled_deletion_at  TIMESTAMPTZ,
+  deactivation_warned_at TIMESTAMPTZ,
 
   CONSTRAINT gridmaster_no_org CHECK (
     platform_role <> 'gridmaster' OR org_id IS NULL
@@ -104,8 +107,9 @@ CREATE TABLE public.organization_memberships (
   user_id           UUID NOT NULL,
   org_id            UUID NOT NULL,
   org_role          public.org_role NOT NULL DEFAULT 'user',
-  admin_permissions JSONB,
-  joined_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  admin_permissions          JSONB,
+  joined_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  schedule_last_viewed_at    TIMESTAMPTZ,
 
   UNIQUE (user_id, org_id)
 );
@@ -832,6 +836,8 @@ CREATE INDEX idx_organizations_id ON public.organizations(id);
 
 -- profiles
 CREATE INDEX idx_profiles_org_id ON public.profiles(org_id);
+CREATE INDEX idx_profiles_last_sign_in ON public.profiles(last_sign_in_at) WHERE last_sign_in_at IS NOT NULL;
+CREATE INDEX idx_profiles_scheduled_deletion ON public.profiles(scheduled_deletion_at) WHERE scheduled_deletion_at IS NOT NULL;
 
 -- organization_memberships
 CREATE INDEX idx_org_memberships_user_id ON public.organization_memberships(user_id);
@@ -952,11 +958,13 @@ CREATE INDEX idx_shift_requests_expiry ON public.shift_requests(expires_at) WHER
 -- ── cookie_consents ─────────────────────────────────────────────────────────
 
 CREATE TABLE public.cookie_consents (
-  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id    UUID,
-  ip_hash    TEXT NOT NULL,
-  consent    JSONB NOT NULL DEFAULT '{"essential": true, "analytics": false}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id         UUID,
+  ip_hash         TEXT NOT NULL,
+  consent         JSONB NOT NULL DEFAULT '{"essential": true, "analytics": false}',
+  consent_version TEXT,
+  user_agent      TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.cookie_consents IS 'Stores cookie consent records for compliance';

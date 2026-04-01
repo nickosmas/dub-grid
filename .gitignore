@@ -32,7 +32,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 !.env.example
 
@@ -43,11 +43,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-
-.env.local
-.env.remote
+# claude
 .claude/
-
-# Sentry Config File
-.env.sentry-build-plugin
-.env*.local

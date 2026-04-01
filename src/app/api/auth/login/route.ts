@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 
 const bodySchema = z.object({
@@ -15,6 +16,10 @@ const bodySchema = z.object({
  * Rate-limits by SHA-256 hash of email (never stores raw email in Redis).
  */
 export async function POST(req: NextRequest) {
+  // ── CSRF: validate Origin header ──────────────────────────────────
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   // ── Input validation ──────────────────────────────────────────────
   let body: unknown;
   try {
