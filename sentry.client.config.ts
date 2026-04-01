@@ -1,20 +1,21 @@
 import * as Sentry from "@sentry/nextjs";
 
+// NOTE: Client-side Sentry is primarily initialized in src/instrumentation-client.ts.
+// This file is kept for compatibility with the withSentryConfig webpack plugin.
+// Settings here should stay aligned with instrumentation-client.ts.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Sample 10% of transactions in production
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
-  // Capture 100% of errors
   replaysOnErrorSampleRate: 1.0,
-  // Sample 10% of sessions for replay
   replaysSessionSampleRate: 0.1,
 
-  // Filter out known non-errors (ad blockers, extensions, etc.)
+  // Do not send PII without explicit analytics consent
+  sendDefaultPii: false,
+
   beforeSend(event) {
-    // Ignore errors from browser extensions
     if (event.exception?.values?.[0]?.stacktrace?.frames?.some(
       (frame) => frame.filename?.includes("chrome-extension://")
     )) {

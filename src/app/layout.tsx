@@ -36,7 +36,7 @@ import AuthProvider from "@/components/AuthProvider";
 import QueryProvider from "@/components/QueryProvider";
 import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
-import { Analytics } from "@vercel/analytics/next";
+import ConsentGatedAnalytics from "@/components/ConsentGatedAnalytics";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CookieConsent from "@/components/CookieConsent";
@@ -72,7 +72,7 @@ export default function RootLayout({
             </PostHogProvider>
           </AuthProvider>
         <CookieConsent />
-        <Analytics />
+        <ConsentGatedAnalytics />
       </body>
     </html>
   );

@@ -197,9 +197,9 @@ export default function CoveragePanel({
                   {fa?.name ?? `Area #${focusAreaId}`}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {faGaps.map((gap, i) => (
+                  {faGaps.map((gap) => (
                     <div
-                      key={i}
+                      key={`${focusAreaId}-${gap.date}-${gap.shiftCodeLabel}`}
                       style={{
                         padding: "10px 12px",
                         borderRadius: 10,

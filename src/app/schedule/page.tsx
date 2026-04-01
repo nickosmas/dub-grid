@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Toolbar from "@/components/Toolbar";
 import ScheduleGrid from "@/components/ScheduleGrid";
@@ -9,6 +10,7 @@ import PrintLegend from "@/components/PrintLegend";
 import PrintOptionsModal, { PrintConfig } from "@/components/PrintOptionsModal";
 import PrintScheduleView from "@/components/PrintScheduleView";
 import DraftBanner from "@/components/DraftBanner";
+import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import ShiftRequestBoard from "@/components/ShiftRequestBoard";
 import CoveragePanel from "@/components/CoveragePanel";
 import ShiftSwapModal from "@/components/ShiftSwapModal";
@@ -17,7 +19,7 @@ import { AnimatedDubGridLogo } from "@/components/Logo";
 import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName, iterateDateRange } from "@/lib/utils";
 import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, timesOverlap, checkCrossDateOverlap, checkSameDayOverlaps } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
-import { fetchShifts, fetchScheduleNotes, fetchRecurringShifts, fetchLatestPublishHistory, upsertShiftTimes, deleteShift, upsertShift, updateSeriesAllShifts, deleteShiftSeries, createShiftSeries, moveShift, applyRecurringSchedules, publishSchedule, discardScheduleDrafts, upsertScheduleNote, deleteScheduleNote, OptimisticLockError } from "@/lib/db";
+import { fetchShifts, fetchScheduleNotes, fetchRecurringShifts, fetchRecentPublishHistory, upsertShiftTimes, deleteShift, upsertShift, updateSeriesAllShifts, deleteShiftSeries, createShiftSeries, moveShift, applyRecurringSchedules, publishSchedule, discardScheduleDrafts, upsertScheduleNote, deleteScheduleNote, OptimisticLockError, updateScheduleLastViewed, getScheduleLastViewed } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { supabase } from "@/lib/supabase";
 import { usePermissions, useOrganizationData, useEmployees, useCellLocks, useShiftRequests } from "@/hooks";
@@ -55,9 +57,9 @@ function SchedulerContent() {
   const { user: authUser } = useAuth();
   const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, allShiftCodesRef, shiftCategories,
+    org, focusAreas, shiftCodes, allShiftCodes, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,
-    absenceTypes, allAbsenceTypesRef, absenceTypeMap,
+    absenceTypes, allAbsenceTypes, absenceTypeMap,
     coverageRequirements,
     loading: orgLoading, loadError,
   } = useOrganizationData();
@@ -106,8 +108,11 @@ function SchedulerContent() {
   const [autoFillPreview, setAutoFillPreview] = useState<{ count: number; dateRange: string } | null>(null);
   const [showDiffOverlay, setShowDiffOverlay] = useState(false);
   const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{ seriesId: string; shiftCount: number } | null>(null);
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry | null>(null);
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([]);
   const [showPublishDiff, setShowPublishDiff] = useState(false);
+  const [showPublishHistory, setShowPublishHistory] = useState(false);
+  const lastViewedRef = useRef<string | null>(null);
+  const hasShownChangeToast = useRef(false);
   const [isImportingPrevious, setIsImportingPrevious] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [importPreview, setImportPreview] = useState<{ count: number; sourceRange: string; targetRange: string } | null>(null);
@@ -257,13 +262,18 @@ function SchedulerContent() {
 
     async function loadSchedule() {
       try {
-        // Critical fetches in parallel — unblock grid render ASAP
-        const [shiftData, noteRows, recShifts, latestPublish] = await Promise.all([
+        // Fetch per-user last-viewed timestamp + critical data in parallel
+        const [shiftData, noteRows, recShifts, lastViewed] = await Promise.all([
           fetchShifts(orgId, canEditShifts, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd),
           fetchScheduleNotes(orgId),
           fetchRecurringShifts(orgId, undefined, shiftCodeMap, false, absenceTypeMap),
-          fetchLatestPublishHistory(orgId).catch(() => null),
+          getScheduleLastViewed(orgId).catch(() => null),
         ]);
+
+        lastViewedRef.current = lastViewed;
+
+        // Fetch publish history since user's last view (falls back to 24h if null)
+        const recentPublishes = await fetchRecentPublishHistory(orgId, lastViewed).catch(() => [] as PublishHistoryEntry[]);
 
         const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
         for (const note of noteRows) {
@@ -276,12 +286,34 @@ function SchedulerContent() {
         setShifts(shiftData);
         setNotes(noteMap);
         setRecurringShifts(recShifts);
-        if (latestPublish) setPublishHistory(latestPublish);
+        if (recentPublishes.length > 0) setPublishHistory(recentPublishes);
+
+        // Show "what changed" toast once per mount
+        if (recentPublishes.length > 0 && !hasShownChangeToast.current) {
+          hasShownChangeToast.current = true;
+          const allChanges = recentPublishes.flatMap(e => e.changes);
+          const newCount = allChanges.filter(c => c.kind === 'new').length;
+          const modCount = allChanges.filter(c => c.kind === 'modified').length;
+          const delCount = allChanges.filter(c => c.kind === 'deleted').length;
+          const parts: string[] = [];
+          if (newCount > 0) parts.push(`${newCount} new`);
+          if (modCount > 0) parts.push(`${modCount} modified`);
+          if (delCount > 0) parts.push(`${delCount} removed`);
+          if (parts.length > 0) {
+            toast.info(
+              `${allChanges.length} shift${allChanges.length !== 1 ? 's' : ''} changed since your last visit — ${parts.join(', ')}`,
+              { duration: 6000 },
+            );
+          }
+        }
+
+        // Fire-and-forget: update last-viewed timestamp for this user
+        void updateScheduleLastViewed(orgId);
 
         // Fetch current user in background — not needed for grid render
         fetchCurrentUser().then(info => { if (info) setCurrentUser(info); }).catch(() => {});
       } catch (err) {
-        console.error("loadSchedule error:", err);
+        Sentry.captureException(err);
       } finally {
         setScheduleLoading(false);
       }
@@ -345,9 +377,9 @@ function SchedulerContent() {
     return () => { cancelled = true; };
   }, [editPanel, shifts, resolveUserName]);
 
-  // Batch-fetch profile names for all shift creators when audit mode is toggled on.
+  // Batch-fetch profile names for shift creators (audit mode) and publishers (publish tooltips).
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
-  const needsAuditNames = showAudit;
+  const needsAuditNames = showAudit || publishHistory.length > 0;
   useEffect(() => {
     if (!needsAuditNames) return;
     // Collect unique creator/updater UUIDs not yet in the cache
@@ -356,9 +388,10 @@ function SchedulerContent() {
       if (entry.createdBy && !profileNameCache.current.has(entry.createdBy)) uncached.add(entry.createdBy);
       if (entry.updatedBy && !profileNameCache.current.has(entry.updatedBy)) uncached.add(entry.updatedBy);
     }
-    // Also collect updatedBy UUIDs from publish history changes (for deleted shifts whose rows are gone)
-    if (publishHistory) {
-      for (const change of publishHistory.changes) {
+    // Also collect updatedBy + publishedBy UUIDs from publish history (for tooltips and deleted shifts)
+    for (const entry of publishHistory) {
+      if (entry.publishedBy && !profileNameCache.current.has(entry.publishedBy)) uncached.add(entry.publishedBy);
+      for (const change of entry.changes) {
         if (change.updatedBy && !profileNameCache.current.has(change.updatedBy)) uncached.add(change.updatedBy);
       }
     }
@@ -417,12 +450,17 @@ function SchedulerContent() {
     return () => { cancelled = true; };
   }, [needsAuditNames, shifts, publishHistory]);
 
-  // Build a lookup map from publish history changes for O(1) access
+  // Build a lookup map from all recent publish history changes for O(1) access.
+  // Iterate oldest→newest so the most recent publish wins per cell key.
   const publishChangesMap = useMemo(() => {
-    if (!publishHistory) return null;
-    const map = new Map<string, PublishChange>();
-    for (const change of publishHistory.changes) {
-      map.set(`${change.empId}_${change.date}`, change);
+    if (publishHistory.length === 0) return null;
+    const map = new Map<string, PublishChange & { publishedAt: string; publishedBy: string }>();
+    // publishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
+    for (let i = publishHistory.length - 1; i >= 0; i--) {
+      const entry = publishHistory[i];
+      for (const change of entry.changes) {
+        map.set(`${change.empId}_${change.date}`, { ...change, publishedAt: entry.publishedAt, publishedBy: entry.publishedBy });
+      }
     }
     return map;
   }, [publishHistory]);
@@ -487,17 +525,17 @@ function SchedulerContent() {
       .on('broadcast', { event: 'schedule_published' }, async () => {
         try {
           await refetchScheduleDataRef.current();
-          const history = await fetchLatestPublishHistory(org.id);
+          const history = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
           setPublishHistory(history);
         } catch (err) {
-          console.error('Failed to sync schedule update:', err);
+          Sentry.captureException(err);
         }
       })
       .on('broadcast', { event: 'drafts_discarded' }, async () => {
         try {
           await refetchScheduleDataRef.current();
         } catch (err) {
-          console.error('Failed to sync drafts discard:', err);
+          Sentry.captureException(err);
         }
       })
       .on('broadcast', { event: 'draft_changed' }, (msg: { payload?: Record<string, unknown> }) => {
@@ -524,7 +562,7 @@ function SchedulerContent() {
           try {
             await refetchScheduleDataRef.current();
           } catch (err) {
-            console.error('Failed to sync draft change:', err);
+            Sentry.captureException(err);
           }
         }, p?.shifts || p?.notes ? 2000 : 150);
       })
@@ -604,7 +642,7 @@ function SchedulerContent() {
       // Refetch to catch any missed broadcasts — skip if data is fresh (<10s old)
       if (Date.now() - lastRefetchAtRef.current > 10_000) {
         refetchScheduleDataRef.current().catch((err) => {
-          console.error("Tab refetch failed:", err);
+          Sentry.captureException(err);
           toast.error("Failed to refresh schedule — try reloading the page");
         });
       }
@@ -627,7 +665,7 @@ function SchedulerContent() {
         const draftShifts = await fetchShifts(org.id, true, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
         setShifts(draftShifts);
       } catch (err) {
-        console.error("Draft check failed:", err);
+        Sentry.captureException(err);
       } finally {
         setDraftCheckComplete(true);
       }
@@ -732,9 +770,8 @@ function SchedulerContent() {
 
   /** Full AbsenceType object map for grid cell styling (includes archived for historical cells) */
   const absenceTypeObjectMap = useMemo(
-    () => new Map(allAbsenceTypesRef.current.map((at) => [at.id, at])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [absenceTypes],
+    () => new Map(allAbsenceTypes.map((at) => [at.id, at])),
+    [allAbsenceTypes],
   );
 
   /** Returns time ranges for an employee's shift. Prefers custom times, falls back to category times. */
@@ -769,12 +806,12 @@ function SchedulerContent() {
   const shiftCodeById = useMemo(() => {
     const map = new Map<number, ShiftCode>();
     for (const sc of shiftCodes) map.set(sc.id, sc);
-    // Include archived codes from allShiftCodesRef for shift lookup
-    for (const sc of allShiftCodesRef.current) {
+    // Include archived codes from allShiftCodes for shift lookup
+    for (const sc of allShiftCodes) {
       if (!map.has(sc.id)) map.set(sc.id, sc);
     }
     return map;
-  }, [shiftCodes, allShiftCodesRef]);
+  }, [shiftCodes, allShiftCodes]);
 
   // ── Cross-date overlap warnings for the open edit panel ─────────────────
   const overnightOverlapWarnings = useMemo((): string[] => {
@@ -908,12 +945,18 @@ function SchedulerContent() {
 
 
   const publishDiffKindForKey = useCallback(
-    (empId: string, date: Date): PublishChange | null => {
+    (empId: string, date: Date): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
       return publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
     },
     [showPublishDiff, publishChangesMap],
   );
+
+  // Set of cell keys published since user's last view — used for subtle background tint
+  const recentlyPublishedKeys = useMemo(() => {
+    if (!publishChangesMap) return undefined;
+    return new Set(publishChangesMap.keys());
+  }, [publishChangesMap]);
 
   const getCustomShiftTimes = useCallback(
     (empId: string, date: Date): { start: string; end: string; perPill?: { start: string; end: string }[] } | null => {
@@ -1009,7 +1052,7 @@ function SchedulerContent() {
       });
       upsertShiftTimes(editPanel.empId, dateKey, start, end, org.id).catch((err) => {
         toast.error("Failed to save shift times");
-        console.error(err);
+        Sentry.captureException(err);
       });
     },
     [editPanel, org?.id],
@@ -1105,6 +1148,7 @@ function SchedulerContent() {
           const deleteValue = {
             label: "OFF", shiftCodeIds: [] as number[], isDraft: true, isDelete: true,
             draftKind: 'deleted' as const,
+            absenceTypeId: null,
             publishedShiftCodeIds: ex.publishedShiftCodeIds,
             publishedAbsenceTypeId: ex.publishedAbsenceTypeId,
             publishedLabel: ex.publishedLabel ?? '',
@@ -1115,7 +1159,7 @@ function SchedulerContent() {
           const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
           const write = prev.then(() => deleteShift(empId, dateKey)).catch((err) => {
             toast.error("Failed to delete shift");
-            console.error(err);
+            Sentry.captureException(err);
           });
           pendingShiftWrites.current.set(key, write);
           broadcastDraftChanged({ shifts: { [key]: deleteValue } });
@@ -1125,7 +1169,7 @@ function SchedulerContent() {
           const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
           const write = prev.then(() => deleteShift(empId, dateKey)).catch((err) => {
             toast.error("Failed to delete shift");
-            console.error(err);
+            Sentry.captureException(err);
           });
           pendingShiftWrites.current.set(key, write);
           broadcastDraftChanged({ shifts: { [key]: null } });
@@ -1166,7 +1210,7 @@ function SchedulerContent() {
             handleConflict();
           } else {
             toast.error("Failed to save shift");
-            console.error(err);
+            Sentry.captureException(err);
           }
         });
         pendingShiftWrites.current.set(key, write);
@@ -1274,7 +1318,7 @@ function SchedulerContent() {
           toast.success("Series updated");
         } catch (err) {
           toast.error("Failed to update series");
-          console.error(err);
+          Sentry.captureException(err);
         }
       } else {
         setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
@@ -1307,7 +1351,7 @@ function SchedulerContent() {
       toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
     } catch (err) {
       toast.error("Failed to delete series");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setPendingSeriesDelete(null);
       unlockCell();
@@ -1356,7 +1400,7 @@ function SchedulerContent() {
         toast.success("Repeating shift created");
       } catch (err) {
         toast.error("Failed to create repeating shift");
-        console.error(err);
+        Sentry.captureException(err);
       } finally {
         unlockCell();
         setEditPanel(null);
@@ -1476,7 +1520,7 @@ function SchedulerContent() {
         toast.error("Shift was modified by another user — refreshing");
       } else {
         toast.error("Failed to move shift");
-        console.error(err);
+        Sentry.captureException(err);
       }
       await refetchScheduleData();
     });
@@ -1644,7 +1688,7 @@ function SchedulerContent() {
       }
     } catch (err) {
       toast.error("Failed to apply recurring schedule");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setIsApplyingRecurring(false);
       setAutoFillPreview(null);
@@ -1765,7 +1809,7 @@ function SchedulerContent() {
       await refetchScheduleData();
     } catch (err) {
       toast.error("Failed to save some imported shifts — refreshing");
-      console.error(err);
+      Sentry.captureException(err);
       await refetchScheduleData();
     } finally {
       setIsImportingPrevious(false);
@@ -1819,7 +1863,7 @@ function SchedulerContent() {
         }
         broadcastDraftChanged({ notes: { [key]: updated } });
       } catch (error) {
-        console.error(error);
+        Sentry.captureException(error);
         toast.error("Failed to save note");
         setNotes(prev => ({ ...prev, [key]: existing }));
       }
@@ -1879,14 +1923,23 @@ function SchedulerContent() {
 
       await publishSchedule(org.id, startDate, endDate);
 
+      // Cancel any pending draft-changed debounce to prevent stale data
+      // from overwriting the fresh post-publish refetch.
+      if (draftChangedDebounceRef.current) {
+        clearTimeout(draftChangedDebounceRef.current);
+        draftChangedDebounceRef.current = null;
+      }
+
       await refetchScheduleData();
-      const latestPublish = await fetchLatestPublishHistory(org.id);
-      setPublishHistory(latestPublish);
+      const recentPublishes = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
+      setPublishHistory(recentPublishes);
       setShowPublishDiff(false);
       unlockCell();
       setEditPanel(null);
       setShowDiffOverlay(false);
       toast.success("Schedule published");
+      // Update last-viewed so publisher doesn't see their own changes as "new" on next visit
+      void updateScheduleLastViewed(org.id);
 
       // Notify other tabs/users to refetch the published schedule
       realtimeChannelRef.current?.send({
@@ -1895,7 +1948,7 @@ function SchedulerContent() {
         payload: {},
       });
     } catch (err: unknown) {
-      console.error('publish_schedule failed:', err);
+      Sentry.captureException(err);
       toast.error("Failed to publish schedule");
     } finally {
       setIsPublishing(false);
@@ -1926,7 +1979,7 @@ function SchedulerContent() {
       toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
     } catch (err: unknown) {
       toast.error("Failed to discard changes");
-      console.error(err);
+      Sentry.captureException(err);
     } finally {
       setCancelingMode(null);
     }
@@ -2070,46 +2123,74 @@ function SchedulerContent() {
                 canPublish={canPublishSchedule}
               />
             )}
-            {!hasUnpublishedChanges && canEditShifts && publishHistory && publishHistory.changeCount > 0 && (
-              <div className="dg-draft-banner no-print" style={{ background: "var(--color-info-bg)", borderColor: "var(--color-info-border)", color: "var(--color-info-text)" }}>
-                <div className="dg-draft-banner-dot" style={{ background: "var(--color-primary)" }} />
-                <span style={{ fontWeight: 600 }}>
-                  Published {(() => {
-                    const diff = Date.now() - new Date(publishHistory.publishedAt).getTime();
-                    const mins = Math.floor(diff / 60000);
-                    if (mins < 1) return "just now";
-                    if (mins < 60) return `${mins} min ago`;
-                    const hrs = Math.floor(mins / 60);
-                    if (hrs < 24) return `${hrs} hr ago`;
-                    const days = Math.floor(hrs / 24);
-                    return `${days} day${days !== 1 ? "s" : ""} ago`;
-                  })()}
-                </span>
-                <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                  {publishHistory.changeCount} change{publishHistory.changeCount !== 1 ? "s" : ""}
-                </span>
-                <div className="dg-draft-banner-actions">
-                  {isMobile ? (
-                    <span style={{ fontSize: "var(--dg-fs-footnote)", opacity: 0.6, fontStyle: "italic" }}>
-                      Use a larger screen to view details
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setShowPublishDiff(v => !v)}
-                      className="dg-btn dg-btn-secondary"
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "5px 12px",
-                        background: showPublishDiff ? "var(--color-info-bg)" : undefined,
-                        color: showPublishDiff ? "var(--color-accent-text)" : undefined,
-                      }}
-                    >
-                      {showPublishDiff ? "Hide Changes" : "Show What Changed"}
-                    </button>
-                  )}
+            {publishHistory.length > 0 && (() => {
+              const latest = publishHistory[0];
+              const totalChanges = publishHistory.reduce((sum, e) => sum + e.changeCount, 0);
+              return (
+                <div className="dg-draft-banner no-print" style={{ background: "var(--color-info-bg)", borderColor: "var(--color-info-border)", color: "var(--color-info-text)" }}>
+                  <div className="dg-draft-banner-dot" style={{ background: "var(--color-primary)" }} />
+                  <span style={{ fontWeight: 600 }}>
+                    Published {(() => {
+                      const diff = Date.now() - new Date(latest.publishedAt).getTime();
+                      const mins = Math.floor(diff / 60000);
+                      if (mins < 1) return "just now";
+                      if (mins < 60) return `${mins} min ago`;
+                      const hrs = Math.floor(mins / 60);
+                      if (hrs < 24) return `${hrs} hr ago`;
+                      const days = Math.floor(hrs / 24);
+                      return `${days} day${days !== 1 ? "s" : ""} ago`;
+                    })()}
+                  </span>
+                  <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                    {totalChanges} change{totalChanges !== 1 ? "s" : ""}
+                    {publishHistory.length > 1 ? ` across ${publishHistory.length} publishes` : ""}
+                  </span>
+                  <div className="dg-draft-banner-actions">
+                    {isMobile ? (
+                      <span style={{ fontSize: "var(--dg-fs-footnote)", opacity: 0.6, fontStyle: "italic" }}>
+                        Use a larger screen to view details
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setShowPublishDiff(v => !v)}
+                          className="dg-btn dg-btn-secondary"
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            padding: "5px 12px",
+                            background: showPublishDiff ? "var(--color-info-bg)" : undefined,
+                            color: showPublishDiff ? "var(--color-accent-text)" : undefined,
+                          }}
+                        >
+                          {showPublishDiff ? "Hide Changes" : "Show What Changed"}
+                        </button>
+                        <button
+                          onClick={() => setShowPublishHistory(true)}
+                          className="dg-btn dg-btn-secondary"
+                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                        >
+                          View History
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (org) {
+                              void updateScheduleLastViewed(org.id);
+                              lastViewedRef.current = new Date().toISOString();
+                            }
+                            setPublishHistory([]);
+                            setShowPublishDiff(false);
+                          }}
+                          className="dg-btn dg-btn-secondary"
+                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                        >
+                          Mark as Seen
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             <div style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
               <Toolbar
                 weekStart={weekStart}
@@ -2137,6 +2218,7 @@ function SchedulerContent() {
                 coverageGapCount={coverageGaps.length}
                 onCoverageToggle={() => setShowCoveragePanel(prev => !prev)}
                 hideTwoWeek={isSmallDesktop}
+                onPublishHistory={() => setShowPublishHistory(true)}
               />
             </div>
           </div>
@@ -2165,6 +2247,8 @@ function SchedulerContent() {
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
                 shiftDisplayMode={org?.shiftDisplayMode}
+                absenceTypeIdForKey={absenceTypeIdForKey}
+                absenceTypeMap={absenceTypeObjectMap}
               />
             )}
 
@@ -2199,6 +2283,7 @@ function SchedulerContent() {
               publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
               hasTimeChangesForKey={hasTimeChangesForKey}
               publishDiffForKey={publishDiffKindForKey}
+              recentlyPublishedKeys={recentlyPublishedKeys}
               cellLocks={lockedCells}
               showAudit={showAudit}
               createdByNameForKey={createdByNameForKey}
@@ -2209,6 +2294,7 @@ function SchedulerContent() {
               absenceTypeMap={absenceTypeObjectMap}
               absenceTypeIdForKey={absenceTypeIdForKey}
               shiftDisplayMode={org?.shiftDisplayMode}
+              resolvePublisherName={(userId: string) => auditNames.get(userId) ?? null}
             />
             <DragOverlay dropAnimation={null}>
               {activeDrag && (
@@ -2368,31 +2454,39 @@ function SchedulerContent() {
               await upsertShift(editPanel.empId, dateKey, [], org?.id ?? null, null, null, version, absenceType.id);
               const absenceDisplayLabel = absenceTypeMap.get(absenceType.id) ?? absenceType.label;
               setShifts((prev) => {
+                const cur = prev[key];
                 const updated = {
-                  ...prev[key],
+                  ...cur,
                   label: absenceDisplayLabel,
                   shiftCodeIds: [] as number[],
                   absenceTypeId: absenceType.id,
-                  publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
-                  publishedLabel: existing?.publishedLabel ?? '',
-                  publishedAbsenceTypeId: existing?.publishedAbsenceTypeId ?? null,
+                  // Clear custom times — not applicable to absence types
+                  customStartTime: null,
+                  customEndTime: null,
+                  // Use current state (not stale closure) for published fields
+                  publishedShiftCodeIds: cur?.publishedShiftCodeIds ?? [],
+                  publishedLabel: cur?.publishedLabel ?? '',
+                  publishedAbsenceTypeId: cur?.publishedAbsenceTypeId ?? null,
                 };
                 const dk = computeDraftKind(updated);
                 return { ...prev, [key]: { ...updated, isDraft: dk !== null, draftKind: dk } };
               });
+              const cur = shiftsRef.current[key];
               const broadcastEntry = {
                 label: absenceDisplayLabel,
                 shiftCodeIds: [] as number[],
                 absenceTypeId: absenceType.id,
-                publishedShiftCodeIds: existing?.publishedShiftCodeIds ?? [],
-                publishedLabel: existing?.publishedLabel ?? '',
-                publishedAbsenceTypeId: existing?.publishedAbsenceTypeId ?? null,
+                customStartTime: null,
+                customEndTime: null,
+                publishedShiftCodeIds: cur?.publishedShiftCodeIds ?? [],
+                publishedLabel: cur?.publishedLabel ?? '',
+                publishedAbsenceTypeId: cur?.publishedAbsenceTypeId ?? null,
               };
               const bdk = computeDraftKind(broadcastEntry);
               broadcastDraftChanged({ shifts: { [key]: { ...broadcastEntry, isDraft: bdk !== null, draftKind: bdk } } });
             } catch (err) {
               toast.error("Failed to save absence");
-              console.error(err);
+              Sentry.captureException(err);
             }
           } : undefined}
         />
@@ -2569,6 +2663,24 @@ function SchedulerContent() {
           onCancel={() => { setShowImportConfirm(false); setImportPreview(null); }}
         />
       )}
+        {showPublishHistory && org && (
+          <PublishHistoryPanel
+            orgId={org.id}
+            open={showPublishHistory}
+            onClose={() => setShowPublishHistory(false)}
+            onSelectEntry={(entry) => {
+              // Navigate grid to the publish's date range
+              const publishStart = new Date(entry.startDate + "T00:00:00");
+              setWeekStart(getWeekStart(publishStart));
+              setPublishHistory([entry]);
+              setShowPublishDiff(true);
+              setShowPublishHistory(false);
+            }}
+            shiftCodeMap={shiftCodeMap}
+            employees={employees}
+            absenceTypeMap={absenceTypeMap}
+          />
+        )}
         </>
       )}
     </div>

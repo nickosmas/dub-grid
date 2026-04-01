@@ -537,13 +537,27 @@ CREATE POLICY "members_select_indicator_types"
   ON public.indicator_types FOR SELECT TO authenticated
   USING (org_id = public.caller_org_id());
 
-CREATE POLICY "admins_manage_indicator_types"
-  ON public.indicator_types FOR ALL TO authenticated
+CREATE POLICY "admins_insert_indicator_types"
+  ON public.indicator_types FOR INSERT TO authenticated
+  WITH CHECK (
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageIndicatorTypes')
+  );
+
+CREATE POLICY "admins_update_indicator_types"
+  ON public.indicator_types FOR UPDATE TO authenticated
   USING (
     org_id = public.caller_org_id()
     AND public.check_admin_permission('canManageIndicatorTypes')
   )
   WITH CHECK (
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canManageIndicatorTypes')
+  );
+
+CREATE POLICY "admins_delete_indicator_types"
+  ON public.indicator_types FOR DELETE TO authenticated
+  USING (
     org_id = public.caller_org_id()
     AND public.check_admin_permission('canManageIndicatorTypes')
   );
@@ -710,7 +724,14 @@ CREATE POLICY "gridmaster_all_notifications"
   USING (public.is_gridmaster())
   WITH CHECK (public.is_gridmaster());
 
--- No direct INSERT policy — notifications are system-generated via SECURITY DEFINER functions
+-- Block direct INSERT/DELETE — notifications are system-generated via SECURITY DEFINER functions
+CREATE POLICY "notifications_insert_blocked"
+  ON public.notifications FOR INSERT TO authenticated
+  WITH CHECK (FALSE);
+
+CREATE POLICY "notifications_delete_blocked"
+  ON public.notifications FOR DELETE TO authenticated
+  USING (FALSE);
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -831,10 +852,7 @@ CREATE POLICY "super_admin_read_org_audit_log"
     AND public.caller_org_role() = 'super_admin'
   );
 
--- Authenticated users can insert audit entries (for client-side logging)
-CREATE POLICY "authenticated_insert_audit_log"
-  ON public.audit_log FOR INSERT TO authenticated
-  WITH CHECK (actor_id = auth.uid());
+-- No direct INSERT — audit entries are written by SECURITY DEFINER functions only
 
 -- Gridmaster can read all
 CREATE POLICY "gridmaster_all_audit_log"

@@ -4,6 +4,8 @@
 
 export const IMPERSONATION_COOKIE_NAME = "dubgrid-impersonation";
 
+const secureSuffix = typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+
 export interface ImpersonationData {
   sessionId: string;
   targetUserId: string;
@@ -66,10 +68,10 @@ export function setImpersonationCookie(data: ImpersonationData): void {
   const value = encodeURIComponent(JSON.stringify(data));
   // Use domain-less cookie so it's sent on all subdomains automatically.
   // SameSite=Lax is fine — impersonation is same-site navigation.
-  document.cookie = `${IMPERSONATION_COOKIE_NAME}=${value}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  document.cookie = `${IMPERSONATION_COOKIE_NAME}=${value}; path=/; max-age=${maxAge}; SameSite=Lax${secureSuffix}`;
 }
 
 /** Clear the impersonation cookie (client-side only). */
 export function clearImpersonationCookie(): void {
-  document.cookie = `${IMPERSONATION_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  document.cookie = `${IMPERSONATION_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureSuffix}`;
 }

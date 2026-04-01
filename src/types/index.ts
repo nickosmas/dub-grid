@@ -194,6 +194,10 @@ export interface PublishChange {
   fromAbsenceTypeId?: number | null;
   toAbsenceTypeId?: number | null;
   updatedBy?: string | null;
+  fromCustomStart?: string | null;
+  fromCustomEnd?: string | null;
+  toCustomStart?: string | null;
+  toCustomEnd?: string | null;
 }
 
 export interface PublishHistoryEntry {
@@ -204,6 +208,10 @@ export interface PublishHistoryEntry {
   changeCount: number;
   changes: PublishChange[];
   publishedAt: string;
+}
+
+export interface PublishHistoryEntryWithName extends PublishHistoryEntry {
+  publishedByName: string;
 }
 
 export type ShiftMap = Record<string, {

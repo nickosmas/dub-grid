@@ -210,8 +210,6 @@ export function usePermissions(): Permissions {
         return;
       }
 
-      // Invalidate cache if it belongs to a different user (e.g. logout → login
-      // as different account). Prevents stale role/org data from flashing.
       const sessionUserId = session.user?.id ?? null;
       if (permsCache && permsCacheUserId && permsCacheUserId !== sessionUserId) {
         permsCache = null;

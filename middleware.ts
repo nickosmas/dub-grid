@@ -95,7 +95,7 @@ export async function middleware(req: NextRequest) {
     object-src 'none';
     base-uri 'none';
     form-action 'self';
-    upgrade-insecure-requests;
+    ${process.env.NODE_ENV === "production" ? "upgrade-insecure-requests;" : ""}
   `;
   const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
 
@@ -123,6 +123,7 @@ export async function middleware(req: NextRequest) {
     pathname === "/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/cookie-policy" ||
     pathname === "/accept-invite" ||
     pathname === "/request-demo" ||
     pathname === "/forgot-password" ||
@@ -216,57 +217,62 @@ export async function middleware(req: NextRequest) {
   ) {
     const userId = session.user.id;
 
-    // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
-    const profile = await cacheThrough(
-      CacheKey.mwProfile(userId),
-      TTL.MIDDLEWARE,
-      async () => {
-        const { data } = await supabase
-          .from("profiles")
-          .select("platform_role, org_id")
-          .eq("id", userId)
-          .maybeSingle();
-        return data;
-      },
-    );
-
-    // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
-    let resolvedOrgRole = "user";
-    let resolvedOrgId = profile?.org_id;
-    let resolvedOrgSlug: string | undefined = undefined;
-
-    if (subdomain && subdomain !== "gridmaster") {
-      const membership = await cacheThrough(
-        CacheKey.mwMembership(userId, subdomain),
+    try {
+      // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
+      const profile = await cacheThrough(
+        CacheKey.mwProfile(userId),
         TTL.MIDDLEWARE,
         async () => {
           const { data } = await supabase
-            .from("organization_memberships")
-            .select("org_role, org_id, organizations!inner(slug)")
-            .eq("user_id", userId)
-            .eq("organizations.slug", subdomain)
-            .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
+            .from("profiles")
+            .select("platform_role, org_id")
+            .eq("id", userId)
+            .maybeSingle();
           return data;
         },
       );
 
-      if (membership) {
-        resolvedOrgRole = membership.org_role;
-        resolvedOrgId = membership.org_id;
-        resolvedOrgSlug = membership.organizations?.slug;
-      } else if (subdomainMismatch) {
-        // User is on a subdomain they don't belong to — redirect to login
-        // instead of silently proceeding with stale/missing org context.
-        return NextResponse.redirect(new URL("/login", req.url));
-      }
-    }
+      // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
+      let resolvedOrgRole = "user";
+      let resolvedOrgId = profile?.org_id;
+      let resolvedOrgSlug: string | undefined = undefined;
 
-    claims = {
-      platform_role: claims.platform_role ?? profile?.platform_role ?? "none",
-      org_role: claims.org_role ?? resolvedOrgRole,
-      org_id: claims.org_id ?? resolvedOrgId ?? undefined,
-      org_slug: claims.org_slug ?? resolvedOrgSlug ?? undefined,
-    };
+      if (subdomain && subdomain !== "gridmaster") {
+        const membership = await cacheThrough(
+          CacheKey.mwMembership(userId, subdomain),
+          TTL.MIDDLEWARE,
+          async () => {
+            const { data } = await supabase
+              .from("organization_memberships")
+              .select("org_role, org_id, organizations!inner(slug)")
+              .eq("user_id", userId)
+              .eq("organizations.slug", subdomain)
+              .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
+            return data;
+          },
+        );
+
+        if (membership) {
+          resolvedOrgRole = membership.org_role;
+          resolvedOrgId = membership.org_id;
+          resolvedOrgSlug = membership.organizations?.slug;
+        } else if (subdomainMismatch) {
+          // User is on a subdomain they don't belong to — redirect to login
+          // instead of silently proceeding with stale/missing org context.
+          return NextResponse.redirect(new URL("/login", req.url));
+        }
+      }
+
+      claims = {
+        platform_role: claims.platform_role ?? profile?.platform_role ?? "none",
+        org_role: claims.org_role ?? resolvedOrgRole,
+        org_id: claims.org_id ?? resolvedOrgId ?? undefined,
+        org_slug: claims.org_slug ?? resolvedOrgSlug ?? undefined,
+      };
+    } catch {
+      // DB/cache unavailable — proceed with JWT claims as-is.
+      // RLS enforces real data security; middleware guards are best-effort.
+    }
   }
 
   // Calculate effective role - Requirement 11.1

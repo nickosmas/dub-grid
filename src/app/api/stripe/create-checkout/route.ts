@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { createStripeCustomer, createCheckoutSession } from "@/lib/stripe";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 
 function getServiceClient() {
@@ -22,6 +23,10 @@ function getUserClient(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // ── CSRF: validate Origin header ──────────────────────────────────
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     // Auth check
     const userClient = getUserClient(req);
@@ -33,6 +38,12 @@ export async function POST(req: NextRequest) {
     const { orgId, returnUrl } = await req.json();
     if (!orgId || !returnUrl) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Validate returnUrl against allowed site URL to prevent open redirects
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!siteUrl || !returnUrl.startsWith(siteUrl)) {
+      return NextResponse.json({ error: "Invalid return URL" }, { status: 400 });
     }
 
     const supabase = getServiceClient();
