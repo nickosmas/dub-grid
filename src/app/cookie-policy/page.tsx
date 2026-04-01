@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CookiePreferencesManager from "./CookiePreferencesManager";
 
 export const metadata: Metadata = {
   title: "Cookie Policy | DubGrid",
@@ -93,14 +94,14 @@ export default function CookiePolicyPage() {
         {/* How to manage */}
         <section style={{ marginBottom: "32px" }}>
           <h2 style={sectionHeading}>Managing Your Preferences</h2>
-          <p style={bodyText}>
+          <p style={{ ...bodyText, marginBottom: "16px" }}>
             When you first visit DubGrid, a consent banner lets you choose
             between <strong>essential only</strong> and{" "}
             <strong>accept all</strong> cookies. You can change your choice at
-            any time using the cookie settings button in the bottom-left corner
-            of the screen. You can also clear cookies through your browser
-            settings.
+            any time using the buttons below, or clear cookies through your
+            browser settings.
           </p>
+          <CookiePreferencesManager />
         </section>
 
         {/* Essential cookies */}
