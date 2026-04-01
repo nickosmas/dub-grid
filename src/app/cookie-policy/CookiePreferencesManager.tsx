@@ -1,22 +1,26 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useEffect } from "react";
 import { getCookieConsent, CONSENT_CHANGED_EVENT } from "@/components/CookieConsent";
 
-function useConsent() {
-  return useSyncExternalStore(
-    (cb) => {
-      window.addEventListener(CONSENT_CHANGED_EVENT, cb);
-      return () => window.removeEventListener(CONSENT_CHANGED_EVENT, cb);
-    },
-    () => getCookieConsent(),
-    () => null,
-  );
+type ConsentState = "all" | "essential" | "none";
+
+function readConsent(): ConsentState {
+  const c = getCookieConsent();
+  if (!c) return "none";
+  return c.analytics ? "all" : "essential";
 }
 
 export default function CookiePreferencesManager() {
-  const consent = useConsent();
+  const [consent, setConsent] = useState<ConsentState>("none");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setConsent(readConsent());
+    function onChange() { setConsent(readConsent()); }
+    window.addEventListener(CONSENT_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(CONSENT_CHANGED_EVENT, onChange);
+  }, []);
 
   async function updateConsent(analytics: boolean) {
     setSaving(true);
@@ -68,7 +72,7 @@ export default function CookiePreferencesManager() {
     setSaving(false);
   }
 
-  const analyticsEnabled = consent?.analytics === true;
+  const analyticsEnabled = consent === "all";
 
   return (
     <div
@@ -89,14 +93,14 @@ export default function CookiePreferencesManager() {
           Your current preference
         </p>
         <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>
-          {consent
+          {consent !== "none"
             ? analyticsEnabled
               ? "All cookies accepted (essential + analytics)"
               : "Essential cookies only"
             : "No preference set — the consent banner will appear on your next visit"}
         </p>
       </div>
-      {consent && (
+      {consent !== "none" && (
         <div style={{ display: "flex", gap: 10 }}>
           {analyticsEnabled ? (
             <button
