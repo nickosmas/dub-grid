@@ -133,9 +133,28 @@ export default function PrivacyPolicyPage() {
               <strong>Technical and usage data.</strong> Our infrastructure
               (including authentication and database hosting) may log
               technical data such as IP address, browser type, and request
-              metadata to operate and secure the Service. DubGrid does not
-              use third-party analytics or advertising trackers on the
-              application.
+              metadata to operate and secure the Service.
+            </li>
+            <li style={{ marginBottom: "8px" }}>
+              <strong>Analytics data (with consent).</strong> If you accept
+              analytics cookies, we use PostHog and Vercel Analytics to
+              collect anonymized usage data such as page views and
+              performance metrics. This data is not collected until you
+              provide consent. See our{" "}
+              <Link
+                href="/cookie-policy"
+                style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              >
+                Cookie Policy
+              </Link>{" "}
+              for details.
+            </li>
+            <li style={{ marginBottom: "8px" }}>
+              <strong>Error reports.</strong> We use Sentry for error
+              monitoring. When an error occurs, technical context (stack
+              traces, request metadata) is captured to help us diagnose
+              issues. Personally identifiable information is not included
+              in error reports.
             </li>
           </ul>
         </section>
@@ -290,7 +309,65 @@ export default function PrivacyPolicyPage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            7. Changes to This Policy
+            7. Third-Party Data Processors
+          </h2>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginBottom: "16px" }}>
+            We use the following third-party services to operate and improve
+            DubGrid. Each processes data on our behalf in accordance with
+            their respective privacy policies:
+          </p>
+          <ul
+            style={{
+              fontSize: "var(--dg-fs-body)",
+              lineHeight: 1.7,
+              color: "var(--color-text-secondary)",
+              paddingLeft: "24px",
+            }}
+          >
+            <li style={{ marginBottom: "8px" }}>
+              <strong>Supabase</strong> &mdash; Authentication and database
+              hosting.
+            </li>
+            <li style={{ marginBottom: "8px" }}>
+              <strong>Vercel</strong> &mdash; Application hosting and web
+              performance analytics (consent required).
+            </li>
+            <li style={{ marginBottom: "8px" }}>
+              <strong>PostHog</strong> &mdash; Product analytics using
+              localStorage and cookies for session tracking (consent
+              required).
+            </li>
+            <li style={{ marginBottom: "8px" }}>
+              <strong>Sentry</strong> &mdash; Error monitoring and crash
+              reporting. No personally identifiable information is sent.
+            </li>
+            <li style={{ marginBottom: "8px" }}>
+              <strong>Stripe</strong> &mdash; Payment processing. Data is
+              only shared during checkout and billing operations.
+            </li>
+          </ul>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginTop: "16px" }}>
+            For a full list of cookies and how to manage them, see our{" "}
+            <Link
+              href="/cookie-policy"
+              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            >
+              Cookie Policy
+            </Link>
+            .
+          </p>
+        </section>
+
+        <section style={{ marginBottom: "32px" }}>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            8. Changes to This Policy
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             We may update this Privacy Policy from time to time. We will
@@ -309,7 +386,7 @@ export default function PrivacyPolicyPage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            8. Contact Us
+            9. Contact Us
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             If you have questions about this Privacy Policy or our data

@@ -18,18 +18,13 @@ export function useLogout() {
     clearPermsCache(); // usePermissions still uses module-level cache
     clearImpersonationCookie();
 
-    // Clean up any active impersonation sessions for this user
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Best-effort impersonation cleanup — fire-and-forget.
+    // Sessions auto-expire after 30 min, so this is non-critical.
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user?.id) {
-        await supabase
-          .from("impersonation_sessions")
-          .delete()
-          .eq("gridmaster_id", session.user.id);
+        supabase.from("impersonation_sessions").delete().eq("gridmaster_id", session.user.id);
       }
-    } catch {
-      // Best-effort cleanup — don't block logout
-    }
+    }).catch(() => {});
 
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;

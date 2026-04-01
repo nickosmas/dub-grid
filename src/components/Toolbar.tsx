@@ -50,6 +50,8 @@ interface ToolbarProps {
   onCoverageToggle?: () => void;
   /** Hide the 2-week option (auto-downgraded on narrow screens). */
   hideTwoWeek?: boolean;
+  /** Open the publish history panel. */
+  onPublishHistory?: () => void;
 }
 
 /* ── Toggle Switch ── */
@@ -97,6 +99,7 @@ function ToolsMenu({
   isImportingPrevious,
   requestsBadgeCount,
   onRequestsToggle,
+  onPublishHistory,
 }: {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -110,6 +113,7 @@ function ToolsMenu({
   isImportingPrevious?: boolean;
   requestsBadgeCount?: number;
   onRequestsToggle?: () => void;
+  onPublishHistory?: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -215,6 +219,21 @@ function ToolsMenu({
         </button>
       )}
 
+      {/* Publish History */}
+      {onPublishHistory && (
+        <button
+          role="menuitem"
+          className="dg-menu-item"
+          onClick={() => { onPublishHistory(); onClose(); }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          Publish History
+        </button>
+      )}
+
       {/* Auto Fill Shifts */}
       {canEditShifts && onApplyRecurring && (
         <button
@@ -280,6 +299,7 @@ export default function Toolbar({
   coverageGapCount = 0,
   onCoverageToggle,
   hideTwoWeek,
+  onPublishHistory,
 }: ToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -474,6 +494,7 @@ export default function Toolbar({
               isImportingPrevious={isImportingPrevious}
               requestsBadgeCount={requestsBadgeCount}
               onRequestsToggle={onRequestsToggle}
+              onPublishHistory={onPublishHistory}
             />
           )}
         </div>
@@ -730,6 +751,7 @@ export default function Toolbar({
             isImportingPrevious={isImportingPrevious}
             requestsBadgeCount={requestsBadgeCount}
             onRequestsToggle={onRequestsToggle}
+            onPublishHistory={onPublishHistory}
           />
         )}
       </div>

@@ -308,7 +308,11 @@ function PillTimeEditor({
   onSave: (start: string | null, end: string | null) => void;
   onRemove: () => void;
 }) {
-  const [expanded, setExpanded] = useState(!!(customStart || customEnd));
+  const hasCustomTime = !!(customStart || customEnd);
+  const [editing, setEditing] = useState(false);
+  // Snapshot of saved values when editing begins — used by Cancel to revert auto-saved changes.
+  const [savedStart, setSavedStart] = useState<string | null>(customStart);
+  const [savedEnd, setSavedEnd] = useState<string | null>(customEnd);
 
   // Local state for intermediate edits (needed because an individual dropdown change
   // may create a temporarily invalid state while the user adjusts other fields).
@@ -325,6 +329,7 @@ function PillTimeEditor({
     setPrevEnd(customEnd);
     setLocalStart(customStart ?? defaultStart);
     setLocalEnd(customEnd ?? defaultEnd);
+    if (!customStart && !customEnd) setEditing(false);
   }
 
   const s = parseTo12h(localStart);
@@ -364,10 +369,31 @@ function PillTimeEditor({
     tryAutoSave(localStart, newEnd);
   }
 
-  if (!expanded) {
+  function startEditing() {
+    setSavedStart(customStart);
+    setSavedEnd(customEnd);
+    setEditing(true);
+  }
+
+  function handleCancel() {
+    // Revert auto-saved changes back to what was saved when editing began
+    if (savedStart !== customStart || savedEnd !== customEnd) {
+      onSave(savedStart, savedEnd);
+    }
+    // If there was nothing saved originally, also call onRemove to clean up
+    if (!savedStart && !savedEnd) {
+      onRemove();
+    }
+    setLocalStart(savedStart ?? defaultStart);
+    setLocalEnd(savedEnd ?? defaultEnd);
+    setEditing(false);
+  }
+
+  // State 1: No custom time set — show "Custom time" button to add one
+  if (!hasCustomTime && !editing) {
     return (
       <button
-        onClick={() => setExpanded(true)}
+        onClick={() => startEditing()}
         style={{
           display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
           color: "var(--color-text-subtle)", background: "none",
@@ -385,14 +411,57 @@ function PillTimeEditor({
     );
   }
 
+  // State 2: Custom time is set and not editing — show formatted text with Edit/Remove
+  if (hasCustomTime && !editing) {
+    const duration = calcTimeDuration(customStart ?? null, customEnd ?? null);
+    return (
+      <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
+              {fmt12h(customStart)} – {fmt12h(customEnd)}
+            </span>
+            {duration && (
+              <span style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-muted)", marginLeft: 8, fontWeight: 600 }}>
+                ({duration})
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => startEditing()}
+              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-primary)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
+            >Edit</button>
+            <button
+              onClick={() => { onRemove(); }}
+              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
+            >Remove</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // State 3: Editing — show the dropdowns
   return (
     <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
-        <button
-          onClick={() => { onRemove(); setExpanded(false); }}
-          style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontWeight: 600 }}
-        >Remove</button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={handleCancel}
+            style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-secondary)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
+          >Cancel</button>
+          {hasCustomTime && (
+            <button
+              onClick={() => { onRemove(); setEditing(false); }}
+              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
+            >Remove</button>
+          )}
+        </div>
       </div>
 
       {/* Start row */}

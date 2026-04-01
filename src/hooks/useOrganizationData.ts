@@ -35,8 +35,10 @@ export interface OrganizationData {
   org: Organization | null;
   focusAreas: FocusArea[];
   shiftCodes: ShiftCode[];
+  allShiftCodes: ShiftCode[];
   allShiftCodesRef: React.RefObject<ShiftCode[]>;
   absenceTypes: AbsenceType[];
+  allAbsenceTypes: AbsenceType[];
   allAbsenceTypesRef: React.RefObject<AbsenceType[]>;
   shiftCategories: ShiftCategory[];
   indicatorTypes: IndicatorType[];
@@ -380,8 +382,10 @@ export function useOrganizationData(): OrganizationData {
     org,
     focusAreas,
     shiftCodes,
+    allShiftCodes,
     allShiftCodesRef,
     absenceTypes,
+    allAbsenceTypes,
     allAbsenceTypesRef,
     shiftCategories,
     indicatorTypes,

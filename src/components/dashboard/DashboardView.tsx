@@ -17,7 +17,7 @@ import type {
   ShiftMap,
   PublishHistoryEntry,
 } from "@/types";
-import { fetchShifts, fetchLatestPublishHistory } from "@/lib/db";
+import { fetchShifts, fetchRecentPublishHistory } from "@/lib/db";
 import {
   getWeekStart,
   getDatesInRange,
@@ -146,11 +146,11 @@ export default function DashboardView({
     const fetchEnd = formatDateKey(periodEnd);
     Promise.all([
       fetchShifts(orgId, isScheduler, shiftCodeMapRef.current, undefined, fetchStart, fetchEnd),
-      fetchLatestPublishHistory(orgId),
-    ]).then(([shifts, pub]) => {
+      fetchRecentPublishHistory(orgId),
+    ]).then(([shifts, pubs]) => {
       if (cancelled) return;
       setAllShifts(shifts);
-      setPublishHistory(pub);
+      setPublishHistory(pubs[0] ?? null);
       setShiftsLoading(false);
     }).catch(() => {
       if (!cancelled) setShiftsLoading(false);

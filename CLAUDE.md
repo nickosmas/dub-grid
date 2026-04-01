@@ -65,6 +65,9 @@
 - **Naming**: `gridmaster` = platform_role (route: `/gridmaster`). `admin` = org_role.
   Never call the gridmaster portal "admin portal"
 - **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
+- **Cookie consent version**: When adding/removing cookies, changing analytics providers,
+  or updating the cookie/privacy policy, bump `CONSENT_VERSION` in
+  `src/components/CookieConsent.tsx`. This re-prompts all users to re-consent on next visit
 
 ---
 ---

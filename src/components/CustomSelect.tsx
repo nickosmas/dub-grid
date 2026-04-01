@@ -50,9 +50,9 @@ export default function CustomSelect<T extends string | number>({
     const spaceBelow = window.innerHeight - rect.bottom - 12;
     const maxH = Math.max(spaceBelow, 160);
     setMenuStyle({
-      position: "absolute",
-      top: rect.bottom + window.scrollY + 6,
-      left: rect.left + window.scrollX,
+      position: "fixed",
+      top: rect.bottom + 6,
+      left: rect.left,
       minWidth: rect.width,
       width: "max-content",
       maxWidth: "min(350px, 90vw)",

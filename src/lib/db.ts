@@ -1549,40 +1549,91 @@ export async function publishSchedule(
   startDate: Date,
   endDate: Date
 ): Promise<string | null> {
+  const startKey = formatDateKey(startDate);
+  const endKey = formatDateKey(endDate);
   const { data, error } = await supabase.rpc("publish_schedule", {
     p_org_id: orgId,
-    p_start_date: startDate.toISOString().split("T")[0],
-    p_end_date: endDate.toISOString().split("T")[0],
+    p_start_date: startKey,
+    p_end_date: endKey,
   });
   if (error) throw error;
   void logAudit("schedule.published", "schedule", orgId, {
-    startDate: startDate.toISOString().split("T")[0],
-    endDate: endDate.toISOString().split("T")[0],
+    startDate: startKey,
+    endDate: endKey,
   }, orgId);
   return data as string | null;
 }
 
-export async function fetchLatestPublishHistory(
-  orgId: string
-): Promise<import("@/types").PublishHistoryEntry | null> {
+/**
+ * Fetch publish history entries since a given timestamp (or last 24 hours as fallback).
+ * Returns newest-first. An empty array means nothing was published recently.
+ */
+export async function fetchRecentPublishHistory(
+  orgId: string,
+  since?: string | null,
+): Promise<import("@/types").PublishHistoryEntry[]> {
+  const cutoff = since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("publish_history")
     .select("*")
     .eq("org_id", orgId)
-    .order("published_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .gte("published_at", cutoff)
+    .order("published_at", { ascending: false });
   if (error) throw error;
-  if (!data) return null;
-  return {
-    id: data.id,
-    publishedBy: data.published_by,
-    startDate: data.start_date,
-    endDate: data.end_date,
-    changeCount: data.change_count,
-    changes: data.changes as import("@/types").PublishChange[],
-    publishedAt: data.published_at,
-  };
+  if (!data || data.length === 0) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data.map((row: any) => ({
+    id: row.id,
+    publishedBy: row.published_by,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    changeCount: row.change_count,
+    changes: row.changes as import("@/types").PublishChange[],
+    publishedAt: row.published_at,
+  }));
+}
+
+/**
+ * Fire-and-forget: records when the current user last viewed the schedule.
+ */
+export async function updateScheduleLastViewed(orgId: string): Promise<void> {
+  await supabase.rpc("update_schedule_last_viewed", { p_org_id: orgId });
+}
+
+/**
+ * Returns when the current user last viewed the schedule (ISO string or null).
+ */
+export async function getScheduleLastViewed(orgId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc("get_schedule_last_viewed", { p_org_id: orgId });
+  if (error) throw error;
+  return data as string | null;
+}
+
+/**
+ * Fetch paginated publish history with publisher names resolved.
+ */
+export async function fetchPublishHistory(
+  orgId: string,
+  limit = 20,
+  offset = 0,
+): Promise<import("@/types").PublishHistoryEntryWithName[]> {
+  const { data, error } = await supabase.rpc("get_publish_history", {
+    p_org_id: orgId,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    publishedBy: row.published_by,
+    publishedByName: row.published_by_name,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    changeCount: row.change_count,
+    changes: row.changes as import("@/types").PublishChange[],
+    publishedAt: row.published_at,
+  }));
 }
 
 export async function discardScheduleDrafts(
