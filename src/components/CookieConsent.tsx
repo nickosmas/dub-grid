@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { initPostHog, resetPostHog } from "@/lib/posthog";
 
 const STORAGE_KEY = "dubgrid-cookie-consent";
@@ -98,17 +98,21 @@ export function hasAnalyticsConsent(): boolean {
 }
 
 export default function CookieConsent() {
-  const [mounted, setMounted] = useState(false);
-  const [hasConsent, setHasConsent] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-
-  useEffect(() => {
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const [hasConsent, setHasConsent] = useState(() => {
+    if (typeof window === "undefined") return false;
     const consent = getCookieConsent();
-    const valid = consent !== null && consent.version === CONSENT_VERSION;
-    setHasConsent(valid);
-    setDialogOpen(!valid);
-    setMounted(true);
-  }, []);
+    return consent !== null && consent.version === CONSENT_VERSION;
+  });
+  const [dialogOpen, setDialogOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const consent = getCookieConsent();
+    return !(consent !== null && consent.version === CONSENT_VERSION);
+  });
 
   function acceptAll() {
     const hadAnalytics = getCookieConsent()?.analytics === true;

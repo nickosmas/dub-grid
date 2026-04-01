@@ -9,11 +9,11 @@ import { getCookieConsent, CONSENT_CHANGED_EVENT } from "@/components/CookieCons
  * Listens for consent changes so it can mount/unmount without a full page reload.
  */
 export default function ConsentGatedAnalytics() {
-  const [hasConsent, setHasConsent] = useState(false);
+  const [hasConsent, setHasConsent] = useState(
+    () => typeof window !== "undefined" && getCookieConsent()?.analytics === true,
+  );
 
   useEffect(() => {
-    setHasConsent(getCookieConsent()?.analytics === true);
-
     function onConsentChanged() {
       setHasConsent(getCookieConsent()?.analytics === true);
     }

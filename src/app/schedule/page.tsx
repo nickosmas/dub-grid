@@ -19,7 +19,7 @@ import { AnimatedDubGridLogo } from "@/components/Logo";
 import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName, iterateDateRange } from "@/lib/utils";
 import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, timesOverlap, checkCrossDateOverlap, checkSameDayOverlaps } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
-import { fetchShifts, fetchScheduleNotes, fetchRecurringShifts, fetchRecentPublishHistory, upsertShiftTimes, deleteShift, upsertShift, updateSeriesAllShifts, deleteShiftSeries, createShiftSeries, moveShift, applyRecurringSchedules, publishSchedule, discardScheduleDrafts, upsertScheduleNote, deleteScheduleNote, OptimisticLockError, updateScheduleLastViewed, getScheduleLastViewed, fetchPublishHistory } from "@/lib/db";
+import { fetchShifts, fetchScheduleNotes, fetchRecurringShifts, fetchRecentPublishHistory, upsertShiftTimes, deleteShift, upsertShift, updateSeriesAllShifts, deleteShiftSeries, createShiftSeries, moveShift, applyRecurringSchedules, publishSchedule, discardScheduleDrafts, upsertScheduleNote, deleteScheduleNote, OptimisticLockError, updateScheduleLastViewed, getScheduleLastViewed } from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { supabase } from "@/lib/supabase";
 import { usePermissions, useOrganizationData, useEmployees, useCellLocks, useShiftRequests } from "@/hooks";
@@ -57,9 +57,9 @@ function SchedulerContent() {
   const { user: authUser } = useAuth();
   const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, allShiftCodes, allShiftCodesRef, shiftCategories,
+    org, focusAreas, shiftCodes, allShiftCodes, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,
-    absenceTypes, allAbsenceTypes, allAbsenceTypesRef, absenceTypeMap,
+    absenceTypes, allAbsenceTypes, absenceTypeMap,
     coverageRequirements,
     loading: orgLoading, loadError,
   } = useOrganizationData();
