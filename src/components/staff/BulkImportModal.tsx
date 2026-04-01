@@ -303,7 +303,7 @@ export function BulkImportModal({
                   <div>
                     <strong>{parseErrors.length} warning(s):</strong>
                     <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
-                      {parseErrors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
+                      {parseErrors.slice(0, 5).map((e, i) => <li key={`parse-${i}-${e.slice(0, 30)}`}>{e}</li>)}
                       {parseErrors.length > 5 && <li>...and {parseErrors.length - 5} more</li>}
                     </ul>
                   </div>
@@ -322,7 +322,7 @@ export function BulkImportModal({
                   </thead>
                   <tbody>
                     {rows.slice(0, 20).map((row, i) => (
-                      <tr key={i}>
+                      <tr key={`preview-${row.firstName}-${row.lastName}-${i}`}>
                         <td style={{ padding: "6px 8px", borderBottom: "1px solid var(--color-border-light)", color: "var(--color-text-muted)" }}>{i + 1}</td>
                         <td style={{ padding: "6px 8px", borderBottom: "1px solid var(--color-border-light)" }}>{row.firstName} {row.lastName}</td>
                         <td style={{ padding: "6px 8px", borderBottom: "1px solid var(--color-border-light)", color: "var(--color-text-muted)" }}>{row.email || "—"}</td>
@@ -370,8 +370,8 @@ export function BulkImportModal({
                 <div style={{ fontSize: "var(--dg-fs-caption)" }}>
                   <strong>Errors:</strong>
                   <ul style={{ margin: "4px 0 0", paddingLeft: 20, color: "var(--color-danger)" }}>
-                    {result.errors.slice(0, 10).map((e, i) => (
-                      <li key={i}>Row {e.row}: {e.error}</li>
+                    {result.errors.slice(0, 10).map((e) => (
+                      <li key={`err-${e.row}`}>Row {e.row}: {e.error}</li>
                     ))}
                     {result.errors.length > 10 && <li>...and {result.errors.length - 10} more</li>}
                   </ul>

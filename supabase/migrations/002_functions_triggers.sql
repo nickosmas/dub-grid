@@ -165,6 +165,11 @@ BEGIN
       claims := jsonb_set(claims, '{org_role}', '"user"');
       claims := claims - 'org_id' - 'org_slug';
     END IF;
+    -- Track last sign-in (debounced to avoid writes on every token refresh)
+    UPDATE public.profiles
+       SET last_sign_in_at = NOW()
+     WHERE id = uid
+       AND (last_sign_in_at IS NULL OR last_sign_in_at < NOW() - INTERVAL '5 minutes');
   ELSE
     claims := jsonb_set(claims, '{platform_role}', '"none"');
     claims := jsonb_set(claims, '{org_role}',      '"user"');
@@ -517,6 +522,11 @@ AS $$
 DECLARE
   target_user_id UUID;
 BEGIN
+  -- Validate email format
+  IF p_email IS NULL OR p_email !~ '^\S+@\S+\.\S+$' THEN
+    RAISE EXCEPTION 'Invalid email format';
+  END IF;
+
   IF NOT (
     public.is_gridmaster()
     OR (
@@ -717,7 +727,11 @@ BEGIN
            s.published_absence_type_id AS old_absence_type_id,
            s.draft_absence_type_id AS new_absence_type_id,
            s.draft_is_delete,
-           s.updated_by
+           s.updated_by,
+           s.published_custom_start_time AS old_custom_start,
+           s.published_custom_end_time AS old_custom_end,
+           s.draft_custom_start_time AS new_custom_start,
+           s.draft_custom_end_time AS new_custom_end
     FROM public.shifts s
     WHERE s.org_id = p_org_id
       AND s.date >= p_start_date AND s.date <= p_end_date
@@ -751,7 +765,11 @@ BEGIN
       'to', CASE WHEN r.draft_is_delete THEN '[]'::JSONB ELSE COALESCE(to_jsonb(r.new_ids), '[]'::JSONB) END,
       'fromAbsenceTypeId', r.old_absence_type_id,
       'toAbsenceTypeId', CASE WHEN r.draft_is_delete THEN NULL ELSE r.new_absence_type_id END,
-      'updatedBy', r.updated_by
+      'updatedBy', r.updated_by,
+      'fromCustomStart', r.old_custom_start,
+      'fromCustomEnd', r.old_custom_end,
+      'toCustomStart', CASE WHEN r.draft_is_delete THEN NULL ELSE r.new_custom_start END,
+      'toCustomEnd', CASE WHEN r.draft_is_delete THEN NULL ELSE r.new_custom_end END
     ));
   END LOOP;
 
@@ -769,14 +787,20 @@ BEGIN
   RETURNING id INTO v_history_id;
 
   -- Promote drafts → published (shift codes, absence types, and custom times)
-  -- Use CASE for shift codes/absence: preserve published values when draft has no code change
-  -- (e.g. when only custom times or notes were modified).
+  -- Shift codes and absence types are mutually exclusive. When one is promoted,
+  -- the other must be cleared to satisfy the shifts_code_or_absence_not_both
+  -- constraint and to keep published state consistent.
   UPDATE public.shifts
   SET published_shift_code_ids = CASE
+        WHEN draft_absence_type_id IS NOT NULL THEN '{}'::BIGINT[]
         WHEN array_length(draft_shift_code_ids, 1) IS NOT NULL THEN draft_shift_code_ids
         ELSE published_shift_code_ids
       END,
-      published_absence_type_id = COALESCE(draft_absence_type_id, published_absence_type_id),
+      published_absence_type_id = CASE
+        WHEN array_length(draft_shift_code_ids, 1) IS NOT NULL THEN NULL
+        WHEN draft_absence_type_id IS NOT NULL THEN draft_absence_type_id
+        ELSE published_absence_type_id
+      END,
       published_custom_start_time = COALESCE(draft_custom_start_time, published_custom_start_time),
       published_custom_end_time = COALESCE(draft_custom_end_time, published_custom_end_time),
       draft_shift_code_ids = '{}',
@@ -825,14 +849,48 @@ BEGIN
     AND date >= p_start_date AND date <= p_end_date
     AND status = 'draft_deleted';
 
-  -- Purge old history (keep last 20 per org)
+  -- Create per-employee notifications for linked users
+  FOR r IN
+    SELECT DISTINCT ON (e.user_id)
+           c->>'empId' AS emp_id,
+           e.user_id,
+           c->>'kind' AS kind,
+           c->>'date' AS change_date
+    FROM jsonb_array_elements(v_changes) AS c
+    JOIN public.employees e ON e.id = (c->>'empId')::UUID
+    WHERE e.user_id IS NOT NULL
+      AND e.user_id <> auth.uid()
+  LOOP
+    INSERT INTO public.notifications (user_id, org_id, type, channel, category, title, message, metadata)
+    VALUES (
+      r.user_id,
+      p_org_id,
+      'shift_change',
+      'in_app',
+      'schedule',
+      CASE r.kind
+        WHEN 'new' THEN 'New shift assigned'
+        WHEN 'modified' THEN 'Your shift was changed'
+        WHEN 'deleted' THEN 'Your shift was removed'
+      END,
+      'Your schedule for ' || to_char(r.change_date::DATE, 'FMDay, FMMonth DD') || ' was updated.',
+      jsonb_build_object(
+        'empId', r.emp_id,
+        'date', r.change_date,
+        'kind', r.kind,
+        'publishedBy', auth.uid()
+      )
+    );
+  END LOOP;
+
+  -- Purge old history (keep last 100 per org)
   DELETE FROM public.publish_history
   WHERE org_id = p_org_id
     AND id NOT IN (
       SELECT id FROM public.publish_history
       WHERE org_id = p_org_id
       ORDER BY published_at DESC
-      LIMIT 20
+      LIMIT 100
     );
 
   RETURN v_history_id;
@@ -1410,9 +1468,9 @@ BEGIN
     RAISE EXCEPTION 'Cannot impersonate yourself';
   END IF;
 
-  -- Validate justification (minimum 10 characters for meaningful reason)
-  IF length(trim(p_justification)) < 10 THEN
-    RAISE EXCEPTION 'Justification must be at least 10 characters';
+  -- Validate justification (10–500 characters for meaningful reason)
+  IF p_justification IS NULL OR length(trim(p_justification)) < 10 OR length(p_justification) > 500 THEN
+    RAISE EXCEPTION 'Justification must be between 10 and 500 characters';
   END IF;
 
   -- Multi-level impersonation prevention: block if caller already has an active session
@@ -2856,3 +2914,147 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.gdpr_erase_user_data IS 'Anonymizes all PII for a user across the platform (GDPR Article 17 compliance).';
+
+
+--- ══════════════════════════════════════════════════════════════════════════════
+--- flag_inactive_accounts
+--- Flags profiles inactive for longer than retention_days for scheduled deletion.
+--- Accounts get a 30-day grace period before purge_scheduled_accounts erases them.
+--- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.flag_inactive_accounts(
+  retention_days INT DEFAULT 730
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  flagged_count BIGINT;
+BEGIN
+  UPDATE profiles
+     SET scheduled_deletion_at  = NOW() + INTERVAL '30 days',
+         deactivation_warned_at = NOW()
+   WHERE last_sign_in_at IS NOT NULL
+     AND last_sign_in_at < NOW() - (retention_days || ' days')::INTERVAL
+     AND platform_role != 'gridmaster'
+     AND scheduled_deletion_at IS NULL;
+
+  GET DIAGNOSTICS flagged_count = ROW_COUNT;
+
+  RETURN jsonb_build_object(
+    'flagged_count', flagged_count,
+    'retention_days', retention_days,
+    'run_at', NOW()
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.flag_inactive_accounts IS 'Flags inactive accounts for scheduled GDPR deletion after a grace period.';
+
+
+--- ══════════════════════════════════════════════════════════════════════════════
+--- purge_scheduled_accounts
+--- Erases PII for accounts past their scheduled_deletion_at date.
+--- Calls gdpr_erase_user_data for each. Does NOT delete auth.users — the
+--- calling API endpoint or cron handler must call auth.admin.deleteUser.
+--- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.purge_scheduled_accounts()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec         RECORD;
+  purged_count BIGINT := 0;
+BEGIN
+  FOR rec IN
+    SELECT id FROM profiles
+     WHERE scheduled_deletion_at IS NOT NULL
+       AND scheduled_deletion_at <= NOW()
+       AND platform_role != 'gridmaster'
+  LOOP
+    PERFORM gdpr_erase_user_data(rec.id);
+    purged_count := purged_count + 1;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'purged_count', purged_count,
+    'run_at', NOW()
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.purge_scheduled_accounts IS 'Erases PII for accounts past their scheduled deletion date (GDPR Article 17).';
+
+
+-- ── update_schedule_last_viewed ─────────────────────────────────────────────
+-- Fire-and-forget: records when the current user last viewed the schedule.
+-- Used to replace the fixed 24h publish window with per-user tracking.
+
+CREATE OR REPLACE FUNCTION public.update_schedule_last_viewed(p_org_id UUID)
+RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  UPDATE organization_memberships
+  SET schedule_last_viewed_at = now()
+  WHERE user_id = auth.uid() AND org_id = p_org_id;
+END;
+$$;
+
+COMMENT ON FUNCTION public.update_schedule_last_viewed IS 'Updates schedule_last_viewed_at for the calling user in the given org.';
+
+
+-- ── get_schedule_last_viewed ────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.get_schedule_last_viewed(p_org_id UUID)
+RETURNS TIMESTAMPTZ
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT schedule_last_viewed_at
+  FROM organization_memberships
+  WHERE user_id = auth.uid() AND org_id = p_org_id;
+$$;
+
+COMMENT ON FUNCTION public.get_schedule_last_viewed IS 'Returns when the calling user last viewed the schedule in the given org.';
+
+
+-- ── get_publish_history (paginated) ─────────────────────────────────────────
+-- Returns paginated publish history with the publisher name resolved.
+
+CREATE OR REPLACE FUNCTION public.get_publish_history(
+  p_org_id  UUID,
+  p_limit   INTEGER DEFAULT 20,
+  p_offset  INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+  id               UUID,
+  published_by     UUID,
+  published_by_name TEXT,
+  start_date       DATE,
+  end_date         DATE,
+  change_count     INTEGER,
+  changes          JSONB,
+  published_at     TIMESTAMPTZ
+)
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT ph.id, ph.published_by,
+         COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), 'Unknown') AS published_by_name,
+         ph.start_date, ph.end_date, ph.change_count, ph.changes, ph.published_at
+  FROM public.publish_history ph
+  LEFT JOIN public.profiles p ON p.id = ph.published_by
+  WHERE ph.org_id = p_org_id
+    AND ph.org_id = public.caller_org_id()
+  ORDER BY ph.published_at DESC
+  LIMIT p_limit OFFSET p_offset;
+$$;
+
+COMMENT ON FUNCTION public.get_publish_history IS 'Returns paginated publish history for an org with publisher names resolved.';

@@ -46,11 +46,11 @@ export const passwordResetLimiter = redis
   : null;
 
 /**
- * Login rate limiter — 5 attempts per 15 minutes per key (email hash).
+ * Login rate limiter — 15 attempts per 15 minutes per key (email hash).
  * Provides brute-force protection at the application level.
  */
 export const loginLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, "15 m") })
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(15, "15 m") })
   : null;
 
 if (!hasRedisEnv) {

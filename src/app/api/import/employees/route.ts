@@ -173,7 +173,8 @@ export async function POST(req: NextRequest) {
             .from("employees")
             .insert(item.record);
           if (insertError) {
-            errors.push({ row: item.index + 1, error: insertError.message });
+            logger.error({ error: insertError, row: item.index + 1 }, "Employee insert failed");
+            errors.push({ row: item.index + 1, error: "Failed to import this employee" });
           } else {
             inserted.push({ row: item.index + 1, name: `${item.record.first_name} ${item.record.last_name}` });
           }

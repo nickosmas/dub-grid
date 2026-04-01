@@ -1373,7 +1373,7 @@ function ShiftCodeRow({
                   <button
                     type="button"
                     onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
-                    style={{ marginTop: 6, background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
+                    style={{ marginTop: 6, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
                     disabled={!canManageShiftCodes}
                   >
                     Set actual times instead
@@ -1417,7 +1417,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
                       >
                         Revert to category default
                       </button>
@@ -1426,7 +1426,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
                       >
                         Remove custom time
                       </button>
@@ -1435,7 +1435,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 })); }}
-                        style={{ background: "none", border: "none", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: 0 }}
+                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
                       >
                         Use duration instead
                       </button>
@@ -1704,6 +1704,7 @@ function AbsenceTypeRow({
   onDeleted,
   canEdit,
   allAbsenceTypes,
+  shiftDisplayMode = "code",
 }: {
   at: AbsenceType & { isNew?: boolean };
   orgId: string;
@@ -1711,7 +1712,9 @@ function AbsenceTypeRow({
   onDeleted: (id: number) => void;
   canEdit: boolean;
   allAbsenceTypes: (AbsenceType & { isNew?: boolean })[];
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
+  const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
   const resolveForm = useCallback((src: AbsenceType) => ({
     label: src.label,
@@ -1745,17 +1748,28 @@ function AbsenceTypeRow({
     (other) => other.id !== at.id && other.label.trim().toUpperCase() === trimmedLabel,
   );
 
-  const canSave = isDirty && !!form.label.trim() && !!form.name.trim() && !isDuplicateLabel;
+  const canSave = isDirty && (isNameMode || !!form.label.trim()) && !!form.name.trim() && !isDuplicateLabel;
 
   const handleSave = useCallback(async () => {
-    if (!form.label.trim() || !form.name.trim()) return;
+    if ((!isNameMode && !form.label.trim()) || !form.name.trim()) return;
     setSaving(true);
     setSaveError(null);
     try {
+      // In name mode, auto-generate label if not provided
+      let labelToSave = form.label.trim();
+      if (isNameMode && !labelToSave) {
+        const base = form.name.trim().split(/\s+/)[0].toUpperCase().slice(0, 4) || "OFF";
+        labelToSave = base;
+        let suffix = 2;
+        while (allAbsenceTypes.some(other => other.id !== at.id && other.label.trim().toUpperCase() === labelToSave)) {
+          labelToSave = `${base}${suffix}`;
+          suffix++;
+        }
+      }
       const saved = await upsertAbsenceType({
         id: at.isNew ? undefined : at.id,
         orgId,
-        label: form.label.trim(),
+        label: labelToSave,
         name: form.name.trim(),
         color: form.color,
         border: form.border,
@@ -1773,7 +1787,7 @@ function AbsenceTypeRow({
     } finally {
       setSaving(false);
     }
-  }, [form, at, orgId, onSaved]);
+  }, [form, at, orgId, onSaved, isNameMode, allAbsenceTypes]);
 
   const handleDelete = useCallback(async () => {
     if (at.isNew) { onDeleted(at.id); return; }
@@ -1797,10 +1811,15 @@ function AbsenceTypeRow({
         style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}
         onClick={() => setExpanded((e) => !e)}
       >
-        <span style={{ display: "inline-block", minWidth: 44, padding: "3px 8px", background: form.color, border: `1px solid ${borderColor(form.text)}`, color: form.text, borderRadius: 8, fontSize: "var(--dg-fs-caption)", fontWeight: 700, textAlign: "center" }}>
-          {form.label || "…"}
-        </span>
-        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)", flex: 1 }}>
+        {!isNameMode && (
+          <span style={{ display: "inline-block", minWidth: 44, padding: "3px 8px", background: form.color, border: `1px solid ${borderColor(form.text)}`, color: form.text, borderRadius: 8, fontSize: "var(--dg-fs-caption)", fontWeight: 700, textAlign: "center" }}>
+            {form.label || "…"}
+          </span>
+        )}
+        {isNameMode && (
+          <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: form.color, border: `1px solid ${borderColor(form.text)}`, flexShrink: 0 }} />
+        )}
+        <span style={{ fontSize: "var(--dg-fs-label)", color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)", fontWeight: isNameMode ? 600 : 400, flex: 1 }}>
           {form.name || "—"}
         </span>
         <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>▾</span>
@@ -1808,13 +1827,15 @@ function AbsenceTypeRow({
 
       {expanded && (
         <div style={{ background: "var(--color-bg)", borderTop: "1px solid var(--color-border-light)", padding: 16, display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isNameMode ? "1fr" : (isMobile ? "1fr" : "120px 1fr"), gap: 10 }}>
+            {!isNameMode && (
+              <div>
+                <label style={labelStyle}>CODE / LABEL</label>
+                <input value={form.label} onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))} placeholder="e.g. X" maxLength={6} className="dg-input" disabled={!canEdit} />
+              </div>
+            )}
             <div>
-              <label style={labelStyle}>CODE / LABEL</label>
-              <input value={form.label} onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))} placeholder="e.g. X" maxLength={6} className="dg-input" disabled={!canEdit} />
-            </div>
-            <div>
-              <label style={labelStyle}>FULL NAME</label>
+              <label style={labelStyle}>{isNameMode ? "OFF DAY NAME" : "FULL NAME"}</label>
               <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sick Leave" maxLength={50} className="dg-input" disabled={!canEdit} />
             </div>
           </div>
@@ -1869,11 +1890,13 @@ function AbsenceTypesSettings({
   orgId,
   onChange,
   canManageShiftCodes,
+  shiftDisplayMode = "code",
 }: {
   absenceTypes: AbsenceType[];
   orgId: string;
   onChange: (types: AbsenceType[]) => void;
   canManageShiftCodes: boolean;
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const [local, setLocal] = useState<(AbsenceType & { isNew?: boolean })[]>(absenceTypes);
   const nextTmpId = useRef(-1);
@@ -1924,7 +1947,7 @@ function AbsenceTypesSettings({
       {local.length > 0 ? (
         <div style={{ padding: "0 16px" }}>
           {local.map((at) => (
-            <AbsenceTypeRow key={at.id} at={at} orgId={orgId} onSaved={handleSaved} onDeleted={handleDeleted} canEdit={canManageShiftCodes} allAbsenceTypes={local} />
+            <AbsenceTypeRow key={at.id} at={at} orgId={orgId} onSaved={handleSaved} onDeleted={handleDeleted} canEdit={canManageShiftCodes} allAbsenceTypes={local} shiftDisplayMode={shiftDisplayMode} />
           ))}
         </div>
       ) : (
@@ -1939,7 +1962,7 @@ function AbsenceTypesSettings({
       )}
       {local.length > 0 && canManageShiftCodes && (
         <div style={{ padding: "8px 16px 12px" }}>
-          <button onClick={handleAdd} style={{ background: "none", border: "none", color: "var(--color-text-muted)", padding: "6px 0", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={handleAdd} style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", padding: "4px 10px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             + Add Off Day Type
           </button>
         </div>
@@ -2147,6 +2170,7 @@ function ShiftCodesSettings({
         orgId={orgId}
         onChange={onAbsenceTypesChange}
         canManageShiftCodes={canManageShiftCodes}
+        shiftDisplayMode={shiftDisplayMode}
       />
     </div>
   );
@@ -3904,8 +3928,8 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
             <button
               onClick={() => { setSearch(""); setRoleFilter("all"); }}
               style={{
-                background: "none", border: "none", color: "var(--color-today-text)", fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600, cursor: "pointer", padding: "4px 8px",
+                background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-today-text)", fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit",
               }}
             >
               Clear

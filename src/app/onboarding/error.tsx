@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 export default function OnboardingError({
   error,
@@ -10,7 +11,7 @@ export default function OnboardingError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Onboarding page error:", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

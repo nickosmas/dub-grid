@@ -62,7 +62,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       setIsLoading(false);
-      // Update Sentry user context
       setSentryUser(currentUser ? { id: currentUser.id, email: currentUser.email } : null);
       // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
       // and ProtectedRoute handles session-expiry redirects to /login.

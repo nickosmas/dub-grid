@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies } from "@/lib/schedule-logic";
-import { Employee, ShiftCode, ShiftCategory, FocusArea, IndicatorType, NamedItem, DraftKind, ShiftDisplayMode } from "@/types";
+import { Employee, ShiftCode, ShiftCategory, FocusArea, IndicatorType, NamedItem, DraftKind, ShiftDisplayMode, AbsenceType } from "@/types";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
 
@@ -33,6 +33,10 @@ interface MobileDayViewProps {
   orgRoles?: NamedItem[];
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   shiftDisplayMode?: ShiftDisplayMode;
+  /** Returns the absence type ID for a given cell, or null if not an absence. */
+  absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** Map from absence type ID to AbsenceType for color/label resolution. */
+  absenceTypeMap?: Map<number, AbsenceType>;
 }
 
 function getDraftBorderStyle(draftKind: DraftKind): string | undefined {
@@ -56,6 +60,8 @@ export default function MobileDayView({
   certifications = [],
   draftKindForKey,
   shiftDisplayMode = "code",
+  absenceTypeIdForKey,
+  absenceTypeMap,
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const todayKey = formatDateKey(today);
@@ -306,24 +312,39 @@ export default function MobileDayView({
                         ? (activeIndicatorIdsForKey(emp.id, date, sectionId)?.length ?? 0) > 0
                         : false;
 
+                    // Check for absence (off-day) entry first
+                    const absenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
+                    const absenceType = absenceTypeId != null ? absenceTypeMap?.get(absenceTypeId) ?? null : null;
+
                     // Build pills for all codes (supports split shifts)
-                    const pills = codeIds.map((id) => {
-                      const sc = shiftCodeById.get(id);
-                      if (!sc) return { label: "?", bg: "var(--color-border-light)", text: "var(--color-text-subtle)", border: "var(--color-border)", foreignInitials: null, foreignBg: null, foreignText: null };
-                      // Cross-wing: show initials if code belongs to a different focus area
-                      const isForeign = sc.focusAreaId != null && sectionId != null && sc.focusAreaId !== sectionId;
-                      const foreignInitials = isForeign ? focusAreaInitials.get(sc.focusAreaId!) ?? null : null;
-                      const homeFa = isForeign ? focusAreas.find((fa) => fa.id === sc.focusAreaId) : undefined;
-                      return {
-                        label: isNameMode ? (sc.name || sc.label) : sc.label,
-                        bg: sc.color,
-                        text: sc.text || borderColor(sc.color),
-                        border: sc.border || borderColor(sc.color),
-                        foreignInitials,
-                        foreignBg: homeFa?.colorBg ?? null,
-                        foreignText: homeFa?.colorText ?? null,
-                      };
-                    });
+                    // For absence cells, synthesize a single pill from the absence type
+                    const pills = absenceType
+                      ? [{
+                          label: isNameMode ? (absenceType.name || absenceType.label) : absenceType.label,
+                          bg: absenceType.color,
+                          text: absenceType.text,
+                          border: absenceType.border,
+                          foreignInitials: null,
+                          foreignBg: null,
+                          foreignText: null,
+                        }]
+                      : codeIds.map((id) => {
+                          const sc = shiftCodeById.get(id);
+                          if (!sc) return { label: "?", bg: "var(--color-border-light)", text: "var(--color-text-subtle)", border: "var(--color-border)", foreignInitials: null, foreignBg: null, foreignText: null };
+                          // Cross-wing: show initials if code belongs to a different focus area
+                          const isForeign = sc.focusAreaId != null && sectionId != null && sc.focusAreaId !== sectionId;
+                          const foreignInitials = isForeign ? focusAreaInitials.get(sc.focusAreaId!) ?? null : null;
+                          const homeFa = isForeign ? focusAreas.find((fa) => fa.id === sc.focusAreaId) : undefined;
+                          return {
+                            label: isNameMode ? (sc.name || sc.label) : sc.label,
+                            bg: sc.color,
+                            text: sc.text || borderColor(sc.color),
+                            border: sc.border || borderColor(sc.color),
+                            foreignInitials,
+                            foreignBg: homeFa?.colorBg ?? null,
+                            foreignText: homeFa?.colorText ?? null,
+                          };
+                        });
 
                     return (
                       <button
@@ -347,11 +368,11 @@ export default function MobileDayView({
                         }}
                       >
                         {pills.length > 0 ? (
-                          pills.map((pill, i) => {
+                          pills.map((pill, pillIdx) => {
                             const fs = pills.length > 1 ? 8 : 10;
                             const codePill = (
                               <span
-                                key={i}
+                                key={`pill-${pill.label}-${pillIdx}`}
                                 style={{
                                   fontSize: fs,
                                   fontWeight: 700,
@@ -377,7 +398,7 @@ export default function MobileDayView({
                             if (pill.foreignInitials) {
                               return (
                                 <div
-                                  key={i}
+                                  key={`foreign-${pill.label}-${pillIdx}`}
                                   style={{
                                     width: "calc(100% - 2px)",
                                     borderRadius: 3,
