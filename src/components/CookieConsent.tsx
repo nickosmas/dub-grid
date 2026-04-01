@@ -103,11 +103,6 @@ export default function CookieConsent() {
     () => true,
     () => false,
   );
-  const [hasConsent, setHasConsent] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const consent = getCookieConsent();
-    return consent !== null && consent.version === CONSENT_VERSION;
-  });
   const [dialogOpen, setDialogOpen] = useState(() => {
     if (typeof window === "undefined") return false;
     const consent = getCookieConsent();
@@ -120,7 +115,6 @@ export default function CookieConsent() {
     setStoredConsent(prefs);
     syncConsentToServer(prefs);
     setDialogOpen(false);
-    setHasConsent(true);
     if (!hadAnalytics) {
       initPostHog();
     }
@@ -133,7 +127,6 @@ export default function CookieConsent() {
     setStoredConsent(prefs);
     syncConsentToServer(prefs);
     setDialogOpen(false);
-    setHasConsent(true);
     if (hadAnalytics) {
       resetPostHog();
     }
@@ -141,48 +134,6 @@ export default function CookieConsent() {
   }
 
   if (!mounted) return null;
-
-  // Settings button — shown when consent has been given but dialog is closed
-  if (hasConsent && !dialogOpen) {
-    return (
-      <button
-        onClick={() => setDialogOpen(true)}
-        aria-label="Cookie settings"
-        style={{
-          position: "fixed",
-          bottom: 16,
-          left: 16,
-          zIndex: 9998,
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
-          border: "1px solid var(--color-border)",
-          background: "var(--color-surface)",
-          color: "var(--color-text-subtle)",
-          fontSize: 18,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-          opacity: 0.6,
-          transition: "opacity 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
-        title="Cookie settings"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
-          <path d="M8.5 8.5v.01" />
-          <path d="M16 15.5v.01" />
-          <path d="M12 12v.01" />
-          <path d="M11 17v.01" />
-          <path d="M7 14v.01" />
-        </svg>
-      </button>
-    );
-  }
 
   if (!dialogOpen) return null;
 
