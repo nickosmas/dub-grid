@@ -12,7 +12,7 @@ import {
   saveOrganizationRoles,
 } from "@/lib/db";
 import type { Organization, AssignableOrganizationRole } from "@/types";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import CustomSelect from "@/components/CustomSelect";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
@@ -67,16 +67,19 @@ function slugify(name: string): string {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface FocusAreaRow {
+  id: string;
   name: string;
   colorBg: string;
 }
 
 interface NamedItemRow {
+  id: string;
   name: string;
   abbr: string;
 }
 
 interface EmployeeRow {
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -210,13 +213,13 @@ export default function OrganizationSetupWizard({
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // ── Step 3: Config ────────────────────────────────────────────────────────
-  const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([{ name: "", colorBg: COLOR_PRESETS[0] }]);
-  const [certifications, setCertifications] = useState<NamedItemRow[]>([{ name: "", abbr: "" }]);
-  const [orgRoles, setOrgRoles] = useState<NamedItemRow[]>([{ name: "", abbr: "" }]);
+  const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([{ id: crypto.randomUUID(), name: "", colorBg: COLOR_PRESETS[0] }]);
+  const [certifications, setCertifications] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
+  const [orgRoles, setOrgRoles] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
 
   // ── Step 4: Employees ─────────────────────────────────────────────────────
   const [employeeRows, setEmployeeRows] = useState<EmployeeRow[]>(
-    Array.from({ length: 5 }, () => ({ firstName: "", lastName: "", email: "", phone: "" })),
+    Array.from({ length: 5 }, () => ({ id: crypto.randomUUID(), firstName: "", lastName: "", email: "", phone: "" })),
   );
   // ── Step 5: Invitations ───────────────────────────────────────────────────
   const [invitationRows, setInvitationRows] = useState<InvitationRow[]>([]);
@@ -278,6 +281,9 @@ export default function OrganizationSetupWizard({
         roleLabel: roleLabel.trim() || "Roles",
         shiftDisplayMode: "code",
         timezone: timezone || null,
+        enforceConflictPrevention: false,
+        dataRetentionDays: 365,
+        featureOverrides: {},
       });
 
       setCreatedOrg(org);
@@ -525,7 +531,7 @@ export default function OrganizationSetupWizard({
   // ── Row helpers ───────────────────────────────────────────────────────────
 
   function addFocusAreaRow() {
-    setFocusAreas((prev) => [...prev, { name: "", colorBg: COLOR_PRESETS[prev.length % COLOR_PRESETS.length] }]);
+    setFocusAreas((prev) => [...prev, { id: crypto.randomUUID(), name: "", colorBg: COLOR_PRESETS[prev.length % COLOR_PRESETS.length] }]);
   }
 
   function updateFocusArea(idx: number, updates: Partial<FocusAreaRow>) {
@@ -537,7 +543,7 @@ export default function OrganizationSetupWizard({
   }
 
   function addNamedItemRow(setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>) {
-    setter((prev) => [...prev, { name: "", abbr: "" }]);
+    setter((prev) => [...prev, { id: crypto.randomUUID(), name: "", abbr: "" }]);
   }
 
   function updateNamedItem(setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>, idx: number, updates: Partial<NamedItemRow>) {
@@ -559,7 +565,7 @@ export default function OrganizationSetupWizard({
   function addEmployeeRows(count: number) {
     setEmployeeRows((prev) => [
       ...prev,
-      ...Array.from({ length: count }, () => ({ firstName: "", lastName: "", email: "", phone: "" })),
+      ...Array.from({ length: count }, () => ({ id: crypto.randomUUID(), firstName: "", lastName: "", email: "", phone: "" })),
     ]);
   }
 
@@ -918,7 +924,7 @@ export default function OrganizationSetupWizard({
               Departments, wings, or units that employees are assigned to.
             </p>
             {focusAreas.map((fa, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div key={fa.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <input
                   type="color"
                   value={fa.colorBg}
@@ -955,7 +961,7 @@ export default function OrganizationSetupWizard({
               Skill levels or designations that employees can hold.
             </p>
             {certifications.map((cert, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div key={cert.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <input
                   className="dg-input"
                   value={cert.name}
@@ -993,7 +999,7 @@ export default function OrganizationSetupWizard({
               Configurable display roles for employees (not to be confused with access roles).
             </p>
             {orgRoles.map((role, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <input
                   className="dg-input"
                   value={role.name}
@@ -1067,7 +1073,7 @@ export default function OrganizationSetupWizard({
 
             {/* Rows */}
             {employeeRows.map((row, idx) => (
-              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
+              <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
                 <input className="dg-input" value={row.firstName} onChange={(e) => updateEmployeeRow(idx, { firstName: e.target.value })} placeholder="John" />
                 <input className="dg-input" value={row.lastName} onChange={(e) => updateEmployeeRow(idx, { lastName: e.target.value })} placeholder="Doe" />
                 <input className="dg-input" type="email" value={row.email} onChange={(e) => updateEmployeeRow(idx, { email: e.target.value })} placeholder="john@example.com" />

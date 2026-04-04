@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { fetchAllUsers } from "@/lib/db";
+import { toast } from "sonner";
+import { fetchAllUsers, deactivateUser, reactivateUser } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import type { PlatformUser, Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
 
 function RoleBadge({ role }: { role: string }) {
@@ -28,6 +31,40 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
+function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
+  if (!deactivatedAt) return null;
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        fontSize: "var(--dg-fs-footnote)",
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 4,
+        background: "var(--color-danger-bg)",
+        color: "var(--color-danger)",
+        textTransform: "uppercase",
+        marginLeft: 4,
+      }}
+    >
+      Deactivated
+    </span>
+  );
+}
+
+function formatRelativeDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Never";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 30) return `${diffDays}d ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  return `${Math.floor(diffDays / 365)}y ago`;
+}
+
 export default function AllUsersView({
   organizations,
   onNavigateToOrg,
@@ -44,16 +81,24 @@ export default function AllUsersView({
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [orgFilter, setOrgFilter] = useState<string>("all");
 
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Action states
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deactivateConfirm, setDeactivateConfirm] = useState<PlatformUser | null>(null);
+  const [forceLogoutConfirm, setForceLogoutConfirm] = useState<PlatformUser | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<PlatformUser | null>(null);
+  const [membershipsUser, setMembershipsUser] = useState<PlatformUser | null>(null);
+  const [memberships, setMemberships] = useState<Array<{ org_id: string; org_role: string; joined_at: string; org_name?: string }>>([]);
+  const [membershipsLoading, setMembershipsLoading] = useState(false);
+
+  function reload() {
     setLoading(true);
     fetchAllUsers()
-      .then((data) => { if (!cancelled) setUsers(data); })
-      .catch((err) => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+      .then((data) => setUsers(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { reload(); }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -68,6 +113,89 @@ export default function AllUsersView({
     });
   }, [users, search, roleFilter, orgFilter]);
 
+  async function handleDeactivate(user: PlatformUser) {
+    if (!user.orgId) return;
+    setActionLoading(user.id);
+    try {
+      const isDeactivated = !!user.deactivatedAt;
+      if (isDeactivated) {
+        await reactivateUser(user.id, user.orgId);
+        toast.success("User reactivated");
+      } else {
+        await deactivateUser(user.id, user.orgId);
+        toast.success("User deactivated");
+      }
+      setDeactivateConfirm(null);
+      reload();
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Action failed");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleForceLogout(user: PlatformUser) {
+    setActionLoading(user.id);
+    try {
+      const { error: rpcError } = await supabase.rpc("force_logout_user", { p_target_user_id: user.id });
+      if (rpcError) throw rpcError;
+      toast.success("User sessions terminated");
+      setForceLogoutConfirm(null);
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to force logout");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handlePasswordReset(user: PlatformUser) {
+    if (!user.email) return;
+    setActionLoading(user.id);
+    try {
+      const res = await fetch("/api/gridmaster/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to send password reset");
+      }
+      toast.success(`Password reset email sent to ${user.email}`);
+      setResetConfirm(null);
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to send password reset");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleViewMemberships(user: PlatformUser) {
+    setMembershipsUser(user);
+    setMembershipsLoading(true);
+    try {
+      const { data, error: queryError } = await supabase
+        .from("organization_memberships")
+        .select("org_id, org_role, joined_at, organizations(name)")
+        .eq("user_id", user.id)
+        .is("archived_at", null);
+      if (queryError) throw queryError;
+      setMemberships(
+        (data ?? []).map((row: Record<string, unknown>) => ({
+          org_id: row.org_id as string,
+          org_role: row.org_role as string,
+          joined_at: row.joined_at as string,
+          org_name: ((row.organizations as Record<string, unknown> | null)?.name as string) ?? "Unknown",
+        })),
+      );
+    } catch {
+      toast.error("Failed to load memberships");
+      setMembershipsUser(null);
+    } finally {
+      setMembershipsLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
@@ -78,6 +206,10 @@ export default function AllUsersView({
 
   return (
     <>
+      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+        All Users
+      </h2>
+
       {error && (
         <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: 10, fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
           {error}
@@ -86,7 +218,6 @@ export default function AllUsersView({
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-        {/* Left group: filter dropdowns */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", whiteSpace: "nowrap" }}>Filter</span>
           <CustomSelect
@@ -127,7 +258,6 @@ export default function AllUsersView({
 
         <div style={{ flex: 1 }} />
 
-        {/* Right group: count, search */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
             {filtered.length} of {users.length}
@@ -150,7 +280,7 @@ export default function AllUsersView({
         </div>
       </div>
 
-      {/* Table & Empty State */}
+      {/* Table */}
       {filtered.length > 0 ? (
         <div style={sectionStyle}>
           <div style={{ overflowX: "auto" }}>
@@ -161,60 +291,102 @@ export default function AllUsersView({
                   <th style={thStyle}>Platform Role</th>
                   <th style={thStyle}>Organization Role</th>
                   <th style={thStyle}>Organization</th>
+                  <th style={thStyle}>Last Login</th>
                   <th style={thStyle}>Joined</th>
                   <th style={thStyle}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => (
-                  <tr key={u.id}>
-                    <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
-                      {u.email ?? "—"}
-                    </td>
-                    <td style={tdStyle}>
-                      {u.platformRole !== "none" && <RoleBadge role={u.platformRole} />}
-                    </td>
-                    <td style={tdStyle}>
-                      {u.orgRole && <RoleBadge role={u.orgRole} />}
-                    </td>
-                    <td style={tdStyle}>
-                      {u.orgName ? (
-                        <button
-                          onClick={() => u.orgId && onNavigateToOrg(u.orgId)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "var(--color-info)",
-                            cursor: "pointer",
-                            fontSize: "var(--dg-fs-label)",
-                            fontWeight: 500,
-                            fontFamily: "inherit",
-                            padding: 0,
-                            textDecoration: "underline",
-                          }}
-                        >
-                          {u.orgName}
-                        </button>
-                      ) : (
-                        <span style={{ color: "var(--color-text-muted)" }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
-                      {new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </td>
-                    <td style={tdStyle}>
-                      {u.platformRole !== "gridmaster" && (
-                        <button
-                          className="dg-btn dg-btn-ghost"
-                          style={{ fontSize: "var(--dg-fs-caption)", padding: "3px 8px" }}
-                          onClick={() => onImpersonate(u.id, u.orgId ?? undefined)}
-                        >
-                          Impersonate
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((u) => {
+                  const isDeactivated = !!u.deactivatedAt;
+                  return (
+                    <tr key={u.id} style={{ opacity: isDeactivated ? 0.6 : 1 }}>
+                      <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
+                        {u.email ?? "—"}
+                        <StatusBadge deactivatedAt={u.deactivatedAt as string | null} />
+                      </td>
+                      <td style={tdStyle}>
+                        {u.platformRole !== "none" && <RoleBadge role={u.platformRole} />}
+                      </td>
+                      <td style={tdStyle}>
+                        {u.orgRole && <RoleBadge role={u.orgRole} />}
+                      </td>
+                      <td style={tdStyle}>
+                        {u.orgName ? (
+                          <button
+                            onClick={() => u.orgId && onNavigateToOrg(u.orgId)}
+                            style={{
+                              background: "none", border: "none", color: "var(--color-info)", cursor: "pointer",
+                              fontSize: "var(--dg-fs-label)", fontWeight: 500, fontFamily: "inherit", padding: 0, textDecoration: "underline",
+                            }}
+                          >
+                            {u.orgName}
+                          </button>
+                        ) : (
+                          <span style={{ color: "var(--color-text-muted)" }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+                        <span title={u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleString() : "Never"}>
+                          {formatRelativeDate(u.lastSignInAt)}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+                        {new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                          {u.platformRole !== "gridmaster" && (
+                            <>
+                              <button
+                                className="dg-btn dg-btn-ghost"
+                                style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px" }}
+                                onClick={() => onImpersonate(u.id, u.orgId ?? undefined)}
+                              >
+                                Impersonate
+                              </button>
+                              <button
+                                className="dg-btn dg-btn-ghost"
+                                style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px" }}
+                                onClick={() => handleViewMemberships(u)}
+                              >
+                                Orgs
+                              </button>
+                              {u.orgId && (
+                                <button
+                                  className="dg-btn dg-btn-ghost"
+                                  style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px", color: isDeactivated ? "var(--color-success, green)" : "var(--color-warning, orange)" }}
+                                  onClick={() => setDeactivateConfirm(u)}
+                                  disabled={actionLoading === u.id}
+                                >
+                                  {isDeactivated ? "Reactivate" : "Deactivate"}
+                                </button>
+                              )}
+                              <button
+                                className="dg-btn dg-btn-ghost"
+                                style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px", color: "var(--color-danger)" }}
+                                onClick={() => setForceLogoutConfirm(u)}
+                                disabled={actionLoading === u.id}
+                              >
+                                Logout
+                              </button>
+                              {u.email && (
+                                <button
+                                  className="dg-btn dg-btn-ghost"
+                                  style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px" }}
+                                  onClick={() => setResetConfirm(u)}
+                                  disabled={actionLoading === u.id}
+                                >
+                                  Reset PW
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -222,27 +394,121 @@ export default function AllUsersView({
       ) : (
         <div
           style={{
-            padding: "48px 20px",
-            textAlign: "center",
-            background: "var(--color-surface)",
-            borderRadius: 12,
-            border: "1px dashed var(--color-border)",
-            color: "var(--color-text-muted)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
+            padding: "48px 20px", textAlign: "center", background: "var(--color-surface)", borderRadius: 12,
+            border: "1px dashed var(--color-border)", color: "var(--color-text-muted)",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
           }}
         >
           <div style={{ color: "var(--color-text-faint)", background: "var(--color-bg)", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div>
-            <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600, marginBottom: 4 }}>
-              No users found
-            </div>
-            <div style={{ fontSize: "var(--dg-fs-label)" }}>
-              There are no matching users for these filters.
+            <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600, marginBottom: 4 }}>No users found</div>
+            <div style={{ fontSize: "var(--dg-fs-label)" }}>There are no matching users for these filters.</div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate/Reactivate confirm */}
+      {deactivateConfirm && (
+        <ConfirmDialog
+          title={!!deactivateConfirm.deactivatedAt ? "Reactivate User" : "Deactivate User"}
+          message={
+            !!deactivateConfirm.deactivatedAt
+              ? `Reactivate "${deactivateConfirm.email}"? They will regain platform access.`
+              : `Deactivate "${deactivateConfirm.email}"? They will be blocked from logging in across all orgs.`
+          }
+          confirmLabel={!!deactivateConfirm.deactivatedAt ? "Reactivate" : "Deactivate"}
+          variant={!!deactivateConfirm.deactivatedAt ? "info" : "danger"}
+          isLoading={actionLoading === deactivateConfirm.id}
+          onConfirm={() => handleDeactivate(deactivateConfirm)}
+          onCancel={() => setDeactivateConfirm(null)}
+        />
+      )}
+
+      {/* Force logout confirm */}
+      {forceLogoutConfirm && (
+        <ConfirmDialog
+          title="Force Logout"
+          message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
+          confirmLabel="Force Logout"
+          variant="danger"
+          isLoading={actionLoading === forceLogoutConfirm.id}
+          onConfirm={() => handleForceLogout(forceLogoutConfirm)}
+          onCancel={() => setForceLogoutConfirm(null)}
+        />
+      )}
+
+      {/* Password reset confirm */}
+      {resetConfirm && (
+        <ConfirmDialog
+          title="Send Password Reset"
+          message={`Send a password reset email to "${resetConfirm.email}"?`}
+          confirmLabel="Send Reset Email"
+          variant="info"
+          isLoading={actionLoading === resetConfirm.id}
+          onConfirm={() => handlePasswordReset(resetConfirm)}
+          onCancel={() => setResetConfirm(null)}
+        />
+      )}
+
+      {/* Multi-org memberships modal */}
+      {membershipsUser && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
+            display: "grid", placeItems: "center", padding: 20,
+          }}
+          onClick={() => setMembershipsUser(null)}
+        >
+          <div
+            style={{
+              background: "var(--color-surface)", borderRadius: 12, padding: 24, maxWidth: 520, width: "100%",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              Organization Memberships
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+              {membershipsUser.email}
+            </p>
+            {membershipsLoading ? (
+              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)" }}>Loading…</div>
+            ) : memberships.length === 0 ? (
+              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)" }}>No active memberships</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Organization</th>
+                    <th style={thStyle}>Role</th>
+                    <th style={thStyle}>Joined</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberships.map((m) => (
+                    <tr key={m.org_id}>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        <button
+                          onClick={() => { setMembershipsUser(null); onNavigateToOrg(m.org_id); }}
+                          style={{ background: "none", border: "none", color: "var(--color-info)", cursor: "pointer", fontSize: "var(--dg-fs-label)", fontWeight: 600, fontFamily: "inherit", padding: 0, textDecoration: "underline" }}
+                        >
+                          {m.org_name}
+                        </button>
+                      </td>
+                      <td style={tdStyle}><RoleBadge role={m.org_role} /></td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                        {new Date(m.joined_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+              <button className="dg-btn dg-btn-secondary" onClick={() => setMembershipsUser(null)}>Close</button>
             </div>
           </div>
         </div>

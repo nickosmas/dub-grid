@@ -90,18 +90,10 @@ export default function ImpersonationBanner() {
   if (!imp) return null;
 
   return (
-    <>
-      {/* Fixed banner pinned to the top of the viewport */}
       <div
-        className="no-print"
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
           height: BANNER_HEIGHT,
-          zIndex: 9999,
-          background: "linear-gradient(135deg, #f59e0b, #d97706)",
+          background: "linear-gradient(135deg, #ef4444, #dc2626)",
           color: "#fff",
           padding: "0 16px",
           display: "flex",
@@ -164,8 +156,5 @@ export default function ImpersonationBanner() {
           {ending ? "Ending..." : "End Session"}
         </button>
       </div>
-      {/* Spacer so page content isn't hidden under the fixed banner */}
-      <div style={{ height: BANNER_HEIGHT }} />
-    </>
   );
 }

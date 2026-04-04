@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 import { z } from "zod";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 
 const querySchema = z.object({
   type: z.enum(["staff", "schedule"]),
@@ -28,15 +30,6 @@ function getUserClient(req: NextRequest) {
   );
 }
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
 function escapeCsvField(value: string | number | null | undefined): string {
   if (value == null) return "";
   const str = String(value);
@@ -60,7 +53,8 @@ async function exportStaff(orgId: string) {
     .select("id, first_name, last_name, email, phone, status, status_note, seniority, focus_area_ids, certification_id, role_ids, contact_notes, archived_at")
     .eq("org_id", orgId)
     .is("archived_at", null)
-    .order("seniority", { ascending: true });
+    .order("seniority", { ascending: true })
+    .limit(10000);
 
   if (error) throw error;
 
@@ -103,6 +97,12 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const end = endDate ?? weekEnd.toISOString().split("T")[0];
+
+  // Cap at 90 days to prevent unbounded queries
+  const daySpan = (new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24);
+  if (daySpan > 90) {
+    throw new Error("Schedule export date range cannot exceed 90 days");
+  }
 
   // Fetch employees
   const { data: employees, error: empErr } = await supabase
@@ -181,6 +181,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
+    // Rate limit by user ID
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+    if (misconfigured) {
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      );
+    }
+
     // Parse params
     const { searchParams } = new URL(req.url);
     const parsed = querySchema.safeParse({
@@ -200,7 +212,7 @@ export async function GET(req: NextRequest) {
     const [{ data: membership }, { data: profile }] = await Promise.all([
       serviceClient
         .from("organization_memberships")
-        .select("org_role")
+        .select("org_role, admin_permissions")
         .eq("user_id", session.user.id)
         .eq("org_id", orgId)
         .maybeSingle(),
@@ -212,9 +224,19 @@ export async function GET(req: NextRequest) {
     ]);
 
     const isGridmaster = profile?.platform_role === "gridmaster";
-    const isAdminPlus = membership?.org_role && ["super_admin", "admin"].includes(membership.org_role);
+    const isSuperAdmin = membership?.org_role === "super_admin";
+    const isAdmin = membership?.org_role === "admin";
+    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
 
-    if (!isGridmaster && !isAdminPlus) {
+    // Gridmaster and super_admin always have full export access.
+    // Admin must have the specific permission for the export type.
+    const hasExportPermission =
+      isGridmaster ||
+      isSuperAdmin ||
+      (isAdmin && type === "staff" && adminPerms?.canManageEmployees === true) ||
+      (isAdmin && type === "schedule" && adminPerms?.canEditShifts === true);
+
+    if (!hasExportPermission) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
@@ -249,6 +271,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "export" } });
     logger.error({ error: err }, "Export failed");
     return NextResponse.json({ error: "Export failed" }, { status: 500 });
   }

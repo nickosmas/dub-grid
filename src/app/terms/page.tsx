@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+export const revalidate = 86400; // 24 hours
+
 export const metadata: Metadata = {
   title: "Terms of Service | DubGrid",
 };

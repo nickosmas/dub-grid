@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 
 export const dynamic = "force-dynamic";
 
@@ -13,17 +13,11 @@ export async function GET() {
   // Check Supabase DB connectivity
   const dbStart = Date.now();
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      checks.db = { status: "unconfigured" };
-    } else {
-      const client = createClient(supabaseUrl, serviceKey);
-      const { error } = await client.from("organizations").select("id").limit(1);
-      checks.db = error
-        ? { status: "error", error: "query failed", latencyMs: Date.now() - dbStart }
-        : { status: "ok", latencyMs: Date.now() - dbStart };
-    }
+    const client = getServiceClient();
+    const { error } = await client.from("organizations").select("id").limit(1);
+    checks.db = error
+      ? { status: "error", error: "query failed", latencyMs: Date.now() - dbStart }
+      : { status: "ok", latencyMs: Date.now() - dbStart };
   } catch {
     checks.db = { status: "error", error: "connection failed", latencyMs: Date.now() - dbStart };
   }

@@ -64,7 +64,7 @@ export default function ShiftBreakdownCard({
                       <span style={{ fontSize: 10, color: "var(--color-text-subtle)" }}>
                         {c.shiftCodeLabel}
                       </span>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-secondary)", fontFamily: "var(--font-dm-mono), 'DM Mono', monospace" }}>
                         {c.count}
                       </span>
                     </div>
@@ -74,10 +74,10 @@ export default function ShiftBreakdownCard({
 
               {/* Count + percentage */}
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)", fontFamily: "var(--font-dm-mono), 'DM Mono', monospace" }}>
                   {fa.total}
                 </div>
-                <div style={{ fontSize: 10, color: "var(--color-text-subtle)" }}>
+                <div style={{ fontSize: 10, color: "var(--color-text-subtle)", fontFamily: "var(--font-dm-mono), 'DM Mono', monospace" }}>
                   {breakdown.totalShifts > 0 ? Math.round((fa.total / breakdown.totalShifts) * 100) : 0}%
                 </div>
               </div>

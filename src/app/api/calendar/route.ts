@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { generateICS } from "@/lib/ical";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 
 function getClient(req: NextRequest) {
   return createServerClient(
@@ -32,6 +34,18 @@ export async function GET(req: NextRequest) {
 
     if (!session) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
+    // Rate limit by user ID
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+    if (misconfigured) {
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      );
     }
 
     const userId = session.user.id;
@@ -122,6 +136,7 @@ export async function GET(req: NextRequest) {
 
     return new NextResponse(ics, { headers: cacheHeaders });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "calendar-export" } });
     logger.error({ error: err }, "Calendar export failed");
     return NextResponse.json({ error: "Calendar export failed" }, { status: 500 });
   }

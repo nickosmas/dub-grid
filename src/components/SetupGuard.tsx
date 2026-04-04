@@ -101,24 +101,41 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
               margin: 0,
             }}
           >
-            Your organization is being set up by an administrator. Please check back soon.
+            Your admin is still configuring the workspace. Try refreshing in a few minutes.
           </p>
         </div>
-        <button
-          onClick={() => signOutLocal()}
-          style={{
-            padding: "10px 24px",
-            borderRadius: 10,
-            border: "1px solid var(--color-border)",
-            background: "var(--color-bg-card, white)",
-            color: "var(--color-text-primary)",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Sign Out
-        </button>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: "10px 24px",
+              borderRadius: 10,
+              border: "none",
+              background: "var(--color-primary, #005F02)",
+              color: "white",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Refresh
+          </button>
+          <button
+            onClick={() => signOutLocal()}
+            style={{
+              padding: "10px 24px",
+              borderRadius: 10,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-bg-card, white)",
+              color: "var(--color-text-primary)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
     );
   }

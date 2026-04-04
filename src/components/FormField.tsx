@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode, type ReactElement, cloneElement, isValidElement } from "react";
 
 const labelStyle: CSSProperties = {
   display: "block",
@@ -23,7 +23,8 @@ const errorStyle: CSSProperties = {
 
 /**
  * Lightweight form field wrapper with label and inline error display.
- * No form library dependency — works with plain useState.
+ * Generates a stable ID to connect <label> → <input> via htmlFor/id,
+ * and error messages via aria-describedby.
  */
 export function FormField({
   label,
@@ -31,24 +32,40 @@ export function FormField({
   required,
   children,
   style,
+  id: externalId,
 }: {
   label?: string;
   error?: string | null;
   required?: boolean;
   children: ReactNode;
   style?: CSSProperties;
+  /** Optional ID override — when omitted a stable ID is generated. */
+  id?: string;
 }) {
+  const generatedId = useId();
+  const fieldId = externalId ?? generatedId;
+  const errorId = `${fieldId}-error`;
+
+  // Inject id + aria-describedby into the child input element
+  const enhancedChildren = isValidElement(children)
+    ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+        id: (children as ReactElement<Record<string, unknown>>).props.id ?? fieldId,
+        ...(error ? { "aria-describedby": errorId, "aria-invalid": true } : {}),
+        ...(required ? { "aria-required": true } : {}),
+      })
+    : children;
+
   return (
     <div style={style}>
       {label && (
-        <label style={labelStyle}>
+        <label htmlFor={fieldId} style={labelStyle}>
           {label}
           {required && <span style={{ color: "var(--color-danger)", marginLeft: 2 }}>*</span>}
         </label>
       )}
-      {children}
+      {enhancedChildren}
       {error && (
-        <div style={errorStyle} role="alert">
+        <div id={errorId} style={errorStyle} role="alert">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />

@@ -9,6 +9,10 @@ function getRootDomain(hostname: string): string {
   if (hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
     return hostname;
   }
+  // Handle *.localhost subdomains (e.g., "acme.localhost" → "localhost")
+  if (hostname.endsWith(".localhost")) {
+    return "localhost";
+  }
   const parts = hostname.split(".");
   // e.g., "dubgrid.com" → 2 parts, "acme.dubgrid.com" → 3 parts
   return parts.length > 2 ? parts.slice(-2).join(".") : hostname;

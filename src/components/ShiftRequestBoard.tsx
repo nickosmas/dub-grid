@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ShiftRequest, ShiftRequestStatus } from "@/types";
+import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -19,6 +19,7 @@ interface ShiftRequestBoardProps {
   onResolve: (requestId: string, approved: boolean, note?: string) => void;
   onCancel: (requestId: string) => void;
   onClose: () => void;
+  absenceTypeMap?: Map<number, AbsenceType>;
 }
 
 type Tab = "available" | "mine" | "approval";
@@ -65,6 +66,7 @@ export default function ShiftRequestBoard({
   onResolve,
   onCancel,
   onClose,
+  absenceTypeMap,
 }: ShiftRequestBoardProps) {
   const isMobile = useMediaQuery(MOBILE);
   const [activeTab, setActiveTab] = useState<Tab>("available");
@@ -146,14 +148,16 @@ export default function ShiftRequestBoard({
 
   function renderCard(req: ShiftRequest) {
     const isSwap = req.type === "swap";
+    const isCalloff = req.type === "calloff";
     const isOwnRequest = currentEmpId === req.requesterEmpId;
     const isTarget = currentEmpId === req.targetEmpId;
+    const absenceType = isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
 
     return (
       <div
         key={req.id}
         style={{
-          border: "1px solid var(--color-border)",
+          border: isCalloff ? "1px solid var(--color-danger-border, #FCA5A5)" : "1px solid var(--color-border)",
           borderRadius: 10,
           padding: "14px 16px",
           background: "var(--color-surface)",
@@ -177,7 +181,25 @@ export default function ShiftRequestBoard({
           >
             {req.requesterName}
           </span>
-          {renderStatusBadge(req.status)}
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {isCalloff && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 6,
+                  background: "var(--color-danger-bg, #FEF2F2)",
+                  color: "var(--color-danger-text, #991B1B)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Calloff
+              </span>
+            )}
+            {renderStatusBadge(req.status)}
+          </div>
         </div>
 
         {/* Shift info */}
@@ -205,6 +227,22 @@ export default function ShiftRequestBoard({
                 {req.targetName}: {req.targetShiftLabel} on {formatShiftDate(req.targetShiftDate)}
               </span>
             </>
+          )}
+
+          {isCalloff && absenceType && (
+            <span
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                padding: "2px 8px",
+                borderRadius: 6,
+                background: absenceType.color || "var(--color-surface-alt)",
+                color: absenceType.text || "var(--color-text-primary)",
+                border: `1px solid ${absenceType.border || "var(--color-border)"}`,
+              }}
+            >
+              {absenceType.label} — {absenceType.name}
+            </span>
           )}
         </div>
 

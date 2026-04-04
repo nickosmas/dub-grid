@@ -1,5 +1,5 @@
 // src/hooks/index.ts
-export { usePermissions, getPermissionsFromSession, clearPermsCache } from "./usePermissions";
+export { usePermissions, getPermissionsFromSession, clearPermsCache, setUserViewActive, getUserViewActive } from "./usePermissions";
 export type { Permissions } from "./usePermissions";
 
 export { useRoleChange, generateIdempotencyKey } from "./useRoleChange";

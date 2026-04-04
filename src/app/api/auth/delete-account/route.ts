@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+
+export const dynamic = "force-dynamic";
 
 function getUserClient(req: NextRequest) {
   return createServerClient(
@@ -17,15 +20,6 @@ function getUserClient(req: NextRequest) {
       },
     },
   );
-}
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 }
 
 /**
@@ -141,6 +135,7 @@ export async function DELETE(req: NextRequest) {
     // 6. Delete the auth user (cascades auth.users row)
     const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
     if (deleteError) {
+      Sentry.captureException(deleteError, { extra: { userId, context: "account-deletion" } });
       logger.error({ error: deleteError, userId }, "Failed to delete auth user");
       return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
     }
@@ -149,6 +144,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "account-deletion" } });
     logger.error({ error: err }, "Account deletion failed");
     return NextResponse.json({ error: "Account deletion failed" }, { status: 500 });
   }

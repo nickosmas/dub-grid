@@ -19,6 +19,15 @@ describe("rowToOrganization", () => {
       shift_display_mode: null,
       timezone: null,
       archived_at: null,
+      suspended_at: null,
+      suspended_reason: null,
+      enforce_conflict_prevention: false,
+      stripe_customer_id: null,
+      subscription_status: null,
+      trial_ends_at: null,
+      subscription_seats: null,
+      data_retention_days: 365,
+      feature_overrides: {},
     };
 
     const result = rowToOrganization(row);
@@ -44,6 +53,15 @@ describe("rowToOrganization", () => {
       shift_display_mode: null,
       timezone: null,
       archived_at: null,
+      suspended_at: null,
+      suspended_reason: null,
+      enforce_conflict_prevention: false,
+      stripe_customer_id: null,
+      subscription_status: null,
+      trial_ends_at: null,
+      subscription_seats: null,
+      data_retention_days: 365,
+      feature_overrides: {},
     };
 
     const result = rowToOrganization(row);

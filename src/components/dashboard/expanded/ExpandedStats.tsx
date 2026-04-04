@@ -170,7 +170,7 @@ export default function ExpandedStats({
 
                       return (
                         <td key={col.key} style={tdStyle}>
-                          <span style={{ fontWeight: 700, fontSize: 14 }}>{fmt}</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--font-dm-mono), 'DM Mono', monospace" }}>{fmt}</span>
                           {delta != null && delta !== 0 && (
                             <span
                               style={{

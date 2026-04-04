@@ -9,6 +9,7 @@ import { clearPermsCache } from "@/hooks/usePermissions";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import * as Sentry from "@/lib/sentry";
 
 export default function EnhancedImpersonation({
   organizations,
@@ -26,6 +27,7 @@ export default function EnhancedImpersonation({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<OrganizationUser | null>(null);
+  const [roleOverride, setRoleOverride] = useState<string>("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [justification, setJustification] = useState("");
@@ -121,12 +123,13 @@ export default function EnhancedImpersonation({
         navigator.userAgent,
         selectedOrg.id,
       );
+      const effectiveRole = roleOverride || selectedUser.orgRole || "user";
       setImpersonationCookie({
         sessionId: result.session_id,
         targetUserId: selectedUser.id,
         targetOrgId: selectedOrg.id,
         targetOrgSlug: selectedOrg.slug ?? "",
-        targetOrgRole: selectedUser.orgRole ?? "user",
+        targetOrgRole: effectiveRole,
         targetEmail: selectedUser.email ?? "",
         targetOrgName: selectedOrg.name,
         justification: trimmedJustification,
@@ -148,6 +151,7 @@ export default function EnhancedImpersonation({
       toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name} — redirecting…`);
       window.location.replace("/schedule");
     } catch (err: unknown) {
+      Sentry.captureException(err, { extra: { context: "impersonation-start" } });
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to start impersonation");
       setLoading(false);
     }
@@ -305,6 +309,22 @@ export default function EnhancedImpersonation({
                 </div>
                 <div style={{ marginTop: 16 }}>
                   <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                    Role Override <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span>
+                  </label>
+                  <select
+                    className="dg-input"
+                    value={roleOverride}
+                    onChange={(e) => setRoleOverride(e.target.value)}
+                    style={{ marginTop: 4, width: "100%" }}
+                  >
+                    <option value="">Use actual role ({selectedUser.orgRole?.replace("_", " ") ?? "user"})</option>
+                    <option value="user">User (read-only)</option>
+                    <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                  </select>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                     Justification <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <textarea
@@ -331,7 +351,7 @@ export default function EnhancedImpersonation({
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => { setSelectedUser(null); setJustification(""); }}
+                    onClick={() => { setSelectedUser(null); setJustification(""); setRoleOverride(""); }}
                   >
                     Cancel
                   </button>
@@ -411,6 +431,22 @@ export default function EnhancedImpersonation({
               <>
                 <div style={{ marginTop: 16 }}>
                   <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                    Role Override <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span>
+                  </label>
+                  <select
+                    className="dg-input"
+                    value={roleOverride}
+                    onChange={(e) => setRoleOverride(e.target.value)}
+                    style={{ marginTop: 4, width: "100%" }}
+                  >
+                    <option value="">Use actual role ({selectedUser.orgRole?.replace("_", " ") ?? "user"})</option>
+                    <option value="user">User (read-only)</option>
+                    <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                  </select>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                     Justification <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <textarea
@@ -437,7 +473,7 @@ export default function EnhancedImpersonation({
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => { setSelectedUser(null); setJustification(""); }}
+                    onClick={() => { setSelectedUser(null); setJustification(""); setRoleOverride(""); }}
                   >
                     Clear
                   </button>

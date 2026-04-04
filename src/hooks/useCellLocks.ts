@@ -47,7 +47,7 @@ export function useCellLocks(
   useEffect(() => {
     currentUserRef.current = currentUser;
     canEditRef.current = canEdit;
-  });
+  }, [currentUser, canEdit]);
 
   // Rebuild lockedCells map + onlineUsers list from presence state.
   // Returned so the parent can register it directly on the channel —

@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 
-const AnalyticsCharts = dynamic(() => import("@/components/dashboard/AnalyticsCharts"), { ssr: false });
 import type { Permissions } from "@/hooks";
 import type {
   Organization,
@@ -14,10 +13,12 @@ import type {
   ShiftCategory,
   CoverageRequirement,
   Employee,
+  AbsenceType,
   ShiftMap,
   PublishHistoryEntry,
 } from "@/types";
-import { fetchShifts, fetchRecentPublishHistory } from "@/lib/db";
+import { fetchShifts, fetchRecentPublishHistory, fetchPublishedDateRanges } from "@/lib/db";
+import { buildPublishedDateSet } from "@/lib/schedule-logic";
 import {
   getWeekStart,
   getDatesInRange,
@@ -40,19 +41,15 @@ import {
 export type ViewMode = "day" | "week" | "2weeks";
 
 import DashboardHeader from "./DashboardHeader";
-import AlertBanner from "./AlertBanner";
-import StatCardsRow from "./StatCardsRow";
-import CoverageBySectionCard from "./CoverageBySectionCard";
-import OpenShiftsCard from "./OpenShiftsCard";
-import StaffHoursCard from "./StaffHoursCard";
-import ShiftBreakdownCard from "./ShiftBreakdownCard";
-import ActivityFeed from "./ActivityFeed";
-import ExpandedStats from "./expanded/ExpandedStats";
-import ExpandedCoverage from "./expanded/ExpandedCoverage";
-import ExpandedOpenShifts from "./expanded/ExpandedOpenShifts";
-import ExpandedStaffHours from "./expanded/ExpandedStaffHours";
-import ExpandedBreakdown from "./expanded/ExpandedBreakdown";
-import ExpandedActivity from "./expanded/ExpandedActivity";
+import UserDashboard from "./UserDashboard";
+import AdminDashboard from "./AdminDashboard";
+import SuperAdminDashboard from "./SuperAdminDashboard";
+const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), { ssr: false });
+const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), { ssr: false });
+const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), { ssr: false });
+const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours"), { ssr: false });
+const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), { ssr: false });
+const ExpandedActivity = dynamic(() => import("./expanded/ExpandedActivity"), { ssr: false });
 
 type ExpandedPanel = "stats" | "coverage" | "openShifts" | "staffHours" | "breakdown" | "activity" | null;
 
@@ -64,6 +61,8 @@ interface DashboardViewProps {
   coverageRequirements: CoverageRequirement[];
   shiftCodeMap: Map<number, string>;
   shiftCodeById: Map<number, ShiftCode>;
+  absenceTypeMap: Map<number, string>;
+  absenceTypes: AbsenceType[];
   employees: Employee[];
   permissions: Permissions;
 }
@@ -76,6 +75,8 @@ export default function DashboardView({
   coverageRequirements,
   shiftCodeMap,
   shiftCodeById,
+  absenceTypeMap,
+  absenceTypes,
   employees,
   permissions,
 }: DashboardViewProps) {
@@ -86,6 +87,7 @@ export default function DashboardView({
   // ─── Expanded panel state ─────────────────────────────
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
   const closeExpanded = useCallback(() => setExpandedPanel(null), []);
+  const handleExpandPanel = useCallback((panel: string) => setExpandedPanel(panel as ExpandedPanel), []);
 
   // ─── View mode + period navigation ─────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("week");
@@ -126,15 +128,18 @@ export default function DashboardView({
   // ─── Data fetching ──────────────────────────────────────
   const [allShifts, setAllShifts] = useState<ShiftMap>({});
   const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry | null>(null);
+  const [publishedDateRanges, setPublishedDateRanges] = useState<{ startDate: string; endDate: string }[]>([]);
   const [shiftsLoading, setShiftsLoading] = useState(true);
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2;
 
-  // Stable ref for shiftCodeMap to avoid re-fetching on every render
+  // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
   const shiftCodeMapRef = useRef(shiftCodeMap);
   useEffect(() => { shiftCodeMapRef.current = shiftCodeMap; });
+  const absenceTypeMapRef = useRef(absenceTypeMap);
+  useEffect(() => { absenceTypeMapRef.current = absenceTypeMap; });
 
   useEffect(() => {
     let cancelled = false;
@@ -145,12 +150,14 @@ export default function DashboardView({
     const fetchStart = formatDateKey(prevPeriodStart);
     const fetchEnd = formatDateKey(periodEnd);
     Promise.all([
-      fetchShifts(orgId, isScheduler, shiftCodeMapRef.current, undefined, fetchStart, fetchEnd),
+      fetchShifts(orgId, isScheduler, shiftCodeMapRef.current, absenceTypeMapRef.current, fetchStart, fetchEnd),
       fetchRecentPublishHistory(orgId),
-    ]).then(([shifts, pubs]) => {
+      fetchPublishedDateRanges(orgId, fetchStart, fetchEnd).catch(() => []),
+    ]).then(([shifts, pubs, pubDateRanges]) => {
       if (cancelled) return;
       setAllShifts(shifts);
       setPublishHistory(pubs[0] ?? null);
+      setPublishedDateRanges(pubDateRanges);
       setShiftsLoading(false);
     }).catch(() => {
       if (!cancelled) setShiftsLoading(false);
@@ -163,6 +170,11 @@ export default function DashboardView({
   const currentEmpId = useMemo(
     () => (authUser ? employees.find((e) => e.userId === authUser.id)?.id ?? null : null),
     [employees, authUser],
+  );
+
+  const currentEmployee = useMemo(
+    () => (currentEmpId ? employees.find((e) => e.id === currentEmpId) : undefined),
+    [employees, currentEmpId],
   );
 
   const shiftRequests = useShiftRequests(
@@ -187,6 +199,11 @@ export default function DashboardView({
   const activeEmployees = useMemo(
     () => employees.filter((e) => e.status === "active"),
     [employees],
+  );
+
+  const absenceTypeById = useMemo(
+    () => new Map(absenceTypes.map((at) => [at.id, at])),
+    [absenceTypes],
   );
 
   // Break-aware hour computation maps
@@ -262,14 +279,21 @@ export default function DashboardView({
     activeEmployees, otAlerts.length, prevOtCount,
   ]);
 
-  // Open shifts
+  // Dates that have been published at least once — coverage-gap open shifts
+  // are only shown for these dates.
+  const publishedDates = useMemo(
+    () => buildPublishedDateSet(publishedDateRanges),
+    [publishedDateRanges],
+  );
+
+  // Open shifts (filtered to only include published dates)
   const openShifts = useMemo(
     () =>
       computeOpenShifts(
         focusAreas, shiftCodes, coverageRequirements,
         periodDates, activeEmployees, currentPeriodShifts, shiftCodeById, shiftCodeMap,
-      ),
-    [focusAreas, shiftCodes, coverageRequirements, periodDates, activeEmployees, currentPeriodShifts, shiftCodeById, shiftCodeMap],
+      ).filter((s) => publishedDates.has(formatDateKey(s.date))),
+    [focusAreas, shiftCodes, coverageRequirements, periodDates, activeEmployees, currentPeriodShifts, shiftCodeById, shiftCodeMap, publishedDates],
   );
 
   // Shift breakdown
@@ -284,13 +308,21 @@ export default function DashboardView({
     [publishHistory, shiftRequests.requests, otAlerts],
   );
 
-  // ─── Permission checks ─────────────────────────────────
-  const showOT = permissions.level >= 2 && permissions.canEditShifts;
-  const showCoverage = permissions.canViewSchedule;
-  const showOpenShifts = permissions.level >= 2;
-  const showStaffHours = permissions.canViewStaff;
-  const showBreakdown = permissions.canViewSchedule;
-  const showActivity = true;
+  // ─── Draft counts ──────────────────────────────────────
+  const { draftNewCount, draftModifiedCount, draftDeletedCount } = useMemo(() => {
+    let newCount = 0;
+    let modifiedCount = 0;
+    let deletedCount = 0;
+    for (const key of Object.keys(currentPeriodShifts)) {
+      const shift = currentPeriodShifts[key];
+      if (shift.isDraft) {
+        if (shift.draftKind === "new") newCount++;
+        else if (shift.draftKind === "modified") modifiedCount++;
+        else if (shift.draftKind === "deleted") deletedCount++;
+      }
+    }
+    return { draftNewCount: newCount, draftModifiedCount: modifiedCount, draftDeletedCount: deletedCount };
+  }, [currentPeriodShifts]);
 
   // ─── Render ─────────────────────────────────────────────
   const headerProps = {
@@ -321,6 +353,58 @@ export default function DashboardView({
     );
   }
 
+  // ─── Shared props for role-specific dashboards ─────────
+  const contentProps = {
+    org,
+    focusAreas,
+    shiftCodes,
+    shiftCategories,
+    coverageRequirements,
+    shiftCodeMap,
+    shiftCodeById,
+    employees,
+    activeEmployees,
+    permissions,
+    viewMode,
+    periodDates,
+    periodStart,
+    periodEnd,
+    prevPeriodLabel,
+    currentPeriodShifts,
+    allShifts,
+    periodStats,
+    sectionCoverage,
+    openShifts,
+    otAlerts,
+    currentHours,
+    prevHours,
+    shiftBreakdown,
+    activityItems,
+    shiftRequests,
+    currentEmpId,
+    currentEmployee,
+    publishHistory,
+    draftNewCount,
+    draftModifiedCount,
+    draftDeletedCount,
+    absenceTypeById,
+    isMobile,
+    isTablet,
+    onExpandPanel: handleExpandPanel,
+  };
+
+  // ─── Pick role-specific layout ─────────────────────────
+  const showOT = permissions.level >= 2 && permissions.canEditShifts;
+
+  let DashboardContent;
+  if (permissions.level >= 3) {
+    DashboardContent = SuperAdminDashboard;
+  } else if (permissions.level >= 2) {
+    DashboardContent = AdminDashboard;
+  } else {
+    DashboardContent = UserDashboard;
+  }
+
   return (
     <div style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
       {/* Sticky toolbar */}
@@ -333,86 +417,88 @@ export default function DashboardView({
       {/* Content */}
       <div style={contentStyle}>
 
-      {/* OT Alert Banner */}
-      {showOT && otAlerts.length > 0 && (
-        <AlertBanner
-          alerts={otAlerts}
-          onReview={() => (window.location.href = "/schedule")}
-        />
-      )}
-
-      {/* Stat Cards */}
-      <StatCardsRow
-        stats={periodStats}
-        showOT={showOT}
-        isMobile={isMobile}
-        hasRequirements={coverageRequirements.length > 0}
-        prevPeriodLabel={prevPeriodLabel}
-        onExpand={() => setExpandedPanel("stats")}
-      />
-
-      {/* Coverage + Open Shifts */}
-      {(showCoverage || showOpenShifts) && (
+      {/* Onboarding checklist for new orgs (pre-dispatch) */}
+      {employees.length === 0 && permissions.level >= 2 && (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
-            gap: 16,
+            padding: "32px 24px",
+            background: "var(--color-surface)",
+            borderRadius: 14,
+            border: "1px dashed var(--color-border)",
+            marginBottom: 16,
           }}
         >
-          {showCoverage && (
-            <CoverageBySectionCard
-              sections={sectionCoverage}
-              focusAreaLabel={org.focusAreaLabel || "section"}
-              isMobile={isMobile}
-              hasRequirements={coverageRequirements.length > 0}
-              onExpand={() => setExpandedPanel("coverage")}
-            />
-          )}
-          {showOpenShifts && (
-            <OpenShiftsCard
-              openShifts={openShifts}
-              onExpand={() => setExpandedPanel("openShifts")}
-            />
-          )}
+          <h3 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+            Get started with DubGrid
+          </h3>
+          <p style={{ margin: "0 0 20px", fontSize: "var(--dg-fs-body)", color: "var(--color-text-muted)" }}>
+            Complete these steps to set up your organization.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[
+              { done: focusAreas.length > 0, label: "Configure focus areas", href: "/settings/focus-areas" },
+              { done: shiftCodes.length > 0, label: "Add shift codes", href: "/settings/shift-codes" },
+              { done: false, label: "Add employees", href: "/staff" },
+              { done: false, label: "Create your first schedule", href: "/schedule" },
+            ].map((step) => (
+              <a
+                key={step.label}
+                href={step.href}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: step.done ? "var(--color-success-bg)" : "var(--color-bg)",
+                  border: `1px solid ${step.done ? "var(--color-success)" : "var(--color-border)"}`,
+                  textDecoration: "none",
+                  color: step.done ? "var(--color-success-text)" : "var(--color-text-primary)",
+                  fontSize: "var(--dg-fs-body)",
+                  fontWeight: 500,
+                  transition: "background 0.15s",
+                }}
+              >
+                <span style={{
+                  width: 20, height: 20, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: step.done ? "var(--color-success)" : "var(--color-border)",
+                  color: step.done ? "#fff" : "var(--color-text-faint)",
+                  fontSize: 12, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {step.done ? "\u2713" : "\u00B7"}
+                </span>
+                {step.label}
+              </a>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Bottom row */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile
-            ? "1fr"
-            : isTablet
-              ? "1fr 1fr"
-              : "1fr 1fr 1fr",
-          gap: 16,
-        }}
-      >
-        {showStaffHours && (
-          <StaffHoursCard
-            employeeHours={currentHours}
-            employees={activeEmployees}
-            focusAreas={focusAreas}
-            onExpand={() => setExpandedPanel("staffHours")}
-          />
-        )}
-        {showBreakdown && (
-          <ShiftBreakdownCard
-            breakdown={shiftBreakdown}
-            onExpand={() => setExpandedPanel("breakdown")}
-          />
-        )}
-        {showActivity && (
-          <ActivityFeed
-            items={activityItems}
-            onExpand={() => setExpandedPanel("activity")}
-          />
-        )}
-      </div>
+      {/* Users see a "setup in progress" message if no employee record */}
+      {employees.length === 0 && permissions.level === 0 && (
+        <div
+          style={{
+            padding: "32px 24px",
+            background: "var(--color-surface)",
+            borderRadius: 14,
+            border: "1px dashed var(--color-border)",
+            textAlign: "center",
+          }}
+        >
+          <h3 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+            Your workspace is being set up
+          </h3>
+          <p style={{ margin: "0", fontSize: "var(--dg-fs-body)", color: "var(--color-text-muted)" }}>
+            Your administrator is configuring the organization. Check back soon.
+          </p>
+        </div>
+      )}
 
-      {/* ─── Expanded Panels ──────────────────────────────── */}
+      {/* ─── Role-specific dashboard content ─────────────── */}
+      <DashboardContent {...contentProps} />
+
+      {/* ─── Expanded Panels (shared across all roles) ───── */}
       {expandedPanel === "stats" && (
         <ExpandedStats
           allShifts={allShifts}
@@ -469,15 +555,6 @@ export default function DashboardView({
         />
       )}
 
-      {/* Historical Analytics — admin+ only */}
-      {permissions.level >= 2 && org.id && !expandedPanel && (
-        <div style={{ marginTop: 24 }}>
-          <h2 style={{ fontSize: "var(--dg-fs-title)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 16 }}>
-            Analytics
-          </h2>
-          <AnalyticsCharts orgId={org.id} />
-        </div>
-      )}
       </div>
     </div>
   );

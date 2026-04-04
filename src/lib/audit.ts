@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import logger from "@/lib/logger";
+import { getImpersonationFromCookie } from "@/lib/impersonation";
 
 export type AuditAction =
   // Employee management
@@ -27,25 +27,38 @@ export type AuditAction =
   | "org.created"
   | "org.archived"
   | "org.restored"
+  | "org.suspended"
+  | "org.unsuspended"
+  | "org.deleted"
   // Role & permissions
   | "role.changed"
   | "permissions.updated"
   | "user.removed_from_org"
+  | "user.deactivated"
+  | "user.reactivated"
+  | "user.force_logout"
+  | "user.password_reset_sent"
   // Invitations
   | "invitation.sent"
   | "invitation.accepted"
   | "invitation.revoked"
+  | "invitation.resent"
   // Config items
   | "focus_area.upserted"
   | "focus_area.archived"
+  | "focus_area.restored"
   | "shift_code.upserted"
   | "shift_code.archived"
+  | "shift_code.restored"
   | "absence_type.upserted"
   | "absence_type.archived"
+  | "absence_type.restored"
   | "shift_category.upserted"
   | "shift_category.archived"
+  | "shift_category.restored"
   | "indicator_type.upserted"
   | "indicator_type.archived"
+  | "indicator_type.restored"
   | "certifications.saved"
   | "org_roles.saved"
   | "coverage_requirements.saved"
@@ -63,6 +76,10 @@ export type AuditAction =
   // Schedule notes
   | "schedule_note.upserted"
   | "schedule_note.deleted"
+  // Billing
+  | "billing.trial_extended"
+  | "billing.subscription_canceled"
+  | "billing.synced"
   // Data export
   | "data.exported";
 
@@ -87,7 +104,9 @@ export type AuditResourceType =
   | "impersonation_session"
   | "schedule_note"
   | "permissions"
-  | "data_export";
+  | "data_export"
+  | "user"
+  | "billing";
 
 /**
  * Log an audit event. Best-effort — never throws.
@@ -104,6 +123,15 @@ export async function logAudit(
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
+    // Attach impersonation session ID if the actor is impersonating.
+    // This makes actions taken during impersonation distinguishable from
+    // direct gridmaster actions in the audit trail.
+    let impersonationSessionId: string | null = null;
+    if (typeof document !== "undefined") {
+      const imp = getImpersonationFromCookie(document.cookie);
+      if (imp) impersonationSessionId = imp.sessionId;
+    }
+
     const { error } = await supabase.from("audit_log").insert({
       org_id: orgId ?? null,
       actor_id: session.user.id,
@@ -112,12 +140,13 @@ export async function logAudit(
       resource_type: resourceType,
       resource_id: resourceId,
       details,
+      impersonation_session_id: impersonationSessionId,
     });
 
     if (error) {
-      logger.error({ error, action, resourceType }, "Failed to write audit log");
+      console.error("Failed to write audit log", { action, resourceType, error });
     }
   } catch (err) {
-    logger.error({ error: err, action, resourceType }, "Audit logging failed");
+    console.error("Audit logging failed", { action, resourceType, err });
   }
 }

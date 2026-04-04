@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 
 function getUserClient(req: NextRequest) {
   return createServerClient(
@@ -16,15 +17,6 @@ function getUserClient(req: NextRequest) {
       },
     },
   );
-}
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 }
 
 /**
@@ -132,6 +124,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "data-export" } });
     logger.error({ error: err }, "Data export failed");
     return NextResponse.json({ error: "Data export failed" }, { status: 500 });
   }

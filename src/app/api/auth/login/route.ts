@@ -4,6 +4,9 @@ import { z } from "zod";
 import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+
+export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -77,6 +80,7 @@ export async function POST(req: NextRequest) {
 
   if (!supabaseUrl || !serviceKey) {
     logger.error("Supabase env vars not configured for login route");
+    Sentry.captureMessage("Supabase env vars not configured for login route", "error");
     return NextResponse.json(
       { success: false, error: "Server misconfigured" },
       { status: 500 },

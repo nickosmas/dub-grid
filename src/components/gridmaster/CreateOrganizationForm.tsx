@@ -104,6 +104,9 @@ export default function CreateOrganizationForm({
         roleLabel: roleLabel.trim() || "Roles",
         shiftDisplayMode: "code",
         timezone: timezone || null,
+        enforceConflictPrevention: false,
+        dataRetentionDays: 365,
+        featureOverrides: {},
       });
 
       // Seed super admin if email provided

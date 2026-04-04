@@ -8,7 +8,7 @@ import SetupGuard from "@/components/SetupGuard";
 import DashboardView from "@/components/dashboard/DashboardView";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 
-const GridmasterPortal = dynamic(() => import("@/app/gridmaster/page"), {
+const GridmasterPortal = dynamic(() => import("@/components/gridmaster/GridmasterPortal"), {
   loading: () => null,
 });
 
@@ -21,6 +21,8 @@ function DashboardPageContent() {
     shiftCategories,
     coverageRequirements,
     shiftCodeMap,
+    absenceTypeMap,
+    absenceTypes,
     loading: refLoading,
     loadError,
   } = useOrganizationData();
@@ -65,6 +67,8 @@ function DashboardPageContent() {
           coverageRequirements={coverageRequirements}
           shiftCodeMap={shiftCodeMap}
           shiftCodeById={shiftCodeById}
+          absenceTypeMap={absenceTypeMap}
+          absenceTypes={absenceTypes}
           employees={employees}
           permissions={perms}
         />

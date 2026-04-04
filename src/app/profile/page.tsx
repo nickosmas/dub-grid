@@ -99,6 +99,11 @@ function ProfilePageContent() {
   const [editLastName, setEditLastName] = useState("");
   const [savingName, setSavingName] = useState(false);
 
+  // Email change
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [editEmail, setEditEmail] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
   // Password change
   const [securityOpen, setSecurityOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -183,6 +188,26 @@ function ProfilePageContent() {
       toast.error(extractErrorMessage(err, "Failed to update name."));
     } finally {
       setSavingName(false);
+    }
+  }
+
+  async function saveEmail() {
+    if (!user) return;
+    const trimmed = editEmail.trim().toLowerCase();
+    if (!trimmed || trimmed === user.email) {
+      setEditingEmail(false);
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: trimmed });
+      if (error) throw error;
+      setEditingEmail(false);
+      toast.success("Confirmation sent to your new email address.");
+    } catch (err: unknown) {
+      toast.error(extractErrorMessage(err, "Failed to update email."));
+    } finally {
+      setSavingEmail(false);
     }
   }
 
@@ -446,7 +471,82 @@ function ProfilePageContent() {
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
               <Field label="First name" value={firstName} />
               <Field label="Last name" value={lastName} />
-              <Field label="Email" value={user?.email} />
+              {editingEmail ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Email
+                  </span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      autoFocus
+                      style={{
+                        flex: 1,
+                        padding: "6px 10px",
+                        fontSize: "var(--dg-fs-body-sm)",
+                        borderRadius: 6,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-bg)",
+                        color: "var(--color-text-primary)",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      onClick={saveEmail}
+                      disabled={savingEmail}
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: "none",
+                        background: "var(--color-primary)",
+                        color: "#fff",
+                        cursor: savingEmail ? "wait" : "pointer",
+                      }}
+                    >
+                      {savingEmail ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingEmail(false)}
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: "1px solid var(--color-border)",
+                        background: "transparent",
+                        color: "var(--color-text-muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Field label="Email" value={user?.email} />
+                  <button
+                    onClick={() => { setEditEmail(user?.email ?? ""); setEditingEmail(true); }}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "var(--dg-fs-footnote)",
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: "1px solid var(--color-border)",
+                      background: "transparent",
+                      color: "var(--color-text-muted)",
+                      cursor: "pointer",
+                      alignSelf: "flex-end",
+                    }}
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
               <Field label="Organization role" value={ROLE_LABELS[role] ?? "User"} />
               {role === "gridmaster" && (
                 <Field label="Platform role" value="Gridmaster" />

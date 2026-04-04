@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 import { z } from "zod";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+
+export const dynamic = "force-dynamic";
 
 const MAX_ROWS = 500;
 
@@ -38,15 +42,6 @@ function getUserClient(req: NextRequest) {
   );
 }
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
 export async function POST(req: NextRequest) {
   try {
     // Auth check
@@ -54,6 +49,18 @@ export async function POST(req: NextRequest) {
     const { data: { session } } = await userClient.auth.getSession();
     if (!session) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
+    // Rate limit by user ID
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+    if (misconfigured) {
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      );
     }
 
     const body = await req.json();
@@ -204,6 +211,7 @@ export async function POST(req: NextRequest) {
       total: rows.length,
     });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "import-employees" } });
     logger.error({ error: err }, "Bulk import failed");
     return NextResponse.json({ error: "Import failed" }, { status: 500 });
   }

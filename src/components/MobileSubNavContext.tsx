@@ -9,6 +9,7 @@ export interface SubNavItem {
   href?: string;
   onClick?: () => void;
   active?: boolean;
+  group?: string;
 }
 
 interface MobileSubNavContextValue {
