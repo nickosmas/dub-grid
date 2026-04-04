@@ -1,10 +1,10 @@
 "use client";
 
-import React, { memo, useMemo, useRef, useLayoutEffect, useState, useEffect } from "react";
+import React, { memo, useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback } from "react";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { resolveRequirement, computeCoverageStatus } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType, ShiftDisplayMode } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType, ShiftDisplayMode, GridOpenShift } from "@/types";
 import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
 import DroppableCell from "./DroppableCell";
@@ -65,6 +65,8 @@ interface ScheduleGridProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
+  /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
+  canDragShifts?: boolean;
   activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
@@ -84,12 +86,10 @@ interface ScheduleGridProps {
   showAudit?: boolean;
   /** Returns the creator's first name for compact grid display */
   createdByNameForKey?: (empId: string, date: Date) => string | null;
-  /** Suppress hover effects during drag */
-  isDragging?: boolean;
   /** Called when mouse enters a cell (for copy-paste hover tracking) */
   onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
-  /** Called on right-click of a cell */
-  onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
+  /** Called on right-click or Shift+F10 of a cell */
+  onCellContextMenu?: (e: React.MouseEvent | React.KeyboardEvent, empId: string, date: Date, focusAreaName: string) => void;
   /** Coverage requirements for inline tally status display */
   coverageRequirements?: CoverageRequirement[];
   /** Map from absence type ID to AbsenceType for color resolution */
@@ -100,6 +100,10 @@ interface ScheduleGridProps {
   shiftDisplayMode?: ShiftDisplayMode;
   /** Resolves a user UUID to a display name for publish tooltips */
   resolvePublisherName?: (userId: string) => string | null;
+  /** Open shifts grouped by focus area, displayed above employee rows */
+  openShifts?: GridOpenShift[];
+  /** Callback when a user clicks to claim an open shift */
+  onClaimOpenShift?: (openShift: GridOpenShift) => void;
 }
 
 
@@ -122,8 +126,10 @@ interface SectionBlockProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
+  canDragShifts?: boolean;
   activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
-  onTooltipChange: (tooltip: { content: string; x: number; y: number } | null) => void;
+  showTooltip: (content: string, x: number, y: number) => void;
+  hideTooltip: () => void;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
@@ -137,14 +143,15 @@ interface SectionBlockProps {
   cellLocks?: Map<string, { userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
-  isDragging?: boolean;
   onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
-  onCellContextMenu?: (e: React.MouseEvent, empId: string, date: Date, focusAreaName: string) => void;
+  onCellContextMenu?: (e: React.MouseEvent | React.KeyboardEvent, empId: string, date: Date, focusAreaName: string) => void;
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   shiftDisplayMode?: ShiftDisplayMode;
   resolvePublisherName?: (userId: string) => string | null;
+  openShifts?: GridOpenShift[];
+  onClaimOpenShift?: (openShift: GridOpenShift) => void;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -163,8 +170,10 @@ const SectionBlock = memo(function SectionBlock({
   shiftCategories,
   indicatorTypes,
   isCellInteractive,
+  canDragShifts = isCellInteractive,
   activeIndicatorIdsForKey,
-  onTooltipChange,
+  showTooltip,
+  hideTooltip,
   getCustomShiftTimes,
   draftKindForKey,
   showDiffOverlay,
@@ -178,7 +187,6 @@ const SectionBlock = memo(function SectionBlock({
   cellLocks,
   showAudit,
   createdByNameForKey,
-  isDragging: isDraggingGlobal,
   onCellHover,
   onCellContextMenu,
   coverageRequirements,
@@ -186,6 +194,8 @@ const SectionBlock = memo(function SectionBlock({
   absenceTypeIdForKey,
   shiftDisplayMode = "code",
   resolvePublisherName,
+  openShifts,
+  onClaimOpenShift,
 }: SectionBlockProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
@@ -221,6 +231,61 @@ const SectionBlock = memo(function SectionBlock({
     },
     [shiftCodeById, contextualGetShiftStyle],
   );
+
+  // ── Event delegation helpers ──────────────────────────────────────
+  // Parse cell data-attributes from a delegated event
+  const findCellFromEvent = useCallback((target: EventTarget | null): { empId: string; dateKey: string } | null => {
+    const el = (target as HTMLElement)?.closest?.("[data-emp-id]") as HTMLElement | null;
+    if (!el) return null;
+    const empId = el.dataset.empId;
+    const dateKey = el.dataset.dateKey;
+    return empId && dateKey ? { empId, dateKey } : null;
+  }, []);
+
+  const employeeById = useMemo(() => {
+    const map = new Map<string, Employee>();
+    for (const e of employees) map.set(e.id, e);
+    return map;
+  }, [employees]);
+
+  const handleGridClick = useCallback((e: React.MouseEvent) => {
+    const cell = findCellFromEvent(e.target);
+    if (!cell) return;
+    const emp = employeeById.get(cell.empId);
+    if (!emp) return;
+    const date = new Date(cell.dateKey + "T00:00:00");
+    const isLocked = !!cellLocks?.get(`${cell.empId}_${cell.dateKey}`);
+    if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
+  }, [findCellFromEvent, employeeById, cellLocks, isCellInteractive, handleCellClick, sectionName]);
+
+  const handleGridContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!onCellContextMenu) return;
+    const cell = findCellFromEvent(e.target);
+    if (!cell) return;
+    if (isCellInteractive) {
+      e.preventDefault();
+      const date = new Date(cell.dateKey + "T00:00:00");
+      onCellContextMenu(e, cell.empId, date, sectionName);
+    }
+  }, [findCellFromEvent, isCellInteractive, onCellContextMenu, sectionName]);
+
+  const handleGridKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const cell = findCellFromEvent(e.target);
+    if (!cell) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const emp = employeeById.get(cell.empId);
+      if (!emp) return;
+      const date = new Date(cell.dateKey + "T00:00:00");
+      const isLocked = !!cellLocks?.get(`${cell.empId}_${cell.dateKey}`);
+      if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
+    }
+    if (e.shiftKey && e.key === "F10" && isCellInteractive && onCellContextMenu) {
+      e.preventDefault();
+      const date = new Date(cell.dateKey + "T00:00:00");
+      onCellContextMenu(e, cell.empId, date, sectionName);
+    }
+  }, [findCellFromEvent, employeeById, cellLocks, isCellInteractive, handleCellClick, onCellContextMenu, sectionName]);
 
   // Only count home employees (those assigned to this section) in tallies.
   // Guest employees are displayed in the grid but excluded from section counts.
@@ -278,7 +343,7 @@ const SectionBlock = memo(function SectionBlock({
         {entries.map(([label, cov], ei) => (
           <span key={label} title={isNameMode ? `${label}: ${cov.actual}/${cov.required}` : undefined} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isNameMode ? 120 : undefined }}>
             {ei > 0 && <span style={{ color: "var(--color-text-faint)", margin: "0 0.3em" }}>|</span>}
-            <span style={{ color: cov.isMet ? "var(--color-success-text)" : "var(--color-danger-dark)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 3 }}>
+            <span style={{ color: cov.isMet ? "var(--color-success-text)" : "var(--color-danger-dark)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 3, fontFamily: "var(--font-dm-mono), 'DM Mono', monospace" }}>
               {cov.isMet
                 ? <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm3.78 5.22a.75.75 0 00-1.06 0L7 8.94 5.28 7.22a.75.75 0 10-1.06 1.06l2.25 2.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 000-1.06z"/></svg>
                 : <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 3.5a.75.75 0 00-.75.75v4a.75.75 0 001.5 0v-4A.75.75 0 008 3.5zM8 12a1 1 0 100-2 1 1 0 000 2z"/></svg>
@@ -329,7 +394,34 @@ const SectionBlock = memo(function SectionBlock({
       .map((cat) => ({ id: cat.id, name: cat.name }));
   }, [dailyCoverageStatus, shiftCategories]);
 
-  if (employees.length === 0) return null;
+  if (employees.length === 0) {
+    return (
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-heading)",
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+            padding: "10px 0 8px",
+          }}
+        >
+          {sectionName}
+        </div>
+        <div
+          style={{
+            padding: "24px 16px",
+            textAlign: "center",
+            border: "1px dashed var(--color-border)",
+            borderRadius: "var(--dg-radius-md)",
+            color: "var(--color-text-muted)",
+            fontSize: "var(--dg-fs-body-sm)",
+          }}
+        >
+          No staff assigned to this area.
+        </div>
+      </div>
+    );
+  }
 
   const gridTemplate = `var(--dg-grid-name-col) repeat(${weekDates.length}, minmax(var(--dg-grid-col-min), 1fr))`;
 
@@ -340,7 +432,7 @@ const SectionBlock = memo(function SectionBlock({
   };
 
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div style={{ marginBottom: 24, marginTop: 8 }}>
       {/* Section label */}
       <div
         style={{
@@ -348,7 +440,9 @@ const SectionBlock = memo(function SectionBlock({
           fontWeight: 800,
           color: "var(--color-text-secondary)",
           marginBottom: 10,
-          paddingLeft: 4,
+          padding: "6px 10px 6px 8px",
+          background: "var(--color-bg-secondary)",
+          borderRadius: 6,
           display: "flex",
           alignItems: "center",
           gap: 8,
@@ -370,6 +464,9 @@ const SectionBlock = memo(function SectionBlock({
         <div
           role="grid"
           aria-label={`${sectionName} schedule grid`}
+          onClick={handleGridClick}
+          onContextMenu={handleGridContextMenu}
+          onKeyDown={handleGridKeyDown}
           style={{
             display: "grid",
             gridTemplateColumns: gridTemplate,
@@ -447,6 +544,117 @@ const SectionBlock = memo(function SectionBlock({
               );
             })}
           </div>
+
+          {/* Open shifts row */}
+          {openShifts && openShifts.length > 0 && (
+            <div
+              role="row"
+              style={{
+                ...rowGrid,
+                background: "var(--color-warning-bg, #FFF8E1)",
+                borderBottom: "2px dashed var(--color-warning-border, #F59E0B)",
+                alignItems: "stretch",
+              }}
+            >
+              {/* Label cell */}
+              <div
+                style={{
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 3,
+                  background: "var(--color-warning-bg, #FFF8E1)",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "6px 10px",
+                  fontWeight: 700,
+                  fontSize: "var(--dg-fs-caption)",
+                  color: "var(--color-warning-text, #92400E)",
+                  gap: 6,
+                  whiteSpace: "nowrap",
+                  borderRight: "1px solid var(--color-border)",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+                Open Shifts
+                <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: "var(--color-warning)", color: "#fff", fontSize: "var(--dg-fs-badge)", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>
+                  {openShifts.length}
+                </span>
+              </div>
+              {/* Date cells */}
+              {weekDates.map((date, ci) => {
+                const dateKey = formatDateKey(date);
+                const isToday = dateKey === todayKey;
+                const isSplit = splitAtIndex != null && ci === splitAtIndex;
+                const cellOpenShifts = openShifts.filter(os => os.date === dateKey);
+                return (
+                  <div
+                    key={dateKey}
+                    style={{
+                      padding: "4px 3px",
+                      minHeight: 36,
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      alignItems: "start",
+                      gap: 4,
+                      background: isToday ? "var(--color-today-bg)" : undefined,
+                      borderLeft: isSplit
+                        ? "2px solid var(--color-dark)"
+                        : "1px solid var(--color-border-light)",
+                    }}
+                  >
+                    {cellOpenShifts.map((os) => {
+                      const sc = os.shiftCodeIds[0] != null ? shiftCodeById.get(os.shiftCodeIds[0]) : undefined;
+                      const needed = os.needed ?? 1;
+                      return (
+                        <button
+                          key={os.id}
+                          className="dg-open-shift-btn"
+                          onClick={() => onClaimOpenShift?.(os)}
+                          title={os.calledOffBy ? `Called off by ${os.calledOffBy}` : `${needed} needed — click to volunteer`}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 4,
+                            padding: "4px 6px",
+                            borderRadius: 6,
+                            border: `1.5px dashed ${sc?.border ?? "var(--color-warning-border, #F59E0B)"}`,
+                            background: sc?.color ?? "var(--color-surface)",
+                            color: sc?.text ?? "var(--color-warning-text, #92400E)",
+                            fontSize: "var(--dg-fs-caption)",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {os.shiftCodeLabel}
+                          <span style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: sc?.text ?? "var(--color-warning)",
+                            color: sc?.color ?? "#fff",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            lineHeight: 1,
+                            flexShrink: 0,
+                          }}>
+                            {needed}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Employee rows */}
           {employees.map((emp, ri) => {
@@ -565,7 +773,7 @@ const SectionBlock = memo(function SectionBlock({
                   const cellAbsenceType = cellAbsenceTypeId != null ? absenceTypeMap?.get(cellAbsenceTypeId) ?? null : null;
 
                   const isRecentlyPublished = !draftKind && recentlyPublishedKeys?.has(`${emp.id}_${dateKey}`);
-                  const hasDraggableShift = isCellInteractive && !isLocked && shiftCode && shiftCode !== "OFF" && draftKind !== 'deleted' && !cellAbsenceType;
+                  const hasDraggableShift = canDragShifts && !isLocked && shiftCode && shiftCode !== "OFF" && draftKind !== 'deleted' && !cellAbsenceType;
                   const firstStyle = hasDraggableShift ? getStyleByIdOrLabel(shiftCode.split("/")[0], cellCodeIds[0]) : null;
 
                   return (
@@ -574,22 +782,15 @@ const SectionBlock = memo(function SectionBlock({
                       id={`drop_${emp.id}_${dateKey}_${sectionName}`}
                       data={{ empId: emp.id, date, dateKey, focusAreaName: sectionName }}
                       disabled={!isCellInteractive || isLocked}
-                      onClick={() => {
-                        if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
-                      }}
-                      onContextMenu={(e) => {
-                        if (isCellInteractive && onCellContextMenu) {
-                          e.preventDefault();
-                          onCellContextMenu(e, emp.id, date, sectionName);
-                        }
-                      }}
                       className="dg-grid-cell"
                       role="gridcell"
                       aria-label={shiftCode && shiftCode !== "OFF" ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftCode}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`}
                       tabIndex={isCellInteractive ? 0 : -1}
+                      data-emp-id={emp.id}
+                      data-date-key={dateKey}
                       data-interactive={isCellInteractive ? "true" : "false"}
                       data-locked={isLocked ? "true" : "false"}
-                      data-dragging={isDraggingGlobal ? "true" : "false"}
+                      data-empty={!shiftCode || shiftCode === "OFF" ? "true" : "false"}
                       style={{
                         height: showAudit ? "var(--dg-grid-cell-height-audit)" : "var(--dg-grid-cell-height)",
                         borderTop: ri > 0 && !isSplit ? "1px solid var(--color-border-light)" : undefined,
@@ -622,25 +823,15 @@ const SectionBlock = memo(function SectionBlock({
                                   : foreignLabelHomeMap.get(l);
                                 return homeFa ? `${style.name} (${homeFa})` : style.name;
                               }).join(" / ");
-                          onTooltipChange({
+                          showTooltip(
                             content,
-                            x: rect.left + rect.width / 2,
-                            y: rect.top,
-                          });
+                            rect.left + rect.width / 2,
+                            rect.top,
+                          );
                         }
                       }}
                       onMouseLeave={() => {
-                        onTooltipChange(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          if (isCellInteractive && !isLocked) handleCellClick(emp, date, sectionName);
-                        }
-                        if (e.shiftKey && e.key === "F10" && isCellInteractive && onCellContextMenu) {
-                          e.preventDefault();
-                          onCellContextMenu(e as unknown as React.MouseEvent, emp.id, date, sectionName);
-                        }
+                        hideTooltip();
                       }}
                     >
                       {shiftCode && shiftCode !== "OFF" ? (
@@ -890,8 +1081,8 @@ const SectionBlock = memo(function SectionBlock({
                                          key={ind.name}
                                          title={ind.name}
                                          style={{
-                                           width: 8,
-                                           height: 8,
+                                           width: 10,
+                                           height: 10,
                                            borderRadius: "50%",
                                            background: ind.color,
                                            border: "1.5px solid rgba(255,255,255,0.9)",
@@ -1105,8 +1296,8 @@ const SectionBlock = memo(function SectionBlock({
                                       key={ind.name}
                                       title={ind.name}
                                       style={{
-                                        width: 8,
-                                        height: 8,
+                                        width: 10,
+                                        height: 10,
                                         borderRadius: "50%",
                                         background: ind.color,
                                         border: "1.5px solid rgba(255,255,255,0.9)",
@@ -1286,14 +1477,15 @@ const SectionBlock = memo(function SectionBlock({
                       ) : (
                         <>
                           {shiftCode === "OFF" && (
-                          <div
+                          <span
                             style={{
-                              width: 16,
-                              height: 2,
-                              background: "var(--color-border)",
-                              borderRadius: 2,
+                              fontSize: "var(--dg-fs-micro)",
+                              fontWeight: 600,
+                              color: "var(--color-text-faint)",
+                              letterSpacing: "0.06em",
+                              userSelect: "none",
                             }}
-                          />
+                          >OFF</span>
                           )}
                           {noteTypes.length > 0 && (
                             <div
@@ -1310,8 +1502,8 @@ const SectionBlock = memo(function SectionBlock({
                                   key={ind.name}
                                   title={ind.name}
                                   style={{
-                                    width: 8,
-                                    height: 8,
+                                    width: 10,
+                                    height: 10,
                                     borderRadius: "50%",
                                     background: ind.color,
                                     border: "1.5px solid rgba(255,255,255,0.85)",
@@ -1364,7 +1556,7 @@ const SectionBlock = memo(function SectionBlock({
               style={{
                 ...rowGrid,
                 borderTop: ci === 0 ? "2px solid var(--color-dark)" : undefined,
-                background: "var(--color-surface)",
+                background: "var(--color-bg-secondary)",
               }}
             >
               <div
@@ -1372,7 +1564,7 @@ const SectionBlock = memo(function SectionBlock({
                   position: "sticky",
                   left: 0,
                   zIndex: 1,
-                  background: "var(--color-surface)",
+                  background: "var(--color-bg-secondary)",
                   padding: "6px 14px",
                   fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
@@ -1443,6 +1635,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
   shiftCategories,
   indicatorTypes = [],
   isCellInteractive = true,
+  canDragShifts,
   activeIndicatorIdsForKey,
   activeFocusArea = null,
   certifications = [],
@@ -1458,7 +1651,6 @@ const ScheduleGrid = memo(function ScheduleGrid({
   cellLocks,
   showAudit,
   createdByNameForKey,
-  isDragging,
   onCellHover,
   onCellContextMenu,
   coverageRequirements,
@@ -1466,21 +1658,42 @@ const ScheduleGrid = memo(function ScheduleGrid({
   absenceTypeIdForKey,
   shiftDisplayMode = "code",
   resolvePublisherName,
+  openShifts,
+  onClaimOpenShift,
 }: ScheduleGridProps) {
-  const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const tooltipTextRef = useRef<HTMLSpanElement>(null);
+  const tooltipVisibleRef = useRef(false);
   const todayKey = useMemo(() => formatDateKey(today), [today]);
+
+  const showTooltipFn = useCallback((content: string, x: number, y: number) => {
+    const el = tooltipRef.current;
+    const textEl = tooltipTextRef.current;
+    if (!el || !textEl) return;
+    textEl.textContent = content;
+    el.style.left = `${x}px`;
+    el.style.top = `${y - 8}px`;
+    el.style.display = "block";
+    tooltipVisibleRef.current = true;
+  }, []);
+
+  const hideTooltipFn = useCallback(() => {
+    const el = tooltipRef.current;
+    if (!el) return;
+    el.style.display = "none";
+    tooltipVisibleRef.current = false;
+  }, []);
 
   // Dismiss tooltip on scroll/resize so it doesn't float detached
   useEffect(() => {
-    if (!tooltip) return;
-    const dismiss = () => setTooltip(null);
+    const dismiss = () => { if (tooltipVisibleRef.current) hideTooltipFn(); };
     window.addEventListener("scroll", dismiss, true);
     window.addEventListener("resize", dismiss);
     return () => {
       window.removeEventListener("scroll", dismiss, true);
       window.removeEventListener("resize", dismiss);
     };
-  }, [tooltip]);
+  }, [hideTooltipFn]);
 
   const sections = useMemo(() => {
     const allNames = focusAreas.map((w) => w.name);
@@ -1577,60 +1790,69 @@ const ScheduleGrid = memo(function ScheduleGrid({
           }}
         >
           <div style={{ color: "var(--color-text-faint)", background: "var(--color-bg)", padding: "12px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            {allEmployees.length === 0 ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            )}
           </div>
           <div>
             <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600, marginBottom: 4 }}>
-              No shifts found for this period
+              {allEmployees.length === 0
+                ? "No staff added yet"
+                : filteredEmployees.length === 0
+                  ? "No matching employees"
+                  : "No shifts found for this period"}
             </div>
             <div style={{ fontSize: "var(--dg-fs-body)", color: "var(--color-text-faint)" }}>
-              {isCellInteractive
-                ? "No employees are assigned to this focus area. Add employees in the Staff view."
-                : "No shifts have been published for this period yet."}
+              {allEmployees.length === 0
+                ? "Add employees on the Staff page to start building your schedule."
+                : filteredEmployees.length === 0
+                  ? "Try clearing your search or focus area filter."
+                  : isCellInteractive
+                    ? "No employees are assigned to this focus area. Add employees in the Staff view."
+                    : "No shifts have been published for this period yet."}
             </div>
           </div>
         </div>
       ) : (
         <>
-          {tooltip && (
+          <div
+            ref={tooltipRef}
+            style={{
+              display: "none",
+              position: "fixed",
+              transform: "translate(-50%, -100%)",
+              background: "var(--color-surface)",
+              padding: "8px 14px",
+              borderRadius: "10px",
+              boxShadow: `
+                0 10px 25px -5px rgba(0, 0, 0, 0.1),
+                0 8px 10px -6px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(0,0,0,0.05)
+              `,
+              zIndex: 1000,
+              fontSize: "var(--dg-fs-body)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+            }}
+          >
+            <span ref={tooltipTextRef} />
             <div
               style={{
-                position: "fixed",
-                left: tooltip.x,
-                top: tooltip.y - 8,
-                transform: "translate(-50%, -100%)",
+                position: "absolute",
+                bottom: -4,
+                left: "50%",
+                transform: "translateX(-50%) rotate(45deg)",
+                width: 10,
+                height: 10,
                 background: "var(--color-surface)",
-                padding: "8px 14px",
-                borderRadius: "10px",
-                boxShadow: `
-                  0 10px 25px -5px rgba(0, 0, 0, 0.1),
-                  0 8px 10px -6px rgba(0, 0, 0, 0.1),
-                  0 0 0 1px rgba(0,0,0,0.05)
-                `,
-                zIndex: 1000,
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 700,
-                color: "var(--color-text-primary)",
-                whiteSpace: "nowrap",
-                pointerEvents: "none",
-                animation: "tooltipFadeIn 0.15s cubic-bezier(0, 0, 0.2, 1)",
+                boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
               }}
-            >
-              {tooltip.content}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: -4,
-                  left: "50%",
-                  transform: "translateX(-50%) rotate(45deg)",
-                  width: 10,
-                  height: 10,
-                  background: "var(--color-surface)",
-                  boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
-                }}
-              />
-            </div>
-          )}
+            />
+          </div>
           {renderedSections.map((section) => {
         const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
         const sectionId = focusAreaIdByName[section];
@@ -1675,8 +1897,10 @@ const ScheduleGrid = memo(function ScheduleGrid({
             shiftCategories={shiftCategories}
             indicatorTypes={indicatorTypes}
             isCellInteractive={isCellInteractive}
+            canDragShifts={canDragShifts ?? isCellInteractive}
             activeIndicatorIdsForKey={activeIndicatorIdsForKey}
-            onTooltipChange={setTooltip}
+            showTooltip={showTooltipFn}
+            hideTooltip={hideTooltipFn}
             getCustomShiftTimes={getCustomShiftTimes}
             draftKindForKey={draftKindForKey}
             showDiffOverlay={showDiffOverlay}
@@ -1690,7 +1914,6 @@ const ScheduleGrid = memo(function ScheduleGrid({
             cellLocks={cellLocks}
             showAudit={showAudit}
             createdByNameForKey={createdByNameForKey}
-            isDragging={isDragging}
             onCellHover={onCellHover}
             onCellContextMenu={onCellContextMenu}
             coverageRequirements={coverageRequirements}
@@ -1698,6 +1921,8 @@ const ScheduleGrid = memo(function ScheduleGrid({
             absenceTypeIdForKey={absenceTypeIdForKey}
             shiftDisplayMode={shiftDisplayMode}
             resolvePublisherName={resolvePublisherName}
+            openShifts={openShifts?.filter(os => sectionId != null && os.focusAreaId === sectionId)}
+            onClaimOpenShift={onClaimOpenShift}
           />
         );
       })}

@@ -10,6 +10,7 @@ import {
   resolveRequirement,
   computeCoverageStatus,
   computeCoverageGaps,
+  buildPublishedDateSet,
 } from "@/lib/schedule-logic";
 import {
   makeEmployee,
@@ -535,5 +536,37 @@ describe("computeCoverageGaps", () => {
     expect(gaps).toHaveLength(1);
     expect(gaps[0].shiftCategoryName).toBe("Evening");
     expect(gaps[0].focusAreaName).toBe("ER");
+  });
+});
+
+// ── buildPublishedDateSet ────────────────────────────────────────────────────
+
+describe("buildPublishedDateSet", () => {
+  it("returns empty set for empty input", () => {
+    expect(buildPublishedDateSet([]).size).toBe(0);
+  });
+
+  it("expands a single range into individual date keys", () => {
+    const set = buildPublishedDateSet([
+      { startDate: "2026-03-02", endDate: "2026-03-04" },
+    ]);
+    expect(set).toEqual(new Set(["2026-03-02", "2026-03-03", "2026-03-04"]));
+  });
+
+  it("deduplicates overlapping ranges", () => {
+    const set = buildPublishedDateSet([
+      { startDate: "2026-03-01", endDate: "2026-03-03" },
+      { startDate: "2026-03-02", endDate: "2026-03-04" },
+    ]);
+    expect(set).toEqual(
+      new Set(["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04"]),
+    );
+  });
+
+  it("handles a single-day range", () => {
+    const set = buildPublishedDateSet([
+      { startDate: "2026-06-15", endDate: "2026-06-15" },
+    ]);
+    expect(set).toEqual(new Set(["2026-06-15"]));
   });
 });

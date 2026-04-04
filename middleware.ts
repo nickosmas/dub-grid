@@ -4,6 +4,7 @@ import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import * as Sentry from "@/lib/sentry";
 
 /**
  * Vercel Edge Middleware for RBAC Route Protection
@@ -91,7 +92,7 @@ export async function middleware(req: NextRequest) {
     img-src 'self' blob: data:;
     font-src 'self';
     connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
-    frame-ancestors 'none';
+    frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
     form-action 'self';
@@ -187,7 +188,8 @@ export async function middleware(req: NextRequest) {
     } else {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
-  } catch {
+  } catch (e) {
+    Sentry.captureException(e, { extra: { context: "middleware-jwt-verify" } });
     try {
       claims = decodeJwt(session.access_token) as JWTClaims;
       // Don't trust gridmaster from unverified tokens — a forged JWT could
@@ -198,7 +200,8 @@ export async function middleware(req: NextRequest) {
         loginUrl.searchParams.set("error", "session_invalid");
         return NextResponse.redirect(loginUrl);
       }
-    } catch {
+    } catch (e) {
+      Sentry.captureException(e, { extra: { context: "middleware-jwt-decode-fallback" } });
       return NextResponse.redirect(new URL("/login", req.url));
     }
   }
@@ -269,7 +272,8 @@ export async function middleware(req: NextRequest) {
         org_id: claims.org_id ?? resolvedOrgId ?? undefined,
         org_slug: claims.org_slug ?? resolvedOrgSlug ?? undefined,
       };
-    } catch {
+    } catch (e) {
+      Sentry.captureException(e, { extra: { context: "middleware-claims-fallback" } });
       // DB/cache unavailable — proceed with JWT claims as-is.
       // RLS enforces real data security; middleware guards are best-effort.
     }
@@ -335,6 +339,38 @@ export async function middleware(req: NextRequest) {
 
   const level = getRoleLevel(effectiveRole);
 
+  // ── Organization suspension check ──────────────────────────────────────
+  // The JWT hook filters out suspended orgs on token refresh, but a user
+  // with a pre-suspension JWT can still access the app until it expires
+  // (up to 1 hour). This check catches that window.
+  // Skip for gridmasters (they manage suspended orgs) and impersonation.
+  if (claims.org_id && !isGridmaster && !isImpersonating) {
+    try {
+      const suspended = await cacheThrough(
+        CacheKey.mwOrgSuspended(claims.org_id),
+        TTL.MIDDLEWARE,
+        async () => {
+          const { data } = await supabase
+            .from("organizations")
+            .select("suspended_at")
+            .eq("id", claims.org_id!)
+            .maybeSingle();
+          return data?.suspended_at ?? null;
+        },
+      );
+
+      if (suspended !== null) {
+        const loginUrl = new URL("/login", req.url);
+        loginUrl.searchParams.set("suspended", "true");
+        return NextResponse.redirect(loginUrl);
+      }
+    } catch (e) {
+      Sentry.captureException(e, { extra: { context: "middleware-suspension-check" } });
+      // DB/cache unavailable — proceed without blocking.
+      // RLS + JWT hook are the primary enforcement; this is defense-in-depth.
+    }
+  }
+
   // Gridmaster subdomain check - Requirement 11.1
   if (subdomain === "gridmaster" && effectiveRole !== "gridmaster" && !isImpersonating) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -398,5 +434,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|favicon\\.ico|api|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)"],
+  matcher: ["/((?!_next|favicon\\.ico|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)"],
 };

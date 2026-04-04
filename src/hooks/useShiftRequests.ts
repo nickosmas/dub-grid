@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { fetchShiftRequests, createShiftRequest, claimShiftRequest, respondToShiftRequest, resolveShiftRequest, cancelShiftRequest } from "@/lib/db";
+import { fetchShiftRequests, createShiftRequest, claimShiftRequest, volunteerForOpenShift, respondToShiftRequest, resolveShiftRequest, cancelShiftRequest } from "@/lib/db";
+import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import type {
   ShiftRequest,
   ShiftRequestType,
@@ -32,13 +33,14 @@ export interface ShiftRequestsData {
   error: string | null;
   /** Refetch all requests. */
   refetch: () => Promise<void>;
-  /** Create a new pickup or swap request. */
+  /** Create a new pickup, swap, or calloff request. */
   create: (
     type: ShiftRequestType,
     requesterEmpId: string,
     requesterShiftDate: string,
     targetEmpId?: string,
-    targetShiftDate?: string
+    targetShiftDate?: string,
+    absenceTypeId?: number
   ) => Promise<string | null>;
   /** Claim an open pickup request. */
   claim: (requestId: string, claimerEmpId: string) => Promise<boolean>;
@@ -53,6 +55,15 @@ export interface ShiftRequestsData {
     requestId: string,
     approved: boolean,
     note?: string
+  ) => Promise<boolean>;
+  /** Volunteer for a coverage-gap open shift. */
+  volunteer: (
+    empId: string,
+    shiftDate: string,
+    shiftCodeIds: number[],
+    focusAreaId: number,
+    customStartTime: string | null,
+    customEndTime: string | null
   ) => Promise<boolean>;
   /** Cancel your own request. */
   cancel: (requestId: string, empId: string) => Promise<boolean>;
@@ -69,6 +80,8 @@ export function useShiftRequests(
   const [error, setError] = useState<string | null>(null);
   const orgIdRef = useRef(orgId);
   orgIdRef.current = orgId;
+  const requestsRef = useRef(requests);
+  requestsRef.current = requests;
 
   // Stabilize the Map reference: serialize to a string key so useCallback
   // doesn't get a new identity every render (Map is compared by reference).
@@ -154,41 +167,54 @@ export function useShiftRequests(
     };
   }, [orgId]);
 
-  // Filter expired at read time: must be a non-terminal status AND not past expiry
-  const now = new Date().toISOString();
-  const activeRequests = requests.filter(
-    (r) =>
-      !["expired", "cancelled", "approved", "rejected"].includes(r.status) &&
-      r.expiresAt > now
-  );
-
-  const openPickups = activeRequests.filter(
-    (r) => r.type === "pickup" && r.status === "open"
-  );
-
-  const myRequests = currentEmpId
-    ? activeRequests.filter(
+  // Filter expired at read time: must be a non-terminal status AND not past expiry.
+  // Memoized so consumers get a stable array reference when the underlying data hasn't changed.
+  const activeRequests = useMemo(
+    () => {
+      const now = new Date().toISOString();
+      return requests.filter(
         (r) =>
-          r.requesterEmpId === currentEmpId ||
-          r.targetEmpId === currentEmpId
-      )
-    : [];
+          !["expired", "cancelled", "approved", "rejected"].includes(r.status) &&
+          r.expiresAt > now
+      );
+    },
+    [requests],
+  );
 
-  const pendingApproval = activeRequests.filter(
-    (r) => r.status === "pending_approval"
+  const openPickups = useMemo(
+    () => activeRequests.filter((r) => r.type === "pickup" && r.status === "open"),
+    [activeRequests],
+  );
+
+  const myRequests = useMemo(
+    () => currentEmpId
+      ? activeRequests.filter(
+          (r) =>
+            r.requesterEmpId === currentEmpId ||
+            r.targetEmpId === currentEmpId
+        )
+      : [],
+    [activeRequests, currentEmpId],
+  );
+
+  const pendingApproval = useMemo(
+    () => activeRequests.filter((r) => r.status === "pending_approval"),
+    [activeRequests],
   );
 
   // Badge count: for employees = swap proposals directed at them (open status);
   // for admins = pending_approval count
-  const myPendingSwaps = currentEmpId
-    ? activeRequests.filter(
-        (r) =>
-          r.type === "swap" &&
-          r.status === "open" &&
-          r.targetEmpId === currentEmpId
-      ).length
-    : 0;
-  const badgeCount = myPendingSwaps + (canApprove ? pendingApproval.length : 0);
+  const badgeCount = useMemo(() => {
+    const myPendingSwaps = currentEmpId
+      ? activeRequests.filter(
+          (r) =>
+            r.type === "swap" &&
+            r.status === "open" &&
+            r.targetEmpId === currentEmpId
+        ).length
+      : 0;
+    return myPendingSwaps + (canApprove ? pendingApproval.length : 0);
+  }, [activeRequests, currentEmpId, canApprove, pendingApproval]);
 
   const create = useCallback(
     async (
@@ -196,7 +222,8 @@ export function useShiftRequests(
       requesterEmpId: string,
       requesterShiftDate: string,
       targetEmpId?: string,
-      targetShiftDate?: string
+      targetShiftDate?: string,
+      absenceTypeId?: number
     ): Promise<string | null> => {
       if (!orgId) return null;
       try {
@@ -206,13 +233,24 @@ export function useShiftRequests(
           requesterEmpId,
           requesterShiftDate,
           targetEmpId,
-          targetShiftDate
+          targetShiftDate,
+          absenceTypeId
         );
         toast.success(
-          type === "pickup"
-            ? "Shift posted as available"
-            : "Swap request sent"
+          type === "calloff"
+            ? "Calloff submitted for approval"
+            : type === "pickup"
+              ? "Shift posted as available"
+              : "Swap request sent"
         );
+        if (id) {
+          queueNotification({
+            action: "shift_request_created",
+            orgId,
+            requestId: id,
+            requestType: type,
+          });
+        }
         return id;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to create request"));
@@ -224,16 +262,61 @@ export function useShiftRequests(
 
   const claim = useCallback(
     async (requestId: string, claimerEmpId: string): Promise<boolean> => {
+      if (!orgId) return false;
       try {
         await claimShiftRequest(requestId, claimerEmpId);
         toast.success("Shift claimed — awaiting admin approval");
+        queueNotification({
+          action: "shift_request_claimed",
+          orgId,
+          requestId,
+          requestType: "pickup",
+        });
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to claim shift"));
         return false;
       }
     },
-    []
+    [orgId]
+  );
+
+  const volunteer = useCallback(
+    async (
+      empId: string,
+      shiftDate: string,
+      shiftCodeIds: number[],
+      focusAreaId: number,
+      customStartTime: string | null,
+      customEndTime: string | null
+    ): Promise<boolean> => {
+      if (!orgId) return false;
+      try {
+        const id = await volunteerForOpenShift(
+          orgId,
+          empId,
+          shiftDate,
+          shiftCodeIds,
+          focusAreaId,
+          customStartTime,
+          customEndTime
+        );
+        toast.success("Volunteered for shift — awaiting admin approval");
+        if (id) {
+          queueNotification({
+            action: "shift_request_created",
+            orgId,
+            requestId: id,
+            requestType: "pickup",
+          });
+        }
+        return true;
+      } catch (err: unknown) {
+        toast.error(errMsg(err, "Failed to volunteer for shift"));
+        return false;
+      }
+    },
+    [orgId]
   );
 
   const respond = useCallback(
@@ -264,16 +347,27 @@ export function useShiftRequests(
       approved: boolean,
       note?: string
     ): Promise<boolean> => {
+      if (!orgId) return false;
       try {
         await resolveShiftRequest(requestId, approved, note);
         toast.success(approved ? "Request approved" : "Request rejected");
+        // Find the request to get its type for the notification
+        const request = requestsRef.current.find((r) => r.id === requestId);
+        queueNotification({
+          action: "shift_request_resolved",
+          orgId,
+          requestId,
+          requestType: request?.type ?? "pickup",
+          approved,
+          adminNote: note,
+        });
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to resolve request"));
         return false;
       }
     },
-    []
+    [orgId]
   );
 
   const cancel = useCallback(
@@ -301,6 +395,7 @@ export function useShiftRequests(
     refetch: fetchRequests,
     create,
     claim,
+    volunteer,
     respond,
     resolve,
     cancel,

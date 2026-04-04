@@ -7,6 +7,7 @@ import type {
   CoverageStatus,
   CoverageGap,
 } from "@/types";
+import { iterateDateRange } from "@/lib/utils";
 
 /**
  * Checks whether an employee is qualified for a given shift code based on
@@ -327,4 +328,22 @@ export function computeCoverageGaps(
   }
 
   return gaps;
+}
+
+/**
+ * Expands publish-history date ranges into a Set of "YYYY-MM-DD" keys.
+ * Used to check whether a given date has ever been published (O(1) lookup).
+ */
+export function buildPublishedDateSet(
+  ranges: { startDate: string; endDate: string }[],
+): Set<string> {
+  const set = new Set<string>();
+  for (const { startDate, endDate } of ranges) {
+    const start = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T00:00:00");
+    for (const { dateKey } of iterateDateRange(start, end)) {
+      set.add(dateKey);
+    }
+  }
+  return set;
 }

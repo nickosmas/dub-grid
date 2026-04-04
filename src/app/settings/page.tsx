@@ -1,6 +1,6 @@
 "use client";
 
-import SettingsPage from "@/components/SettingsPage";
+import SettingsPage from "@/components/settings/SettingsPage";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, usePermissions } from "@/hooks";

@@ -2,18 +2,19 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType, ShiftDisplayMode } from "@/types";
-import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles } from "@/lib/db";
+import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles, fetchFullAuditLog, fetchInvitations, revokeInvitation, resendInvitation } from "@/lib/db";
 import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
 import HelpTooltip from "@/components/HelpTooltip";
 import { helpText } from "@/lib/help-content";
+import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { useAuth } from "@/components/AuthProvider";
@@ -3748,6 +3749,87 @@ function CoverageRequirementsSettings({
 }
 
 // ── User Management Settings ──────────────────────────────────────────────────
+// ── Org Activity Log ──────────────────────────────────────────────────────────
+
+function OrgActivityLog({ orgId }: { orgId: string }) {
+  const [entries, setEntries] = useState<import("@/types").FullAuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchFullAuditLog({ orgId, limit: PAGE_SIZE, offset: page * PAGE_SIZE })
+      .then((data) => { if (!cancelled) setEntries(data); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [orgId, page]);
+
+  const formatAction = (action: string) => action.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  };
+
+  if (loading && entries.length === 0) {
+    return <div style={{ textAlign: "center", padding: 40, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>Loading activity...</div>;
+  }
+  if (error) {
+    return <div style={{ textAlign: "center", padding: 40, color: "var(--color-danger)" }}>{error}</div>;
+  }
+  if (entries.length === 0 && page === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: 48, color: "var(--color-text-muted)" }}>
+        <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 600, marginBottom: 4 }}>No activity yet</div>
+        <div style={{ fontSize: "var(--dg-fs-body-sm)" }}>Actions taken in your organization will appear here.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--dg-fs-body-sm)" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+              <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Time</th>
+              <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Action</th>
+              <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Resource</th>
+              <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => (
+              <tr key={e.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+                <td style={{ padding: "8px 12px", whiteSpace: "nowrap", color: "var(--color-text-muted)" }}>{formatTime(e.createdAt)}</td>
+                <td style={{ padding: "8px 12px" }}>
+                  <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "var(--dg-fs-footnote)", fontWeight: 600, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+                    {formatAction(e.action)}
+                  </span>
+                </td>
+                <td style={{ padding: "8px 12px", color: "var(--color-text-muted)" }}>{e.resourceType}{e.resourceId ? ` #${e.resourceId.slice(0, 8)}` : ""}</td>
+                <td style={{ padding: "8px 12px", color: "var(--color-text-muted)" }}>{e.actorEmail ?? "System"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+        <span>Page {page + 1}</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", cursor: page === 0 ? "default" : "pointer", opacity: page === 0 ? 0.4 : 1, color: "var(--color-text-primary)", fontSize: "var(--dg-fs-footnote)" }}>Previous</button>
+          <button onClick={() => setPage((p) => p + 1)} disabled={entries.length < PAGE_SIZE} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", cursor: entries.length < PAGE_SIZE ? "default" : "pointer", opacity: entries.length < PAGE_SIZE ? 0.4 : 1, color: "var(--color-text-primary)", fontSize: "var(--dg-fs-footnote)" }}>Next</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── User Management ──────────────────────────────────────────────────────────
+
 function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean }) {
   const { user: currentUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
@@ -3763,11 +3845,19 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     userId: string; userName: string; from: OrganizationRole; to: OrganizationRole;
   } | null>(null);
 
+  // Invitations
+  const [invitations, setInvitations] = useState<import("@/types").Invitation[]>([]);
+  const [showInvitations, setShowInvitations] = useState(false);
+  const [invitationAction, setInvitationAction] = useState<string | null>(null);
+
   useEffect(() => {
     let mounted = true;
     fetchOrganizationUsers(orgId)
       .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
       .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+    fetchInvitations(orgId)
+      .then((inv) => { if (mounted) setInvitations(inv); })
+      .catch(() => {});
     return () => { mounted = false; };
   }, [orgId]);
 
@@ -3775,10 +3865,19 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     setSaving(userId);
     setError(null);
     try {
-      await changeOrganizationUserRole(userId, newRole, orgId);
+      const target = users.find((u) => u.id === userId);
+      const oldRole = target?.orgRole ?? "user";
+      await changeOrganizationUserRole(userId, newRole, orgId, target?.email ?? undefined);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
       if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
       toast.success("Role updated");
+      queueNotification({
+        action: "role_changed",
+        orgId,
+        targetUserId: userId,
+        fromRole: oldRole,
+        toRole: newRole,
+      });
     } catch (e) {
       toast.error("Failed to change role");
       setError(e instanceof Error ? e.message : "Failed to change role");
@@ -3818,7 +3917,7 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
     setSavingPerms(userId);
     setError(null);
     try {
-      await updateAdminPermissions(userId, editingPerms[userId], orgId);
+      await updateAdminPermissions(userId, editingPerms[userId], orgId, users.find((u) => u.id === userId)?.email ?? undefined);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: editingPerms[userId] } : u));
       toast.success("Permissions saved");
     } catch (e) {
@@ -4198,6 +4297,123 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
       </div>
 
       {/* Role change confirmation */}
+      {/* ── Pending Invitations ─────────────────────────────────────── */}
+      {(() => {
+        const now = new Date().toISOString();
+        const pending = invitations.filter((inv) => !inv.acceptedAt && !inv.revokedAt);
+        const pendingCount = pending.length;
+        if (pendingCount === 0 && !showInvitations) return null;
+        return (
+          <div style={{ marginTop: 24 }}>
+            <button
+              onClick={() => setShowInvitations((v) => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: 0, background: "none",
+                border: "none", cursor: "pointer", fontSize: "var(--dg-fs-body)", fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showInvitations ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+              Pending Invitations ({pendingCount})
+            </button>
+            {showInvitations && (
+              <div style={{ marginTop: 12, overflowX: "auto" }}>
+                {pending.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>No pending invitations.</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--dg-fs-body-sm)" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Expires</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</th>
+                        <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pending.map((inv) => {
+                        const isExpired = inv.expiresAt < now;
+                        return (
+                          <tr key={inv.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+                            <td style={{ padding: "8px 12px" }}>{inv.email}</td>
+                            <td style={{ padding: "8px 12px" }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "var(--dg-fs-footnote)", fontWeight: 600, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+                                {inv.roleToAssign === "admin" ? "Admin" : "User"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "8px 12px", color: "var(--color-text-muted)" }}>
+                              {new Date(inv.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                            </td>
+                            <td style={{ padding: "8px 12px" }}>
+                              <span style={{
+                                padding: "2px 8px", borderRadius: 4, fontSize: "var(--dg-fs-footnote)", fontWeight: 600,
+                                background: isExpired ? "var(--color-danger-bg)" : "var(--color-warning-bg)",
+                                color: isExpired ? "var(--color-danger-dark)" : "var(--color-warning-text)",
+                              }}>
+                                {isExpired ? "Expired" : "Pending"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                <button
+                                  disabled={invitationAction === inv.id}
+                                  onClick={async () => {
+                                    setInvitationAction(inv.id);
+                                    try {
+                                      await resendInvitation(inv.id, orgId);
+                                      const refreshed = await fetchInvitations(orgId);
+                                      setInvitations(refreshed);
+                                      toast.success("Invitation resent");
+                                    } catch { toast.error("Failed to resend"); }
+                                    finally { setInvitationAction(null); }
+                                  }}
+                                  style={{
+                                    padding: "4px 10px", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, borderRadius: 6,
+                                    border: "1px solid var(--color-primary)", background: "transparent",
+                                    color: "var(--color-primary)", cursor: invitationAction === inv.id ? "wait" : "pointer",
+                                  }}
+                                >
+                                  Resend
+                                </button>
+                                {!isExpired && (
+                                  <button
+                                    disabled={invitationAction === inv.id}
+                                    onClick={async () => {
+                                      setInvitationAction(inv.id);
+                                      try {
+                                        await revokeInvitation(inv.id, orgId);
+                                        const refreshed = await fetchInvitations(orgId);
+                                        setInvitations(refreshed);
+                                        toast.success("Invitation revoked");
+                                      } catch { toast.error("Failed to revoke"); }
+                                      finally { setInvitationAction(null); }
+                                    }}
+                                    style={{
+                                      padding: "4px 10px", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, borderRadius: 6,
+                                      border: "1px solid var(--color-danger-border)", background: "transparent",
+                                      color: "var(--color-danger-dark)", cursor: invitationAction === inv.id ? "wait" : "pointer",
+                                    }}
+                                  >
+                                    Revoke
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {roleChangeConfirm && (
         <ConfirmDialog
           title="Change Role"
@@ -4468,8 +4684,9 @@ export default function SettingsPage({
   onAbsenceTypesChange,
 }: SettingsPageProps) {
   const pathname = usePathname();
-  const VALID_SECTIONS = ["organization", "display-mode", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "impersonation"];
-  const sectionFromPath = pathname.split("/")[2];
+  const searchParams = useSearchParams();
+  const VALID_SECTIONS = ["organization", "display-mode", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "activity", "impersonation"];
+  const sectionFromPath = searchParams.get("section");
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
   const defaultSection = canManageOrg ? "organization" : "impersonation";
@@ -4509,6 +4726,7 @@ export default function SettingsPage({
     { id: "indicators", label: "Indicators", icon: iconIndicator },
     { id: "staff-config", label: "Designations", icon: iconDesignations },
     ...(isSuperAdmin ? [{ id: "users", label: "User Management", icon: iconUsers }] : []),
+    ...(isSuperAdmin ? [{ id: "activity", label: "Activity Log", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> }] : []),
   ] : [];
 
   const gridmasterLinks = isGridmaster ? [
@@ -4524,7 +4742,7 @@ export default function SettingsPage({
         id: link.id,
         label: link.label,
         icon: link.icon,
-        href: link.id === defaultSection ? "/settings" : `/settings/${link.id}`,
+        href: link.id === defaultSection ? "/settings" : `/settings?section=${link.id}`,
         active: activeSection === link.id,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4545,7 +4763,7 @@ export default function SettingsPage({
                     {allLinks.map((link) => (
                       <SidebarMenuItem key={link.id}>
                         <SidebarMenuButton
-                          render={<Link href={link.id === defaultSection ? "/settings" : `/settings/${link.id}`} replace />}
+                          render={<Link href={link.id === defaultSection ? "/settings" : `/settings?section=${link.id}`} replace />}
                           isActive={activeSection === link.id}
                           tooltip={link.label}
                           className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
@@ -4589,11 +4807,28 @@ export default function SettingsPage({
         {(() => {
           const title = allLinks.find(l => l.id === activeSection)?.label;
           return title ? (
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 20px", width: "100%", maxWidth: activeSection === "users" ? 1100 : 860 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 20px", width: "100%", maxWidth: activeSection === "users" || activeSection === "activity" ? 1100 : 860 }}>
               {title}
             </h1>
           ) : null;
         })()}
+
+        {/* Permission info for admins with limited access */}
+        {canManageOrg && !isSuperAdmin && !isGridmaster && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 14px", marginBottom: 16,
+            background: "var(--color-info-bg)", borderRadius: "var(--dg-radius-sm)",
+            border: "1px solid var(--color-info-border)",
+            fontSize: "var(--dg-fs-caption)", color: "var(--color-info-text)",
+            width: "100%", maxWidth: 860,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Some settings are read-only based on your permissions. Contact your super admin to request changes.
+          </div>
+        )}
 
         {activeSection === "organization" && canManageOrg && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 860 }}>
@@ -4611,6 +4846,37 @@ export default function SettingsPage({
                   organization={organization}
                   onSave={onOrganizationSave}
                 />
+              </Section>
+            )}
+            {isSuperAdmin && (
+              <Section title="Schedule Settings">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}>Enforce shift conflict prevention</div>
+                    <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>When enabled, overlapping shifts cannot be saved. Admins can override.</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const next = !organization.enforceConflictPrevention;
+                      try {
+                        await onOrganizationSave({ ...organization, enforceConflictPrevention: next });
+                        toast.success(next ? "Conflict enforcement enabled" : "Conflict enforcement disabled");
+                      } catch { toast.error("Failed to update setting"); }
+                    }}
+                    style={{
+                      width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer", flexShrink: 0,
+                      background: organization.enforceConflictPrevention ? "var(--color-primary)" : "var(--color-border)",
+                      position: "relative", transition: "background 0.2s",
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                      position: "absolute", top: 3,
+                      left: organization.enforceConflictPrevention ? 23 : 3,
+                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                    }} />
+                  </button>
+                </div>
               </Section>
             )}
             <Section title={focusAreaLabel} noPadding helpText={helpText.staff.focusAreas}>
@@ -4740,6 +5006,12 @@ export default function SettingsPage({
         {activeSection === "users" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth: 1100 }}>
             <UserManagementSettings orgId={organization.id} isSuperAdmin={isSuperAdmin} />
+          </div>
+        )}
+
+        {activeSection === "activity" && isSuperAdmin && (
+          <div style={{ width: "100%", maxWidth: 1100 }}>
+            <OrgActivityLog orgId={organization.id} />
           </div>
         )}
 

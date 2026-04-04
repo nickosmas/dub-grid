@@ -36,7 +36,7 @@ AS $$
   SELECT COALESCE(cm.org_role, 'user'::public.org_role)
   FROM public.profiles p
   LEFT JOIN public.organization_memberships cm
-    ON cm.user_id = p.id AND cm.org_id = p.org_id
+    ON cm.user_id = p.id AND cm.org_id = p.org_id AND cm.archived_at IS NULL
   WHERE p.id = auth.uid();
 $$;
 
@@ -54,7 +54,8 @@ RETURNS INTEGER
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT COUNT(*)::INTEGER FROM public.schedule_draft_sessions;
+  SELECT COUNT(*)::INTEGER FROM public.schedule_draft_sessions
+  WHERE org_id = public.caller_org_id();
 $$;
 
 
@@ -132,6 +133,8 @@ BEGIN
 
   -- Resolve user profile with org context.
   -- Archived orgs are filtered out (AND o.archived_at IS NULL).
+  -- Suspended orgs are filtered out (AND o.suspended_at IS NULL).
+  -- Deactivated users get no org claims (AND p.deactivated_at IS NULL on membership join).
   -- org_role is NOT coalesced — a NULL value means no membership exists,
   -- which must result in no org claims being set (prevents read access
   -- to an org the user has no membership for).
@@ -143,10 +146,11 @@ BEGIN
   INTO user_profile
   FROM public.profiles p
   LEFT JOIN public.organization_memberships cm
-    ON cm.user_id = p.id AND cm.org_id = p.org_id
+    ON cm.user_id = p.id AND cm.org_id = p.org_id AND cm.archived_at IS NULL
   LEFT JOIN public.organizations o
-    ON o.id = p.org_id AND o.archived_at IS NULL
-  WHERE p.id = uid;
+    ON o.id = p.org_id AND o.archived_at IS NULL AND o.suspended_at IS NULL
+  WHERE p.id = uid
+    AND p.deactivated_at IS NULL;
 
   IF FOUND THEN
     claims := jsonb_set(claims, '{platform_role}', to_jsonb(COALESCE(user_profile.platform_role, 'none')));
@@ -262,6 +266,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.update_shifts_updated_at()
 RETURNS TRIGGER
 LANGUAGE PLPGSQL
+SET search_path = 'public'
 AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -403,6 +408,29 @@ CREATE TRIGGER trg_membership_deleted
   AFTER DELETE ON public.organization_memberships
   FOR EACH ROW EXECUTE FUNCTION public.on_membership_deleted();
 
+-- Guard: prevent direct UPDATE of org_role on organization_memberships.
+-- All role changes must go through change_user_role() RPC which sets the
+-- session variable 'app.allow_role_change' = 'true' before mutating.
+-- This ensures every role change goes through the audit trail, idempotency,
+-- advisory lock, and JWT refresh lock machinery.
+CREATE OR REPLACE FUNCTION public.guard_org_role_change()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+  IF OLD.org_role IS DISTINCT FROM NEW.org_role THEN
+    IF current_setting('app.allow_role_change', true) IS DISTINCT FROM 'true' THEN
+      RAISE EXCEPTION 'Direct org_role changes are not allowed. Use change_user_role() RPC.';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_guard_org_role_change
+  BEFORE UPDATE OF org_role ON public.organization_memberships
+  FOR EACH ROW EXECUTE FUNCTION public.guard_org_role_change();
+
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 6. RPC FUNCTIONS
@@ -414,7 +442,8 @@ CREATE OR REPLACE FUNCTION public.change_user_role(
   p_target_user_id  UUID,
   p_new_role        TEXT,
   p_changed_by_id   UUID,
-  p_idempotency_key TEXT
+  p_idempotency_key TEXT,
+  p_org_id          UUID DEFAULT NULL  -- explicit org context for multi-org
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -440,8 +469,13 @@ BEGIN
     RETURN jsonb_build_object('status', 'already_applied');
   END IF;
 
-  SELECT org_id INTO v_target_org_id
-  FROM profiles WHERE id = p_target_user_id;
+  -- Resolve the org context: prefer explicit p_org_id, fall back to target's active org.
+  IF p_org_id IS NOT NULL THEN
+    v_target_org_id := p_org_id;
+  ELSE
+    SELECT org_id INTO v_target_org_id
+    FROM profiles WHERE id = p_target_user_id;
+  END IF;
 
   IF v_target_org_id IS NULL THEN
     RAISE EXCEPTION 'Target user not found or has no active organization';
@@ -453,16 +487,18 @@ BEGIN
   FOR UPDATE;
 
   IF v_old_role IS NULL THEN
-    RAISE EXCEPTION 'Target user has no membership for their active organization';
+    RAISE EXCEPTION 'Target user has no membership for this organization';
   END IF;
 
-  SELECT p.platform_role::TEXT, p.org_id
-  INTO v_caller_platform_role, v_caller_org_id
+  SELECT p.platform_role::TEXT
+  INTO v_caller_platform_role
   FROM profiles p WHERE p.id = auth.uid();
 
+  -- Resolve caller's role in the target org (not their active org).
+  v_caller_org_id := v_target_org_id;
   SELECT cm.org_role::TEXT INTO v_caller_org_role
   FROM organization_memberships cm
-  WHERE cm.user_id = auth.uid() AND cm.org_id = v_caller_org_id;
+  WHERE cm.user_id = auth.uid() AND cm.org_id = v_target_org_id;
 
   IF v_caller_org_role IS NULL AND v_caller_platform_role <> 'gridmaster' THEN
     RAISE EXCEPTION 'Caller not found or has no membership';
@@ -473,8 +509,9 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: only admins and gridmasters can change roles';
   END IF;
 
+  -- Org scoping: caller must have membership in the target org (already verified above).
   IF v_caller_platform_role <> 'gridmaster' THEN
-    IF v_caller_org_id IS NULL OR v_caller_org_id <> v_target_org_id THEN
+    IF v_caller_org_role IS NULL THEN
       RAISE EXCEPTION 'Unauthorized: cannot change roles for users outside your organization';
     END IF;
   END IF;
@@ -483,6 +520,21 @@ BEGIN
      AND p_new_role IN ('gridmaster', 'admin', 'super_admin') THEN
     RAISE EXCEPTION 'admin cannot promote to admin, super_admin, or gridmaster';
   END IF;
+
+  -- Prevent demotion of the last super_admin in an org.
+  IF v_old_role = 'super_admin' AND p_new_role <> 'super_admin' THEN
+    IF (SELECT count(*) FROM organization_memberships
+        WHERE org_id = v_target_org_id
+          AND org_role = 'super_admin'
+          AND user_id <> p_target_user_id
+          AND archived_at IS NULL) = 0 THEN
+      RAISE EXCEPTION 'Cannot demote the last super_admin of an organization';
+    END IF;
+  END IF;
+
+  -- Set session flag to bypass the guard_org_role_change trigger.
+  -- This is the ONLY authorised path for org_role mutations.
+  PERFORM set_config('app.allow_role_change', 'true', true);
 
   UPDATE organization_memberships
   SET org_role = p_new_role::org_role
@@ -506,7 +558,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.change_user_role IS 'Race-condition-safe role change RPC. Verifies caller identity via auth.uid(), gates on admin/super_admin/gridmaster, enforces company scoping, and prevents admin self-promotion.';
+COMMENT ON FUNCTION public.change_user_role IS 'Race-condition-safe role change RPC. Verifies caller identity via auth.uid(), gates on admin/super_admin/gridmaster, enforces org scoping (explicit p_org_id or fallback to target profiles.org_id), and prevents admin self-promotion.';
 
 
 -- ── assign_org_role_by_email ──────────────────────────────────────────────────
@@ -548,6 +600,9 @@ BEGIN
   ON CONFLICT (id) DO UPDATE
     SET org_id = COALESCE(profiles.org_id, EXCLUDED.org_id),
         updated_at = NOW();
+
+  -- Bypass guard_org_role_change trigger — this is an authorised role path.
+  PERFORM set_config('app.allow_role_change', 'true', true);
 
   INSERT INTO public.organization_memberships (user_id, org_id, org_role)
   VALUES (target_user_id, p_org_id, p_org_role)
@@ -610,7 +665,7 @@ BEGIN
 
   IF NOT EXISTS (
     SELECT 1 FROM public.organization_memberships
-    WHERE user_id = v_uid AND org_id = target_org_id
+    WHERE user_id = v_uid AND org_id = target_org_id AND archived_at IS NULL
   ) THEN
     RAISE EXCEPTION 'Not a member of this organization';
   END IF;
@@ -1287,6 +1342,9 @@ BEGIN
         last_name  = COALESCE(EXCLUDED.last_name, profiles.last_name),
         updated_at = NOW();
 
+  -- Bypass guard_org_role_change trigger — this is an authorised role path.
+  PERFORM set_config('app.allow_role_change', 'true', true);
+
   INSERT INTO public.organization_memberships (user_id, org_id, org_role)
   VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign)
   ON CONFLICT (user_id, org_id) DO UPDATE
@@ -1527,6 +1585,27 @@ BEGIN
       'justification', trim(p_justification)
     )
   );
+
+  -- Notify all org super_admins about the impersonation (security transparency).
+  -- Excludes the target user (already notified above) to avoid duplicate notifications.
+  INSERT INTO notifications (user_id, org_id, type, title, message, metadata)
+  SELECT
+    cm.user_id,
+    v_target_org_id,
+    'impersonation_start',
+    'Impersonation session started',
+    'A platform administrator has started an impersonation session in your organization.',
+    jsonb_build_object(
+      'session_id', v_session.session_id,
+      'expires_at', v_session.expires_at,
+      'justification', trim(p_justification),
+      'target_user_id', p_target_user_id
+    )
+  FROM organization_memberships cm
+  WHERE cm.org_id = v_target_org_id
+    AND cm.org_role = 'super_admin'
+    AND cm.archived_at IS NULL
+    AND cm.user_id <> p_target_user_id;
 
   RETURN jsonb_build_object('session_id', v_session.session_id, 'expires_at', v_session.expires_at);
 END;
@@ -1835,6 +1914,7 @@ BEGIN
   JOIN public.profiles p ON p.id = cm.user_id
   JOIN auth.users u ON u.id = cm.user_id
   WHERE cm.org_id = p_org_id
+    AND cm.archived_at IS NULL
   ORDER BY u.email ASC;
 END;
 $$;
@@ -1932,7 +2012,10 @@ GRANT EXECUTE ON FUNCTION public.shift_times_overlap(INT8[], INT8[]) TO authenti
 
 
 -- ── create_shift_request ────────────────────────────────────────────────────
--- Creates a pickup or swap request. Validates shift ownership and snapshots data.
+-- Creates a pickup, swap, or calloff request. Validates shift ownership and snapshots data.
+
+-- Drop old 7-param overload so the 8-param version is the only one
+DROP FUNCTION IF EXISTS public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID);
 
 CREATE OR REPLACE FUNCTION public.create_shift_request(
   p_org_id              UUID,
@@ -1941,7 +2024,8 @@ CREATE OR REPLACE FUNCTION public.create_shift_request(
   p_requester_shift_date DATE,
   p_target_emp_id       UUID DEFAULT NULL,
   p_target_shift_date   DATE DEFAULT NULL,
-  p_idempotency_key     UUID DEFAULT gen_random_uuid()
+  p_idempotency_key     UUID DEFAULT gen_random_uuid(),
+  p_absence_type_id     BIGINT DEFAULT NULL
 ) RETURNS UUID
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -1951,13 +2035,29 @@ DECLARE
   v_requester_shift RECORD;
   v_target_shift RECORD;
   v_requester_employee RECORD;
+  v_initial_status public.shift_request_status;
 BEGIN
   -- Idempotency: return existing if already created
   SELECT id INTO v_request_id FROM public.shift_requests WHERE idempotency_key = p_idempotency_key;
   IF FOUND THEN RETURN v_request_id; END IF;
 
+  -- Validate calloff-specific constraints
+  IF p_type = 'calloff' THEN
+    IF p_absence_type_id IS NULL THEN
+      RAISE EXCEPTION 'Calloff requests require an absence type';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.absence_types
+      WHERE id = p_absence_type_id AND org_id = p_org_id AND archived_at IS NULL
+    ) THEN
+      RAISE EXCEPTION 'Absence type not found or archived';
+    END IF;
+  ELSIF p_absence_type_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Only calloff requests can have an absence type';
+  END IF;
+
   -- Validate requester is an active employee in this org
-  SELECT id, user_id, status INTO v_requester_employee
+  SELECT id, user_id, status, focus_area_ids INTO v_requester_employee
   FROM public.employees
   WHERE id = p_requester_emp_id AND org_id = p_org_id AND archived_at IS NULL;
 
@@ -1981,6 +2081,11 @@ BEGIN
 
   IF NOT FOUND OR array_length(v_requester_shift.published_shift_code_ids, 1) IS NULL THEN
     RAISE EXCEPTION 'No published shift found for this employee on this date';
+  END IF;
+
+  -- Fall back to employee's primary focus area when shift has no focus_area_id
+  IF v_requester_shift.focus_area_id IS NULL THEN
+    v_requester_shift.focus_area_id := v_requester_employee.focus_area_ids[1];
   END IF;
 
   -- Check not an absence (can't avail an off day)
@@ -2007,6 +2112,13 @@ BEGIN
       AND status IN ('open', 'pending_approval')
   ) THEN
     RAISE EXCEPTION 'This shift is already involved in another active request';
+  END IF;
+
+  -- Calloffs go straight to pending_approval; pickups/swaps start as open
+  IF p_type = 'calloff' THEN
+    v_initial_status := 'pending_approval';
+  ELSE
+    v_initial_status := 'open';
   END IF;
 
   -- For swaps: validate target
@@ -2067,7 +2179,7 @@ BEGIN
       target_focus_area_id, target_custom_start_time, target_custom_end_time,
       idempotency_key
     ) VALUES (
-      p_org_id, p_type, 'open',
+      p_org_id, p_type, v_initial_status,
       p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
       v_requester_shift.focus_area_id, v_requester_shift.published_custom_start_time, v_requester_shift.published_custom_end_time,
       p_target_emp_id, p_target_shift_date,
@@ -2077,6 +2189,18 @@ BEGIN
       v_target_shift.published_custom_end_time,
       p_idempotency_key
     ) RETURNING id INTO v_request_id;
+  ELSIF p_type = 'calloff' THEN
+    INSERT INTO public.shift_requests (
+      org_id, type, status,
+      requester_emp_id, requester_shift_date, requester_shift_code_ids,
+      requester_focus_area_id, requester_custom_start_time, requester_custom_end_time,
+      absence_type_id, idempotency_key
+    ) VALUES (
+      p_org_id, p_type, v_initial_status,
+      p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
+      v_requester_shift.focus_area_id, v_requester_shift.published_custom_start_time, v_requester_shift.published_custom_end_time,
+      p_absence_type_id, p_idempotency_key
+    ) RETURNING id INTO v_request_id;
   ELSE
     INSERT INTO public.shift_requests (
       org_id, type, status,
@@ -2085,7 +2209,7 @@ BEGIN
       target_emp_id, target_shift_date,
       idempotency_key
     ) VALUES (
-      p_org_id, p_type, 'open',
+      p_org_id, p_type, v_initial_status,
       p_requester_emp_id, p_requester_shift_date, v_requester_shift.published_shift_code_ids,
       v_requester_shift.focus_area_id, v_requester_shift.published_custom_start_time, v_requester_shift.published_custom_end_time,
       NULL, NULL,
@@ -2097,7 +2221,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID, BIGINT) TO authenticated;
 
 
 -- ── claim_shift_request ─────────────────────────────────────────────────────
@@ -2365,17 +2489,83 @@ BEGIN
 
   -- ── APPROVAL: execute the shift reassignment ──
 
+  -- ── CALLOFF: apply absence + spawn open pickup ──
+  IF v_request.type = 'calloff' THEN
+    -- Advisory lock on requester's shift
+    PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+
+    -- Re-validate requester's shift still matches snapshot
+    SELECT * INTO v_req_shift
+    FROM public.shifts
+    WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+
+    IF NOT FOUND OR v_req_shift.published_shift_code_ids IS DISTINCT FROM v_request.requester_shift_code_ids THEN
+      RAISE EXCEPTION 'The requester''s shift has been modified since the calloff was created. Please ask the employee to resubmit.';
+    END IF;
+
+    -- Replace published shift with absence type
+    UPDATE public.shifts
+    SET published_shift_code_ids = '{}',
+        published_absence_type_id = v_request.absence_type_id,
+        published_custom_start_time = NULL,
+        published_custom_end_time = NULL,
+        draft_shift_code_ids = '{}',
+        draft_absence_type_id = v_request.absence_type_id,
+        updated_by = v_admin_user_id,
+        updated_at = now()
+    WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+
+    -- Auto-create an open pickup request so other staff can claim the vacated shift
+    INSERT INTO public.shift_requests (
+      org_id, type, status,
+      requester_emp_id, requester_shift_date, requester_shift_code_ids,
+      requester_focus_area_id, requester_custom_start_time, requester_custom_end_time,
+      parent_request_id
+    ) VALUES (
+      v_request.org_id, 'pickup', 'open',
+      v_request.requester_emp_id, v_request.requester_shift_date, v_request.requester_shift_code_ids,
+      v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
+      p_request_id
+    );
+
+    -- Mark calloff as approved
+    UPDATE public.shift_requests
+    SET status = 'approved', admin_user_id = v_admin_user_id,
+        admin_note = p_note, resolved_at = now(), updated_at = now()
+    WHERE id = p_request_id;
+
+    -- Cascade-cancel other active requests involving this shift
+    UPDATE public.shift_requests
+    SET status = 'cancelled',
+        admin_note = 'Auto-cancelled: shift was called off',
+        resolved_at = now(), updated_at = now()
+    WHERE id != p_request_id
+      AND org_id = v_request.org_id
+      AND status IN ('open', 'pending_approval')
+      AND (
+        (requester_emp_id = v_request.requester_emp_id AND requester_shift_date = v_request.requester_shift_date)
+        OR (target_emp_id = v_request.requester_emp_id AND target_shift_date = v_request.requester_shift_date)
+      );
+
+    RETURN;
+  END IF;
+
   -- Advisory lock on involved shifts to prevent concurrent modifications.
   -- Acquire in deterministic order (alphabetical by key) to prevent deadlocks.
   IF v_request.type = 'pickup' THEN
-    -- Lock both requester and target shifts (UPSERT may merge into target's existing row)
-    IF (v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
-       < (v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
-    THEN
-      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
-      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+    IF v_request.target_emp_id IS NOT NULL THEN
+      -- Calloff-claimed pickup: lock both requester and target shifts
+      IF (v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
+         < (v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT)
+      THEN
+        PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+        PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+      ELSE
+        PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+        PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+      END IF;
     ELSE
-      PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.target_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
+      -- Volunteer pickup: only lock the volunteer's date
       PERFORM pg_advisory_xact_lock(hashtext('shift_lock_' || v_request.requester_emp_id::TEXT || '_' || v_request.requester_shift_date::TEXT));
     END IF;
   ELSIF v_request.type = 'swap' THEN
@@ -2408,68 +2598,129 @@ BEGIN
   END IF;
 
   -- Verify requester's shift still exists as snapshotted
-  SELECT * INTO v_req_shift
-  FROM public.shifts
-  WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+  -- (Skip for volunteer pickups — there is no original shift to validate against)
+  IF NOT (v_request.type = 'pickup' AND v_request.target_emp_id IS NULL) THEN
+    SELECT * INTO v_req_shift
+    FROM public.shifts
+    WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
 
-  IF NOT FOUND OR v_req_shift.published_shift_code_ids IS DISTINCT FROM v_request.requester_shift_code_ids THEN
-    RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. Please ask the employee to resubmit.';
+    IF NOT FOUND OR v_req_shift.published_shift_code_ids IS DISTINCT FROM v_request.requester_shift_code_ids THEN
+      RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. Please ask the employee to resubmit.';
+    END IF;
   END IF;
 
   IF v_request.type = 'pickup' THEN
-    -- Re-check at approval: target must not have an overlapping shift on this date
-    IF EXISTS (
-      SELECT 1 FROM public.shifts s
-      WHERE s.emp_id = v_request.target_emp_id
-        AND s.date = v_request.requester_shift_date
-        AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-        AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
-    ) THEN
-      RAISE EXCEPTION 'The target employee has an overlapping shift on this date. Cannot approve.';
-    END IF;
+    IF v_request.target_emp_id IS NULL THEN
+      -- ── VOLUNTEER PICKUP: no source shift to transfer, just assign to volunteer ──
 
-    -- Delete requester's shift
-    DELETE FROM public.shifts
-    WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+      -- Re-check at approval: volunteer must not have an overlapping shift now
+      IF EXISTS (
+        SELECT 1 FROM public.shifts s
+        WHERE s.emp_id = v_request.requester_emp_id
+          AND s.date = v_request.requester_shift_date
+          AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
+      ) THEN
+        RAISE EXCEPTION 'The volunteer has an overlapping shift on this date. Cannot approve.';
+      END IF;
 
-    -- Insert as target's shift (merge if target already has a non-overlapping shift on this date)
-    INSERT INTO public.shifts (
-      emp_id, date, org_id, user_id,
-      published_shift_code_ids, draft_shift_code_ids,
-      focus_area_id, published_custom_start_time, published_custom_end_time,
-      created_by, updated_by
-    )
-    SELECT
-      v_request.target_emp_id, v_request.requester_shift_date, v_request.org_id, e.user_id,
-      v_request.requester_shift_code_ids, '{}',
-      v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
-      v_admin_user_id, v_admin_user_id
-    FROM public.employees e
-    WHERE e.id = v_request.target_emp_id
-    ON CONFLICT (emp_id, date) DO UPDATE SET
-      published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
-      published_custom_start_time = CASE
-        WHEN shifts.published_custom_start_time IS NOT NULL AND EXCLUDED.published_custom_start_time IS NOT NULL
-          THEN shifts.published_custom_start_time || '|' || EXCLUDED.published_custom_start_time
-        WHEN EXCLUDED.published_custom_start_time IS NOT NULL THEN EXCLUDED.published_custom_start_time
-        ELSE shifts.published_custom_start_time
-      END,
-      published_custom_end_time = CASE
-        WHEN shifts.published_custom_end_time IS NOT NULL AND EXCLUDED.published_custom_end_time IS NOT NULL
-          THEN shifts.published_custom_end_time || '|' || EXCLUDED.published_custom_end_time
-        WHEN EXCLUDED.published_custom_end_time IS NOT NULL THEN EXCLUDED.published_custom_end_time
-        ELSE shifts.published_custom_end_time
-      END,
-      focus_area_id = CASE
-        WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
-        ELSE NULL
-      END,
-      updated_by = EXCLUDED.updated_by,
-      updated_at = now();
+      -- Insert shift for volunteer (merge if they already have a non-overlapping shift)
+      INSERT INTO public.shifts (
+        emp_id, date, org_id, user_id,
+        published_shift_code_ids, draft_shift_code_ids,
+        focus_area_id, published_custom_start_time, published_custom_end_time,
+        created_by, updated_by
+      )
+      SELECT
+        v_request.requester_emp_id, v_request.requester_shift_date, v_request.org_id, e.user_id,
+        v_request.requester_shift_code_ids, '{}',
+        v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
+        v_admin_user_id, v_admin_user_id
+      FROM public.employees e
+      WHERE e.id = v_request.requester_emp_id
+      ON CONFLICT (emp_id, date) DO UPDATE SET
+        published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
+        published_custom_start_time = CASE
+          WHEN shifts.published_custom_start_time IS NOT NULL AND EXCLUDED.published_custom_start_time IS NOT NULL
+            THEN shifts.published_custom_start_time || '|' || EXCLUDED.published_custom_start_time
+          WHEN EXCLUDED.published_custom_start_time IS NOT NULL THEN EXCLUDED.published_custom_start_time
+          ELSE shifts.published_custom_start_time
+        END,
+        published_custom_end_time = CASE
+          WHEN shifts.published_custom_end_time IS NOT NULL AND EXCLUDED.published_custom_end_time IS NOT NULL
+            THEN shifts.published_custom_end_time || '|' || EXCLUDED.published_custom_end_time
+          WHEN EXCLUDED.published_custom_end_time IS NOT NULL THEN EXCLUDED.published_custom_end_time
+          ELSE shifts.published_custom_end_time
+        END,
+        focus_area_id = CASE
+          WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
+          ELSE NULL
+        END,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = now();
 
-    GET DIAGNOSTICS v_row_count = ROW_COUNT;
-    IF v_row_count = 0 THEN
-      RAISE EXCEPTION 'Failed to reassign shift: target employee not found';
+      GET DIAGNOSTICS v_row_count = ROW_COUNT;
+      IF v_row_count = 0 THEN
+        RAISE EXCEPTION 'Failed to assign shift: volunteer employee not found';
+      END IF;
+
+    ELSE
+      -- ── CALLOFF-CLAIMED PICKUP: transfer shift from requester to target ──
+
+      -- Re-check at approval: target must not have an overlapping shift on this date
+      IF EXISTS (
+        SELECT 1 FROM public.shifts s
+        WHERE s.emp_id = v_request.target_emp_id
+          AND s.date = v_request.requester_shift_date
+          AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
+      ) THEN
+        RAISE EXCEPTION 'The target employee has an overlapping shift on this date. Cannot approve.';
+      END IF;
+
+      -- Delete requester's shift
+      DELETE FROM public.shifts
+      WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
+
+      -- Insert as target's shift (merge if target already has a non-overlapping shift on this date)
+      INSERT INTO public.shifts (
+        emp_id, date, org_id, user_id,
+        published_shift_code_ids, draft_shift_code_ids,
+        focus_area_id, published_custom_start_time, published_custom_end_time,
+        created_by, updated_by
+      )
+      SELECT
+        v_request.target_emp_id, v_request.requester_shift_date, v_request.org_id, e.user_id,
+        v_request.requester_shift_code_ids, '{}',
+        v_request.requester_focus_area_id, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
+        v_admin_user_id, v_admin_user_id
+      FROM public.employees e
+      WHERE e.id = v_request.target_emp_id
+      ON CONFLICT (emp_id, date) DO UPDATE SET
+        published_shift_code_ids = shifts.published_shift_code_ids || EXCLUDED.published_shift_code_ids,
+        published_custom_start_time = CASE
+          WHEN shifts.published_custom_start_time IS NOT NULL AND EXCLUDED.published_custom_start_time IS NOT NULL
+            THEN shifts.published_custom_start_time || '|' || EXCLUDED.published_custom_start_time
+          WHEN EXCLUDED.published_custom_start_time IS NOT NULL THEN EXCLUDED.published_custom_start_time
+          ELSE shifts.published_custom_start_time
+        END,
+        published_custom_end_time = CASE
+          WHEN shifts.published_custom_end_time IS NOT NULL AND EXCLUDED.published_custom_end_time IS NOT NULL
+            THEN shifts.published_custom_end_time || '|' || EXCLUDED.published_custom_end_time
+          WHEN EXCLUDED.published_custom_end_time IS NOT NULL THEN EXCLUDED.published_custom_end_time
+          ELSE shifts.published_custom_end_time
+        END,
+        focus_area_id = CASE
+          WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
+          ELSE NULL
+        END,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = now();
+
+      GET DIAGNOSTICS v_row_count = ROW_COUNT;
+      IF v_row_count = 0 THEN
+        RAISE EXCEPTION 'Failed to reassign shift: target employee not found';
+      END IF;
     END IF;
 
   ELSIF v_request.type = 'swap' THEN
@@ -2674,6 +2925,107 @@ $$;
 GRANT EXECUTE ON FUNCTION public.cancel_shift_request(UUID, UUID) TO authenticated;
 
 
+-- ── volunteer_for_open_shift ────────────────────────────────────────────────
+-- Employee volunteers for a coverage-gap open shift (no existing shift_request).
+-- Creates a pickup request with status='pending_approval' (volunteer IS the requester,
+-- target_emp_id is NULL to distinguish from calloff-claimed pickups).
+
+CREATE OR REPLACE FUNCTION public.volunteer_for_open_shift(
+  p_org_id              UUID,
+  p_emp_id              UUID,
+  p_shift_date          DATE,
+  p_shift_code_ids      BIGINT[],
+  p_focus_area_id       BIGINT,
+  p_custom_start_time   TEXT DEFAULT NULL,
+  p_custom_end_time     TEXT DEFAULT NULL
+) RETURNS UUID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_request_id UUID;
+  v_employee RECORD;
+BEGIN
+  -- Validate shift_code_ids is non-empty
+  IF array_length(p_shift_code_ids, 1) IS NULL THEN
+    RAISE EXCEPTION 'At least one shift code is required';
+  END IF;
+
+  -- Validate employee is active in this org
+  SELECT id, user_id, certification_id, status INTO v_employee
+  FROM public.employees
+  WHERE id = p_emp_id AND org_id = p_org_id AND archived_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Employee not found or archived';
+  END IF;
+
+  IF v_employee.status != 'active' THEN
+    RAISE EXCEPTION 'Employee is not active';
+  END IF;
+
+  -- Validate caller is the employee or admin+
+  IF v_employee.user_id IS DISTINCT FROM auth.uid()
+     AND NOT public.is_gridmaster()
+     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'Unauthorized: you can only volunteer for yourself';
+  END IF;
+
+  -- Check certification requirements
+  IF EXISTS (
+    SELECT 1 FROM public.shift_codes sc
+    WHERE sc.id = ANY(p_shift_code_ids)
+      AND array_length(sc.required_certification_ids, 1) IS NOT NULL
+      AND (
+        v_employee.certification_id IS NULL
+        OR NOT (v_employee.certification_id = ANY(sc.required_certification_ids))
+      )
+  ) THEN
+    RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
+  END IF;
+
+  -- Check time conflicts: volunteer must not have an overlapping shift on this date
+  IF EXISTS (
+    SELECT 1 FROM public.shifts s
+    WHERE s.emp_id = p_emp_id
+      AND s.date = p_shift_date
+      AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
+      AND public.shift_times_overlap(s.published_shift_code_ids, p_shift_code_ids)
+  ) THEN
+    RAISE EXCEPTION 'You have a shift with overlapping times on this date';
+  END IF;
+
+  -- Check no active request already exists for this employee on this date
+  IF EXISTS (
+    SELECT 1 FROM public.shift_requests
+    WHERE org_id = p_org_id
+      AND status IN ('open', 'pending_approval')
+      AND (
+        (requester_emp_id = p_emp_id AND requester_shift_date = p_shift_date)
+        OR (target_emp_id = p_emp_id AND target_shift_date = p_shift_date)
+      )
+  ) THEN
+    RAISE EXCEPTION 'You are involved in another active shift request on this date';
+  END IF;
+
+  -- Create the volunteer pickup request (pending_approval immediately)
+  INSERT INTO public.shift_requests (
+    org_id, type, status,
+    requester_emp_id, requester_shift_date, requester_shift_code_ids,
+    requester_focus_area_id, requester_custom_start_time, requester_custom_end_time
+  ) VALUES (
+    p_org_id, 'pickup', 'pending_approval',
+    p_emp_id, p_shift_date, p_shift_code_ids,
+    p_focus_area_id, p_custom_start_time, p_custom_end_time
+  ) RETURNING id INTO v_request_id;
+
+  RETURN v_request_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.volunteer_for_open_shift(UUID, UUID, DATE, BIGINT[], BIGINT, TEXT, TEXT) TO authenticated;
+
+
 -- ── expire_shift_requests ───────────────────────────────────────────────────
 -- Bulk-expire stale requests. Called by application cron or manually.
 -- Restricted to gridmaster only (cron calls via service_role bypass RLS).
@@ -2789,6 +3141,11 @@ DECLARE
   a_count BIGINT;
   i_count BIGINT;
 BEGIN
+  -- Auth check: only service-role (cron) or gridmasters may call this.
+  IF auth.uid() IS NOT NULL AND NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'unauthorized: restricted to service role or gridmaster';
+  END IF;
+
   FOR org IN
     SELECT o.id, o.data_retention_days
     FROM organizations o
@@ -2864,6 +3221,12 @@ DECLARE
   result JSONB := '{}'::JSONB;
   emp_count BIGINT;
 BEGIN
+  -- Auth check: only the target user, gridmasters, or service-role (auth.uid() IS NULL) may call this.
+  -- purge_scheduled_accounts() calls this internally via service-role context where auth.uid() IS NULL.
+  IF auth.uid() IS NOT NULL AND auth.uid() != p_user_id AND NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'unauthorized: caller must be the target user or a gridmaster';
+  END IF;
+
   -- 1. Anonymize profile
   UPDATE profiles
     SET first_name = 'Deleted', last_name = 'User', mfa_enabled = false
@@ -2933,6 +3296,11 @@ AS $$
 DECLARE
   flagged_count BIGINT;
 BEGIN
+  -- Auth check: only service-role (cron) or gridmasters may call this.
+  IF auth.uid() IS NOT NULL AND NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'unauthorized: restricted to service role or gridmaster';
+  END IF;
+
   UPDATE profiles
      SET scheduled_deletion_at  = NOW() + INTERVAL '30 days',
          deactivation_warned_at = NOW()
@@ -2971,6 +3339,11 @@ DECLARE
   rec         RECORD;
   purged_count BIGINT := 0;
 BEGIN
+  -- Auth check: only service-role (cron) or gridmasters may call this.
+  IF auth.uid() IS NOT NULL AND NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'unauthorized: restricted to service role or gridmaster';
+  END IF;
+
   FOR rec IN
     SELECT id FROM profiles
      WHERE scheduled_deletion_at IS NOT NULL
@@ -3058,3 +3431,50 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.get_publish_history IS 'Returns paginated publish history for an org with publisher names resolved.';
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- PERFORMANCE: Aggregation & Batch RPCs
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Server-side tenant stats aggregation (replaces 2 full table scans + client-side aggregation)
+CREATE OR REPLACE FUNCTION public.get_tenant_stats()
+RETURNS TABLE(org_id UUID, user_count BIGINT, employee_count BIGINT)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  -- Auth check: only gridmasters may view cross-org tenant stats.
+  IF NOT public.is_gridmaster() THEN
+    RAISE EXCEPTION 'unauthorized: restricted to gridmaster';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    COALESCE(m.org_id, e.org_id) AS org_id,
+    COALESCE(m.cnt, 0) AS user_count,
+    COALESCE(e.cnt, 0) AS employee_count
+  FROM
+    (SELECT om.org_id, COUNT(*) AS cnt FROM public.organization_memberships om GROUP BY om.org_id) m
+  FULL OUTER JOIN
+    (SELECT emp.org_id, COUNT(*) AS cnt FROM public.employees emp WHERE emp.archived_at IS NULL GROUP BY emp.org_id) e
+  ON m.org_id = e.org_id;
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_tenant_stats IS 'Returns per-org user and employee counts aggregated server-side.';
+
+
+-- Batch remove a focus area ID from all employee focus_area_ids arrays (replaces N+1 loop)
+CREATE OR REPLACE FUNCTION public.remove_focus_area_from_employees(p_focus_area_id BIGINT)
+RETURNS VOID
+LANGUAGE SQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  UPDATE public.employees
+  SET focus_area_ids = array_remove(focus_area_ids, p_focus_area_id)
+  WHERE focus_area_ids @> ARRAY[p_focus_area_id]
+    AND org_id = public.caller_org_id();
+$$;
+
+COMMENT ON FUNCTION public.remove_focus_area_from_employees IS 'Removes a focus area ID from all employee arrays in a single UPDATE.';

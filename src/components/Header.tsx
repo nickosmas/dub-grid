@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { useLogout, usePermissions, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useLogout, usePermissions, setUserViewActive, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import MobileNavSheet from "@/components/MobileNavSheet";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 
 
@@ -182,7 +182,7 @@ export default function Header({ orgName }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOutLocal } = useLogout();
-  const { isGridmaster, role, canViewStaff, canManageOrg, isSuperAdmin } = usePermissions();
+  const { isGridmaster, role, canViewStaff, canManageOrg, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -336,6 +336,10 @@ export default function Header({ orgName }: HeaderProps) {
           initials={initials}
           roleLabel={roleLabel}
           onSignOut={handleSignOut}
+          isUserViewActive={isUserViewActive}
+          actualLevel={actualLevel}
+          isImpersonating={isImpersonating}
+          onToggleUserView={() => setUserViewActive(!isUserViewActive)}
         />
       </>
     );
@@ -460,6 +464,7 @@ export default function Header({ orgName }: HeaderProps) {
             border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
             borderRadius: 8,
             padding: "4px 8px 4px 4px",
+            minHeight: 44,
             cursor: "pointer",
             fontFamily: "inherit",
             transition: "background 150ms ease, border-color 150ms ease",
@@ -525,6 +530,21 @@ export default function Header({ orgName }: HeaderProps) {
               </svg>
               Profile
             </button>
+            {actualLevel >= 2 && !isImpersonating && (
+              <>
+                <div className="dg-menu-divider" />
+                <button
+                  className="dg-menu-item"
+                  onClick={() => { setMenuOpen(false); setUserViewActive(!isUserViewActive); }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  {isUserViewActive ? "Exit User View" : "View as User"}
+                </button>
+              </>
+            )}
             <div className="dg-menu-divider" />
             <button
               className="dg-menu-item dg-menu-item--danger"

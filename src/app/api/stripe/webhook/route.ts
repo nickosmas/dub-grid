@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
-import { createClient } from "@supabase/supabase-js";
+import { getStripe } from "@/lib/stripe";
+import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 async function upsertSubscription(sub: Stripe.Subscription) {
   const supabase = getServiceClient();
@@ -61,6 +53,7 @@ async function upsertSubscription(sub: Stripe.Subscription) {
 }
 
 export async function POST(req: NextRequest) {
+  const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
   }
@@ -108,6 +101,7 @@ export async function POST(req: NextRequest) {
         logger.info({ type: event.type }, "Unhandled Stripe event type");
     }
   } catch (err) {
+    Sentry.captureException(err, { extra: { eventType: event.type, eventId: event.id } });
     logger.error({ error: err, type: event.type }, "Error processing Stripe webhook");
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }

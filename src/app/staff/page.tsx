@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { toast } from "sonner";
 import StaffView from "@/components/StaffView";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import ProgressBar from "@/components/ProgressBar";
@@ -8,7 +9,7 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 
 function StaffPageContent() {
-  const { canViewStaff, canEditShifts, canManageEmployees, isLoading: permsLoading, orgId } = usePermissions();
+  const { canViewStaff, canEditShifts, canManageEmployees, isSuperAdmin, isGridmaster, isLoading: permsLoading, orgId } = usePermissions();
   const {
     org, focusAreas, shiftCodes, certifications, orgRoles, shiftCodeMap, absenceTypes,
     loading: refLoading, loadError,
@@ -25,6 +26,7 @@ function StaffPageContent() {
 
   useEffect(() => {
     if (!permsLoading && !canViewStaff) {
+      toast.info("You don't have access to the Staff page.");
       window.location.replace("/schedule");
     }
   }, [permsLoading, canViewStaff]);
@@ -74,6 +76,8 @@ function StaffPageContent() {
             absenceTypes={absenceTypes}
             canEditShifts={canEditShifts}
             canManageEmployees={canManageEmployees}
+            isSuperAdmin={isSuperAdmin}
+            isGridmaster={isGridmaster}
             focusAreaLabel={org?.focusAreaLabel}
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}

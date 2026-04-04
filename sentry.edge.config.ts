@@ -1,11 +1,18 @@
+// Edge-runtime Sentry config — loaded by src/instrumentation.ts *only* in
+// production (NODE_ENV !== "development").  See that file for the guard.
+//
+// Do NOT import this file directly; always go through src/instrumentation.ts.
+
 import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   enabled: !!process.env.SENTRY_DSN,
 
-  // Sample 10% of transactions in production, 100% in dev
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+  tracesSampleRate: 0.1,
+
+  // Do not send PII (emails, IPs) without explicit analytics consent
+  sendDefaultPii: false,
 
   // Enable Sentry structured logs
   enableLogs: true,

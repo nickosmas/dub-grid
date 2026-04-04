@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef, useState } from "react";
+import React, { useEffect, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
@@ -23,6 +23,10 @@ interface MobileNavSheetProps {
   initials: string;
   roleLabel: string;
   onSignOut: () => void;
+  isUserViewActive?: boolean;
+  actualLevel?: number;
+  isImpersonating?: boolean;
+  onToggleUserView?: () => void;
 }
 
 export default function MobileNavSheet({
@@ -35,6 +39,10 @@ export default function MobileNavSheet({
   initials,
   roleLabel,
   onSignOut,
+  isUserViewActive = false,
+  actualLevel = 0,
+  isImpersonating = false,
+  onToggleUserView,
 }: MobileNavSheetProps) {
   const router = useRouter();
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -214,6 +222,18 @@ export default function MobileNavSheet({
                   </svg>
                   Profile
                 </button>
+                {actualLevel >= 2 && !isImpersonating && onToggleUserView && (
+                  <button
+                    onClick={() => { close(); onToggleUserView(); }}
+                    className="dg-bottom-sheet-footer-btn"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {isUserViewActive ? "Exit User View" : "View as User"}
+                  </button>
+                )}
                 <button
                   onClick={() => { close(); onSignOut(); }}
                   className="dg-bottom-sheet-footer-btn dg-bottom-sheet-footer-btn--danger"
@@ -245,15 +265,25 @@ export default function MobileNavSheet({
             </div>
 
             <nav className="dg-bottom-sheet-drill-list">
-              {subNavItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleSubItemClick(item)}
-                  className={`dg-bottom-sheet-drill-item${item.active ? " active" : ""}`}
-                >
-                  <span className="dg-bottom-sheet-item-label">{item.label}</span>
-                </button>
-              ))}
+              {subNavItems.map((item, idx) => {
+                const prevGroup = idx > 0 ? subNavItems[idx - 1].group : null;
+                const showGroupHeader = item.group && item.group !== prevGroup;
+                return (
+                  <React.Fragment key={item.id}>
+                    {showGroupHeader && (
+                      <div className="dg-bottom-sheet-group-label">
+                        {item.group}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleSubItemClick(item)}
+                      className={`dg-bottom-sheet-drill-item${item.active ? " active" : ""}`}
+                    >
+                      <span className="dg-bottom-sheet-item-label">{item.label}</span>
+                    </button>
+                  </React.Fragment>
+                );
+              })}
             </nav>
           </>
         )}

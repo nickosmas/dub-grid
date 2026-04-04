@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchEmployees, insertEmployee, updateEmployee, deleteEmployee, benchEmployee, activateEmployee } from "@/lib/db";
 import { toast } from "sonner";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
 import type { Employee } from "@/types";
 

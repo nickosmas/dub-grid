@@ -18,6 +18,7 @@ interface ShiftContextMenuProps {
   onClear: () => void;
   onMakeAvailable?: () => void;
   onProposeSwap?: () => void;
+  onCallOff?: () => void;
   onClose: () => void;
 }
 
@@ -33,6 +34,7 @@ export default function ShiftContextMenu({
   onClear,
   onMakeAvailable,
   onProposeSwap,
+  onCallOff,
   onClose,
 }: ShiftContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -230,6 +232,23 @@ export default function ShiftContextMenu({
             >
               <ArrowLeftRight size={14} />
               Propose a swap
+            </button>
+          )}
+          {onCallOff && (
+            <button
+              role="menuitem"
+              className="dg-menu-item dg-menu-item--danger"
+              onClick={() => {
+                onCallOff();
+                onClose();
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              Call off
             </button>
           )}
         </>

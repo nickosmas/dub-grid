@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+
+export const dynamic = "force-dynamic";
 
 function getUserClient(req: NextRequest) {
   return createServerClient(
@@ -17,15 +20,6 @@ function getUserClient(req: NextRequest) {
       },
     },
   );
-}
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 }
 
 /**
@@ -103,6 +97,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, result });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "gdpr-erase" } });
     logger.error({ error: err }, "GDPR erasure failed");
     return NextResponse.json({ error: "Data erasure failed" }, { status: 500 });
   }

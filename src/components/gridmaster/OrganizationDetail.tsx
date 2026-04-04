@@ -4,7 +4,8 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail } from "@/lib/db";
+import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail } from "@/lib/db";
+import { queueNotification } from "@/lib/notify";
 import type { TenantStats } from "@/lib/db";
 import type {
   Organization,
@@ -22,8 +23,11 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
+import ReadOnlyScheduleView from "@/components/gridmaster/ReadOnlyScheduleView";
+import FeatureFlagsEditor from "@/components/gridmaster/FeatureFlagsEditor";
+import { supabase } from "@/lib/supabase";
 
-type Tab = "overview" | "users" | "employees" | "config" | "activity";
+type Tab = "overview" | "users" | "employees" | "config" | "activity" | "invitations" | "schedule" | "features";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -31,6 +35,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "employees", label: "Employees" },
   { id: "config", label: "Configuration" },
   { id: "activity", label: "Activity" },
+  { id: "invitations", label: "Invitations" },
+  { id: "schedule", label: "Schedule" },
+  { id: "features", label: "Features" },
 ];
 
 function StatusDot({ status }: { status: string }) {
@@ -113,6 +120,7 @@ export default function OrganizationDetail({
   const [orgRoles, setOrgRoles] = useState<NamedItem[] | null>(null);
   const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[] | null>(null);
   const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
+  const [invitations, setInvitations] = useState<any[] | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
 
@@ -129,6 +137,7 @@ export default function OrganizationDetail({
     setOrgRoles(null);
     setIndicatorTypes(null);
     setAbsenceTypes(null);
+    setInvitations(null);
     setTabError(null);
   }, [organization.id]);
 
@@ -155,6 +164,15 @@ export default function OrganizationDetail({
             setBenchedEmployees(benched);
             setTerminatedEmployees(terminated);
           }
+        }
+        if (tab === "invitations" && invitations === null) {
+          const { data, error } = await supabase
+            .from("invitations")
+            .select("id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, employee_id")
+            .eq("org_id", organization.id)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          if (!cancelled) setInvitations(data ?? []);
         }
         if (tab === "config" && focusAreas === null) {
           const [fa, sc, certs, roles, ind, abs] = await Promise.all([
@@ -183,7 +201,7 @@ export default function OrganizationDetail({
 
     if (tab !== "overview" && tab !== "activity") load();
     return () => { cancelled = true; };
-  }, [tab, organization.id, users, employees, focusAreas]);
+  }, [tab, organization.id, users, employees, focusAreas, invitations]);
 
   return (
     <div>
@@ -219,6 +237,21 @@ export default function OrganizationDetail({
             }}
           >
             Archived
+          </span>
+        )}
+        {organization.suspendedAt && (
+          <span
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 4,
+              background: "var(--color-warning-bg)",
+              color: "var(--color-warning)",
+              textTransform: "uppercase",
+            }}
+          >
+            Suspended
           </span>
         )}
       </div>
@@ -310,6 +343,15 @@ export default function OrganizationDetail({
       {!tabLoading && tab === "activity" && (
         <AuditLogView orgId={organization.id} title="Organization Activity" />
       )}
+      {!tabLoading && tab === "invitations" && invitations && (
+        <InvitationsTab invitations={invitations} orgId={organization.id} onRefresh={() => setInvitations(null)} />
+      )}
+      {!tabLoading && tab === "schedule" && (
+        <ReadOnlyScheduleView orgId={organization.id} />
+      )}
+      {!tabLoading && tab === "features" && (
+        <FeatureFlagsEditor organization={organization} onUpdated={onOrgUpdated} />
+      )}
     </div>
   );
 }
@@ -334,8 +376,14 @@ function OverviewTab({
   const [editCertLabel, setEditCertLabel] = useState(organization.certificationLabel);
   const [editRoleLabel, setEditRoleLabel] = useState(organization.roleLabel);
   const [saving, setSaving] = useState(false);
+  const [editShiftDisplayMode, setEditShiftDisplayMode] = useState(organization.shiftDisplayMode);
+  const [editEnforceConflictPrevention, setEditEnforceConflictPrevention] = useState(organization.enforceConflictPrevention);
+  const [editDataRetentionDays, setEditDataRetentionDays] = useState((organization as any).dataRetentionDays ?? 365);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [suspendConfirm, setSuspendConfirm] = useState(false);
+  const [suspending, setSuspending] = useState(false);
+  const [suspendReason, setSuspendReason] = useState("");
 
   // Reset edit state when organization changes
   useEffect(() => {
@@ -347,7 +395,10 @@ function OverviewTab({
     setEditFocusAreaLabel(organization.focusAreaLabel);
     setEditCertLabel(organization.certificationLabel);
     setEditRoleLabel(organization.roleLabel);
-  }, [organization.id, organization.name, organization.address, organization.phone, organization.timezone, organization.focusAreaLabel, organization.certificationLabel, organization.roleLabel]);
+    setEditShiftDisplayMode(organization.shiftDisplayMode);
+    setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
+    setEditDataRetentionDays((organization as any).dataRetentionDays ?? 365);
+  }, [organization.id, organization.name, organization.address, organization.phone, organization.timezone, organization.focusAreaLabel, organization.certificationLabel, organization.roleLabel, organization.shiftDisplayMode, organization.enforceConflictPrevention]);
 
   async function handleSave() {
     setSaving(true);
@@ -361,7 +412,10 @@ function OverviewTab({
         focusAreaLabel: editFocusAreaLabel.trim() || "Focus Areas",
         certificationLabel: editCertLabel.trim() || "Certifications",
         roleLabel: editRoleLabel.trim() || "Roles",
+        shiftDisplayMode: editShiftDisplayMode,
+        enforceConflictPrevention: editEnforceConflictPrevention,
       };
+      (updated as any).dataRetentionDays = editDataRetentionDays;
       await updateOrganization(updated);
       toast.success("Organization updated");
       setEditing(false);
@@ -381,6 +435,18 @@ function OverviewTab({
         toast.success("Organization restored");
         onOrgUpdated?.({ ...organization, archivedAt: null });
       } else {
+        // Cancel Stripe subscription before archiving (best-effort)
+        if (organization.stripeCustomerId) {
+          try {
+            await fetch("/api/gridmaster/subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orgId: organization.id, action: "cancel" }),
+            });
+          } catch {
+            // Best-effort — proceed with archive even if Stripe cancel fails
+          }
+        }
         await archiveOrganization(organization.id);
         toast.success("Organization archived");
         onOrgUpdated?.({ ...organization, archivedAt: new Date().toISOString() });
@@ -429,6 +495,26 @@ function OverviewTab({
               <div>
                 <label style={labelStyle}>Timezone</label>
                 <input className="dg-input" value={editTimezone} onChange={(e) => setEditTimezone(e.target.value)} placeholder="America/New_York" />
+              </div>
+              <div>
+                <label style={labelStyle}>Shift Display</label>
+                <select className="dg-input" value={editShiftDisplayMode} onChange={(e) => setEditShiftDisplayMode(e.target.value as "code" | "name")}>
+                  <option value="code">Short Labels</option>
+                  <option value="name">Full Names</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 22 }}>
+                <input
+                  type="checkbox"
+                  id="editConflictPrevention"
+                  checked={editEnforceConflictPrevention}
+                  onChange={(e) => setEditEnforceConflictPrevention(e.target.checked)}
+                />
+                <label htmlFor="editConflictPrevention" style={{ ...labelStyle, marginBottom: 0, cursor: "pointer" }}>Conflict Prevention</label>
+              </div>
+              <div>
+                <label style={labelStyle}>Data Retention (days)</label>
+                <input className="dg-input" type="number" min={1} value={editDataRetentionDays} onChange={(e) => setEditDataRetentionDays(Number(e.target.value))} />
               </div>
               <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
                 <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
@@ -484,6 +570,39 @@ function OverviewTab({
         </div>
       </div>
 
+      {/* Billing & Subscription */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>Billing &amp; Subscription</div>
+        <div style={sectionBodyStyle}>
+          <InfoRow label="Status" value={(organization as any).subscriptionStatus ?? "No subscription"} />
+          <InfoRow
+            label="Trial Ends"
+            value={
+              (organization as any).trialEndsAt
+                ? new Date((organization as any).trialEndsAt).toLocaleDateString()
+                : "—"
+            }
+          />
+          <InfoRow
+            label="Stripe Customer"
+            value={
+              (organization as any).stripeCustomerId ? (
+                <a
+                  href={`https://dashboard.stripe.com/customers/${(organization as any).stripeCustomerId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-today-text)", textDecoration: "underline" }}
+                >
+                  {(organization as any).stripeCustomerId}
+                </a>
+              ) : (
+                "Not connected"
+              )
+            }
+          />
+        </div>
+      </div>
+
       {/* Danger zone: Archive / Restore */}
       <div style={{ ...sectionStyle, borderColor: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)" }}>
         <div style={{ ...sectionHeaderStyle, borderBottomColor: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)", color: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)" }}>
@@ -523,6 +642,107 @@ function OverviewTab({
           onCancel={() => setArchiveConfirm(false)}
         />
       )}
+
+      {/* Suspension */}
+      <div style={{ ...sectionStyle, borderColor: organization.suspendedAt ? "var(--color-warning)" : "var(--color-border)" }}>
+        <div style={{ ...sectionHeaderStyle, borderBottomColor: organization.suspendedAt ? "var(--color-warning)" : undefined, color: organization.suspendedAt ? "var(--color-warning)" : undefined }}>
+          Suspension
+        </div>
+        <div style={{ ...sectionBodyStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {organization.suspendedAt ? (
+            <>
+              <div>
+                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-warning)", marginBottom: 4 }}>
+                  Organization is suspended
+                </div>
+                {organization.suspendedReason && (
+                  <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                    Reason: {organization.suspendedReason}
+                  </div>
+                )}
+              </div>
+              <button
+                className="dg-btn dg-btn-primary"
+                onClick={async () => {
+                  setSuspending(true);
+                  try {
+                    await unsuspendOrganization(organization.id);
+                    toast.success("Organization unsuspended");
+                    onOrgUpdated?.({ ...organization, suspendedAt: null, suspendedReason: null });
+                  } catch (err: unknown) {
+                    toast.error((err instanceof Error ? err.message : null) ?? "Failed to unsuspend");
+                  } finally {
+                    setSuspending(false);
+                  }
+                }}
+                disabled={suspending}
+                style={{ flexShrink: 0 }}
+              >
+                {suspending ? "Unsuspending..." : "Unsuspend"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div>
+                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+                  Suspend this organization
+                </div>
+                <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                  Suspending blocks all members from accessing the app. Data is preserved.
+                </div>
+              </div>
+              <button
+                className="dg-btn dg-btn-danger"
+                onClick={() => setSuspendConfirm(true)}
+                style={{ flexShrink: 0 }}
+              >
+                Suspend
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {suspendConfirm && (
+        <ConfirmDialog
+          title="Suspend Organization"
+          message={
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <span>Are you sure you want to suspend &quot;{organization.name}&quot;? All members will be blocked from accessing the app.</span>
+              <textarea
+                className="dg-input"
+                placeholder="Reason for suspension (required)"
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3}
+                style={{ resize: "vertical" }}
+              />
+            </div>
+          }
+          confirmLabel="Suspend"
+          variant="danger"
+          isLoading={suspending}
+          onConfirm={async () => {
+            if (!suspendReason.trim()) {
+              toast.error("Please provide a reason for suspension");
+              return;
+            }
+            setSuspending(true);
+            try {
+              await suspendOrganization(organization.id, suspendReason.trim());
+              toast.success("Organization suspended");
+              onOrgUpdated?.({ ...organization, suspendedAt: new Date().toISOString(), suspendedReason: suspendReason.trim() });
+              setSuspendConfirm(false);
+              setSuspendReason("");
+            } catch (err: unknown) {
+              toast.error((err instanceof Error ? err.message : null) ?? "Failed to suspend");
+            } finally {
+              setSuspending(false);
+            }
+          }}
+          onCancel={() => { setSuspendConfirm(false); setSuspendReason(""); }}
+        />
+      )}
     </div>
   );
 }
@@ -552,8 +772,17 @@ function UsersTab({
   async function handleRoleChange(userId: string, newRole: OrganizationRole) {
     setChangingRole(userId);
     try {
-      await changeOrganizationUserRole(userId, newRole, orgId);
+      const target = users.find((u) => u.id === userId);
+      const oldRole = target?.orgRole ?? "user";
+      await changeOrganizationUserRole(userId, newRole, orgId, target?.email ?? undefined);
       toast.success("Role updated");
+      queueNotification({
+        action: "role_changed",
+        orgId,
+        targetUserId: userId,
+        fromRole: oldRole,
+        toRole: newRole,
+      });
       onUsersChanged();
     } catch (err: unknown) {
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to change role");
@@ -740,6 +969,7 @@ function UsersTab({
           userId={editingPerms.id}
           orgId={orgId}
           userName={[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}
+          userEmail={editingPerms.email ?? undefined}
           currentPermissions={editingPerms.adminPermissions}
           onClose={() => setEditingPerms(null)}
           onSaved={() => onUsersChanged()}
@@ -1213,6 +1443,125 @@ function ConfigTab({
               ))}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Invitations tab ─────────────────────────────────────────────────────────
+
+function InvitationsTab({
+  invitations,
+  orgId,
+  onRefresh,
+}: {
+  invitations: any[];
+  orgId: string;
+  onRefresh: () => void;
+}) {
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  function getStatus(inv: any): { label: string; color: string; bg: string } {
+    if (inv.accepted_at) return { label: "Accepted", color: "var(--color-success)", bg: "var(--color-success-bg)" };
+    if (inv.revoked_at) return { label: "Revoked", color: "var(--color-danger)", bg: "var(--color-danger-bg)" };
+    if (new Date(inv.expires_at) < new Date()) return { label: "Expired", color: "var(--color-warning)", bg: "var(--color-warning-bg)" };
+    return { label: "Pending", color: "var(--color-today-text)", bg: "var(--color-today-bg)" };
+  }
+
+  async function handleRevoke(invId: string) {
+    setRevoking(invId);
+    try {
+      const { error } = await supabase
+        .from("invitations")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", invId)
+        .eq("org_id", orgId);
+      if (error) throw error;
+      toast.success("Invitation revoked");
+      onRefresh();
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to revoke invitation");
+    } finally {
+      setRevoking(null);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+          {invitations.length} invitation{invitations.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Email</th>
+                <th style={thStyle}>Role</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Sent</th>
+                <th style={thStyle}>Expires</th>
+                <th style={thStyle}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invitations.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
+                    No invitations found
+                  </td>
+                </tr>
+              ) : (
+                invitations.map((inv) => {
+                  const status = getStatus(inv);
+                  const isPending = status.label === "Pending";
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{inv.email}</td>
+                      <td style={{ ...tdStyle, textTransform: "capitalize" }}>{inv.role_to_assign?.replace("_", " ") ?? "—"}</td>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontWeight: 600,
+                            color: status.color,
+                            background: status.bg,
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                        {new Date(inv.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                        {new Date(inv.expires_at).toLocaleDateString()}
+                      </td>
+                      <td style={tdStyle}>
+                        {isPending && (
+                          <button
+                            className="dg-btn dg-btn-ghost"
+                            style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px", color: "var(--color-danger)" }}
+                            onClick={() => handleRevoke(inv.id)}
+                            disabled={revoking === inv.id}
+                          >
+                            {revoking === inv.id ? "Revoking..." : "Revoke"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

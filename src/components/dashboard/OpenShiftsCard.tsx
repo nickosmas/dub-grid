@@ -11,12 +11,14 @@ interface OpenShiftsCardProps {
   openShifts: OpenShift[];
   maxVisible?: number;
   onExpand?: () => void;
+  onVolunteer?: (shift: OpenShift) => void;
 }
 
 export default function OpenShiftsCard({
   openShifts,
   maxVisible = 5,
   onExpand,
+  onVolunteer,
 }: OpenShiftsCardProps) {
   const visible = openShifts.slice(0, maxVisible);
 
@@ -91,21 +93,44 @@ export default function OpenShiftsCard({
                     </div>
                   </div>
 
-                  {/* Badge */}
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "3px 8px",
-                      borderRadius: 5,
-                      background: badge.bg,
-                      color: badge.color,
-                      border: `1px solid ${badge.border}`,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {badge.label}
-                  </span>
+                  {/* Badge + Volunteer */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: "3px 8px",
+                        borderRadius: 5,
+                        background: badge.bg,
+                        color: badge.color,
+                        border: `1px solid ${badge.border}`,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                    {onVolunteer && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onVolunteer(shift);
+                        }}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 5,
+                          background: "var(--color-primary)",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Volunteer
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

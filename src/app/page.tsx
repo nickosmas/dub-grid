@@ -245,9 +245,9 @@ export default function RootPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface)] text-slate-950 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--color-surface)] text-[var(--color-text-primary)] font-sans overflow-x-hidden">
       {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-slate-100">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-[var(--color-border-light)]">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <DubGridLogo size={28} color="var(--color-brand)" />
@@ -258,13 +258,13 @@ export default function RootPage() {
           <div className="hidden md:flex items-center gap-8">
             <a
               href="#features"
-              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+              className="text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
             >
               Features
             </a>
             <a
               href="#security"
-              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+              className="text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
             >
               Security
             </a>
@@ -280,7 +280,7 @@ export default function RootPage() {
             {/* Mobile hamburger */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 -mr-2 text-[var(--color-text-muted)] hover:text-slate-900 transition-colors"
+              className="md:hidden p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
               aria-label="Open menu"
             >
               <Menu size={22} />
@@ -299,7 +299,7 @@ export default function RootPage() {
             </div>
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-2 -mr-2 text-[var(--color-text-muted)] hover:text-slate-900 transition-colors"
+              className="p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
               aria-label="Close menu"
             >
               <X size={22} />
@@ -309,14 +309,14 @@ export default function RootPage() {
             <a
               href="#features"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-slate-900 hover:text-slate-600 transition-colors"
+              className="text-2xl font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-subtle)] transition-colors"
             >
               Features
             </a>
             <a
               href="#security"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-slate-900 hover:text-slate-600 transition-colors"
+              className="text-2xl font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-subtle)] transition-colors"
             >
               Security
             </a>
@@ -359,14 +359,14 @@ export default function RootPage() {
 
         <div className="max-w-4xl mx-auto px-6 text-center pt-28 pb-14">
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-slate-950 leading-[1.05]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-[var(--color-text-primary)] leading-[1.05]">
             Purpose built for
             <br />
             <span className="text-[var(--color-brand)]">CS Care Facilities</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-6 text-lg md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-lg md:text-xl text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
             DubGrid replaces spreadsheets with a purpose-built scheduling
             platform. Faster to use, easier to manage, impossible to break.
           </p>
@@ -382,7 +382,7 @@ export default function RootPage() {
             </Link>
             <a
               href="#features"
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full border border-slate-200 text-[var(--color-text-secondary)] font-semibold text-base hover:border-slate-400 transition-colors duration-200"
+              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)] font-semibold text-base hover:border-[var(--color-border)] transition-colors duration-200"
             >
               See Features
             </a>
@@ -405,10 +405,10 @@ export default function RootPage() {
       <RevealSection id="features" className="py-16 sm:py-20 lg:py-24 bg-[var(--color-bg)]">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
               Everything you need
             </h2>
-            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
               Built specifically for care facilities that need reliable,
               role-aware scheduling.
             </p>
@@ -420,19 +420,19 @@ export default function RootPage() {
               return (
                 <div
                   key={feature.title}
-                  className="group rounded-2xl border border-slate-100 bg-[var(--color-surface)] p-6 lg:p-8 hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                  className="group rounded-2xl border border-[var(--color-border-light)] bg-[var(--color-surface)] p-6 lg:p-8 hover:border-[var(--color-border)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                   style={{ transitionDelay: `${i * 75}ms` }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-slate-200 transition-colors duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--color-bg-secondary)] flex items-center justify-center mb-4 group-hover:bg-[var(--color-border-light)] transition-colors duration-300">
                     <Icon
                       size={20}
-                      className="text-[var(--color-text-muted)] group-hover:text-slate-700 transition-colors duration-300"
+                      className="text-[var(--color-text-muted)] group-hover:text-[var(--color-text-muted)] transition-colors duration-300"
                     />
                   </div>
-                  <h3 className="text-base font-semibold text-slate-900 mb-2">
+                  <h3 className="text-base font-semibold text-[var(--color-text-secondary)] mb-2">
                     {feature.title}
                   </h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">
+                  <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
                     {feature.description}
                   </p>
                 </div>
@@ -447,10 +447,10 @@ export default function RootPage() {
       <RevealSection className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
               Make it yours
             </h2>
-            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
               Rename focus areas, certifications, and roles to match how your facility actually works.
             </p>
           </div>
@@ -462,10 +462,10 @@ export default function RootPage() {
       <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
               Automate the routine
             </h2>
-            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
               Set recurring shift templates and apply them in one click. Daily, weekly, or biweekly.
             </p>
           </div>
@@ -477,10 +477,10 @@ export default function RootPage() {
       <RevealSection className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
               Your team, at a glance
             </h2>
-            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
               Certifications, focus areas, and account status — all in one unified view.
             </p>
           </div>
@@ -497,10 +497,10 @@ export default function RootPage() {
       >
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-slate-950">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
               Built for trust
             </h2>
-            <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
               Enterprise-grade security without the enterprise complexity.
             </p>
           </div>
@@ -513,17 +513,17 @@ export default function RootPage() {
                 return (
                   <div
                     key={signal.title}
-                    className="p-6 rounded-2xl bg-[var(--color-surface)] border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200"
+                    className="p-6 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border-light)] hover:border-[var(--color-border)] hover:shadow-sm transition-all duration-200"
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-lg bg-[var(--color-bg-secondary)] flex items-center justify-center">
                         <Icon size={18} className="text-[var(--color-text-muted)]" />
                       </div>
-                      <h3 className="text-base font-semibold text-slate-900">
+                      <h3 className="text-base font-semibold text-[var(--color-text-secondary)]">
                         {signal.title}
                       </h3>
                     </div>
-                    <p className="text-sm text-slate-500 leading-relaxed">
+                    <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
                       {signal.description}
                     </p>
                   </div>
@@ -571,27 +571,27 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-slate-100">
+      <footer className="border-t border-[var(--color-border-light)]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <a
             href={typeof window !== "undefined" ? `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login` : "/login"}
             className="flex items-center gap-2.5"
           >
             <DubGridLogo size={20} color="var(--color-text-faint)" />
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-[var(--color-text-faint)]">
               &copy; {new Date().getFullYear()} DubGrid
             </span>
           </a>
           <div className="flex gap-6">
             <Link
               href="/privacy"
-              className="text-xs text-slate-400 hover:text-[var(--color-text-muted)] transition-colors"
+              className="text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)] transition-colors"
             >
               Privacy Policy
             </Link>
             <Link
               href="/terms"
-              className="text-xs text-slate-400 hover:text-[var(--color-text-muted)] transition-colors"
+              className="text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)] transition-colors"
             >
               Terms of Service
             </Link>

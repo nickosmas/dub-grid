@@ -39,6 +39,11 @@ import {
   ShiftRequestType,
   ShiftRequestStatus,
   CoverageRequirement,
+  GridOpenShift,
+  OrgActivityMetrics,
+  UserMembership,
+  Subscription,
+  OrganizationRole,
 } from "@/types";
 
 // ── Optimistic Locking Error ──────────────────────────────────────────────────
@@ -86,6 +91,15 @@ export interface DbOrganization {
   shift_display_mode: string | null;
   timezone: string | null;
   archived_at: string | null;
+  suspended_at: string | null;
+  suspended_reason: string | null;
+  enforce_conflict_prevention: boolean;
+  stripe_customer_id: string | null;
+  subscription_status: string | null;
+  trial_ends_at: string | null;
+  subscription_seats: number | null;
+  data_retention_days: number;
+  feature_overrides: Record<string, boolean>;
 }
 
 export interface DbFocusArea {
@@ -194,6 +208,19 @@ interface DbScheduleNote {
   updated_at: string;
 }
 
+// ── Column projections (avoid select('*') to reduce payload) ─────────────────
+
+const ORGANIZATION_COLS = "id, name, slug, address, phone, employee_count, focus_area_label, certification_label, role_label, shift_display_mode, timezone, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides";
+const FOCUS_AREA_COLS = "id, org_id, name, color_bg, color_text, sort_order, break_minutes, archived_at";
+const SHIFT_CODE_COLS = "id, org_id, label, name, color, border_color, text_color, category_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
+const SHIFT_CATEGORY_COLS = "id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes, archived_at";
+const NAMED_ITEM_COLS = "id, org_id, name, abbr, sort_order, archived_at";
+const EMPLOYEE_COLS = "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id";
+const COVERAGE_REQ_COLS = "id, org_id, focus_area_id, shift_code_id, day_of_week, min_staff";
+const ABSENCE_TYPE_COLS = "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
+const INDICATOR_TYPE_COLS = "id, org_id, name, color, sort_order, archived_at";
+const RECURRING_SHIFT_COLS = "id, emp_id, org_id, day_of_week, shift_code_id, absence_type_id, effective_from, effective_until, created_at, updated_at, archived_at";
+
 // ── Mapping helpers ───────────────────────────────────────────────────────────
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
@@ -232,6 +259,15 @@ export function rowToOrganization(row: DbOrganization): Organization {
     shiftDisplayMode: (row.shift_display_mode as import("@/types").ShiftDisplayMode) ?? 'code',
     timezone: row.timezone ?? null,
     archivedAt: row.archived_at ?? null,
+    suspendedAt: row.suspended_at ?? null,
+    suspendedReason: row.suspended_reason ?? null,
+    enforceConflictPrevention: row.enforce_conflict_prevention ?? false,
+    stripeCustomerId: row.stripe_customer_id ?? null,
+    subscriptionStatus: row.subscription_status ?? null,
+    trialEndsAt: row.trial_ends_at ?? null,
+    subscriptionSeats: row.subscription_seats ?? null,
+    dataRetentionDays: row.data_retention_days ?? 365,
+    featureOverrides: row.feature_overrides ?? {},
   };
 }
 
@@ -362,7 +398,7 @@ export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<Db
 // ── Organization ──────────────────────────────────────────────────────────────
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
-  let query = supabase.from("organizations").select("*");
+  let query = supabase.from("organizations").select(ORGANIZATION_COLS);
 
   // Client-side: scope by subdomain slug if present
   if (typeof window !== "undefined") {
@@ -392,7 +428,7 @@ export async function fetchOrganizationById(orgId: string): Promise<Organization
   return cacheThrough(CacheKey.organization(orgId), TTL.STABLE, async () => {
     const { data, error } = await supabase
       .from("organizations")
-      .select("*")
+      .select(ORGANIZATION_COLS)
       .eq("id", orgId)
       .maybeSingle();
 
@@ -415,6 +451,9 @@ export async function updateOrganization(org: Organization): Promise<void> {
       role_label: org.roleLabel || null,
       shift_display_mode: org.shiftDisplayMode || 'code',
       timezone: org.timezone || null,
+      enforce_conflict_prevention: org.enforceConflictPrevention ?? false,
+      data_retention_days: org.dataRetentionDays ?? 365,
+      feature_overrides: org.featureOverrides ?? {},
     })
     .eq("id", org.id);
   if (error) throw error;
@@ -429,7 +468,7 @@ export async function fetchCertifications(orgId: string, includeArchived = false
     return cacheThrough(CacheKey.certifications(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
         .from("certifications")
-        .select("*")
+        .select(NAMED_ITEM_COLS)
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order");
@@ -439,7 +478,7 @@ export async function fetchCertifications(orgId: string, includeArchived = false
   }
   const query = supabase
     .from("certifications")
-    .select("*")
+    .select(NAMED_ITEM_COLS)
     .eq("org_id", orgId);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
@@ -506,7 +545,7 @@ export async function fetchOrganizationRoles(orgId: string, includeArchived = fa
     return cacheThrough(CacheKey.orgRoles(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
         .from("organization_roles")
-        .select("*")
+        .select(NAMED_ITEM_COLS)
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order");
@@ -516,7 +555,7 @@ export async function fetchOrganizationRoles(orgId: string, includeArchived = fa
   }
   const query = supabase
     .from("organization_roles")
-    .select("*")
+    .select(NAMED_ITEM_COLS)
     .eq("org_id", orgId);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
@@ -602,6 +641,7 @@ export async function updateAdminPermissions(
   userId: string,
   permissions: import("@/types").AdminPermissions | null,
   orgId: string,
+  targetEmail?: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("organization_memberships")
@@ -610,13 +650,14 @@ export async function updateAdminPermissions(
     .eq("org_id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.orgUsers(orgId));
-  void logAudit("permissions.updated", "permissions", userId, { permissions }, orgId);
+  void logAudit("permissions.updated", "permissions", userId, { permissions, targetEmail: targetEmail ?? null }, orgId);
 }
 
 export async function changeOrganizationUserRole(
   targetUserId: string,
   newRole: import("@/types").OrganizationRole,
   orgId?: string,
+  targetEmail?: string,
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -625,12 +666,13 @@ export async function changeOrganizationUserRole(
     p_new_role: newRole,
     p_changed_by_id: user.id,
     p_idempotency_key: `${targetUserId}-${newRole}-${Date.now()}`,
+    p_org_id: orgId ?? null,
   });
   if (error) throw error;
   const keys = [CacheKey.allUsers(), CacheKey.mwProfile(targetUserId)];
   if (orgId) keys.push(CacheKey.orgUsers(orgId));
   await cacheDel(...keys);
-  void logAudit("role.changed", "role", targetUserId, { newRole }, orgId);
+  void logAudit("role.changed", "role", targetUserId, { newRole, targetEmail: targetEmail ?? null }, orgId);
 }
 
 
@@ -641,7 +683,7 @@ export async function fetchFocusAreas(orgId: string, includeArchived = false): P
     return cacheThrough(CacheKey.focusAreas(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
         .from("focus_areas")
-        .select("*")
+        .select(FOCUS_AREA_COLS)
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order");
@@ -651,7 +693,7 @@ export async function fetchFocusAreas(orgId: string, includeArchived = false): P
   }
   const { data, error } = await supabase
     .from("focus_areas")
-    .select("*")
+    .select(FOCUS_AREA_COLS)
     .eq("org_id", orgId)
     .order("sort_order");
   if (error) throw error;
@@ -709,21 +751,11 @@ export async function deleteFocusArea(focusAreaId: number, orgId: string): Promi
     .is("archived_at", null);
   if (catErr) throw catErr;
 
-  // Remove this focus area from employee focusAreaIds arrays
-  const { data: affectedEmps, error: empFetchErr } = await supabase
-    .from("employees")
-    .select("id, focus_area_ids")
-    .contains("focus_area_ids", [focusAreaId]);
-  if (empFetchErr) throw empFetchErr;
-
-  for (const emp of affectedEmps ?? []) {
-    const updated = (emp.focus_area_ids as number[]).filter((id: number) => id !== focusAreaId);
-    const { error: empErr } = await supabase
-      .from("employees")
-      .update({ focus_area_ids: updated })
-      .eq("id", emp.id);
-    if (empErr) throw empErr;
-  }
+  // Remove this focus area from employee focusAreaIds arrays (single batch UPDATE via RPC)
+  const { error: empErr } = await supabase.rpc("remove_focus_area_from_employees", {
+    p_focus_area_id: focusAreaId,
+  });
+  if (empErr) throw empErr;
 
   // Soft-delete the focus area (row persists — all FK/array references remain valid)
   const { error } = await supabase
@@ -741,13 +773,23 @@ export async function deleteFocusArea(focusAreaId: number, orgId: string): Promi
   void logAudit("focus_area.archived", "focus_area", String(focusAreaId), {}, orgId);
 }
 
+export async function restoreFocusArea(focusAreaId: number, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("focus_areas")
+    .update({ archived_at: null })
+    .eq("id", focusAreaId);
+  if (error) throw error;
+  await cacheDel(CacheKey.focusAreas(orgId));
+  void logAudit("focus_area.restored", "focus_area", String(focusAreaId), {}, orgId);
+}
+
 // ── Shift Codes ───────────────────────────────────────────────────────────────
 
 export async function fetchShiftCodes(orgId: string, includeArchived = false): Promise<ShiftCode[]> {
   return cacheThrough(CacheKey.shiftCodes(orgId, includeArchived), TTL.STABLE, async () => {
     let query = supabase
       .from("shift_codes")
-      .select("*")
+      .select(SHIFT_CODE_COLS)
       .eq("org_id", orgId);
     if (!includeArchived) query = query.is("archived_at", null);
     const { data, error } = await query.order("sort_order");
@@ -761,7 +803,7 @@ export async function fetchShiftCategories(orgId: string, includeArchived = fals
     return cacheThrough(CacheKey.shiftCategories(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
         .from("shift_categories")
-        .select("*")
+        .select(SHIFT_CATEGORY_COLS)
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order");
@@ -771,7 +813,7 @@ export async function fetchShiftCategories(orgId: string, includeArchived = fals
   }
   const { data, error } = await supabase
     .from("shift_categories")
-    .select("*")
+    .select(SHIFT_CATEGORY_COLS)
     .eq("org_id", orgId)
     .order("sort_order");
   if (error) throw error;
@@ -821,13 +863,23 @@ export async function deleteShiftCategory(id: number, orgId: string): Promise<vo
   await cacheDel(CacheKey.shiftCategories(orgId));
 }
 
+export async function restoreShiftCategory(id: number, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("shift_categories")
+    .update({ archived_at: null })
+    .eq("id", id);
+  if (error) throw error;
+  await cacheDel(CacheKey.shiftCategories(orgId));
+  void logAudit("shift_category.restored", "shift_category", String(id), {}, orgId);
+}
+
 // ── Coverage Requirements ─────────────────────────────────────────────────────
 
 export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
   return cacheThrough(CacheKey.coverageReqs(orgId), TTL.STABLE, async () => {
     const { data, error } = await supabase
       .from("coverage_requirements")
-      .select("*")
+      .select(COVERAGE_REQ_COLS)
       .eq("org_id", orgId);
     if (error) throw error;
     return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
@@ -934,13 +986,23 @@ export async function deleteShiftCode(id: number, orgId: string): Promise<void> 
   await cacheDel(CacheKey.shiftCodes(orgId), CacheKey.shiftCodes(orgId, true), CacheKey.coverageReqs(orgId));
 }
 
+export async function restoreShiftCode(id: number, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("shift_codes")
+    .update({ archived_at: null })
+    .eq("id", id);
+  if (error) throw error;
+  await cacheDel(CacheKey.shiftCodes(orgId), CacheKey.shiftCodes(orgId, true), CacheKey.coverageReqs(orgId));
+  void logAudit("shift_code.restored", "shift_code", String(id), {}, orgId);
+}
+
 // ── Absence Types ─────────────────────────────────────────────────────────────
 
 export async function fetchAbsenceTypes(orgId: string, includeArchived = false): Promise<AbsenceType[]> {
   return cacheThrough(CacheKey.absenceTypes(orgId, includeArchived), TTL.STABLE, async () => {
     let query = supabase
       .from("absence_types")
-      .select("*")
+      .select(ABSENCE_TYPE_COLS)
       .eq("org_id", orgId);
     if (!includeArchived) query = query.is("archived_at", null);
     const { data, error } = await query.order("sort_order");
@@ -995,6 +1057,16 @@ export async function deleteAbsenceType(id: number, orgId: string): Promise<void
   await cacheDel(CacheKey.absenceTypes(orgId), CacheKey.absenceTypes(orgId, true));
 }
 
+export async function restoreAbsenceType(id: number, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("absence_types")
+    .update({ archived_at: null })
+    .eq("id", id);
+  if (error) throw error;
+  await cacheDel(CacheKey.absenceTypes(orgId), CacheKey.absenceTypes(orgId, true));
+  void logAudit("absence_type.restored", "absence_type", String(id), {}, orgId);
+}
+
 // ── Employees ─────────────────────────────────────────────────────────────────
 
 export async function fetchEmployees(
@@ -1003,7 +1075,7 @@ export async function fetchEmployees(
 ): Promise<Employee[]> {
   let query = supabase
     .from("employees")
-    .select("*")
+    .select(EMPLOYEE_COLS)
     .eq("org_id", orgId);
   // Terminated employees have archived_at set, so skip the filter when fetching them
   const includesTerminated = statuses?.includes("terminated");
@@ -1046,10 +1118,12 @@ export async function updateEmployee(emp: Employee, orgId: string): Promise<void
 
 export async function deleteEmployee(empId: string, orgId?: string): Promise<void> {
   const now = new Date().toISOString();
-  const { error } = await supabase
+  let query = supabase
     .from("employees")
     .update({ archived_at: now, status: 'terminated' as EmployeeStatus, status_changed_at: now })
     .eq("id", empId);
+  if (orgId) query = query.eq("org_id", orgId);
+  const { error } = await query;
   if (error) throw error;
   const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
   if (orgId) keys.push(CacheKey.employees(orgId));
@@ -1058,7 +1132,7 @@ export async function deleteEmployee(empId: string, orgId?: string): Promise<voi
 }
 
 export async function benchEmployee(empId: string, note?: string, orgId?: string): Promise<void> {
-  const { error } = await supabase
+  let query = supabase
     .from("employees")
     .update({
       status: 'benched' as EmployeeStatus,
@@ -1066,6 +1140,8 @@ export async function benchEmployee(empId: string, note?: string, orgId?: string
       status_note: note ?? '',
     })
     .eq("id", empId);
+  if (orgId) query = query.eq("org_id", orgId);
+  const { error } = await query;
   if (error) throw error;
   const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
   if (orgId) keys.push(CacheKey.employees(orgId));
@@ -1074,7 +1150,7 @@ export async function benchEmployee(empId: string, note?: string, orgId?: string
 }
 
 export async function activateEmployee(empId: string, orgId?: string): Promise<void> {
-  const { error } = await supabase
+  let query = supabase
     .from("employees")
     .update({
       status: 'active' as EmployeeStatus,
@@ -1083,6 +1159,8 @@ export async function activateEmployee(empId: string, orgId?: string): Promise<v
       archived_at: null,
     })
     .eq("id", empId);
+  if (orgId) query = query.eq("org_id", orgId);
+  const { error } = await query;
   if (error) throw error;
   const keys = [CacheKey.employeeDetail(empId), CacheKey.tenantStats()];
   if (orgId) keys.push(CacheKey.employees(orgId));
@@ -1099,7 +1177,7 @@ export async function fetchEmployeeById(
   return cacheThrough(CacheKey.employeeDetail(empId), TTL.MODERATE, async () => {
     const { data, error } = await supabase
       .from("employees")
-      .select("*")
+      .select(EMPLOYEE_COLS)
       .eq("id", empId)
       .eq("org_id", orgId)
       .maybeSingle();
@@ -1498,7 +1576,7 @@ export async function upsertShiftTimes(
   if (error) throw error;
 }
 
-export async function deleteShift(empId: string, date: string): Promise<void> {
+export async function deleteShift(empId: string, date: string, orgId?: string): Promise<void> {
   // Soft delete: set draft_is_delete so the publish RPC knows to clear it.
   // Uses update (not upsert) to avoid creating orphaned rows when no shift exists.
   const { error } = await supabase
@@ -1507,7 +1585,7 @@ export async function deleteShift(empId: string, date: string): Promise<void> {
     .eq("emp_id", empId)
     .eq("date", date);
   if (error) throw error;
-  void logAudit("shift.deleted", "shift", `${empId}:${date}`, {});
+  void logAudit("shift.deleted", "shift", `${empId}:${date}`, {}, orgId);
 }
 
 /**
@@ -1575,7 +1653,7 @@ export async function fetchRecentPublishHistory(
   const cutoff = since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("publish_history")
-    .select("*")
+    .select("id, org_id, published_by, start_date, end_date, change_count, changes, published_at")
     .eq("org_id", orgId)
     .gte("published_at", cutoff)
     .order("published_at", { ascending: false });
@@ -1590,6 +1668,31 @@ export async function fetchRecentPublishHistory(
     changeCount: row.change_count,
     changes: row.changes as import("@/types").PublishChange[],
     publishedAt: row.published_at,
+  }));
+}
+
+/**
+ * Returns date ranges that have been published at least once for the given org
+ * and date window. Used to gate coverage-gap open shifts so they only appear
+ * after the schedule has been published for those dates.
+ */
+export async function fetchPublishedDateRanges(
+  orgId: string,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<{ startDate: string; endDate: string }[]> {
+  const { data, error } = await supabase
+    .from("publish_history")
+    .select("start_date, end_date")
+    .eq("org_id", orgId)
+    .lte("start_date", rangeEnd)
+    .gte("end_date", rangeStart);
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data.map((row: any) => ({
+    startDate: row.start_date,
+    endDate: row.end_date,
   }));
 }
 
@@ -1736,11 +1839,14 @@ export async function discardScheduleDrafts(
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────
 
-export async function fetchScheduleNotes(orgId: string): Promise<ScheduleNote[]> {
-  const { data, error } = await supabase
+export async function fetchScheduleNotes(orgId: string, startDate?: string, endDate?: string): Promise<ScheduleNote[]> {
+  let query = supabase
     .from("schedule_notes")
     .select("id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at")
     .eq("org_id", orgId);
+  if (startDate) query = query.gte("date", startDate);
+  if (endDate) query = query.lte("date", endDate);
+  const { data, error } = await query;
   if (error) throw error;
 
   return (data as DbScheduleNote[]).map((row) => ({
@@ -1787,6 +1893,7 @@ export async function upsertScheduleNote(
 }
 
 export async function deleteScheduleNote(
+  orgId: string,
   empId: string,
   date: string,
   indicatorTypeId: number,
@@ -1798,6 +1905,7 @@ export async function deleteScheduleNote(
     const { error } = await supabase
       .from("schedule_notes")
       .delete()
+      .eq("org_id", orgId)
       .eq("emp_id", empId)
       .eq("date", date)
       .eq("indicator_type_id", indicatorTypeId)
@@ -1808,6 +1916,7 @@ export async function deleteScheduleNote(
     const { error } = await supabase
       .from("schedule_notes")
       .update({ status: 'draft_deleted' })
+      .eq("org_id", orgId)
       .eq("emp_id", empId)
       .eq("date", date)
       .eq("indicator_type_id", indicatorTypeId)
@@ -1844,7 +1953,7 @@ export async function fetchIndicatorTypes(orgId: string, includeArchived = false
     return cacheThrough(CacheKey.indicatorTypes(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
         .from("indicator_types")
-        .select("*")
+        .select(INDICATOR_TYPE_COLS)
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order");
@@ -1854,7 +1963,7 @@ export async function fetchIndicatorTypes(orgId: string, includeArchived = false
   }
   const { data, error } = await supabase
     .from("indicator_types")
-    .select("*")
+    .select(INDICATOR_TYPE_COLS)
     .eq("org_id", orgId)
     .order("sort_order");
   if (error) throw error;
@@ -1898,6 +2007,16 @@ export async function deleteIndicatorType(id: number, orgId: string): Promise<vo
     .eq("id", id);
   if (error) throw error;
   await cacheDel(CacheKey.indicatorTypes(orgId));
+}
+
+export async function restoreIndicatorType(id: number, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("indicator_types")
+    .update({ archived_at: null })
+    .eq("id", id);
+  if (error) throw error;
+  await cacheDel(CacheKey.indicatorTypes(orgId));
+  void logAudit("indicator_type.restored", "indicator_type", String(id), {}, orgId);
 }
 
 
@@ -2099,13 +2218,33 @@ export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
 }
 
 export async function revokeInvitation(invitationId: string, orgId?: string): Promise<void> {
-  const { error } = await supabase
+  let query = supabase
     .from("invitations")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", invitationId);
+  if (orgId) query = query.eq("org_id", orgId);
+  const { error } = await query;
   if (error) throw error;
   if (orgId) await cacheDel(CacheKey.invitations(orgId));
   void logAudit("invitation.revoked", "invitation", invitationId, {}, orgId);
+}
+
+export async function resendInvitation(
+  invitationId: string,
+  orgId: string,
+): Promise<{ token: string; expiresAt: string }> {
+  const newToken = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase
+    .from("invitations")
+    .update({ token: newToken, expires_at: expiresAt, revoked_at: null })
+    .eq("id", invitationId)
+    .eq("org_id", orgId)
+    .is("accepted_at", null);
+  if (error) throw error;
+  await cacheDel(CacheKey.invitations(orgId));
+  void logAudit("invitation.resent", "invitation", invitationId, {}, orgId);
+  return { token: newToken, expiresAt };
 }
 
 export async function linkEmployeeToUser(
@@ -2175,7 +2314,7 @@ export async function fetchRecurringShifts(
 ): Promise<RecurringShift[]> {
   let query = supabase
     .from("recurring_shifts")
-    .select("*")
+    .select(RECURRING_SHIFT_COLS)
     .eq("org_id", orgId)
     .order("day_of_week")
     .order("effective_from", { ascending: false });
@@ -2267,7 +2406,7 @@ export interface RecurringDraft {
 export async function getRecurringDraft(orgId: string): Promise<RecurringDraft | null> {
   const { data, error } = await supabase
     .from("recurring_shifts_draft_sessions")
-    .select("*")
+    .select("id, org_id, saved_by, draft_data, saved_at")
     .eq("org_id", orgId)
     .maybeSingle();
   if (error) throw error;
@@ -2476,7 +2615,7 @@ export async function fetchAllOrganizations(): Promise<Organization[]> {
   return cacheThrough(CacheKey.allOrganizations(), TTL.STABLE, async () => {
     const { data, error } = await supabase
       .from("organizations")
-      .select("*")
+      .select(ORGANIZATION_COLS)
       .order("name");
     if (error) throw error;
     return (data ?? []).map((row: unknown) => rowToOrganization(row as DbOrganization));
@@ -2508,7 +2647,7 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
   if (error) throw error;
   await cacheDel(CacheKey.allOrganizations(), CacheKey.tenantStats());
   const result = rowToOrganization(row as DbOrganization);
-  void logAudit("org.created", "organization", result.id, { name: data.name });
+  void logAudit("org.created", "organization", result.id, { name: data.name }, result.id);
   return result;
 }
 
@@ -2532,6 +2671,47 @@ export async function restoreOrganization(orgId: string): Promise<void> {
   void logAudit("org.restored", "organization", orgId, {}, orgId);
 }
 
+export async function deactivateUser(userId: string, orgId: string): Promise<void> {
+  const { data: { user: actor } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ deactivated_at: new Date().toISOString(), deactivated_by: actor?.id ?? null })
+    .eq("id", userId);
+  if (error) throw error;
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.allUsers());
+  void logAudit("user.deactivated", "role", userId, {}, orgId);
+}
+
+export async function reactivateUser(userId: string, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ deactivated_at: null, deactivated_by: null })
+    .eq("id", userId);
+  if (error) throw error;
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.allUsers());
+  void logAudit("user.reactivated", "role", userId, {}, orgId);
+}
+
+export async function suspendOrganization(orgId: string, reason: string): Promise<void> {
+  const { error } = await supabase
+    .from("organizations")
+    .update({ suspended_at: new Date().toISOString(), suspended_reason: reason })
+    .eq("id", orgId);
+  if (error) throw error;
+  await cacheDel(CacheKey.organization(orgId), CacheKey.allOrganizations());
+  void logAudit("org.suspended", "organization", orgId, { reason }, orgId);
+}
+
+export async function unsuspendOrganization(orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("organizations")
+    .update({ suspended_at: null, suspended_reason: null })
+    .eq("id", orgId);
+  if (error) throw error;
+  await cacheDel(CacheKey.organization(orgId), CacheKey.allOrganizations());
+  void logAudit("org.unsuspended", "organization", orgId, {}, orgId);
+}
+
 export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]> {
   return cacheThrough(CacheKey.allUsers(), TTL.MODERATE, async () => {
     const { data, error } = await supabase.rpc("get_all_users_with_profiles");
@@ -2548,6 +2728,7 @@ export async function fetchAllUsers(): Promise<import("@/types").PlatformUser[]>
       orgSlug: (row.org_slug as string | null) ?? null,
       createdAt: row.created_at as string,
       lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+      deactivatedAt: (row.deactivated_at as string | null) ?? null,
     }));
   });
 }
@@ -2580,13 +2761,14 @@ export async function fetchAuditLog(options?: {
 export async function fetchFullAuditLog(options?: {
   orgId?: string;
   action?: string;
+  actionPrefix?: string;
   resourceType?: string;
   limit?: number;
   offset?: number;
 }): Promise<import("@/types").FullAuditLogEntry[]> {
   let query = supabase
     .from("audit_log")
-    .select("*")
+    .select("id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at")
     .order("created_at", { ascending: false })
     .range(
       options?.offset ?? 0,
@@ -2594,6 +2776,7 @@ export async function fetchFullAuditLog(options?: {
     );
   if (options?.orgId) query = query.eq("org_id", options.orgId);
   if (options?.action) query = query.eq("action", options.action);
+  if (options?.actionPrefix) query = query.like("action", `${options.actionPrefix}%`);
   if (options?.resourceType) query = query.eq("resource_type", options.resourceType);
   const { data, error } = await query;
   if (error) throw error;
@@ -2614,9 +2797,10 @@ export async function removeUserFromOrganization(
   userId: string,
   orgId: string,
 ): Promise<void> {
+  const { data: { user: actor } } = await supabase.auth.getUser();
   const { error } = await supabase
     .from("organization_memberships")
-    .delete()
+    .update({ archived_at: new Date().toISOString(), archived_by: actor?.id ?? null })
     .eq("user_id", userId)
     .eq("org_id", orgId);
   if (error) throw error;
@@ -2626,34 +2810,237 @@ export async function removeUserFromOrganization(
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {
   return cacheThrough(CacheKey.tenantStats(), TTL.MODERATE, async () => {
-    const [{ data: memberData, error: mErr }, { data: empData, error: eErr }] =
-      await Promise.all([
-        supabase.from("organization_memberships").select("org_id"),
-        supabase.from("employees").select("org_id").is("archived_at", null),
-      ]);
-    if (mErr) throw mErr;
-    if (eErr) throw eErr;
-
-    const statsMap = new Map<string, TenantStats>();
-
-    for (const row of memberData ?? []) {
-      const cid = row.org_id;
-      if (!cid) continue;
-      const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
-      entry.userCount++;
-      statsMap.set(cid, entry);
-    }
-
-    for (const row of empData ?? []) {
-      const cid = row.org_id;
-      if (!cid) continue;
-      const entry = statsMap.get(cid) ?? { orgId: cid, userCount: 0, employeeCount: 0 };
-      entry.employeeCount++;
-      statsMap.set(cid, entry);
-    }
-
-    return Array.from(statsMap.values());
+    const { data, error } = await supabase.rpc("get_tenant_stats");
+    if (error) throw error;
+    return (data ?? []).map((row: { org_id: string; user_count: number; employee_count: number }) => ({
+      orgId: row.org_id,
+      userCount: Number(row.user_count),
+      employeeCount: Number(row.employee_count),
+    }));
   });
+}
+
+export async function fetchInvitationsForOrg(orgId: string): Promise<Invitation[]> {
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    orgId: row.org_id as string,
+    invitedBy: (row.invited_by as string) ?? null,
+    email: row.email as string,
+    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
+    expiresAt: row.expires_at as string,
+    acceptedAt: (row.accepted_at as string) ?? null,
+    revokedAt: (row.revoked_at as string) ?? null,
+    createdAt: row.created_at as string,
+    employeeId: (row.employee_id as string) ?? null,
+  }));
+}
+
+export async function revokeInvitationAsGridmaster(invitationId: string, orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", invitationId);
+  if (error) throw error;
+  await cacheDel(CacheKey.invitations(orgId));
+  void logAudit("invitation.revoked", "invitation", invitationId, { revokedBy: "gridmaster" }, orgId);
+}
+
+export async function fetchUserMemberships(userId: string): Promise<UserMembership[]> {
+  const { data, error } = await supabase
+    .from("organization_memberships")
+    .select("org_id, org_role, joined_at, admin_permissions, organizations(name, slug)")
+    .eq("user_id", userId)
+    .is("archived_at", null);
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const org = row.organizations as { name: string; slug: string | null } | null;
+    return {
+      orgId: row.org_id as string,
+      orgName: org?.name ?? "Unknown",
+      orgSlug: org?.slug ?? null,
+      orgRole: row.org_role as OrganizationRole,
+      joinedAt: row.joined_at as string,
+      adminPermissions: (row.admin_permissions as UserMembership["adminPermissions"]) ?? null,
+    };
+  });
+}
+
+export async function fetchOrgActivityMetrics(orgId: string): Promise<OrgActivityMetrics> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date().toISOString();
+
+  const [lastLoginResult, activeUsersResult, shiftsResult, pendingInvResult, acceptedInvResult] =
+    await Promise.all([
+      // Last login across all org users
+      supabase
+        .from("profiles")
+        .select("last_sign_in_at")
+        .in(
+          "id",
+          (await supabase
+            .from("organization_memberships")
+            .select("user_id")
+            .eq("org_id", orgId)
+            .is("archived_at", null)
+          ).data?.map((r: { user_id: string }) => r.user_id) ?? [],
+        )
+        .not("last_sign_in_at", "is", null)
+        .order("last_sign_in_at", { ascending: false })
+        .limit(1),
+
+      // Active users in last 30 days
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .in(
+          "id",
+          (await supabase
+            .from("organization_memberships")
+            .select("user_id")
+            .eq("org_id", orgId)
+            .is("archived_at", null)
+          ).data?.map((r: { user_id: string }) => r.user_id) ?? [],
+        )
+        .gte("last_sign_in_at", thirtyDaysAgo),
+
+      // Shifts created in last 30 days
+      supabase
+        .from("shifts")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .gte("created_at", thirtyDaysAgo),
+
+      // Pending invitations (not accepted, not revoked, not expired)
+      supabase
+        .from("invitations")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .gte("expires_at", now),
+
+      // Invitations accepted in last 30 days
+      supabase
+        .from("invitations")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .gte("accepted_at", thirtyDaysAgo),
+    ]);
+
+  const lastLoginRow = lastLoginResult.data?.[0] as { last_sign_in_at: string } | undefined;
+
+  return {
+    orgId,
+    lastLoginAt: lastLoginRow?.last_sign_in_at ?? null,
+    activeUsers30d: activeUsersResult.count ?? 0,
+    shiftsCreated30d: shiftsResult.count ?? 0,
+    invitationsPending: pendingInvResult.count ?? 0,
+    invitationsAccepted30d: acceptedInvResult.count ?? 0,
+  };
+}
+
+export async function deleteOrganizationPermanently(orgId: string): Promise<void> {
+  // Audit BEFORE deletion since audit entries for this org will be removed
+  void logAudit("org.deleted", "organization", orgId, { permanent: true }, orgId);
+
+  try {
+    // Delete in dependency order — children before parents
+    // Schedule data
+    await supabase.from("schedule_notes").delete().eq("org_id", orgId);
+    await supabase.from("shifts").delete().eq("org_id", orgId);
+    await supabase.from("recurring_shifts").delete().eq("org_id", orgId);
+    await supabase.from("shift_series").delete().eq("org_id", orgId);
+
+    // Coverage
+    await supabase.from("coverage_requirements").delete().eq("org_id", orgId);
+
+    // Config items
+    await supabase.from("shift_codes").delete().eq("org_id", orgId);
+    await supabase.from("shift_categories").delete().eq("org_id", orgId);
+    await supabase.from("absence_types").delete().eq("org_id", orgId);
+    await supabase.from("focus_areas").delete().eq("org_id", orgId);
+    await supabase.from("certifications").delete().eq("org_id", orgId);
+    await supabase.from("organization_roles").delete().eq("org_id", orgId);
+    await supabase.from("indicator_types").delete().eq("org_id", orgId);
+
+    // Employees
+    await supabase.from("employees").delete().eq("org_id", orgId);
+
+    // Invitations
+    await supabase.from("invitations").delete().eq("org_id", orgId);
+
+    // Notifications
+    await supabase.from("notifications").delete().eq("org_id", orgId);
+
+    // Shift requests
+    await supabase.from("shift_requests").delete().eq("org_id", orgId);
+
+    // Memberships
+    await supabase.from("organization_memberships").delete().eq("org_id", orgId);
+
+    // Audit log entries for this org
+    await supabase.from("audit_log").delete().eq("org_id", orgId);
+
+    // Subscriptions
+    await supabase.from("subscriptions").delete().eq("org_id", orgId);
+
+    // The organization itself
+    const { error } = await supabase.from("organizations").delete().eq("id", orgId);
+    if (error) throw error;
+
+    await cacheDel(
+      CacheKey.organization(orgId),
+      CacheKey.allOrganizations(),
+      CacheKey.tenantStats(),
+      CacheKey.employees(orgId),
+      CacheKey.orgUsers(orgId),
+      CacheKey.invitations(orgId),
+      CacheKey.focusAreas(orgId),
+      CacheKey.shiftCodes(orgId),
+      CacheKey.shiftCategories(orgId),
+      CacheKey.indicatorTypes(orgId),
+      CacheKey.certifications(orgId),
+      CacheKey.orgRoles(orgId),
+      CacheKey.coverageReqs(orgId),
+      CacheKey.absenceTypes(orgId),
+    );
+  } catch (err) {
+    console.error("Failed to permanently delete organization", orgId, err);
+    throw err;
+  }
+}
+
+export async function fetchOrgSubscription(orgId: string): Promise<Subscription | null> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("id, org_id, stripe_subscription_id, stripe_customer_id, status, price_id, quantity, current_period_start, current_period_end, cancel_at, canceled_at, trial_end, created_at, updated_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  return {
+    id: row.id as number,
+    orgId: row.org_id as string,
+    stripeSubscriptionId: (row.stripe_subscription_id as string) ?? null,
+    stripeCustomerId: (row.stripe_customer_id as string) ?? null,
+    status: row.status as string,
+    priceId: (row.price_id as string) ?? null,
+    quantity: row.quantity as number,
+    currentPeriodStart: (row.current_period_start as string) ?? null,
+    currentPeriodEnd: (row.current_period_end as string) ?? null,
+    cancelAt: (row.cancel_at as string) ?? null,
+    canceledAt: (row.canceled_at as string) ?? null,
+    trialEnd: (row.trial_end as string) ?? null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
 }
 
 
@@ -2678,6 +3065,8 @@ interface DbShiftRequest {
   target_focus_area_id: number | null;
   target_custom_start_time: string | null;
   target_custom_end_time: string | null;
+  absence_type_id: number | null;
+  parent_request_id: string | null;
   admin_user_id: string | null;
   admin_note: string | null;
   expires_at: string;
@@ -2727,6 +3116,8 @@ function rowToShiftRequest(
     targetFocusAreaId: row.target_focus_area_id,
     targetCustomStartTime: row.target_custom_start_time,
     targetCustomEndTime: row.target_custom_end_time,
+    absenceTypeId: row.absence_type_id,
+    parentRequestId: row.parent_request_id,
     adminUserId: row.admin_user_id,
     adminNote: row.admin_note,
     expiresAt: row.expires_at,
@@ -2780,16 +3171,37 @@ export async function fetchShiftRequests(
       first_name: string;
       last_name: string;
     } | null;
-    return rowToShiftRequest(
-      {
-        ...(row as unknown as DbShiftRequest),
-        requester_first_name: requester?.first_name,
-        requester_last_name: requester?.last_name,
-        target_first_name: target?.first_name ?? null,
-        target_last_name: target?.last_name ?? null,
-      },
-      shiftCodeMap
-    );
+    const mapped: DbShiftRequest = {
+      id: row.id as string,
+      org_id: row.org_id as string,
+      type: row.type as ShiftRequestType,
+      status: row.status as ShiftRequestStatus,
+      requester_emp_id: row.requester_emp_id as string,
+      requester_shift_date: row.requester_shift_date as string,
+      requester_shift_code_ids: row.requester_shift_code_ids as number[],
+      requester_focus_area_id: row.requester_focus_area_id as number | null,
+      requester_custom_start_time: row.requester_custom_start_time as string | null,
+      requester_custom_end_time: row.requester_custom_end_time as string | null,
+      target_emp_id: row.target_emp_id as string | null,
+      target_shift_date: row.target_shift_date as string | null,
+      target_shift_code_ids: row.target_shift_code_ids as number[] | null,
+      target_focus_area_id: row.target_focus_area_id as number | null,
+      target_custom_start_time: row.target_custom_start_time as string | null,
+      target_custom_end_time: row.target_custom_end_time as string | null,
+      absence_type_id: row.absence_type_id as number | null,
+      parent_request_id: row.parent_request_id as string | null,
+      admin_user_id: row.admin_user_id as string | null,
+      admin_note: row.admin_note as string | null,
+      expires_at: row.expires_at as string,
+      resolved_at: row.resolved_at as string | null,
+      created_at: row.created_at as string,
+      updated_at: row.updated_at as string,
+      requester_first_name: requester?.first_name,
+      requester_last_name: requester?.last_name,
+      target_first_name: target?.first_name ?? null,
+      target_last_name: target?.last_name ?? null,
+    };
+    return rowToShiftRequest(mapped, shiftCodeMap);
   });
 }
 
@@ -2811,7 +3223,8 @@ export async function createShiftRequest(
   requesterEmpId: string,
   requesterShiftDate: string,
   targetEmpId?: string,
-  targetShiftDate?: string
+  targetShiftDate?: string,
+  absenceTypeId?: number
 ): Promise<string> {
   const { data, error } = await supabase.rpc("create_shift_request", {
     p_org_id: orgId,
@@ -2820,6 +3233,7 @@ export async function createShiftRequest(
     p_requester_shift_date: requesterShiftDate,
     p_target_emp_id: targetEmpId ?? null,
     p_target_shift_date: targetShiftDate ?? null,
+    p_absence_type_id: absenceTypeId ?? null,
   });
   if (error) throw error;
   return data as string;
@@ -2834,6 +3248,28 @@ export async function claimShiftRequest(
     p_claimer_emp_id: claimerEmpId,
   });
   if (error) throw error;
+}
+
+export async function volunteerForOpenShift(
+  orgId: string,
+  empId: string,
+  shiftDate: string,
+  shiftCodeIds: number[],
+  focusAreaId: number,
+  customStartTime: string | null,
+  customEndTime: string | null
+): Promise<string> {
+  const { data, error } = await supabase.rpc("volunteer_for_open_shift", {
+    p_org_id: orgId,
+    p_emp_id: empId,
+    p_shift_date: shiftDate,
+    p_shift_code_ids: shiftCodeIds,
+    p_focus_area_id: focusAreaId,
+    p_custom_start_time: customStartTime,
+    p_custom_end_time: customEndTime,
+  });
+  if (error) throw error;
+  return data as string;
 }
 
 export async function respondToShiftRequest(
@@ -2871,4 +3307,52 @@ export async function cancelShiftRequest(
     p_emp_id: empId,
   });
   if (error) throw error;
+}
+
+// ── Open Shifts for Grid ──────────────────────────────────────────────────
+
+export async function fetchCalloffOpenShifts(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  shiftCodeMap: Map<number, string>
+): Promise<GridOpenShift[]> {
+  // Fetch pickup requests spawned from approved calloffs (parent_request_id IS NOT NULL)
+  const { data, error } = await supabase
+    .from("shift_requests")
+    .select(
+      `*, requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name, focus_area_ids)`
+    )
+    .eq("org_id", orgId)
+    .eq("type", "pickup")
+    .eq("status", "open")
+    .not("parent_request_id", "is", null)
+    .gte("requester_shift_date", startDate)
+    .lte("requester_shift_date", endDate);
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const requester = row.requester as {
+      first_name: string;
+      last_name: string;
+      focus_area_ids: number[];
+    } | null;
+    const codeIds = (row.requester_shift_code_ids as number[]) ?? [];
+    return {
+      id: row.id as string,
+      source: "calloff" as const,
+      date: row.requester_shift_date as string,
+      focusAreaId: (row.requester_focus_area_id as number) ?? requester?.focus_area_ids?.[0] ?? 0,
+      shiftCodeIds: codeIds,
+      shiftCodeLabel: resolveCodeLabels(codeIds, shiftCodeMap),
+      customStartTime: (row.requester_custom_start_time as string) ?? null,
+      customEndTime: (row.requester_custom_end_time as string) ?? null,
+      calledOffBy: [requester?.first_name, requester?.last_name]
+        .filter(Boolean)
+        .join(" ") || undefined,
+      requestId: row.id as string,
+      needed: 1,
+    };
+  });
 }

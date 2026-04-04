@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 export interface RoleChangeParams {
   targetUserId: string;
   newRole: string;
+  orgId?: string;
 }
 
 export interface RoleChangeResult {
@@ -58,6 +59,7 @@ export function useRoleChange() {
         p_new_role: params.newRole,
         p_changed_by_id: changedById,
         p_idempotency_key: idempotencyKey,
+        p_org_id: params.orgId ?? null,
       });
 
       if (error) throw error;

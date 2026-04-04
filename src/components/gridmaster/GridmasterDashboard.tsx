@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Organization, AuditLogEntry } from "@/types";
+import type { Organization, AuditLogEntry, FullAuditLogEntry } from "@/types";
 import type { TenantStats } from "@/lib/db";
-import { fetchAuditLog } from "@/lib/db";
+import { fetchAuditLog, fetchFullAuditLog } from "@/lib/db";
 import { sectionStyle, thStyle } from "@/lib/styles";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
         minWidth: 140,
       }}
     >
-      <div style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 4 }}>
+      <div style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, fontFamily: "var(--font-dm-mono), 'DM Mono', monospace", color: "var(--color-text-primary)", marginBottom: 4 }}>
         {value}
       </div>
       <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -88,16 +88,22 @@ export default function GridmasterDashboard({
   onCreateOrg: () => void;
 }) {
   const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
+  const [platformActivity, setPlatformActivity] = useState<FullAuditLogEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     fetchAuditLog({ limit: 10 })
       .then((entries) => { if (!cancelled) setRecentActivity(entries); })
       .catch(() => {});
+    fetchFullAuditLog({ limit: 100 })
+      .then((entries) => { if (!cancelled) setPlatformActivity(entries); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
   const activeOrganizations = organizations.filter((c) => !c.archivedAt);
+  const suspendedOrgs = organizations.filter((c) => c.suspendedAt);
+  const archivedOrgs = organizations.filter((c) => c.archivedAt);
 
   return (
     <>
@@ -112,10 +118,98 @@ export default function GridmasterDashboard({
 
       {/* Stats row */}
       <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
-        <StatCard label="Organizations" value={activeOrganizations.length} />
+        <StatCard label="Active Orgs" value={activeOrganizations.length - suspendedOrgs.filter((o) => !o.archivedAt).length} />
+        <StatCard label="Suspended" value={suspendedOrgs.length} />
+        <StatCard label="Archived" value={archivedOrgs.length} />
         <StatCard label="Users" value={totalUsers} />
         <StatCard label="Employees" value={totalEmployees} />
       </div>
+
+      {/* Suspended orgs alert */}
+      {suspendedOrgs.length > 0 && (
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--color-warning-bg, #fff8e6)",
+            border: "1px solid var(--color-warning, #b08800)",
+            borderRadius: 10,
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            color: "var(--color-warning, #b08800)",
+            marginBottom: 20,
+          }}
+        >
+          {suspendedOrgs.length} organization{suspendedOrgs.length !== 1 ? "s" : ""} currently suspended:{" "}
+          {suspendedOrgs.map((o, i) => (
+            <span key={o.id}>
+              {i > 0 && ", "}
+              <button
+                onClick={() => onSelectOrg(o.id)}
+                style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontWeight: 700, fontFamily: "inherit", padding: 0, textDecoration: "underline" }}
+              >
+                {o.name}
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Platform Activity Trends */}
+      {platformActivity.length > 0 && (() => {
+        const now = Date.now();
+        const day = 86400000;
+        const last24h = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < day);
+        const last7d = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < 7 * day);
+
+        // Group by action category
+        const categories: Record<string, number> = {};
+        for (const e of last7d) {
+          const cat = e.action.split(".")[0] ?? "other";
+          categories[cat] = (categories[cat] ?? 0) + 1;
+        }
+        const topCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+        // Anomaly: any single org with >30% of all actions
+        const orgCounts: Record<string, number> = {};
+        for (const e of last7d) {
+          if (e.orgId) orgCounts[e.orgId] = (orgCounts[e.orgId] ?? 0) + 1;
+        }
+        const anomalies = Object.entries(orgCounts)
+          .filter(([, count]) => count > last7d.length * 0.3 && count > 10)
+          .map(([oid, count]) => ({ orgId: oid, count, name: organizations.find((o) => o.id === oid)?.name ?? oid.slice(0, 8) }));
+
+        return (
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              Platform Activity (last 7 days)
+            </h3>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+              <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+                <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last24h.length}</div>
+                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 24h</div>
+              </div>
+              <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+                <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last7d.length}</div>
+                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 7 days</div>
+              </div>
+              {topCategories.map(([cat, count]) => (
+                <div key={cat} style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+                  <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{count}</div>
+                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{cat}</div>
+                </div>
+              ))}
+            </div>
+            {anomalies.length > 0 && (
+              <div style={{
+                padding: "10px 14px", background: "var(--color-danger-bg)", border: "1px solid var(--color-danger)",
+                borderRadius: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-danger)", fontWeight: 600,
+              }}>
+                Anomaly detected: {anomalies.map((a) => `${a.name} (${a.count} actions)`).join(", ")}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
@@ -147,7 +241,7 @@ export default function GridmasterDashboard({
         <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
           <thead>
             <tr>
-              {["Name", "Slug", "Users", "Employees", "Focus Areas", "Certifications", "Roles", "Timezone"].map((h) => (
+              {["Name", "Slug", "Status", "Users", "Employees", "Focus Areas", "Certifications", "Roles", "Timezone"].map((h) => (
                 <th
                   key={h}
                   style={{
@@ -161,7 +255,7 @@ export default function GridmasterDashboard({
             </tr>
           </thead>
           <tbody>
-            {activeOrganizations.map((c) => {
+            {organizations.filter((c) => !c.archivedAt).map((c) => {
               const s = stats.get(c.id);
               return (
                 <tr
@@ -176,6 +270,13 @@ export default function GridmasterDashboard({
                   </td>
                   <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace", borderBottom: "1px solid var(--color-border-light)" }}>
                     {c.slug ?? "—"}
+                  </td>
+                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-footnote)", borderBottom: "1px solid var(--color-border-light)" }}>
+                    {c.suspendedAt ? (
+                      <span style={{ fontWeight: 600, color: "var(--color-danger)", background: "var(--color-danger-bg)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Suspended</span>
+                    ) : (
+                      <span style={{ fontWeight: 600, color: "var(--color-success, #1a8a1a)", background: "var(--color-success-bg, #e6f9e6)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Active</span>
+                    )}
                   </td>
                   <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
                     {s?.userCount ?? 0}

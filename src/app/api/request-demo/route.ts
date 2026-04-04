@@ -4,6 +4,7 @@ import { z } from "zod";
 import { demoLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 
 const bodySchema = z.object({
   contactName: z.string().trim().min(1, "Name is required").max(100),
@@ -152,6 +153,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "request-demo" } });
     logger.error({ err, path: "/api/request-demo" }, "Failed to send demo request email");
     return NextResponse.json(
       { success: false, error: "Failed to send email" },

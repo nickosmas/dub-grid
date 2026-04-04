@@ -1,14 +1,12 @@
-// This file configures the initialization of Sentry on the client.
-// The added config here will be used whenever a users loads a page in their browser.
-// https://docs.sentry.io/platforms/javascript/guides/nextjs/
+// Client-side Sentry initialization — routed through the dev-aware shim
+// so the full SDK never loads in development (prevents manifest ENOENT errors).
+import { init, replayIntegration, captureRouterTransitionStart } from "@/lib/sentry";
 
-import * as Sentry from "@sentry/nextjs";
-
-Sentry.init({
+init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  integrations: [Sentry.replayIntegration()],
+  integrations: [replayIntegration()],
 
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
   enableLogs: true,
@@ -20,9 +18,10 @@ Sentry.init({
   sendDefaultPii: false,
 
   // Filter out browser extension errors
-  beforeSend(event) {
+  beforeSend(event: Record<string, unknown>) {
+    const exception = event.exception as { values?: Array<{ stacktrace?: { frames?: Array<{ filename?: string }> } }> } | undefined;
     if (
-      event.exception?.values?.[0]?.stacktrace?.frames?.some(
+      exception?.values?.[0]?.stacktrace?.frames?.some(
         (frame) => frame.filename?.includes("chrome-extension://"),
       )
     ) {
@@ -32,4 +31,4 @@ Sentry.init({
   },
 });
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+export const onRouterTransitionStart = captureRouterTransitionStart;

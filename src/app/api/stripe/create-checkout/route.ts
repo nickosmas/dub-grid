@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
 import { createServerClient } from "@supabase/ssr";
 import { createStripeCustomer, createCheckoutSession } from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase env vars not configured");
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+import * as Sentry from "@/lib/sentry";
 
 function getUserClient(req: NextRequest) {
   return createServerClient(
@@ -121,6 +113,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "create-checkout" } });
     logger.error({ error: err }, "Failed to create checkout session");
     return NextResponse.json({ error: "Failed to create checkout" }, { status: 500 });
   }
