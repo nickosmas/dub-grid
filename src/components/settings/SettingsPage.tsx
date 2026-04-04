@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, CoverageRequirement, AbsenceType } from "@/types";
 import { saveCertifications, saveOrganizationRoles } from "@/lib/db";
@@ -102,7 +102,7 @@ export default function SettingsPage({
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
-  const perms: NavPermissions = {
+  const perms: NavPermissions = useMemo(() => ({
     canManageOrg,
     isSuperAdmin,
     isGridmaster,
@@ -112,7 +112,7 @@ export default function SettingsPage({
     canManageIndicatorTypes,
     canManageOrgSettings,
     canManageCoverageRequirements,
-  };
+  }), [canManageOrg, isSuperAdmin, isGridmaster, canManageOrgLabels, canManageFocusAreas, canManageShiftCodes, canManageIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements]);
 
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
@@ -157,9 +157,6 @@ export default function SettingsPage({
     [activeSection, canManageOrg, isSuperAdmin, isGridmaster],
   );
   useSetMobileSubNav(subNavItems);
-
-  // Find the active group for highlighting
-  const activeGroup = navGroups.find(g => g.items.some(i => i.id === activeSection));
 
   // Get the title for the active section
   const activeItem = allItems.find(i => i.id === activeSection);

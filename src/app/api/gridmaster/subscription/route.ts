@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { z } from "zod";
-import { cancelSubscription, extendTrial, getSubscription } from "@/lib/stripe";
+import { cancelSubscription, extendTrial } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Organization, AuditLogEntry, FullAuditLogEntry } from "@/types";
 import type { TenantStats } from "@/lib/db";
 import { fetchAuditLog, fetchFullAuditLog } from "@/lib/db";
@@ -105,6 +105,62 @@ export default function GridmasterDashboard({
   const suspendedOrgs = organizations.filter((c) => c.suspendedAt);
   const archivedOrgs = organizations.filter((c) => c.archivedAt);
 
+  const [activitySnapshotMs] = useState(() => Date.now());
+  const activityTrends = useMemo(() => {
+    if (platformActivity.length === 0) return null;
+    const now = activitySnapshotMs;
+    const day = 86400000;
+    const last24h = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < day);
+    const last7d = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < 7 * day);
+
+    const categories: Record<string, number> = {};
+    for (const e of last7d) {
+      const cat = e.action.split(".")[0] ?? "other";
+      categories[cat] = (categories[cat] ?? 0) + 1;
+    }
+    const topCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+    const orgCounts: Record<string, number> = {};
+    for (const e of last7d) {
+      if (e.orgId) orgCounts[e.orgId] = (orgCounts[e.orgId] ?? 0) + 1;
+    }
+    const anomalies = Object.entries(orgCounts)
+      .filter(([, count]) => count > last7d.length * 0.3 && count > 10)
+      .map(([oid, count]) => ({ orgId: oid, count, name: organizations.find((o) => o.id === oid)?.name ?? oid.slice(0, 8) }));
+
+    return (
+      <div style={{ marginBottom: 28 }}>
+        <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+          Platform Activity (last 7 days)
+        </h3>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+            <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last24h.length}</div>
+            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 24h</div>
+          </div>
+          <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+            <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last7d.length}</div>
+            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 7 days</div>
+          </div>
+          {topCategories.map(([cat, count]) => (
+            <div key={cat} style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{count}</div>
+              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{cat}</div>
+            </div>
+          ))}
+        </div>
+        {anomalies.length > 0 && (
+          <div style={{
+            padding: "10px 14px", background: "var(--color-danger-bg)", border: "1px solid var(--color-danger)",
+            borderRadius: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-danger)", fontWeight: 600,
+          }}>
+            Anomaly detected: {anomalies.map((a) => `${a.name} (${a.count} actions)`).join(", ")}
+          </div>
+        )}
+      </div>
+    );
+  }, [platformActivity, organizations, activitySnapshotMs]);
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -155,61 +211,7 @@ export default function GridmasterDashboard({
       )}
 
       {/* Platform Activity Trends */}
-      {platformActivity.length > 0 && (() => {
-        const now = Date.now();
-        const day = 86400000;
-        const last24h = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < day);
-        const last7d = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < 7 * day);
-
-        // Group by action category
-        const categories: Record<string, number> = {};
-        for (const e of last7d) {
-          const cat = e.action.split(".")[0] ?? "other";
-          categories[cat] = (categories[cat] ?? 0) + 1;
-        }
-        const topCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]).slice(0, 6);
-
-        // Anomaly: any single org with >30% of all actions
-        const orgCounts: Record<string, number> = {};
-        for (const e of last7d) {
-          if (e.orgId) orgCounts[e.orgId] = (orgCounts[e.orgId] ?? 0) + 1;
-        }
-        const anomalies = Object.entries(orgCounts)
-          .filter(([, count]) => count > last7d.length * 0.3 && count > 10)
-          .map(([oid, count]) => ({ orgId: oid, count, name: organizations.find((o) => o.id === oid)?.name ?? oid.slice(0, 8) }));
-
-        return (
-          <div style={{ marginBottom: 28 }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
-              Platform Activity (last 7 days)
-            </h3>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-              <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-                <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last24h.length}</div>
-                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 24h</div>
-              </div>
-              <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-                <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last7d.length}</div>
-                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 7 days</div>
-              </div>
-              {topCategories.map(([cat, count]) => (
-                <div key={cat} style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-                  <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{count}</div>
-                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{cat}</div>
-                </div>
-              ))}
-            </div>
-            {anomalies.length > 0 && (
-              <div style={{
-                padding: "10px 14px", background: "var(--color-danger-bg)", border: "1px solid var(--color-danger)",
-                borderRadius: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-danger)", fontWeight: 600,
-              }}>
-                Anomaly detected: {anomalies.map((a) => `${a.name} (${a.count} actions)`).join(", ")}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {activityTrends}
 
       {/* Recent Activity */}
       {recentActivity.length > 0 && (

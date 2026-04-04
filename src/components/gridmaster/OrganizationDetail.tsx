@@ -19,6 +19,17 @@ import type {
   AdminPermissions,
   OrganizationRole,
 } from "@/types";
+
+/** Raw invitation row from supabase (snake_case columns). */
+interface InvitationRow {
+  id: string;
+  email: string;
+  role_to_assign: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
@@ -120,7 +131,7 @@ export default function OrganizationDetail({
   const [orgRoles, setOrgRoles] = useState<NamedItem[] | null>(null);
   const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[] | null>(null);
   const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
-  const [invitations, setInvitations] = useState<any[] | null>(null);
+  const [invitations, setInvitations] = useState<InvitationRow[] | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
 
@@ -378,7 +389,7 @@ function OverviewTab({
   const [saving, setSaving] = useState(false);
   const [editShiftDisplayMode, setEditShiftDisplayMode] = useState(organization.shiftDisplayMode);
   const [editEnforceConflictPrevention, setEditEnforceConflictPrevention] = useState(organization.enforceConflictPrevention);
-  const [editDataRetentionDays, setEditDataRetentionDays] = useState((organization as any).dataRetentionDays ?? 365);
+  const [editDataRetentionDays, setEditDataRetentionDays] = useState(organization.dataRetentionDays ?? 365);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [suspendConfirm, setSuspendConfirm] = useState(false);
@@ -397,8 +408,8 @@ function OverviewTab({
     setEditRoleLabel(organization.roleLabel);
     setEditShiftDisplayMode(organization.shiftDisplayMode);
     setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
-    setEditDataRetentionDays((organization as any).dataRetentionDays ?? 365);
-  }, [organization.id, organization.name, organization.address, organization.phone, organization.timezone, organization.focusAreaLabel, organization.certificationLabel, organization.roleLabel, organization.shiftDisplayMode, organization.enforceConflictPrevention]);
+    setEditDataRetentionDays(organization.dataRetentionDays ?? 365);
+  }, [organization.id, organization.name, organization.address, organization.phone, organization.timezone, organization.focusAreaLabel, organization.certificationLabel, organization.roleLabel, organization.shiftDisplayMode, organization.enforceConflictPrevention, organization.dataRetentionDays]);
 
   async function handleSave() {
     setSaving(true);
@@ -415,7 +426,7 @@ function OverviewTab({
         shiftDisplayMode: editShiftDisplayMode,
         enforceConflictPrevention: editEnforceConflictPrevention,
       };
-      (updated as any).dataRetentionDays = editDataRetentionDays;
+      updated.dataRetentionDays = editDataRetentionDays;
       await updateOrganization(updated);
       toast.success("Organization updated");
       setEditing(false);
@@ -574,26 +585,26 @@ function OverviewTab({
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>Billing &amp; Subscription</div>
         <div style={sectionBodyStyle}>
-          <InfoRow label="Status" value={(organization as any).subscriptionStatus ?? "No subscription"} />
+          <InfoRow label="Status" value={organization.subscriptionStatus ?? "No subscription"} />
           <InfoRow
             label="Trial Ends"
             value={
-              (organization as any).trialEndsAt
-                ? new Date((organization as any).trialEndsAt).toLocaleDateString()
+              organization.trialEndsAt
+                ? new Date(organization.trialEndsAt).toLocaleDateString()
                 : "—"
             }
           />
           <InfoRow
             label="Stripe Customer"
             value={
-              (organization as any).stripeCustomerId ? (
+              organization.stripeCustomerId ? (
                 <a
-                  href={`https://dashboard.stripe.com/customers/${(organization as any).stripeCustomerId}`}
+                  href={`https://dashboard.stripe.com/customers/${organization.stripeCustomerId}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: "var(--color-today-text)", textDecoration: "underline" }}
                 >
-                  {(organization as any).stripeCustomerId}
+                  {organization.stripeCustomerId}
                 </a>
               ) : (
                 "Not connected"
@@ -1456,13 +1467,13 @@ function InvitationsTab({
   orgId,
   onRefresh,
 }: {
-  invitations: any[];
+  invitations: InvitationRow[];
   orgId: string;
   onRefresh: () => void;
 }) {
   const [revoking, setRevoking] = useState<string | null>(null);
 
-  function getStatus(inv: any): { label: string; color: string; bg: string } {
+  function getStatus(inv: InvitationRow): { label: string; color: string; bg: string } {
     if (inv.accepted_at) return { label: "Accepted", color: "var(--color-success)", bg: "var(--color-success-bg)" };
     if (inv.revoked_at) return { label: "Revoked", color: "var(--color-danger)", bg: "var(--color-danger-bg)" };
     if (new Date(inv.expires_at) < new Date()) return { label: "Expired", color: "var(--color-warning)", bg: "var(--color-warning-bg)" };

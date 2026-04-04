@@ -3,8 +3,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { ShiftCode, FocusArea, ShiftCategory, NamedItem, AbsenceType, ShiftDisplayMode } from "@/types";
 import { upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType } from "@/lib/db";
-import { parseTo12h, to24h, fmt12h, calcTimeDuration } from "@/lib/utils";
-import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
+import { fmt12h, calcTimeDuration } from "@/lib/utils";
+import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";

@@ -63,7 +63,6 @@ export default function FeatureFlagsEditor({
   }
 
   // All flags: known + any custom ones from the current overrides
-  const allFlagNames = new Set([...KNOWN_FLAGS.map((f) => f.name), ...Object.keys(flags)]);
   const customFlags = Object.keys(flags).filter((k) => !KNOWN_FLAGS.find((f) => f.name === k));
 
   return (

@@ -61,7 +61,7 @@ function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
   const isSmallDesktop = useMediaQuery(SMALL_DESKTOP);
   const { user: authUser } = useAuth();
-  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId, role } = usePermissions();
+  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId } = usePermissions();
   const {
     org, focusAreas, shiftCodes, allShiftCodes, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,

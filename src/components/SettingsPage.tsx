@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType, ShiftDisplayMode } from "@/types";
 import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles, fetchFullAuditLog, fetchInvitations, revokeInvitation, resendInvitation } from "@/lib/db";
@@ -3760,7 +3760,6 @@ function OrgActivityLog({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetchFullAuditLog({ orgId, limit: PAGE_SIZE, offset: page * PAGE_SIZE })
       .then((data) => { if (!cancelled) setEntries(data); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load"); })
@@ -4683,7 +4682,6 @@ export default function SettingsPage({
   absenceTypes,
   onAbsenceTypesChange,
 }: SettingsPageProps) {
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const VALID_SECTIONS = ["organization", "display-mode", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "activity", "impersonation"];
   const sectionFromPath = searchParams.get("section");

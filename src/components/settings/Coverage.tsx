@@ -5,10 +5,6 @@ import { CoverageRequirement, FocusArea, ShiftCategory, ShiftCode, ShiftDisplayM
 import { saveCoverageRequirements } from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { useMediaQuery, MOBILE } from "@/hooks";
-import { fmt12h } from "@/lib/utils";
-import { borderColor } from "@/lib/colors";
-import { Section } from "./shared";
 
 // ── Coverage Requirements Settings ────────────────────────────────────────────
 

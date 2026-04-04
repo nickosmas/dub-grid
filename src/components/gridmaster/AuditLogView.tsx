@@ -145,8 +145,6 @@ export default function AuditLogView({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     fetchFullAuditLog({
       orgId,
@@ -154,7 +152,7 @@ export default function AuditLogView({
       offset: page * PAGE_SIZE,
     })
       .then((data) => { if (!cancelled) setEntries(data); })
-      .catch((err) => { if (!cancelled) setError(err.message); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [orgId, page]);

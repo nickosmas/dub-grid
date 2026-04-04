@@ -126,6 +126,7 @@ export function getDefaultSection(perms: NavPermissions): SectionId {
 }
 
 /** Get max content width for a section. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getMaxWidth(section: SectionId): number {
   return 860;
 }

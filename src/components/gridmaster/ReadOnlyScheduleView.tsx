@@ -103,7 +103,7 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
             focusAreaName: fa?.name ?? null,
             isDraft,
           };
-        }).filter((_r: ShiftRow) => true); // draft_is_delete filtered at DB level
+        }); // draft_is_delete filtered at DB level
 
         setShifts(rows);
       } catch (err: unknown) {

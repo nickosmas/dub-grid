@@ -23,8 +23,8 @@ type CaptureContext = { extra?: Record<string, unknown>; [key: string]: unknown 
 
 // ── No-op implementations ─────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const noop = (..._args: any[]) => {};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const noop = (...args: unknown[]) => {};
 
 const devLogger = {
   info: noop,
@@ -95,7 +95,6 @@ export const captureRequestError: (...args: any[]) => any = _sdk
   : noop;
 
 // init — used in sentry.server/edge/client config files
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const init: (options: Record<string, unknown>) => void = _sdk
   ? (...args) => { _sdk!.init(...args); }
   : noop;

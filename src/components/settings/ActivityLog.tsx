@@ -301,8 +301,6 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     fetchFullAuditLog({
       orgId,
