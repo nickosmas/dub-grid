@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchCoverageRequirements } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";

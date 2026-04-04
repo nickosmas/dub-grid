@@ -37,6 +37,7 @@ interface ToolbarProps {
   onImportPrevious?: () => void;
   isImportingPrevious?: boolean;
   onPrintOpen?: () => void;
+  onExportCSV?: () => void;
   presenceSlot?: React.ReactNode;
   showAudit?: boolean;
   onAuditToggle?: () => void;
@@ -92,6 +93,7 @@ function ToolsMenu({
   showAudit,
   onAuditToggle,
   onPrintOpen,
+  onExportCSV,
   canEditShifts,
   onApplyRecurring,
   isApplyingRecurring,
@@ -106,6 +108,7 @@ function ToolsMenu({
   showAudit?: boolean;
   onAuditToggle?: () => void;
   onPrintOpen?: () => void;
+  onExportCSV?: () => void;
   canEditShifts?: boolean;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
@@ -219,6 +222,22 @@ function ToolsMenu({
         </button>
       )}
 
+      {/* Export CSV */}
+      {onExportCSV && (
+        <button
+          role="menuitem"
+          className="dg-menu-item"
+          onClick={() => { onExportCSV(); onClose(); }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Export CSV
+        </button>
+      )}
+
       {/* Publish History */}
       {onPublishHistory && (
         <button
@@ -234,7 +253,7 @@ function ToolsMenu({
         </button>
       )}
 
-      {/* Auto Fill Shifts */}
+      {/* Auto Fill */}
       {canEditShifts && onApplyRecurring && (
         <button
           role="menuitem"
@@ -249,7 +268,7 @@ function ToolsMenu({
             <line x1="3" y1="10" x2="21" y2="10" />
             <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
           </svg>
-          {isApplyingRecurring ? "Filling..." : "Auto Fill Shifts"}
+          {isApplyingRecurring ? "Filling…" : "Auto Fill"}
         </button>
       )}
 
@@ -291,6 +310,7 @@ export default function Toolbar({
   onImportPrevious,
   isImportingPrevious,
   onPrintOpen,
+  onExportCSV,
   presenceSlot,
   showAudit,
   onAuditToggle,
@@ -487,6 +507,7 @@ export default function Toolbar({
               showAudit={showAudit}
               onAuditToggle={onAuditToggle}
               onPrintOpen={onPrintOpen}
+              onExportCSV={onExportCSV}
               canEditShifts={canEditShifts}
               onApplyRecurring={onApplyRecurring}
               isApplyingRecurring={isApplyingRecurring}

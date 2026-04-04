@@ -9,6 +9,7 @@ import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import { acceptTerms } from "@/lib/terms";
+import * as Sentry from "@/lib/sentry";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
 
@@ -27,6 +28,7 @@ export default function AcceptInvitePage() {
   const [loading, setLoading] = useState(false);
   const [emailFromUrl, setEmailFromUrl] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [orgName, setOrgName] = useState<string | null>(null);
 
   // Extract token and email from URL on mount
   useEffect(() => {
@@ -42,6 +44,17 @@ export default function AcceptInvitePage() {
         setEmailFromUrl(true);
       }
       setState("form");
+      // Fetch org name for context (best-effort)
+      supabase
+        .from("invitations")
+        .select("organizations(name)")
+        .eq("token", t)
+        .maybeSingle()
+        .then(({ data }: { data: { organizations: { name: string } | null } | null }) => {
+          const name = data?.organizations?.name;
+          if (name) setOrgName(name);
+        })
+        .catch(() => { /* best-effort */ });
     }
   }, []);
 
@@ -79,7 +92,7 @@ export default function AcceptInvitePage() {
       });
 
       if (signUpError) {
-        throw new Error(signUpError.message);
+        throw new Error("Unable to create your account. Please try again or contact support.");
       }
 
       // If no session (email confirmation required or user already exists),
@@ -93,7 +106,7 @@ export default function AcceptInvitePage() {
           throw new Error(
             signInError.message.toLowerCase().includes("email not confirmed")
               ? "Please check your email to confirm your account, then try again."
-              : signInError.message
+              : "Unable to sign in. Please try again or contact support."
           );
         }
       }
@@ -148,7 +161,7 @@ export default function AcceptInvitePage() {
       setOrgSlug(slug);
       setState("success");
     } catch (err: unknown) {
-      console.error("[accept-invite] Error:", err);
+      Sentry.captureException(err, { extra: { context: "accept-invite" } });
       setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setState("form");
       setLoading(false);
@@ -200,7 +213,9 @@ export default function AcceptInvitePage() {
           <>
             <h1 style={headingStyle}>Accept Invitation</h1>
             <p style={subtextStyle}>
-              Set your password to join your organization.
+              {orgName
+                ? <>Set your password to join <strong>{orgName}</strong> on DubGrid.</>
+                : "Set your password to join your organization on DubGrid."}
             </p>
 
             <form
@@ -349,7 +364,8 @@ function SuccessState({
       <h1 style={headingStyle}>You&apos;re All Set</h1>
       <p style={subtextStyle}>
         Your account has been created and invitation accepted.
-        Redirecting to sign in{countdown > 0 ? ` in ${countdown}...` : "..."}
+        For security, please sign in with the password you just created.
+        Redirecting{countdown > 0 ? ` in ${countdown}...` : "..."}
       </p>
       <button
         onClick={() => (window.location.href = getLoginUrl(orgSlug))}

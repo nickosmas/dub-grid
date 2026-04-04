@@ -33,6 +33,24 @@ export interface Organization {
   timezone: string | null;
   /** Non-null when the organization has been archived (soft-deleted). */
   archivedAt?: string | null;
+  /** Non-null when the organization is suspended. Members are blocked from the app. */
+  suspendedAt?: string | null;
+  /** Reason for suspension, set by gridmaster. */
+  suspendedReason?: string | null;
+  /** When true, shift overlap warnings become blocking — save is disabled until conflicts are resolved. */
+  enforceConflictPrevention: boolean;
+  /** Stripe customer ID for billing. */
+  stripeCustomerId?: string | null;
+  /** Stripe subscription status: trialing, active, past_due, canceled, unpaid. */
+  subscriptionStatus?: string | null;
+  /** Trial expiry timestamp. */
+  trialEndsAt?: string | null;
+  /** Number of subscription seats from Stripe. */
+  subscriptionSeats?: number | null;
+  /** Number of days to retain archived/deleted data before permanent purge. */
+  dataRetentionDays: number;
+  /** Per-org feature flag overrides. Keys are flag names, values are booleans. */
+  featureOverrides: Record<string, boolean>;
 }
 
 
@@ -300,6 +318,8 @@ export interface EditModalState {
   empCertificationId: number | null;
   /** The focus area section the cell was clicked in */
   activeFocusAreaId?: number | null;
+  /** When true, panel shows only the calloff absence type picker */
+  calloffMode?: boolean;
 }
 
 export interface IndicatorType {
@@ -579,6 +599,7 @@ export interface PlatformUser {
   orgSlug: string | null;
   createdAt: string;
   lastSignInAt: string | null;
+  deactivatedAt: string | null;
 }
 
 /** An audit log entry from the role_change_log table, denormalized with user emails. */
@@ -621,9 +642,39 @@ export interface OrganizationMembership {
   lastName: string | null;
 }
 
+/** Org activity metrics for gridmaster dashboard. */
+export interface OrgActivityMetrics {
+  orgId: string;
+  lastLoginAt: string | null;
+  activeUsers30d: number;
+  shiftsCreated30d: number;
+  invitationsPending: number;
+  invitationsAccepted30d: number;
+}
+
+/** Feature flag override per org. */
+export interface FeatureOverride {
+  id: string;
+  orgId: string;
+  flagName: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** User's memberships across all orgs (gridmaster user detail view). */
+export interface UserMembership {
+  orgId: string;
+  orgName: string;
+  orgSlug: string | null;
+  orgRole: OrganizationRole;
+  joinedAt: string;
+  adminPermissions: AdminPermissions | null;
+}
+
 // ── Shift Requests ──────────────────────────────────────────────────────────
 
-export type ShiftRequestType = 'pickup' | 'swap';
+export type ShiftRequestType = 'pickup' | 'swap' | 'calloff';
 export type ShiftRequestStatus = 'open' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'expired';
 
 export interface ShiftRequest {
@@ -647,10 +698,29 @@ export interface ShiftRequest {
   targetFocusAreaId: number | null;
   targetCustomStartTime: string | null;
   targetCustomEndTime: string | null;
+  absenceTypeId: number | null;
+  parentRequestId: string | null;
   adminUserId: string | null;
   adminNote: string | null;
   expiresAt: string;
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ── Grid Open Shifts ────────────────────────────────────────────────────────
+
+export interface GridOpenShift {
+  id: string;
+  source: 'calloff' | 'coverage_gap';
+  date: string;
+  focusAreaId: number;
+  shiftCodeIds: number[];
+  shiftCodeLabel: string;
+  customStartTime: string | null;
+  customEndTime: string | null;
+  calledOffBy?: string;
+  requestId?: string;
+  /** Number of staff still needed for this open shift. */
+  needed?: number;
 }

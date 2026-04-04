@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
+import UserViewBanner from "@/components/UserViewBanner";
 import { useOrganizationData, usePermissions } from "@/hooks";
 
 const APP_ROUTES = ["/dashboard", "/schedule", "/staff", "/settings"];
@@ -15,11 +16,7 @@ function AppHeader() {
   const { org } = useOrganizationData();
   return (
     <div
-      className="no-print"
       style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
         background: "var(--color-bg)",
         boxShadow: "var(--shadow-raised)",
       }}
@@ -42,8 +39,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <ImpersonationBanner />
-      {showHeader && <AppHeader />}
+      <div
+        className="no-print"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 9999,
+        }}
+      >
+        <ImpersonationBanner />
+        <UserViewBanner />
+        {showHeader && <AppHeader />}
+      </div>
       {children}
     </>
   );

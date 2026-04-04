@@ -47,10 +47,17 @@ CREATE POLICY "own_profile_select"
   ON public.profiles FOR SELECT TO authenticated
   USING (id = auth.uid());
 
+-- own_profile_update: users can update their own profile (name, preferences, etc.)
+-- but CANNOT change platform_role or org_id — those are managed exclusively by
+-- SECURITY DEFINER functions (assign_gridmaster_by_email, switch_org).
 CREATE POLICY "own_profile_update"
   ON public.profiles FOR UPDATE TO authenticated
   USING (id = auth.uid())
-  WITH CHECK (id = auth.uid());
+  WITH CHECK (
+    id = auth.uid()
+    AND platform_role = (SELECT p.platform_role FROM public.profiles p WHERE p.id = auth.uid())
+    AND (org_id IS NOT DISTINCT FROM (SELECT p.org_id FROM public.profiles p WHERE p.id = auth.uid()))
+  );
 
 CREATE POLICY "org_member_profiles_select"
   ON public.profiles FOR SELECT TO authenticated
@@ -104,13 +111,14 @@ CREATE POLICY "gridmaster_all_memberships"
 
 CREATE POLICY "own_memberships_select"
   ON public.organization_memberships FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid() AND archived_at IS NULL);
 
 CREATE POLICY "admin_memberships_select"
   ON public.organization_memberships FOR SELECT TO authenticated
   USING (
     org_id = public.caller_org_id()
     AND public.caller_org_role() IN ('admin', 'super_admin')
+    AND archived_at IS NULL
   );
 
 CREATE POLICY "super_admin_insert_memberships"
@@ -582,14 +590,26 @@ CREATE POLICY "invitations_insert"
   ON public.invitations FOR INSERT TO authenticated
   WITH CHECK (
     org_id = public.caller_org_id()
-    AND public.caller_org_role()::TEXT = 'super_admin'
+    AND (
+      public.caller_org_role()::TEXT = 'super_admin'
+      OR (
+        public.caller_org_role()::TEXT = 'admin'
+        AND public.check_admin_permission('canManageEmployees')
+      )
+    )
   );
 
 CREATE POLICY "invitations_revoke"
   ON public.invitations FOR UPDATE TO authenticated
   USING (
     org_id = public.caller_org_id()
-    AND public.caller_org_role()::TEXT = 'super_admin'
+    AND (
+      public.caller_org_role()::TEXT = 'super_admin'
+      OR (
+        public.caller_org_role()::TEXT = 'admin'
+        AND public.check_admin_permission('canManageEmployees')
+      )
+    )
     AND accepted_at IS NULL
   )
   WITH CHECK (revoked_at IS NOT NULL);
@@ -630,12 +650,26 @@ CREATE POLICY "own_locks_only"
 -- 12. IMPERSONATION SESSIONS (gridmaster only)
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE POLICY "gridmaster_all_impersonation"
-  ON public.impersonation_sessions FOR ALL TO authenticated
-  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+CREATE POLICY "gridmaster_read_impersonation"
+  ON public.impersonation_sessions FOR SELECT TO authenticated
+  USING (public.is_gridmaster());
 
-COMMENT ON POLICY "gridmaster_all_impersonation" ON public.impersonation_sessions
-  IS 'Only gridmasters can view and manage impersonation sessions';
+CREATE POLICY "gridmaster_insert_impersonation"
+  ON public.impersonation_sessions FOR INSERT TO authenticated
+  WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "gridmaster_update_impersonation"
+  ON public.impersonation_sessions FOR UPDATE TO authenticated
+  USING (public.is_gridmaster());
+
+-- No DELETE for gridmaster — impersonation sessions are append-only audit records
+
+COMMENT ON POLICY "gridmaster_read_impersonation" ON public.impersonation_sessions
+  IS 'Only gridmasters can view impersonation sessions';
+COMMENT ON POLICY "gridmaster_insert_impersonation" ON public.impersonation_sessions
+  IS 'Only gridmasters can create impersonation sessions';
+COMMENT ON POLICY "gridmaster_update_impersonation" ON public.impersonation_sessions
+  IS 'Only gridmasters can update impersonation sessions (e.g. set ended_at)';
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -852,13 +886,25 @@ CREATE POLICY "super_admin_read_org_audit_log"
     AND public.caller_org_role() = 'super_admin'
   );
 
--- No direct INSERT — audit entries are written by SECURITY DEFINER functions only
+-- Authenticated users can insert their own audit entries (scoped to their org)
+CREATE POLICY "authenticated_insert_audit_log"
+  ON public.audit_log FOR INSERT TO authenticated
+  WITH CHECK (
+    actor_id = auth.uid()
+    AND (org_id IS NULL OR org_id = public.caller_org_id())
+  );
 
--- Gridmaster can read all
-CREATE POLICY "gridmaster_all_audit_log"
-  ON public.audit_log FOR ALL TO authenticated
-  USING (public.is_gridmaster())
+-- Gridmaster can read all audit entries
+CREATE POLICY "gridmaster_read_audit_log"
+  ON public.audit_log FOR SELECT TO authenticated
+  USING (public.is_gridmaster());
+
+-- Gridmaster can insert audit entries
+CREATE POLICY "gridmaster_insert_audit_log"
+  ON public.audit_log FOR INSERT TO authenticated
   WITH CHECK (public.is_gridmaster());
+
+-- No UPDATE/DELETE for gridmaster — audit_log is append-only
 
 -- Service role bypasses RLS for server-side audit logging
 

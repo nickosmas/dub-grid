@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } fr
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { getInitials, getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
+import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode } from "@/types";
@@ -13,7 +13,7 @@ import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { BulkImportModal } from "@/components/staff/BulkImportModal";
 import { fetchInvitations, revokeInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/sentry";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
@@ -21,6 +21,8 @@ import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { useStaffFilters, useStaffSelection, useStaffReorder, StaffTableRow, StaffEmptyState, StaffPagination, StaffDetailPanel, StaffToolbar, StaffFilterPopover, StaffContextBar } from "./staff";
 import type { EmployeeTab } from "./staff";
+import UserManagementSettings from "@/components/settings/UserManagement";
+import OrgActivityLog from "@/components/settings/ActivityLog";
 import {
   SidebarProvider,
   SidebarInset,
@@ -36,7 +38,7 @@ import {
 
 const EMPTY_CODE_MAP = new Map<number, string>();
 
-type StaffSection = "members" | "recurring-schedule" | "focus-areas" | "certifications" | "roles";
+type StaffSection = "members" | "users" | "activity" | "recurring-schedule";
 
 interface StaffViewProps {
   employees: Employee[];
@@ -57,78 +59,13 @@ interface StaffViewProps {
   absenceTypes?: AbsenceType[];
   canEditShifts?: boolean;
   canManageEmployees?: boolean;
+  isSuperAdmin?: boolean;
+  isGridmaster?: boolean;
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
   orgName?: string;
   shiftDisplayMode?: ShiftDisplayMode;
-}
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-// ── Employee avatar chip (used in Focus Areas & Roles sections) ───────────────
-function EmpChip({ emp }: { emp: Employee }) {
-  const { user: currentUser } = useAuth();
-  const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
-  const hue = hashCode(emp.id) % 360;
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 7,
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border-light)",
-        borderRadius: 24,
-        padding: "3px 10px 3px 4px",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-      }}
-    >
-      <div
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          background: `hsl(${hue}, 70%, 92%)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "var(--dg-fs-micro)",
-          fontWeight: 800,
-          color: `hsl(${hue}, 70%, 35%)`,
-          flexShrink: 0,
-          border: `1px solid hsl(${hue}, 70%, 85%)`,
-        }}
-      >
-        {getInitials(getEmployeeDisplayName(emp))}
-      </div>
-      <span
-        style={{
-          fontSize: "var(--dg-fs-caption)",
-          fontWeight: 600,
-          color: "var(--color-text-secondary)",
-          whiteSpace: "nowrap",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {getEmployeeDisplayName(emp)}
-      </span>
-      {isYou && (
-        <span style={{
-          fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-          background: "var(--color-brand-bg)", color: "var(--color-link)", whiteSpace: "nowrap",
-        }}>
-          You
-        </span>
-      )}
-    </div>
-  );
 }
 
 // ── Members section (the existing staff table) ────────────────────────────────
@@ -1376,238 +1313,6 @@ function RecurringScheduleSection({
   );
 }
 
-// ── Focus Areas section ───────────────────────────────────────────────────────
-function FocusAreasSection({
-  employees,
-  focusAreas,
-  focusAreaLabel = "Focus Areas",
-}: {
-  employees: Employee[];
-  focusAreas: FocusArea[];
-  focusAreaLabel?: string;
-}) {
-  const grouped = useMemo(() => {
-    return focusAreas.map((focusArea) => ({
-      focusArea,
-      members: employees.filter((e) => e.focusAreaIds.includes(focusArea.id))
-        .sort((a, b) => a.seniority - b.seniority),
-    }));
-  }, [employees, focusAreas]);
-
-  const unassigned = useMemo(
-    () => employees.filter((e) => e.focusAreaIds.length === 0).sort((a, b) => a.seniority - b.seniority),
-    [employees],
-  );
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
-      <div>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-          {focusAreaLabel}
-        </h2>
-        <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-          Staff members grouped by their assigned {focusAreaLabel.toLowerCase()}. Edit assignments from the Members tab.
-        </p>
-      </div>
-
-      {grouped.map(({ focusArea, members }) => (
-        <div
-          key={focusArea.id}
-          style={{
-            background: "var(--color-surface)",
-            borderRadius: 14,
-            border: "1px solid var(--color-border)",
-            overflow: "hidden",
-            boxShadow: "var(--shadow-raised)",
-          }}
-        >
-          <div
-            style={{
-              padding: "12px 20px",
-              borderBottom: members.length > 0 ? "1px solid var(--color-border-light)" : "none",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: "var(--color-bg-secondary)",
-                color: "var(--color-text-secondary)",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                borderRadius: 20,
-                padding: "3px 10px",
-                border: "1px solid var(--color-border-light)",
-              }}
-            >
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
-              {focusArea.name}
-            </span>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-              {members.length} {members.length === 1 ? "member" : "members"}
-            </span>
-          </div>
-          <div style={{ padding: "16px 20px" }}>
-            {members.length === 0 ? (
-              <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-faint)", fontStyle: "italic" }}>
-                No staff assigned to this {focusAreaLabel.replace(/s$/, "").toLowerCase()}.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {members.map((emp) => (
-                  <EmpChip key={emp.id} emp={emp} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
-
-      {unassigned.length > 0 && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            borderRadius: 12,
-            border: "1px solid var(--color-border)",
-            overflow: "hidden",
-            boxShadow: BOX_SHADOW_CARD,
-          }}
-        >
-          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-            Unassigned
-          </div>
-          <div style={{ padding: "16px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {unassigned.map((emp) => <EmpChip key={emp.id} emp={emp} />)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Read-only Named Items Section (shared by Certifications & Roles) ─────────
-function NamedItemsSection({
-  employees,
-  items,
-  label = "Items",
-  singularLabel = "Item",
-  getEmployeeValues,
-  pillStyle,
-}: {
-  employees: Employee[];
-  items: NamedItem[];
-  label?: string;
-  singularLabel?: string;
-  getEmployeeValues: (emp: Employee) => number[];
-  pillStyle?: { bg: string; text: string };
-}) {
-  const grouped = useMemo(() => {
-    return items.map((item) => ({
-      item,
-      members: employees.filter((e) => getEmployeeValues(e).includes(item.id))
-        .sort((a, b) => a.seniority - b.seniority),
-    }));
-  }, [employees, items, getEmployeeValues]);
-
-  const unassigned = useMemo(
-    () => employees.filter((e) => getEmployeeValues(e).length === 0).sort((a, b) => a.seniority - b.seniority),
-    [employees, getEmployeeValues],
-  );
-
-  const defaultPill = pillStyle ?? { bg: "var(--color-brand)", text: "var(--color-text-inverse)" };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1100 }}>
-      <div>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-          {label}
-        </h2>
-        <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-          Staff members grouped by their assigned {label.toLowerCase()}. Edit assignments from the Members tab.
-        </p>
-      </div>
-
-      {grouped.map(({ item, members }) => (
-        <div
-          key={item.id}
-          style={{
-            background: "var(--color-surface)",
-            borderRadius: 14,
-            border: "1px solid var(--color-border)",
-            overflow: "hidden",
-            boxShadow: "var(--shadow-raised)",
-          }}
-        >
-          <div
-            style={{
-              padding: "12px 20px",
-              borderBottom: members.length > 0 ? "1px solid var(--color-border-light)" : "none",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <span
-              style={{
-                background: defaultPill.bg,
-                color: defaultPill.text,
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                borderRadius: 20,
-                padding: "3px 10px",
-              }}
-            >
-              {item.abbr}
-            </span>
-            <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-              {item.name !== item.abbr ? item.name : ""}
-            </span>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-              {members.length} {members.length === 1 ? "member" : "members"}
-            </span>
-          </div>
-          <div style={{ padding: "16px 20px" }}>
-            {members.length === 0 ? (
-              <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-faint)", fontStyle: "italic" }}>
-                No staff with this {singularLabel.toLowerCase()}.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {members.map((emp) => (
-                  <EmpChip key={emp.id} emp={emp} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
-
-      {unassigned.length > 0 && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            borderRadius: 12,
-            border: "1px solid var(--color-border)",
-            overflow: "hidden",
-            boxShadow: BOX_SHADOW_CARD,
-          }}
-        >
-          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-            Unassigned
-          </div>
-          <div style={{ padding: "16px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {unassigned.map((emp) => <EmpChip key={emp.id} emp={emp} />)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function StaffView({
   employees,
@@ -1627,6 +1332,8 @@ export default function StaffView({
   absenceTypes,
   canEditShifts,
   canManageEmployees,
+  isSuperAdmin = false,
+  isGridmaster = false,
   focusAreaLabel = "Focus Areas",
   certificationLabel = "Certifications",
   roleLabel = "Roles",
@@ -1635,26 +1342,21 @@ export default function StaffView({
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
-  const VALID_SECTIONS: StaffSection[] = ["members", "recurring-schedule", "focus-areas", "certifications", "roles"];
+  const VALID_SECTIONS: StaffSection[] = ["members", "users", "activity", "recurring-schedule"];
   const sectionParam = searchParams.get("section") as StaffSection | null;
   const activeSection: StaffSection = sectionParam && VALID_SECTIONS.includes(sectionParam) ? sectionParam : "members";
 
-  const iconUsers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+  const iconMembers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+  const iconUserMgmt = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+  const iconActivity = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>;
   const iconCalendar = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
-  const iconGrid = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
-  const iconTag = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
-  const iconCert = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
 
   const links: { id: StaffSection; label: string; icon: React.ReactNode }[] = [
-    { id: "members", label: "Staff Members", icon: iconUsers },
+    { id: "members", label: "Staff Members", icon: iconMembers },
+    ...((isSuperAdmin || isGridmaster) ? [{ id: "users" as StaffSection, label: "User Management", icon: iconUserMgmt }] : []),
     ...(orgId ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
-    { id: "focus-areas", label: focusAreaLabel, icon: iconGrid },
-    { id: "certifications", label: certificationLabel, icon: iconCert },
-    { id: "roles", label: roleLabel, icon: iconTag },
+    ...(isSuperAdmin ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: iconActivity }] : []),
   ];
-
-  const getCertValues = useCallback((emp: Employee) => emp.certificationId != null ? [emp.certificationId] : [], []);
-  const getRoleValues = useCallback((emp: Employee) => emp.roleIds, []);
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -1678,7 +1380,7 @@ export default function StaffView({
         active: activeSection === link.id,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeSection, orgId, focusAreaLabel, certificationLabel, roleLabel],
+    [activeSection, orgId, isSuperAdmin, isGridmaster],
   );
   useSetMobileSubNav(subNavItems);
 
@@ -1762,6 +1464,18 @@ export default function StaffView({
 
         {activeSection !== "members" && (
           <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+            {activeSection === "users" && (isSuperAdmin || isGridmaster) && orgId && (
+              <div style={{ width: "100%", maxWidth: 1100 }}>
+                <UserManagementSettings orgId={orgId} isSuperAdmin={isSuperAdmin} />
+              </div>
+            )}
+
+            {activeSection === "activity" && isSuperAdmin && orgId && (
+              <div style={{ width: "100%", maxWidth: 1100 }}>
+                <OrgActivityLog orgId={orgId} />
+              </div>
+            )}
+
             {activeSection === "recurring-schedule" && orgId && (
               <RecurringScheduleSection
                 employees={employees}
@@ -1776,34 +1490,6 @@ export default function StaffView({
               />
             )}
 
-            {activeSection === "focus-areas" && (
-              <FocusAreasSection
-                employees={employees}
-                focusAreas={focusAreas}
-                focusAreaLabel={focusAreaLabel}
-              />
-            )}
-
-            {activeSection === "certifications" && (
-              <NamedItemsSection
-                employees={employees}
-                items={certifications}
-                label={certificationLabel}
-                singularLabel={certificationLabel.replace(/s$/, "")}
-                getEmployeeValues={getCertValues}
-                pillStyle={{ bg: "var(--color-border-light)", text: "var(--color-text-muted)" }}
-              />
-            )}
-
-            {activeSection === "roles" && (
-              <NamedItemsSection
-                employees={employees}
-                items={roles}
-                label={roleLabel}
-                singularLabel={roleLabel.replace(/s$/, "")}
-                getEmployeeValues={getRoleValues}
-              />
-            )}
           </div>
         )}
       </SidebarInset>

@@ -36,8 +36,8 @@
   --color-text-primary: #0F172A;
   --color-text-secondary: #1E293B;
   --color-text-muted: #475569;
-  --color-text-subtle: #64748B;
-  --color-text-faint: #718096;
+  --color-text-subtle: #596678;
+  --color-text-faint: #637085;
   --color-text-inverse: #FFFFFF;
   --color-brand: #005F02;
   --color-brand-light: #2E9930;
@@ -1262,8 +1262,13 @@ textarea {
   transition: background 100ms ease;
 }
 
-.dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):not([data-dragging="true"]):hover {
+.dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):hover {
   background: var(--color-bg-secondary) !important;
+}
+
+/* Suppress hover effects during active drag */
+html[data-dragging] .dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):hover {
+  background: transparent !important;
 }
 
 .dg-grid-cell[data-interactive="true"]:not([data-locked="true"]) {
@@ -1272,6 +1277,11 @@ textarea {
 
 .dg-grid-cell[data-locked="true"] {
   cursor: not-allowed;
+}
+
+/* Dim locked cells during active drag to show they are invalid drop targets */
+html[data-dragging] .dg-grid-cell[data-locked="true"] {
+  opacity: 0.4;
 }
 
 .dg-grid-cell:focus-visible {
@@ -1302,6 +1312,18 @@ textarea {
   right: -6px;
 }
 
+/* ── Open Shift Button ────────────────────────────────── */
+.dg-open-shift-btn {
+  transition: filter 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+}
+.dg-open-shift-btn:hover {
+  filter: brightness(0.93);
+}
+.dg-open-shift-btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
 /* ── Tooltip Animation ─────────────────────────────────── */
 @keyframes tooltipFadeIn {
   from { opacity: 0; transform: translate(-50%, -90%) scale(0.95); }
@@ -1311,6 +1333,32 @@ textarea {
 /* ── Shift Cell Transition ─────────────────────────────── */
 .dg-shift-pill {
   transition: transform 150ms ease, opacity 150ms ease;
+}
+
+/* ── Drag Grip Affordance ─────────────────────────────── */
+.dg-draggable-shift:hover .dg-drag-grip {
+  opacity: 1 !important;
+}
+
+/* ── Snap-back Animation (when drag is cancelled) ─────── */
+@keyframes dg-snap-back {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.03); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.dg-draggable-shift.dg-snap-back {
+  animation: dg-snap-back 200ms ease-out;
+}
+
+/* ── Empty Cell Hover Affordance ──────────────────────── */
+.dg-grid-cell[data-interactive="true"][data-empty="true"]:not([data-locked="true"]):hover::after {
+  content: "+";
+  position: absolute;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* ── Draft Banner ───────────────────────────────────────── */
@@ -2077,6 +2125,19 @@ textarea {
     background: var(--color-brand-bg);
   }
 
+  .dg-bottom-sheet-group-label {
+    padding: 10px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+    border-top: 1px solid var(--color-border-light);
+  }
+  .dg-bottom-sheet-group-label:first-child {
+    border-top: none;
+  }
+
   /* Shared item utilities */
   .dg-bottom-sheet-item-icon {
     display: flex;
@@ -2262,5 +2323,22 @@ textarea {
   }
   html {
     @apply font-sans;
+  }
+}
+
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+ * Disables non-essential animations and transitions for users who have
+ * enabled the "reduce motion" accessibility setting in their OS.
+ * WCAG 2.3.3 Animation from Interactions.
+ * ──────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

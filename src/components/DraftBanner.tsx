@@ -98,20 +98,19 @@ export default function DraftBanner({
             </>
           ) : "Discard"}
         </button>
-        {canPublish && (
-          <button
-            onClick={onPublish}
-            disabled={isDisabled}
-            className="dg-btn dg-btn-primary dg-btn-sm"
-          >
-            {isPublishing ? (
-              <>
-                <ButtonSpinner size={12} />
-                Publishing…
-              </>
-            ) : "Publish"}
-          </button>
-        )}
+        <button
+          onClick={onPublish}
+          disabled={isDisabled || !canPublish}
+          className="dg-btn dg-btn-primary dg-btn-sm"
+          title={!canPublish ? "You don't have permission to publish schedules." : undefined}
+        >
+          {isPublishing ? (
+            <>
+              <ButtonSpinner size={12} />
+              Publishing…
+            </>
+          ) : "Publish"}
+        </button>
       </div>
     </div>
   );

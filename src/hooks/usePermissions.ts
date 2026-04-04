@@ -1,5 +1,5 @@
 // src/hooks/usePermissions.ts
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { decodeJwt } from "jose";
 import { supabase } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
@@ -62,6 +62,10 @@ export interface Permissions extends AdminPermissions {
   isSuperAdmin: boolean;
   /** True when gridmaster is impersonating another user. */
   isImpersonating: boolean;
+  /** True when admin is previewing as a regular user. */
+  isUserViewActive: boolean;
+  /** The user's actual role level (unaffected by user view toggle). */
+  actualLevel: number;
   /** True if user can access the settings page (has any config-level permission). */
   canManageOrg: boolean;
   /** True if user can invite / change roles of org members (super_admin+ only). */
@@ -129,6 +133,8 @@ function buildPerms(
     isGridmaster,
     isSuperAdmin,
     isImpersonating,
+    isUserViewActive: false,
+    actualLevel: level,
     canManageOrg,
     canManageUsers: isImpersonating ? false : (isSuperAdmin || isGridmaster),
     canConfigureAdminPermissions: isImpersonating ? false : (isSuperAdmin || isGridmaster),
@@ -150,11 +156,50 @@ let permsCache: Permissions | null = null;
 let permsCacheTimestamp = 0;
 let permsCacheUserId: string | null = null;
 
-/** Clear the cache (call on logout). */
+/** Clear the permission cache (call on logout). Does NOT affect user view state. */
 export function clearPermsCache(): void {
   permsCache = null;
   permsCacheTimestamp = 0;
   permsCacheUserId = null;
+}
+
+// ── User View toggle ───────────────────────────────────────────────────────
+// Client-side-only flag that lets admins preview the UI as a regular user.
+// Persisted in sessionStorage so it survives page refreshes and navigations.
+// Only cleared on manual exit or sign-out.
+// Uses useSyncExternalStore for reliable cross-instance reactivity.
+
+const USER_VIEW_KEY = "dg_user_view";
+const userViewListeners = new Set<() => void>();
+
+function readUserView(): boolean {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(USER_VIEW_KEY) === "1";
+}
+
+function subscribeUserView(callback: () => void): () => void {
+  userViewListeners.add(callback);
+  return () => { userViewListeners.delete(callback); };
+}
+
+const SERVER_SNAPSHOT = false;
+function getServerSnapshot(): boolean {
+  return SERVER_SNAPSHOT;
+}
+
+export function setUserViewActive(active: boolean): void {
+  if (typeof window !== "undefined") {
+    if (active) {
+      sessionStorage.setItem(USER_VIEW_KEY, "1");
+    } else {
+      sessionStorage.removeItem(USER_VIEW_KEY);
+    }
+  }
+  userViewListeners.forEach((fn) => fn());
+}
+
+export function getUserViewActive(): boolean {
+  return readUserView();
 }
 
 /**
@@ -190,6 +235,10 @@ export function getPermissionsFromSession(session: Session | null): Permissions 
 
 export function usePermissions(): Permissions {
   const [perms, setPerms] = useState<Permissions>(() => permsCache ?? { ...LOADING_PERMS });
+
+  // Reactively subscribe to user view toggle — reads sessionStorage directly,
+  // re-renders all hook instances when setUserViewActive() is called.
+  const userViewActive = useSyncExternalStore(subscribeUserView, readUserView, getServerSnapshot);
 
   useEffect(() => {
     let mounted = true;
@@ -341,16 +390,80 @@ export function usePermissions(): Permissions {
         permsCache = null;
         permsCacheTimestamp = 0;
         permsCacheUserId = null;
+        setUserViewActive(false);
       }
       setPerms((prev) => ({ ...prev, isLoading: true }));
       loadSession(session);
     });
 
+    // ── Realtime: invalidate permission cache on membership changes ────
+    // When another session (e.g. super_admin) updates the current user's
+    // admin_permissions or org_role, we get a Postgres change event and
+    // immediately re-resolve permissions instead of waiting up to 10s.
+    let membershipChannel: ReturnType<typeof supabase.channel> | null = null;
+    // Unique channel name per effect instance avoids reusing an already-subscribed
+    // channel during React strict-mode double-mounts.
+    const channelId = `perms:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
+    if (typeof supabase.channel === "function") {
+      supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
+        if (!mounted || !s?.user?.id) return;
+        const uid = s.user.id;
+        membershipChannel = supabase
+          .channel(channelId)
+          .on(
+            "postgres_changes" as "system",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "organization_memberships",
+              filter: `user_id=eq.${uid}`,
+            } as Record<string, unknown>,
+            () => {
+              // Bust the cache so the next resolve reads fresh DB data.
+              clearPermsCache();
+              supabase.auth.getSession().then(({ data: { session: fresh } }: { data: { session: Session | null } }) => {
+                if (mounted) loadSession(fresh);
+              });
+            },
+          )
+          .subscribe();
+      });
+    }
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      if (membershipChannel) supabase.removeChannel(membershipChannel);
     };
   }, []);
+
+  // ── User View override ──────────────────────────────────────────────
+  // When active, return read-only permissions so admins see the user experience.
+  // Preserve orgId so data fetching still works (user is still authenticated).
+  if (userViewActive && perms.level >= 2) {
+    return {
+      ...READ_ONLY_PERMS,
+      role: "user",
+      orgId: perms.orgId,
+      level: 0,
+      isLoading: false,
+      isGridmaster: false,
+      isSuperAdmin: false,
+      isImpersonating: false,
+      isUserViewActive: true,
+      actualLevel: perms.level,
+      canManageOrg: false,
+      canManageUsers: false,
+      canConfigureAdminPermissions: false,
+      atLeast: (r: string) => 0 >= (ROLE_LEVEL[r] ?? 0),
+    };
+  }
+
+  // Always reflect the toggle state so the banner renders even while perms load.
+  if (userViewActive) {
+    return { ...perms, isUserViewActive: true, actualLevel: perms.level };
+  }
 
   return perms;
 }

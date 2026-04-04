@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 
 export interface CellDropData {
@@ -16,7 +16,7 @@ interface DroppableCellProps extends React.HTMLAttributes<HTMLDivElement> {
   disabled?: boolean;
 }
 
-export default function DroppableCell({
+export default memo(function DroppableCell({
   id,
   data,
   disabled,
@@ -44,4 +44,4 @@ export default function DroppableCell({
       {children}
     </div>
   );
-}
+});

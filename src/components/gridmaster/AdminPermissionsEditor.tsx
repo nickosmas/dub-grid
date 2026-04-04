@@ -72,6 +72,7 @@ export default function AdminPermissionsEditor({
   userId,
   orgId,
   userName,
+  userEmail,
   currentPermissions,
   onClose,
   onSaved,
@@ -79,6 +80,7 @@ export default function AdminPermissionsEditor({
   userId: string;
   orgId: string;
   userName: string;
+  userEmail?: string;
   currentPermissions: AdminPermissions | null;
   onClose: () => void;
   onSaved: (perms: AdminPermissions) => void;
@@ -121,7 +123,7 @@ export default function AdminPermissionsEditor({
   async function handleSave() {
     setSaving(true);
     try {
-      await updateAdminPermissions(userId, perms, orgId);
+      await updateAdminPermissions(userId, perms, orgId, userEmail);
       toast.success("Permissions updated");
       onSaved(perms);
       onClose();

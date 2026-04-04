@@ -63,6 +63,8 @@ interface ShiftEditPanelProps {
   onMakeAvailable?: () => void;
   /** Callback to open the swap proposal modal. */
   onProposeSwap?: () => void;
+  /** Callback to submit a calloff request with the selected absence type. */
+  onCallOff?: (absenceType: AbsenceType) => void;
   /** Available absence types for off-day selection. */
   absenceTypes?: AbsenceType[];
   /** Called when user selects an absence type (off day). */
@@ -71,6 +73,8 @@ interface ShiftEditPanelProps {
   currentAbsenceTypeId?: number | null;
   /** Cross-date overlap warnings to display (non-blocking). */
   overlapWarnings?: string[];
+  /** When true, overlap warnings block saving (admin can override). */
+  enforceConflicts?: boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
 }
@@ -466,7 +470,7 @@ function PillTimeEditor({
 
       {/* Start row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
-        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>START</span>
+        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 40, flexShrink: 0 }}>START<span style={{ color: "var(--color-danger)", marginLeft: 1 }}>*</span></span>
         <TimeDropdown value={s.hour} options={hourOptions} onChange={(v) => updateStart(v, s.minute, s.period)} width={50} placeholder="--" />
         <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>:</span>
         <TimeDropdown value={s.minute} options={minuteOptions} onChange={(v) => updateStart(s.hour, v, s.period)} width={50} />
@@ -475,7 +479,7 @@ function PillTimeEditor({
 
       {/* End row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 36, flexShrink: 0 }}>END</span>
+        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 40, flexShrink: 0 }}>END<span style={{ color: "var(--color-danger)", marginLeft: 1 }}>*</span></span>
         <TimeDropdown value={e.hour} options={hourOptions} onChange={(v) => updateEnd(v, e.minute, e.period)} width={50} placeholder="--" />
         <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>:</span>
         <TimeDropdown value={e.minute} options={minuteOptions} onChange={(v) => updateEnd(e.hour, v, e.period)} width={50} />
@@ -538,10 +542,12 @@ export default function ShiftEditPanel({
   hasActiveRequest = false,
   onMakeAvailable,
   onProposeSwap,
+  onCallOff,
   absenceTypes = [],
   onAbsenceSelect,
   currentAbsenceTypeId,
   overlapWarnings = [],
+  enforceConflicts = false,
   shiftDisplayMode = "code",
 }: ShiftEditPanelProps) {
   const isNameMode = shiftDisplayMode === "name";
@@ -553,6 +559,7 @@ export default function ShiftEditPanel({
   const isAbsence = currentAbsenceTypeId != null;
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
   const [showRepeatForm, setShowRepeatForm] = useState(false);
+  const [showCallOffPicker, setShowCallOffPicker] = useState(false);
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
@@ -1316,6 +1323,108 @@ export default function ShiftEditPanel({
   // (or when shift edits are not allowed)
   const inDetailMode = !allowShiftEdits || (!showPicker && hasActiveShift);
 
+  // ── Calloff-only mode: show only absence type picker ──
+  if (modal.calloffMode && onCallOff) {
+    return (
+      <>
+        <div className="dg-panel-overlay" onClick={onClose} />
+        <div
+          className="dg-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Call off shift"
+          onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "16px 20px",
+              borderBottom: "1px solid var(--color-border)",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                Call Off
+              </div>
+              <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", marginTop: 2 }}>
+                {modal.empName} &middot; {modal.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="dg-btn dg-btn-ghost"
+              style={{ padding: 6, borderRadius: 8, lineHeight: 1 }}
+              aria-label="Close"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Absence type list */}
+          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                color: "var(--color-text-secondary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: 4,
+              }}
+            >
+              Select absence reason
+            </div>
+            {absenceTypes.filter(at => !at.archivedAt).map((at) => (
+              <button
+                key={at.id}
+                onClick={() => onCallOff(at)}
+                className="dg-btn dg-btn-ghost"
+                style={{
+                  width: "100%",
+                  fontSize: "var(--dg-fs-body)",
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  border: `1.5px solid ${at.border || "var(--color-border)"}`,
+                  background: at.color || "var(--color-surface)",
+                  color: at.text || "var(--color-text-primary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  fontWeight: 500,
+                  textAlign: "left",
+                }}
+              >
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: at.color || "var(--color-surface-alt)",
+                  border: `1px solid ${at.border || "var(--color-border)"}`,
+                  color: at.text || "var(--color-text-primary)",
+                  fontWeight: 700,
+                  fontSize: "var(--dg-fs-body)",
+                  flexShrink: 0,
+                }}>
+                  {at.label}
+                </span>
+                {at.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Backdrop */}
@@ -1737,6 +1846,96 @@ export default function ShiftEditPanel({
                       Propose a swap
                     </button>
                   )}
+                  {onCallOff && !showCallOffPicker && (
+                    <button
+                      onClick={() => setShowCallOffPicker(true)}
+                      className="dg-btn dg-btn-ghost"
+                      style={{
+                        width: "100%",
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                        border: "1px solid var(--color-danger-border)",
+                        borderRadius: 8,
+                        color: "var(--color-danger-text)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <line x1="9" y1="9" x2="15" y2="15" />
+                      </svg>
+                      Call off
+                    </button>
+                  )}
+                  {onCallOff && showCallOffPicker && (
+                    <div style={{ marginTop: 4 }}>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--color-danger-text)",
+                          marginBottom: 6,
+                        }}
+                      >
+                        Select absence reason:
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {absenceTypes.filter(at => !at.archivedAt).map((at) => (
+                          <button
+                            key={at.id}
+                            onClick={() => onCallOff(at)}
+                            className="dg-btn dg-btn-ghost"
+                            style={{
+                              width: "100%",
+                              fontSize: "var(--dg-fs-caption)",
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: `1.5px solid ${at.border || "var(--color-border)"}`,
+                              background: at.color || "var(--color-surface)",
+                              color: at.text || "var(--color-text-primary)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              fontWeight: 500,
+                            }}
+                          >
+                            <span style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 24,
+                              height: 24,
+                              borderRadius: 6,
+                              background: at.color || "var(--color-surface-alt)",
+                              border: `1px solid ${at.border || "var(--color-border)"}`,
+                              color: at.text || "var(--color-text-primary)",
+                              fontWeight: 700,
+                              fontSize: "var(--dg-fs-caption)",
+                            }}>
+                              {at.label}
+                            </span>
+                            {at.name}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setShowCallOffPicker(false)}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          marginTop: 4,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-subtle)",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {isOwnShift && hasActiveRequest && (
@@ -1758,29 +1957,34 @@ export default function ShiftEditPanel({
                 <div style={{
                   marginTop: 16,
                   padding: "10px 12px",
-                  background: "var(--color-warning-bg)",
-                  border: "1px solid var(--color-warning-border)",
+                  background: enforceConflicts ? "var(--color-danger-bg)" : "var(--color-warning-bg)",
+                  border: `1px solid ${enforceConflicts ? "var(--color-danger-border)" : "var(--color-warning-border)"}`,
                   borderRadius: 8,
                 }}>
                   <div style={{
                     fontSize: "var(--dg-fs-badge)",
                     fontWeight: 700,
-                    color: "var(--color-warning-text)",
+                    color: enforceConflicts ? "var(--color-danger-dark)" : "var(--color-warning-text)",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                     marginBottom: 4,
                   }}>
-                    Overlap Warning
+                    {enforceConflicts ? "Conflict Blocked" : "Overlap Warning"}
                   </div>
                   {overlapWarnings.map((w, i) => (
                     <div key={i} style={{
                       fontSize: "var(--dg-fs-caption)",
-                      color: "var(--color-warning-text)",
+                      color: enforceConflicts ? "var(--color-danger-dark)" : "var(--color-warning-text)",
                       marginTop: i > 0 ? 4 : 0,
                     }}>
                       {w}
                     </div>
                   ))}
+                  {enforceConflicts && (
+                    <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 6, fontStyle: "italic" }}>
+                      Resolve the overlap to save this shift.
+                    </div>
+                  )}
                 </div>
               )}
             </>

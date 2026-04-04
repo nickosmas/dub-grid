@@ -84,6 +84,7 @@ export default function StatCard({
         style={{
           fontSize: 28,
           fontWeight: 700,
+          fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
           color:
             variant === "danger"
               ? "var(--color-danger)"

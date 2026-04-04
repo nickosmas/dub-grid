@@ -6,6 +6,7 @@ import { z } from "zod";
 import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -231,6 +232,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
+    Sentry.captureException(err, { extra: { context: "send-invite-email" } });
     logger.error({ err, path: "/api/send-invite-email" }, "Failed to send invite email");
     return NextResponse.json(
       { success: false, error: "Failed to send email" },

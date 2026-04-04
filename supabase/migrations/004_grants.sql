@@ -51,9 +51,11 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- anon: minimal access for unauthenticated visitors
+-- IMPORTANT: anon must NOT have blanket EXECUTE on all functions.
+-- Functions like gdpr_erase_user_data, purge_expired_data, etc. would be
+-- callable via PostgREST by unauthenticated users if granted here.
 GRANT SELECT ON TABLE public.organizations TO anon;
 GRANT INSERT ON TABLE public.cookie_consents TO anon;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
 
 

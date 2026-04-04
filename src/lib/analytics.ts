@@ -13,6 +13,14 @@ export interface EmployeeUtilization {
   shiftCount: number;
 }
 
+interface ShiftWithEmployee {
+  employee_id: number;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  employees: { first_name: string; last_name: string };
+}
+
 /**
  * Fetch weekly shift hours for an org over a given number of weeks.
  */
@@ -79,11 +87,12 @@ export async function fetchEmployeeUtilization(
   if (error) throw error;
 
   const empMap = new Map<number, { name: string; totalHours: number; shiftCount: number }>();
+  const rows = (data ?? []) as unknown as ShiftWithEmployee[];
 
-  for (const row of data ?? []) {
-    const empId = row.employee_id as number;
-    const emp = row.employees as unknown as { first_name: string; last_name: string };
-    const hours = calcHours(row.start_time as string | null, row.end_time as string | null);
+  for (const row of rows) {
+    const empId = row.employee_id;
+    const emp = row.employees;
+    const hours = calcHours(row.start_time, row.end_time);
 
     const entry = empMap.get(empId) ?? {
       name: `${emp.first_name} ${emp.last_name}`,

@@ -122,6 +122,7 @@ export default function StaffHoursCard({
                     style={{
                       fontSize: 12,
                       fontWeight: 700,
+                      fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
                       color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
                     }}
                   >

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import CookiePreferencesManager from "./CookiePreferencesManager";
 
+export const revalidate = 86400; // 24 hours
+
 export const metadata: Metadata = {
   title: "Cookie Policy | DubGrid",
 };

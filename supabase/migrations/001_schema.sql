@@ -14,7 +14,7 @@ CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'none');
 CREATE TYPE public.org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly');
 CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
-CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap');
+CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap', 'calloff');
 CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired');
 
 
@@ -55,12 +55,17 @@ CREATE TABLE public.organizations (
   subscription_seats   INTEGER,
   data_retention_days  INTEGER NOT NULL DEFAULT 365,
   archived_at          TIMESTAMPTZ,
+  suspended_at                  TIMESTAMPTZ,
+  suspended_reason              TEXT,
+  enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
+  feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_by           UUID,
   updated_by           UUID,
   created_at           TIMESTAMPTZ DEFAULT now(),
   updated_at           TIMESTAMPTZ DEFAULT now()
 );
 
+COMMENT ON COLUMN public.organizations.suspended_at IS 'Non-null when the organization is suspended. Members are blocked from accessing the app.';
 COMMENT ON COLUMN public.organizations.data_retention_days IS 'Number of days to retain archived/deleted data before permanent purge (default 365)';
 COMMENT ON COLUMN public.organizations.stripe_customer_id IS 'Stripe customer ID for billing';
 COMMENT ON COLUMN public.organizations.subscription_status IS 'Stripe subscription status: trialing, active, past_due, canceled, unpaid';
@@ -69,6 +74,7 @@ COMMENT ON COLUMN public.organizations.app_name IS 'Custom display name for the 
 COMMENT ON COLUMN public.organizations.meta_description IS 'Custom SEO meta description';
 COMMENT ON COLUMN public.organizations.theme_config IS 'JSON object containing primary_color, accent_color, etc.';
 COMMENT ON COLUMN public.organizations.landing_page_config IS 'JSON object containing hero_title, features, and pain_points';
+COMMENT ON COLUMN public.organizations.feature_overrides IS 'JSON object of per-org feature flag overrides. Keys are flag names, values are booleans. Checked before PostHog.';
 
 
 -- ── profiles ──────────────────────────────────────────────────────────────────
@@ -89,6 +95,8 @@ CREATE TABLE public.profiles (
   last_sign_in_at        TIMESTAMPTZ,
   scheduled_deletion_at  TIMESTAMPTZ,
   deactivation_warned_at TIMESTAMPTZ,
+  deactivated_at         TIMESTAMPTZ,
+  deactivated_by         UUID,
 
   CONSTRAINT gridmaster_no_org CHECK (
     platform_role <> 'gridmaster' OR org_id IS NULL
@@ -102,6 +110,8 @@ COMMENT ON CONSTRAINT gridmaster_no_org ON public.profiles IS 'Gridmasters canno
 
 -- ── organization_memberships ──────────────────────────────────────────────────
 
+-- NOTE: Organization suspension columns (suspended_at, suspended_reason) are on the organizations table above.
+
 CREATE TABLE public.organization_memberships (
   id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id           UUID NOT NULL,
@@ -110,6 +120,8 @@ CREATE TABLE public.organization_memberships (
   admin_permissions          JSONB,
   joined_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
   schedule_last_viewed_at    TIMESTAMPTZ,
+  archived_at                TIMESTAMPTZ,
+  archived_by                UUID,
 
   UNIQUE (user_id, org_id)
 );
@@ -633,6 +645,8 @@ CREATE TABLE public.shift_requests (
   target_focus_area_id        BIGINT,
   target_custom_start_time    TEXT,
   target_custom_end_time      TEXT,
+  absence_type_id             BIGINT,
+  parent_request_id           UUID,
   admin_user_id               UUID,
   admin_note                  TEXT,
   expires_at                  TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '72 hours'),
@@ -646,7 +660,11 @@ ALTER TABLE ONLY public.shift_requests REPLICA IDENTITY FULL;
 
 -- Swaps must specify a target employee and target shift date
 ALTER TABLE public.shift_requests ADD CONSTRAINT target_required_for_swap
-  CHECK (type = 'pickup' OR (target_emp_id IS NOT NULL AND target_shift_date IS NOT NULL));
+  CHECK (type IN ('pickup', 'calloff') OR (target_emp_id IS NOT NULL AND target_shift_date IS NOT NULL));
+
+-- Calloffs must have an absence type; non-calloffs must not
+ALTER TABLE public.shift_requests ADD CONSTRAINT calloff_requires_absence_type
+  CHECK ((type = 'calloff' AND absence_type_id IS NOT NULL) OR (type != 'calloff' AND absence_type_id IS NULL));
 
 -- Cannot swap with yourself
 ALTER TABLE public.shift_requests ADD CONSTRAINT no_self_swap
@@ -768,8 +786,8 @@ ALTER TABLE public.invitations
 
 -- role_change_log
 ALTER TABLE public.role_change_log
-  ADD CONSTRAINT role_change_log_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id),
-  ADD CONSTRAINT role_change_log_changed_by_id_fkey FOREIGN KEY (changed_by_id) REFERENCES auth.users(id);
+  ADD CONSTRAINT role_change_log_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT role_change_log_changed_by_id_fkey FOREIGN KEY (changed_by_id) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- jwt_refresh_locks
 ALTER TABLE public.jwt_refresh_locks
@@ -777,9 +795,9 @@ ALTER TABLE public.jwt_refresh_locks
 
 -- impersonation_sessions
 ALTER TABLE public.impersonation_sessions
-  ADD CONSTRAINT impersonation_sessions_gridmaster_id_fkey FOREIGN KEY (gridmaster_id) REFERENCES auth.users(id),
-  ADD CONSTRAINT impersonation_sessions_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id),
-  ADD CONSTRAINT impersonation_sessions_target_org_id_fkey FOREIGN KEY (target_org_id) REFERENCES public.organizations(id);
+  ADD CONSTRAINT impersonation_sessions_gridmaster_id_fkey FOREIGN KEY (gridmaster_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD CONSTRAINT impersonation_sessions_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD CONSTRAINT impersonation_sessions_target_org_id_fkey FOREIGN KEY (target_org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 -- notifications
 ALTER TABLE public.notifications
@@ -798,17 +816,19 @@ ALTER TABLE public.shift_requests
   ADD CONSTRAINT shift_requests_requester_focus_area_id_fkey FOREIGN KEY (requester_focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_requests_target_emp_id_fkey FOREIGN KEY (target_emp_id) REFERENCES public.employees(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_requests_target_focus_area_id_fkey FOREIGN KEY (target_focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shift_requests_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  ADD CONSTRAINT shift_requests_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_requests_absence_type_id_fkey FOREIGN KEY (absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_requests_parent_request_id_fkey FOREIGN KEY (parent_request_id) REFERENCES public.shift_requests(id) ON DELETE SET NULL;
 
 -- schedule_draft_sessions
 ALTER TABLE public.schedule_draft_sessions
   ADD CONSTRAINT schedule_draft_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT schedule_draft_sessions_saved_by_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id);
+  ADD CONSTRAINT schedule_draft_sessions_saved_by_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- recurring_shifts_draft_sessions
 ALTER TABLE public.recurring_shifts_draft_sessions
   ADD CONSTRAINT recurring_shifts_draft_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT recurring_shifts_draft_user_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id);
+  ADD CONSTRAINT recurring_shifts_draft_user_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- coverage_requirements
 ALTER TABLE public.coverage_requirements
@@ -899,6 +919,7 @@ CREATE INDEX idx_shifts_published_code_ids ON public.shifts USING gin(published_
 CREATE INDEX idx_schedule_notes_org ON public.schedule_notes(org_id);
 CREATE INDEX idx_schedule_notes_emp ON public.schedule_notes(emp_id);
 CREATE INDEX idx_schedule_notes_emp_date ON public.schedule_notes(emp_id, date);
+CREATE INDEX idx_schedule_notes_indicator_type_id ON public.schedule_notes(indicator_type_id);
 
 -- indicator_types
 CREATE UNIQUE INDEX indicator_types_org_name_active_unique ON public.indicator_types(org_id, name) WHERE archived_at IS NULL;
@@ -953,6 +974,8 @@ CREATE INDEX idx_shift_requests_requester ON public.shift_requests(requester_emp
 CREATE INDEX idx_shift_requests_target ON public.shift_requests(target_emp_id, status) WHERE target_emp_id IS NOT NULL;
 CREATE INDEX idx_shift_requests_org_open_pickups ON public.shift_requests(org_id) WHERE type = 'pickup' AND status = 'open';
 CREATE INDEX idx_shift_requests_expiry ON public.shift_requests(expires_at) WHERE status IN ('open', 'pending_approval');
+CREATE INDEX idx_shift_requests_approved_calloffs ON public.shift_requests(org_id, requester_shift_date) WHERE type = 'calloff' AND status = 'approved';
+CREATE INDEX idx_shift_requests_parent ON public.shift_requests(parent_request_id) WHERE parent_request_id IS NOT NULL;
 
 
 -- ── cookie_consents ─────────────────────────────────────────────────────────
@@ -1029,6 +1052,7 @@ CREATE TABLE public.audit_log (
   details       JSONB NOT NULL DEFAULT '{}',
   ip_address    INET,
   user_agent    TEXT,
+  impersonation_session_id UUID,        -- set when action taken during impersonation
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -1051,3 +1075,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_codes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.absence_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_requirements;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.organization_memberships;
