@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback } from "react";
 import { NamedItem } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import { inputStyle } from "./shared";
 
 export default function StringListSettings({
   label,
@@ -11,29 +10,40 @@ export default function StringListSettings({
   onSave,
   placeholder,
   canEdit = true,
+  hideAbbr = false,
 }: {
   label: string;
   items: NamedItem[];
   onSave: (items: NamedItem[]) => Promise<void>;
   placeholder: string;
   canEdit?: boolean;
+  hideAbbr?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [isEditing, setIsEditing] = useState(false);
   const [local, setLocal] = useState<NamedItem[]>(items);
-  const [newName, setNewName] = useState("");
-  const [newAbbr, setNewAbbr] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const nextTmpId = useRef(-1);
+  const nameRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  const abbrRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
-  const isDirty = JSON.stringify(local) !== JSON.stringify(items);
+  // Clean comparison: ignore empty uncommitted rows
+  const nonEmpty = useCallback(
+    (list: NamedItem[]) => list.filter((it) => it.name.trim()),
+    [],
+  );
+  const isDirty = useMemo(
+    () => JSON.stringify(nonEmpty(local)) !== JSON.stringify(items),
+    [local, items, nonEmpty],
+  );
 
   const displayList = useMemo((): NamedItem[] => {
-    if (!isEditing || draggedIdx === null || dragOverIdx === null) return isEditing ? local : items;
+    if (!isEditing) return items;
+    if (draggedIdx === null || dragOverIdx === null) return local;
     const list = [...local];
     const [item] = list.splice(draggedIdx, 1);
     list.splice(dragOverIdx, 0, item);
@@ -43,8 +53,6 @@ export default function StringListSettings({
   const handleEnterEdit = () => {
     setLocal([...items]);
     setIsEditing(true);
-    setNewName("");
-    setNewAbbr("");
     setError(null);
   };
 
@@ -53,23 +61,30 @@ export default function StringListSettings({
     setIsEditing(false);
     setDraggedIdx(null);
     setDragOverIdx(null);
-    setNewName("");
-    setNewAbbr("");
     setError(null);
   };
 
   const handleSave = async () => {
+    // Strip empty rows before saving
+    const cleaned = nonEmpty(local).map((it, i) => ({
+      ...it,
+      name: it.name.trim(),
+      abbr: it.abbr.trim() || it.name.trim(),
+      sortOrder: i,
+    }));
+
     // Validate no duplicate names
-    const names = local.map((it) => it.name.trim().toLowerCase());
+    const names = cleaned.map((it) => it.name.toLowerCase());
     const dupes = names.filter((n, i) => n && names.indexOf(n) !== i);
     if (dupes.length > 0) {
       setError(`Duplicate name: "${dupes[0]}"`);
       return;
     }
+
     setSaving(true);
     setError(null);
     try {
-      await onSave(local);
+      await onSave(cleaned);
       setSaved(true);
       setIsEditing(false);
       setTimeout(() => setSaved(false), 2000);
@@ -84,29 +99,111 @@ export default function StringListSettings({
     }
   };
 
-  const handleAdd = () => {
-    const trimmedName = newName.trim();
-    const trimmedAbbr = newAbbr.trim() || trimmedName;
-    if (!trimmedName || local.some((it) => it.name === trimmedName)) return;
-    setLocal((prev) => [...prev, { id: nextTmpId.current--, orgId: "", name: trimmedName, abbr: trimmedAbbr, sortOrder: prev.length }]);
-    setNewName("");
-    setNewAbbr("");
-  };
+  const addRow = useCallback(() => {
+    const id = nextTmpId.current--;
+    setLocal((prev) => [
+      ...prev,
+      { id, orgId: "", name: "", abbr: "", sortOrder: prev.length },
+    ]);
+    // Focus new row's name input after render
+    requestAnimationFrame(() => {
+      nameRefs.current.get(id)?.focus();
+    });
+  }, []);
 
   const handleRemove = (i: number) => {
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  const handleItemChange = (i: number, field: "name" | "abbr", value: string) => {
-    setLocal((prev) => prev.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)));
+  const handleItemChange = (
+    i: number,
+    field: "name" | "abbr",
+    value: string,
+  ) => {
+    setLocal((prev) =>
+      prev.map((item, idx) =>
+        idx === i ? { ...item, [field]: value } : item,
+      ),
+    );
   };
 
+  const handleNameKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    item: NamedItem,
+    idx: number,
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (hideAbbr) {
+        // No abbr field — behave like abbr Enter: go to next row or add new
+        if (!item.name.trim()) return;
+        if (idx < local.length - 1) {
+          nameRefs.current.get(local[idx + 1].id)?.focus();
+        } else {
+          addRow();
+        }
+      } else {
+        abbrRefs.current.get(item.id)?.focus();
+      }
+    }
+  };
+
+  const handleAbbrKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    item: NamedItem,
+    idx: number,
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // If this row is empty, don't create another
+      if (!item.name.trim() && !item.abbr.trim()) return;
+      // If there's a next row, focus it; otherwise add a new row
+      if (idx < local.length - 1) {
+        nameRefs.current.get(local[idx + 1].id)?.focus();
+      } else {
+        addRow();
+      }
+    }
+  };
+
+  // Backspace on empty name removes the row (if it's a new empty row)
+  const handleNameBackspace = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    item: NamedItem,
+    idx: number,
+  ) => {
+    if (
+      e.key === "Backspace" &&
+      !item.name &&
+      !item.abbr &&
+      item.id < 0 // only auto-remove temp rows
+    ) {
+      e.preventDefault();
+      handleRemove(idx);
+      // Focus previous row
+      if (idx > 0) {
+        const prevId = local[idx - 1].id;
+        requestAnimationFrame(() => {
+          if (hideAbbr) {
+            nameRefs.current.get(prevId)?.focus();
+          } else {
+            abbrRefs.current.get(prevId)?.focus();
+          }
+        });
+      }
+    }
+  };
+
+  // ── Drag handlers ──────────────────────────────────────────────────────────
   const handleDragStart = (idx: number) => {
     setDraggedIdx(idx);
     setDragOverIdx(idx);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, targetIdx: number) => {
+  const handleDragOver = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetIdx: number,
+  ) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDragOverIdx(targetIdx);
@@ -114,9 +211,15 @@ export default function StringListSettings({
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx
-        && draggedIdx >= 0 && draggedIdx < local.length
-        && dragOverIdx >= 0 && dragOverIdx <= local.length) {
+    if (
+      draggedIdx !== null &&
+      dragOverIdx !== null &&
+      draggedIdx !== dragOverIdx &&
+      draggedIdx >= 0 &&
+      draggedIdx < local.length &&
+      dragOverIdx >= 0 &&
+      dragOverIdx <= local.length
+    ) {
       const list = [...local];
       const [item] = list.splice(draggedIdx, 1);
       list.splice(dragOverIdx, 0, item);
@@ -131,243 +234,391 @@ export default function StringListSettings({
     setDragOverIdx(null);
   };
 
-  const gridCols = isMobile
-    ? (isEditing ? "24px 32px 1fr 100px 28px" : "32px 1fr 100px")
-    : (isEditing ? "24px 32px 1fr 200px 28px" : "32px 1fr 200px");
+  // ── Input style ────────────────────────────────────────────────────────────
+  const fieldStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "6px 10px",
+    fontSize: "var(--dg-fs-label)",
+    fontWeight: 500,
+    border: "1px solid var(--color-border)",
+    borderRadius: 6,
+    background: "var(--color-surface)",
+    color: "var(--color-text-primary)",
+    outline: "none",
+    transition: "border-color 150ms ease, box-shadow 150ms ease",
+  };
+
+  const gridCols = hideAbbr
+    ? isEditing
+      ? "24px 32px 1fr 28px"
+      : "32px 1fr"
+    : isMobile
+      ? isEditing
+        ? "24px 32px 1fr 100px 28px"
+        : "32px 1fr 100px"
+      : isEditing
+        ? "24px 32px 1fr 200px 28px"
+        : "32px 1fr 200px";
 
   return (
     <div style={{ padding: "16px" }}>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 0, marginBottom: 12 }}>
+      <p
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          color: "var(--color-text-muted)",
+          marginTop: 0,
+          marginBottom: 12,
+        }}
+      >
         {label}
       </p>
 
       {/* Controls */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-        {!isEditing && (
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        {!isEditing && canEdit && (
           <button
             onClick={handleEnterEdit}
             className="dg-btn dg-btn-secondary"
-            style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
+            style={{
+              padding: "7px 12px",
+              fontSize: "var(--dg-fs-caption)",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
             Edit
           </button>
         )}
-        {isEditing && isDirty && (
-          <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary" style={{ padding: "7px 14px" }}>
-            {saving ? "Saving…" : "Save"}
-          </button>
-        )}
         {isEditing && (
-          <button onClick={handleCancel} className="dg-btn dg-btn-secondary" style={{ padding: "7px 14px" }}>
-            Cancel
-          </button>
+          <>
+            <button
+              onClick={handleSave}
+              disabled={saving || !isDirty}
+              className="dg-btn dg-btn-primary"
+              style={{
+                padding: "7px 14px",
+                opacity: !isDirty ? 0.5 : 1,
+              }}
+            >
+              {saving ? "Saving\u2026" : "Save"}
+            </button>
+            <button
+              onClick={handleCancel}
+              className="dg-btn dg-btn-secondary"
+              style={{ padding: "7px 14px" }}
+            >
+              Cancel
+            </button>
+          </>
         )}
         {saved && (
-          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>Saved!</span>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-brand)",
+              fontWeight: 600,
+            }}
+          >
+            Saved!
+          </span>
         )}
       </div>
 
       {/* Table */}
       {displayList.length === 0 && !isEditing ? (
-        <div style={{
-          border: "1px dashed var(--color-border)", borderRadius: 12,
-          padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)",
-          fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-        }}>
+        <div
+          style={{
+            border: "1px dashed var(--color-border)",
+            borderRadius: 12,
+            padding: "40px 20px",
+            textAlign: "center",
+            color: "var(--color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
           <span>No items defined yet</span>
           {canEdit && (
-            <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary" style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}>
+            <button
+              onClick={handleEnterEdit}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                padding: "7px 16px",
+                fontSize: "var(--dg-fs-caption)",
+              }}
+            >
               + Add New
             </button>
           )}
         </div>
       ) : (
-      <div
-        style={{
-          overflow: "hidden",
-          transition: "border-color 150ms ease, box-shadow 150ms ease",
-        }}
-      >
-        {/* Header row */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: gridCols,
-            padding: "10px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
-            background: isEditing ? "var(--color-brand-bg)" : undefined,
+            overflow: "hidden",
+            transition: "border-color 150ms ease, box-shadow 150ms ease",
           }}
         >
-          {(isEditing
-            ? ["", "#", "Full Name", "Abbreviation", ""]
-            : ["#", "Full Name", "Abbreviation"]
-          ).map((h, i) => (
-            <div
-              key={i}
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                letterSpacing: "0.06em",
-              }}
-            >
-              {h}
-            </div>
-          ))}
-        </div>
-
-        {/* Item rows */}
-        {displayList.map((item, i) => {
-          const isDragging = isEditing && draggedIdx !== null && local[draggedIdx]?.id === item.id;
-          const isDropTarget = isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
-          return (
-            <div
-              key={item.id}
-              draggable={isEditing}
-              onDragStart={isEditing ? () => handleDragStart(i) : undefined}
-              onDragOver={isEditing ? (e) => handleDragOver(e, i) : undefined}
-              onDrop={isEditing ? handleDrop : undefined}
-              onDragEnd={isEditing ? handleDragEnd : undefined}
-              style={{
-                display: "grid",
-                gridTemplateColumns: gridCols,
-                padding: "8px 16px",
-                borderTop: isDropTarget
-                  ? "2px solid var(--color-brand)"
-                  : i === 0
-                    ? "none"
-                    : "1px solid var(--color-border-light)",
-                alignItems: "center",
-                background: i % 2 === 0 ? "var(--color-surface)" : "var(--color-row-alt)",
-                cursor: isEditing ? "grab" : "default",
-                transition: "background 150ms ease, opacity 150ms ease",
-                opacity: isDragging ? 0.5 : 1,
-                userSelect: isEditing ? "none" : undefined,
-              }}
-            >
-              {isEditing && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-faint)" }}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                    <rect x="3" y="2" width="2" height="2" rx="1"/>
-                    <rect x="9" y="2" width="2" height="2" rx="1"/>
-                    <rect x="3" y="6" width="2" height="2" rx="1"/>
-                    <rect x="9" y="6" width="2" height="2" rx="1"/>
-                    <rect x="3" y="10" width="2" height="2" rx="1"/>
-                    <rect x="9" y="10" width="2" height="2" rx="1"/>
-                  </svg>
-                </div>
-              )}
-
-              <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-faint)" }}>
-                {i + 1}
-              </div>
-
-              {isEditing ? (
-                <input
-                  value={item.name}
-                  onChange={(e) => handleItemChange(i, "name", e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  draggable={false}
-                  placeholder="Full name"
-                  style={{ ...inputStyle, fontSize: "var(--dg-fs-label)", fontWeight: 500 }}
-                />
-              ) : (
-                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)" }}>
-                  {item.name}
-                </div>
-              )}
-
-              {isEditing ? (
-                <input
-                  value={item.abbr}
-                  onChange={(e) => handleItemChange(i, "abbr", e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  draggable={false}
-                  placeholder="Abbreviation"
-                  style={{ ...inputStyle, fontSize: "var(--dg-fs-label)", fontWeight: 600 }}
-                />
-              ) : (
-                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-muted)" }}>
-                  {item.abbr}
-                </div>
-              )}
-
-              {isEditing && (
-                <button
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--color-text-muted)",
-                    fontSize: "var(--dg-fs-body)",
-                    lineHeight: 1,
-                    padding: "0 2px",
-                  }}
-                  title="Remove"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Add new row — only in edit mode */}
-        {isEditing && (
+          {/* Header row */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: gridCols,
-              padding: "8px 16px",
-              borderTop: "1px solid var(--color-border-light)",
-              alignItems: "center",
-              background: "var(--color-bg)",
+              padding: "10px 16px",
+              borderBottom: "1px solid var(--color-border-light)",
+              background: isEditing ? "var(--color-brand-bg)" : undefined,
             }}
           >
-            <div />
-            <div />
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              placeholder={placeholder}
-              style={{ ...inputStyle, fontSize: "var(--dg-fs-label)" }}
-            />
-            <input
-              value={newAbbr}
-              onChange={(e) => setNewAbbr(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              placeholder="Abbreviation"
-              style={{ ...inputStyle, fontSize: "var(--dg-fs-label)" }}
-            />
+            {(isEditing
+              ? hideAbbr ? ["", "#", "Name", ""] : ["", "#", "Full Name", "Abbreviation", ""]
+              : hideAbbr ? ["#", "Name"] : ["#", "Full Name", "Abbreviation"]
+            ).map((h, i) => (
+              <div
+                key={i}
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                {h}
+              </div>
+            ))}
+          </div>
+
+          {/* Item rows */}
+          {displayList.map((item, i) => {
+            const isDragging =
+              isEditing &&
+              draggedIdx !== null &&
+              local[draggedIdx]?.id === item.id;
+            const isDropTarget =
+              isEditing &&
+              dragOverIdx === i &&
+              draggedIdx !== null &&
+              draggedIdx !== i;
+            return (
+              <div
+                key={item.id}
+                draggable={isEditing}
+                onDragStart={
+                  isEditing ? () => handleDragStart(i) : undefined
+                }
+                onDragOver={
+                  isEditing ? (e) => handleDragOver(e, i) : undefined
+                }
+                onDrop={isEditing ? handleDrop : undefined}
+                onDragEnd={isEditing ? handleDragEnd : undefined}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: gridCols,
+                  padding: "8px 16px",
+                  borderTop: isDropTarget
+                    ? "2px solid var(--color-brand)"
+                    : i === 0
+                      ? "none"
+                      : "1px solid var(--color-border-light)",
+                  alignItems: "center",
+                  background:
+                    i % 2 === 0
+                      ? "var(--color-surface)"
+                      : "var(--color-row-alt)",
+                  cursor: isEditing ? "grab" : "default",
+                  transition:
+                    "background 150ms ease, opacity 150ms ease",
+                  opacity: isDragging ? 0.5 : 1,
+                  userSelect: isEditing ? "none" : undefined,
+                }}
+              >
+                {isEditing && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--color-text-faint)",
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="currentColor"
+                    >
+                      <rect x="3" y="2" width="2" height="2" rx="1" />
+                      <rect x="9" y="2" width="2" height="2" rx="1" />
+                      <rect x="3" y="6" width="2" height="2" rx="1" />
+                      <rect x="9" y="6" width="2" height="2" rx="1" />
+                      <rect x="3" y="10" width="2" height="2" rx="1" />
+                      <rect x="9" y="10" width="2" height="2" rx="1" />
+                    </svg>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 700,
+                    color: "var(--color-text-faint)",
+                  }}
+                >
+                  {i + 1}
+                </div>
+
+                {isEditing ? (
+                  <input
+                    ref={(el) => {
+                      if (el) nameRefs.current.set(item.id, el);
+                      else nameRefs.current.delete(item.id);
+                    }}
+                    value={item.name}
+                    onChange={(e) =>
+                      handleItemChange(i, "name", e.target.value)
+                    }
+                    onKeyDown={(e) => {
+                      handleNameBackspace(e, item, i);
+                      handleNameKeyDown(e, item, i);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    draggable={false}
+                    placeholder="Full name"
+                    style={fieldStyle}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 500,
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    {item.name}
+                  </div>
+                )}
+
+                {!hideAbbr && (isEditing ? (
+                  <input
+                    ref={(el) => {
+                      if (el) abbrRefs.current.set(item.id, el);
+                      else abbrRefs.current.delete(item.id);
+                    }}
+                    value={item.abbr}
+                    onChange={(e) =>
+                      handleItemChange(i, "abbr", e.target.value)
+                    }
+                    onKeyDown={(e) => handleAbbrKeyDown(e, item, i)}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    draggable={false}
+                    placeholder="Abbreviation"
+                    style={{ ...fieldStyle, fontWeight: 600 }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    {item.abbr}
+                  </div>
+                ))}
+
+                {isEditing && (
+                  <button
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(i);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--color-text-muted)",
+                      fontSize: "var(--dg-fs-body)",
+                      lineHeight: 1,
+                      padding: "0 2px",
+                    }}
+                    title="Remove"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add row button — only in edit mode */}
+          {isEditing && (
             <button
-              onClick={handleAdd}
-              disabled={!newName.trim()}
+              onClick={addRow}
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                width: "100%",
+                padding: "10px 16px",
                 background: "none",
                 border: "none",
-                cursor: newName.trim() ? "pointer" : "not-allowed",
-                color: newName.trim() ? "var(--color-brand)" : "var(--color-text-faint)",
-                fontSize: "var(--dg-fs-heading)",
-                fontWeight: 700,
-                lineHeight: 1,
-                padding: 0,
+                borderTop: "1px solid var(--color-border-light)",
+                cursor: "pointer",
+                color: "var(--color-brand)",
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+                transition: "background 120ms ease",
               }}
-              title="Add"
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background =
+                  "var(--color-brand-bg)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "none")
+              }
             >
-              +
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add {placeholder.toLowerCase()}
             </button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       )}
 
       {error && (
