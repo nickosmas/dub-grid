@@ -418,6 +418,7 @@ export default function SettingsPage({
                 label={`Define ${departmentLabel.toLowerCase()} for people who have app access but don\u2019t appear on the schedule (e.g. HR, Finance, Reception, Management).`}
                 items={departments}
                 placeholder="e.g. HR"
+                hideAbbr
                 onSave={async (updated) => {
                   try {
                     const saved = await saveDepartments(organization.id, updated, departments);

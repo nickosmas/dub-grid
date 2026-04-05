@@ -505,34 +505,30 @@ export async function saveCertifications(
     if (error) throw error;
   }
 
-  // Batch upsert: update existing + insert new in two bulk operations
+  // Separate update + insert to avoid GENERATED ALWAYS identity column errors
   const toUpdate = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id && existingIds.has(item.id));
+    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
   const toInsert = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => !item.id || !existingIds.has(item.id));
+    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
 
-  const upsertRows = [
-    ...toUpdate.map(({ item, sortOrder }) => ({
-      id: item.id,
-      org_id: orgId,
-      name: item.name,
-      abbr: item.abbr,
-      sort_order: sortOrder,
-      archived_at: null,
-    })),
-    ...toInsert.map(({ item, sortOrder }) => ({
-      org_id: orgId,
-      name: item.name,
-      abbr: item.abbr,
-      sort_order: sortOrder,
-    })),
-  ];
-  if (upsertRows.length > 0) {
+  for (const { item, sortOrder } of toUpdate) {
     const { error } = await supabase
       .from("certifications")
-      .upsert(upsertRows, { onConflict: "id" });
+      .update({ name: item.name, abbr: item.abbr, sort_order: sortOrder, archived_at: null })
+      .eq("id", item.id);
+    if (error) throw error;
+  }
+  if (toInsert.length > 0) {
+    const { error } = await supabase
+      .from("certifications")
+      .insert(toInsert.map(({ item, sortOrder }) => ({
+        org_id: orgId,
+        name: item.name,
+        abbr: item.abbr,
+        sort_order: sortOrder,
+      })));
     if (error) throw error;
   }
 
@@ -582,34 +578,30 @@ export async function saveOrganizationRoles(
     if (error) throw error;
   }
 
-  // Batch upsert: update existing + insert new in two bulk operations
+  // Separate update + insert to avoid GENERATED ALWAYS identity column errors
   const toUpdate = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id && existingIds.has(item.id));
+    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
   const toInsert = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => !item.id || !existingIds.has(item.id));
+    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
 
-  const upsertRows = [
-    ...toUpdate.map(({ item, sortOrder }) => ({
-      id: item.id,
-      org_id: orgId,
-      name: item.name,
-      abbr: item.abbr,
-      sort_order: sortOrder,
-      archived_at: null,
-    })),
-    ...toInsert.map(({ item, sortOrder }) => ({
-      org_id: orgId,
-      name: item.name,
-      abbr: item.abbr,
-      sort_order: sortOrder,
-    })),
-  ];
-  if (upsertRows.length > 0) {
+  for (const { item, sortOrder } of toUpdate) {
     const { error } = await supabase
       .from("organization_roles")
-      .upsert(upsertRows, { onConflict: "id" });
+      .update({ name: item.name, abbr: item.abbr, sort_order: sortOrder, archived_at: null })
+      .eq("id", item.id);
+    if (error) throw error;
+  }
+  if (toInsert.length > 0) {
+    const { error } = await supabase
+      .from("organization_roles")
+      .insert(toInsert.map(({ item, sortOrder }) => ({
+        org_id: orgId,
+        name: item.name,
+        abbr: item.abbr,
+        sort_order: sortOrder,
+      })));
     if (error) throw error;
   }
 
@@ -661,33 +653,30 @@ export async function saveDepartments(
     if (error) throw error;
   }
 
+  // Separate update + insert to avoid GENERATED ALWAYS identity column errors
   const toUpdate = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id && existingIds.has(item.id));
+    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
   const toInsert = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => !item.id || !existingIds.has(item.id));
+    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
 
-  const upsertRows = [
-    ...toUpdate.map(({ item, sortOrder }) => ({
-      id: item.id,
-      org_id: orgId,
-      name: item.name,
-      abbr: item.abbr || "",
-      sort_order: sortOrder,
-      archived_at: null,
-    })),
-    ...toInsert.map(({ item, sortOrder }) => ({
-      org_id: orgId,
-      name: item.name,
-      abbr: item.abbr || "",
-      sort_order: sortOrder,
-    })),
-  ];
-  if (upsertRows.length > 0) {
+  for (const { item, sortOrder } of toUpdate) {
     const { error } = await supabase
       .from("departments")
-      .upsert(upsertRows, { onConflict: "id" });
+      .update({ name: item.name, abbr: item.abbr || "", sort_order: sortOrder, archived_at: null })
+      .eq("id", item.id);
+    if (error) throw error;
+  }
+  if (toInsert.length > 0) {
+    const { error } = await supabase
+      .from("departments")
+      .insert(toInsert.map(({ item, sortOrder }) => ({
+        org_id: orgId,
+        name: item.name,
+        abbr: item.abbr || "",
+        sort_order: sortOrder,
+      })));
     if (error) throw error;
   }
 
