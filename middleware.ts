@@ -399,8 +399,8 @@ export async function middleware(req: NextRequest) {
 
   // Route guards - Requirements 11.2, 11.3
 
-  // Staff page: requires admin+ (level >= 2)
-  if (pathname.startsWith("/staff") && level < 2) {
+  // People page (formerly Staff): requires admin+ (level >= 2)
+  if ((pathname.startsWith("/people") || pathname.startsWith("/staff")) && level < 2) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchCoverageRequirements } from "@/lib/db";
+import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
@@ -44,6 +44,7 @@ export interface OrganizationData {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  departments: NamedItem[];
   shiftCodeMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
   loading: boolean;
@@ -57,6 +58,7 @@ export interface OrganizationData {
   setIndicatorTypes: (types: IndicatorType[]) => void;
   handleCertificationsChange: (items: NamedItem[]) => Promise<void>;
   setOrgRoles: (items: NamedItem[]) => void;
+  setDepartments: (items: NamedItem[]) => void;
   coverageRequirements: CoverageRequirement[];
   setCoverageRequirements: (reqs: CoverageRequirement[]) => void;
 }
@@ -211,6 +213,13 @@ export function useOrganizationData(): OrganizationData {
     staleTime: CONFIG_STALE_TIME,
   });
 
+  const departmentsQuery = useQuery({
+    queryKey: queryKeys.org.departments(effectiveOrgId!),
+    queryFn: () => fetchDepartments(effectiveOrgId!),
+    enabled: !!effectiveOrgId,
+    staleTime: CONFIG_STALE_TIME,
+  });
+
   const coverageReqsQuery = useQuery({
     queryKey: queryKeys.org.coverageRequirements(effectiveOrgId!),
     queryFn: () => fetchCoverageRequirements(effectiveOrgId!),
@@ -226,6 +235,7 @@ export function useOrganizationData(): OrganizationData {
   const indicatorTypes = useMemo(() => indicatorTypesQuery.data ?? [], [indicatorTypesQuery.data]);
   const certifications = useMemo(() => certificationsQuery.data ?? [], [certificationsQuery.data]);
   const orgRoles = useMemo(() => orgRolesQuery.data ?? [], [orgRolesQuery.data]);
+  const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
   const coverageRequirements = useMemo(() => coverageReqsQuery.data ?? [], [coverageReqsQuery.data]);
 
   const shiftCodes = useMemo(
@@ -372,6 +382,12 @@ export function useOrganizationData(): OrganizationData {
     }
   }, [queryClient, effectiveOrgId]);
 
+  const setDepartments = useCallback((items: NamedItem[]) => {
+    if (effectiveOrgId) {
+      queryClient.setQueryData(queryKeys.org.departments(effectiveOrgId), items);
+    }
+  }, [queryClient, effectiveOrgId]);
+
   const setCoverageRequirements = useCallback((reqs: CoverageRequirement[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.coverageRequirements(effectiveOrgId), reqs);
@@ -391,6 +407,7 @@ export function useOrganizationData(): OrganizationData {
     indicatorTypes,
     certifications,
     orgRoles,
+    departments,
     shiftCodeMap,
     absenceTypeMap,
     loading,
@@ -404,6 +421,7 @@ export function useOrganizationData(): OrganizationData {
     setIndicatorTypes,
     handleCertificationsChange,
     setOrgRoles,
+    setDepartments,
     coverageRequirements,
     setCoverageRequirements,
   };

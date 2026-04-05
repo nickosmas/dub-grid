@@ -20,6 +20,7 @@ export default function OrganizationLabels({
     focusAreaLabel: organization.focusAreaLabel,
     certificationLabel: organization.certificationLabel,
     roleLabel: organization.roleLabel,
+    departmentLabel: organization.departmentLabel,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -27,7 +28,8 @@ export default function OrganizationLabels({
   const isModified =
     form.focusAreaLabel !== organization.focusAreaLabel ||
     form.certificationLabel !== organization.certificationLabel ||
-    form.roleLabel !== organization.roleLabel;
+    form.roleLabel !== organization.roleLabel ||
+    form.departmentLabel !== organization.departmentLabel;
 
   // Warn before navigating away with unsaved changes
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function OrganizationLabels({
         focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
         certificationLabel: form.certificationLabel.trim() || "Certifications",
         roleLabel: form.roleLabel.trim() || "Roles",
+        departmentLabel: form.departmentLabel.trim() || "Departments",
       };
       await updateOrganization(updated);
       onSave(updated);
@@ -64,7 +67,7 @@ export default function OrganizationLabels({
       <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
         Customize what your organization calls each feature. These labels appear throughout the app.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <div>
           <label style={labelStyle}>FOCUS AREAS LABEL</label>
           <input
@@ -102,6 +105,19 @@ export default function OrganizationLabels({
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Responsibilities, Positions
+          </p>
+        </div>
+        <div>
+          <label style={labelStyle}>DEPARTMENTS LABEL</label>
+          <input
+            value={form.departmentLabel}
+            onChange={(e) => setForm((p) => ({ ...p, departmentLabel: e.target.value }))}
+            placeholder="Departments"
+            maxLength={30}
+            className="dg-input"
+          />
+          <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            e.g. Departments, Teams, Divisions
           </p>
         </div>
       </div>

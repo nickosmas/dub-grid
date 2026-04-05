@@ -19,9 +19,9 @@ function SettingsPageContent() {
   } = usePermissions();
   const {
     org, focusAreas, shiftCodes, absenceTypes, shiftCategories, indicatorTypes,
-    certifications, orgRoles, coverageRequirements, loading, loadError,
+    certifications, orgRoles, departments, coverageRequirements, loading, loadError,
     setOrg, setFocusAreas, handleShiftCodesChange, handleAbsenceTypesChange, setShiftCategories,
-    setIndicatorTypes, handleCertificationsChange, setOrgRoles, setCoverageRequirements,
+    setIndicatorTypes, handleCertificationsChange, setOrgRoles, setDepartments, setCoverageRequirements,
   } = useOrganizationData();
   const isLoading = loading || !org;
 
@@ -53,6 +53,7 @@ function SettingsPageContent() {
           indicatorTypes={indicatorTypes}
           certifications={certifications}
           orgRoles={orgRoles}
+          departments={departments}
           onOrganizationSave={setOrg}
           onFocusAreasChange={setFocusAreas}
           onShiftCodesChange={handleShiftCodesChange}
@@ -60,6 +61,7 @@ function SettingsPageContent() {
           onIndicatorTypesChange={setIndicatorTypes}
           onCertificationsChange={handleCertificationsChange}
           onOrgRolesChange={setOrgRoles}
+          onDepartmentsChange={setDepartments}
           canManageOrg={canManageOrg}
           isSuperAdmin={isSuperAdmin}
           isGridmaster={isGridmaster}

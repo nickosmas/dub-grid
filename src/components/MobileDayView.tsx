@@ -190,7 +190,7 @@ export default function MobileDayView({
             <div
               style={{
                 position: "sticky",
-                top: 56,
+                top: "var(--app-shell-header-h, 56px)",
                 zIndex: 10,
                 background: "var(--color-bg)",
                 borderBottom: "1px solid var(--color-border)",

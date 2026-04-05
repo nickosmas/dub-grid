@@ -2,14 +2,22 @@
 
 import React, { useState, useEffect } from "react";
 import { AdminPermissions, OrganizationUser, OrganizationRole } from "@/types";
-import { fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, fetchInvitations, revokeInvitation, resendInvitation } from "@/lib/db";
+import {
+  fetchOrganizationUsers,
+  changeOrganizationUserRole,
+  updateAdminPermissions,
+  fetchInvitations,
+  revokeInvitation,
+  resendInvitation,
+  removeUserFromOrganization,
+} from "@/lib/db";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { queueNotification } from "@/lib/notify";
 import { useAuth } from "@/components/AuthProvider";
 import CustomSelect from "@/components/CustomSelect";
-import { labelStyle } from "./shared";
+import { ROLE_BADGE_COLORS } from "@/lib/styles";
 import {
   Table,
   TableHeader,
@@ -18,6 +26,10 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Admin permission metadata ──────────────────────────────────────────────────
 
@@ -48,10 +60,7 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canApproveShiftRequests: "Approve Shift Requests",
 };
 
-/** Permissions that are always on and cannot be toggled off. */
 const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule"]);
-
-/** Permissions that only super_admin can hold — hidden from admin permissions editor. */
 const SUPER_ADMIN_ONLY = new Set<keyof AdminPermissions>(["canManageOrgSettings"]);
 
 function emptyAdminPerms(): AdminPermissions {
@@ -75,25 +84,70 @@ function emptyAdminPerms(): AdminPermissions {
   };
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  user: "User",
+};
+
+const ROLE_ORDER: Record<string, number> = { super_admin: 0, admin: 1, user: 2 };
+
+const AVATAR_COLORS: Record<string, string> = {
+  super_admin: "#92400E",
+  admin: "#004501",
+  user: "#475569",
+};
+
+type SortKey = "name" | "role" | "lastLogin";
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={active ? "text-foreground" : "text-muted-foreground/40"}>
+      <path d="m7 15 5 5 5-5" opacity={!active || dir === "desc" ? 1 : 0.3} />
+      <path d="m7 9 5-5 5 5" opacity={!active || dir === "asc" ? 1 : 0.3} />
+    </svg>
+  );
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean }) {
   const { user: currentUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
   const myRole = isSuperAdmin ? "super_admin" : "user";
+
+  // Data
   const [users, setUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
-  const [editingPerms, setEditingPerms] = useState<Record<string, AdminPermissions>>({});
-  const [savingPerms, setSavingPerms] = useState<string | null>(null);
+  const [invitations, setInvitations] = useState<import("@/types").Invitation[]>([]);
+
+  // UI state
+  const [activeTab, setActiveTab] = useState("active");
+  const [search, setSearch] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "role", dir: "asc" });
+
+  // Role change
+  const [saving, setSaving] = useState<string | null>(null);
   const [roleChangeConfirm, setRoleChangeConfirm] = useState<{
     userId: string; userName: string; from: OrganizationRole; to: OrganizationRole;
   } | null>(null);
 
-  // Invitations
-  const [invitations, setInvitations] = useState<import("@/types").Invitation[]>([]);
-  const [showInvitations, setShowInvitations] = useState(false);
+  // Permissions
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [editingPerms, setEditingPerms] = useState<Record<string, AdminPermissions>>({});
+  const [savingPerms, setSavingPerms] = useState<string | null>(null);
+
+  // Revoke access
+  const [revokeConfirm, setRevokeConfirm] = useState<{ userId: string; userName: string } | null>(null);
+  const [revoking, setRevoking] = useState(false);
+
+  // Invitation actions
   const [invitationAction, setInvitationAction] = useState<string | null>(null);
+
+  // ── Data fetching ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     let mounted = true;
@@ -106,6 +160,54 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     return () => { mounted = false; };
   }, [orgId]);
 
+  // ── Derived data ─────────────────────────────────────────────────────────────
+
+  const userCount = users.filter((u) => u.orgRole === "user").length;
+  const adminCount = users.filter((u) => u.orgRole === "admin").length;
+  const superAdminCount = users.filter((u) => u.orgRole === "super_admin").length;
+
+  const pendingInvitations = invitations.filter((inv) => !inv.acceptedAt && !inv.revokedAt);
+  const deniedInvitations = invitations.filter((inv) => inv.revokedAt !== null);
+
+  const filteredUsers = users.filter((u) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const name = [u.firstName, u.lastName].filter(Boolean).join(" ").toLowerCase();
+    const email = (u.email ?? "").toLowerCase();
+    return name.includes(q) || email.includes(q);
+  });
+
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const aIsYou = !!(currentUser && a.id === currentUser.id);
+    const bIsYou = !!(currentUser && b.id === currentUser.id);
+    if (aIsYou !== bIsYou) return aIsYou ? -1 : 1;
+
+    const { key, dir } = sortConfig;
+    const mul = dir === "asc" ? 1 : -1;
+
+    if (key === "role") {
+      const ra = ROLE_ORDER[a.orgRole] ?? 3;
+      const rb = ROLE_ORDER[b.orgRole] ?? 3;
+      if (ra !== rb) return (ra - rb) * mul;
+    }
+    if (key === "lastLogin") {
+      const da = a.lastSignInAt ? new Date(a.lastSignInAt).getTime() : 0;
+      const db = b.lastSignInAt ? new Date(b.lastSignInAt).getTime() : 0;
+      if (da !== db) return (da - db) * mul;
+    }
+    const nameA = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "";
+    const nameB = [b.firstName, b.lastName].filter(Boolean).join(" ") || b.email || "";
+    return key === "name" ? nameA.localeCompare(nameB) * mul : nameA.localeCompare(nameB);
+  });
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+    );
+  };
+
   const handleRoleChange = async (userId: string, newRole: OrganizationRole) => {
     setSaving(userId);
     setError(null);
@@ -116,13 +218,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
       if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
       toast.success("Role updated");
-      queueNotification({
-        action: "role_changed",
-        orgId,
-        targetUserId: userId,
-        fromRole: oldRole,
-        toRole: newRole,
-      });
+      queueNotification({ action: "role_changed", orgId, targetUserId: userId, fromRole: oldRole, toRole: newRole });
     } catch (e) {
       toast.error("Failed to change role");
       setError(e instanceof Error ? e.message : "Failed to change role");
@@ -141,6 +237,21 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     if (!roleChangeConfirm) return;
     handleRoleChange(roleChangeConfirm.userId, roleChangeConfirm.to);
     setRoleChangeConfirm(null);
+  };
+
+  const handleRevokeAccess = async () => {
+    if (!revokeConfirm) return;
+    setRevoking(true);
+    try {
+      await removeUserFromOrganization(revokeConfirm.userId, orgId);
+      setUsers((prev) => prev.filter((u) => u.id !== revokeConfirm.userId));
+      toast.success("Access revoked");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to revoke access");
+    } finally {
+      setRevoking(false);
+      setRevokeConfirm(null);
+    }
   };
 
   const openPermissions = (user: OrganizationUser) => {
@@ -173,51 +284,18 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     }
   };
 
-  const ROLE_LABELS: Record<string, string> = {
-    super_admin: "Super Admin",
-    admin: "Admin",
-    user: "User",
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
   };
 
-  const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-    super_admin: { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
-    admin: { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
-    user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
+  const formatDateShort = (dateStr: string | null) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
-
-  const ROLE_ORDER: Record<string, number> = { super_admin: 0, admin: 1, user: 2 };
-
-  const sortedUsers = [...users]
-    .filter((u) => {
-      if (roleFilter !== "all" && u.orgRole !== roleFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const name = [u.firstName, u.lastName].filter(Boolean).join(" ").toLowerCase();
-        const email = (u.email ?? "").toLowerCase();
-        if (!name.includes(q) && !email.includes(q)) return false;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      // Pin logged-in user to the top
-      const aIsYou = !!(currentUser && a.id === currentUser.id);
-      const bIsYou = !!(currentUser && b.id === currentUser.id);
-      if (aIsYou !== bIsYou) return aIsYou ? -1 : 1;
-
-      const ra = ROLE_ORDER[a.orgRole] ?? 3;
-      const rb = ROLE_ORDER[b.orgRole] ?? 3;
-      if (ra !== rb) return ra - rb;
-      const nameA = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "";
-      const nameB = [b.firstName, b.lastName].filter(Boolean).join(" ") || b.email || "";
-      return nameA.localeCompare(nameB);
-    });
-
-  if (loading) {
-    return <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>Loading users…</p>;
-  }
+  // ── Confirm dialog messages ──────────────────────────────────────────────────
 
   const roleChangeMessage = roleChangeConfirm ? (() => {
     const toLabel = ROLE_LABELS[roleChangeConfirm.to] ?? roleChangeConfirm.to;
@@ -237,260 +315,415 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
       : "info"
     : "info";
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "—";
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  const getDisplayName = (user: OrganizationUser) =>
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+
+  const getInitial = (name: string) =>
+    (name !== "—" ? name : "?")[0].toUpperCase();
+
+  /** Render a role badge using the design-system color map */
+  function RoleBadge({ role, icon }: { role: string; icon?: boolean }) {
+    const colors = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap border"
+        style={{ background: colors.bg, color: colors.text, borderColor: colors.border }}
+      >
+        {icon && role === "super_admin" && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 -ml-0.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+        )}
+        {ROLE_LABELS[role] ?? role}
+      </span>
+    );
+  }
+
+  // ── Loading state ────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-48 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <Separator />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[88px] rounded-xl" />)}
+        </div>
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-8 w-80" />
+        <div className="rounded-xl border border-border overflow-hidden">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-border last:border-b-0">
+              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div className="space-y-6">
+      {/* Error banner */}
       {error && (
-        <div style={{ marginBottom: 12, padding: 10, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)" }}>
+        <div className="rounded-lg border px-4 py-3 text-[13px]" style={{ background: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
           {error}
         </div>
       )}
 
-      {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-        {/* Left group: filter */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Filter</span>
-          <CustomSelect
-            value={roleFilter}
-            options={[
-              { value: "all", label: "All Roles" },
-              { value: "super_admin", label: "Super Admin" },
-              { value: "admin", label: "Admin" },
-              { value: "user", label: "User" },
-            ]}
-            onChange={setRoleFilter}
-            style={{ width: "auto", minWidth: 140 }}
-            fontSize={12}
-          />
-          {(search || roleFilter !== "all") && (
-            <button
-              onClick={() => { setSearch(""); setRoleFilter("all"); }}
-              style={{
-                background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-today-text)", fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit",
-              }}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        <div style={{ flex: 1 }} />
-
-        {/* Right group: count + search */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
-            {sortedUsers.length} of {users.length}
-          </span>
-          <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
-            <svg
-              width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-faint)" }}
-            >
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              className="dg-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              style={{ paddingLeft: 32, fontSize: "var(--dg-fs-caption)", background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
-            />
-          </div>
-        </div>
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">Users & Access</h2>
+        <p className="text-[13px] text-[var(--color-text-muted)] mt-1">Manage staff accounts, roles, and access requests</p>
       </div>
 
-      <div className="rounded-xl border border-border overflow-hidden bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4 text-[11px] tracking-wide uppercase text-muted-foreground">Name</TableHead>
-              <TableHead className="text-[11px] tracking-wide uppercase text-muted-foreground">Role</TableHead>
-              <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-muted-foreground">Joined</TableHead>
-              <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-muted-foreground">Last Login</TableHead>
-              <TableHead className="w-10 pr-4" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedUsers.length === 0 && (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="py-10 text-center text-[13px] text-muted-foreground">
-                  {search || roleFilter !== "all" ? "No users match your filters" : "No users found"}
-                </TableCell>
-              </TableRow>
-            )}
+      <Separator />
 
-            {sortedUsers.map((user) => {
-              const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
-              const roleColor = ROLE_COLORS[user.orgRole] ?? ROLE_COLORS.user;
-              const isSuperAdminUser = user.orgRole === "super_admin";
-              const isExpanded = expandedUserId === user.id;
-              const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
-              const perms = editingPerms[user.id] ?? savedPerms;
-              const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
-              const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
-                allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Users */}
+        <Card size="sm" className="border-[var(--color-border-light)]">
+          <CardContent className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">Users</p>
+              <p className="text-2xl font-bold tracking-tight mt-0.5">{userCount}</p>
+            </div>
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-bg-secondary)]">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-subtle)]">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg>
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* Admins */}
+        <Card size="sm" className="border-[var(--color-brand-border)]">
+          <CardContent className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">Admins</p>
+              <p className="text-2xl font-bold tracking-tight mt-0.5">{adminCount}</p>
+            </div>
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-brand-bg)]">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-brand)]">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Super Admins */}
+        <Card size="sm" className="border-[#FDE68A]">
+          <CardContent className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#92400E]">Super Admins</p>
+              <p className="text-2xl font-bold tracking-tight mt-0.5">{superAdminCount}</p>
+            </div>
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#FEF3C7]">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-faint)]" style={{ left: 12 }}>
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          className="dg-input w-full"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or email..."
+          style={{ height: 40, paddingLeft: 36 }}
+        />
+      </div>
+
+      {/* Tabs */}
+      {(() => {
+        const tabs: { key: string; label: string; count: number }[] = [
+          { key: "active", label: "Active Users", count: sortedUsers.length },
+          { key: "pending", label: "Pending Requests", count: pendingInvitations.length },
+          { key: "revoked", label: "Revoked Users", count: deniedInvitations.length },
+        ];
+        return (
+          <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+            {tabs.map((tab, i) => {
+              const active = activeTab === tab.key;
+              const prevActive = i > 0 && activeTab === tabs[i - 1].key;
+              const showDivider = i > 0 && !active && !prevActive;
               return (
-                <React.Fragment key={user.id}>
-                  <TableRow
-                    className="cursor-pointer"
-                    onClick={() => openPermissions(user)}
+                <span key={tab.key} style={{ display: "contents" }}>
+                  {i > 0 && (
+                    <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                  )}
+                  <button
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`dg-span-tab${active ? " active" : ""}`}
                   >
-                    {/* Name + Email */}
-                    <TableCell className="pl-4 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white" style={{ background: "var(--color-brand)" }}>
-                          {(displayName !== "—" ? displayName : "?")[0].toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground truncate">
-                            {displayName}
-                            {currentUser && user.id === currentUser.id && (
-                              <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-brand-bg)] text-[var(--color-brand)] shrink-0">
-                                You
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground truncate">
-                            {user.email ?? "—"}
-                          </div>
-                        </div>
+                    {tab.label}
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                      fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                      background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                      color: active ? "inherit" : "var(--color-text-muted)",
+                      marginLeft: 3,
+                    }}>{tab.count}</span>
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── Active Users Tab ──────────────────────────────────────────────── */}
+      {activeTab === "active" && (
+          <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent bg-[var(--color-bg)]">
+                  <TableHead
+                    className="pl-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold cursor-pointer select-none"
+                    onClick={() => handleSort("name")}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      User <SortIcon active={sortConfig.key === "name"} dir={sortConfig.dir} />
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold cursor-pointer select-none"
+                    onClick={() => handleSort("role")}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Role <SortIcon active={sortConfig.key === "role"} dir={sortConfig.dir} />
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="hidden md:table-cell text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold cursor-pointer select-none"
+                    onClick={() => handleSort("lastLogin")}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Last Login <SortIcon active={sortConfig.key === "lastLogin"} dir={sortConfig.dir} />
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right pr-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedUsers.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="py-16 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-faint)]">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <line x1="17" y1="11" x2="22" y2="11" />
+                        </svg>
+                        <p className="text-[13px] text-[var(--color-text-muted)]">
+                          {search ? "No users match your search" : "No users found"}
+                        </p>
                       </div>
                     </TableCell>
-
-                    {/* Role */}
-                    <TableCell className="py-3">
-                      <span
-                        className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: roleColor.bg, color: roleColor.text }}
-                      >
-                        {ROLE_LABELS[user.orgRole] ?? user.orgRole}
-                      </span>
-                    </TableCell>
-
-                    {/* Joined */}
-                    <TableCell className="hidden md:table-cell py-3 text-[12px] text-muted-foreground">
-                      {formatDate(user.createdAt)}
-                    </TableCell>
-
-                    {/* Last Login */}
-                    <TableCell className="hidden md:table-cell py-3 text-[12px] text-muted-foreground">
-                      {formatDate(user.lastSignInAt)}
-                    </TableCell>
-
-                    {/* Chevron */}
-                    <TableCell className="pr-4 py-3">
-                      <svg
-                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                        className="text-muted-foreground/50 transition-transform duration-150"
-                        style={{ transform: isExpanded ? "rotate(180deg)" : "none" }}
-                      >
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </TableCell>
                   </TableRow>
+                )}
 
-                  {/* Expanded permissions panel */}
-                  {isExpanded && (
-                    <TableRow className="hover:bg-transparent border-0">
-                      <TableCell colSpan={5} className="p-0">
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            padding: isMobile ? "12px 12px 12px 16px" : "12px 16px 16px 52px",
-                            display: "flex", flexDirection: "column", gap: 12,
-                          }}
-                        >
-                          {/* Role selector */}
-                          {myRole === "super_admin" && !isSuperAdminUser && (
-                            <div>
-                              <label style={labelStyle}>ROLE</label>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <CustomSelect
-                                  value={user.orgRole}
-                                  options={[
-                                    { value: "user", label: "User" },
-                                    { value: "admin", label: "Admin" },
-                                    { value: "super_admin", label: "Super Admin" },
-                                  ]}
-                                  onChange={(v) => requestRoleChange(user, v as OrganizationRole)}
-                                  disabled={saving === user.id}
-                                  style={{ width: 160 }}
-                                  fontSize={12}
-                                />
-                                {saving === user.id && (
-                                  <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>Saving…</span>
+                {sortedUsers.map((user) => {
+                  const displayName = getDisplayName(user);
+                  const initial = getInitial(displayName);
+                  const isYou = !!(currentUser && user.id === currentUser.id);
+                  const isSuperAdminUser = user.orgRole === "super_admin";
+                  const isExpanded = expandedUserId === user.id;
+                  const canEditRole = isSuperAdmin && !isSuperAdminUser && !isYou;
+                  const avatarColor = AVATAR_COLORS[user.orgRole] ?? AVATAR_COLORS.user;
+
+                  const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
+                  const perms = editingPerms[user.id] ?? savedPerms;
+                  const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
+                  const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
+                    allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
+
+                  const lastLogin = formatDate(user.lastSignInAt);
+
+                  return (
+                    <React.Fragment key={user.id}>
+                      <TableRow className={`transition-colors ${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"}`}>
+                        {/* User */}
+                        <TableCell className="pl-4 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar>
+                              <AvatarFallback className="text-[11px] font-bold text-white" style={{ background: avatarColor }}>
+                                {initial}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--color-text-primary)] truncate">
+                                {displayName}
+                                {isYou && (
+                                  <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-brand-bg)] text-[var(--color-brand)] shrink-0">You</span>
                                 )}
                               </div>
+                              <div className="text-[11px] text-[var(--color-text-muted)] truncate flex items-center gap-1 mt-0.5">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-faint)]">
+                                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                </svg>
+                                {user.email ?? "—"}
+                              </div>
                             </div>
-                          )}
+                          </div>
+                        </TableCell>
 
-                          {/* Permissions (admin only) */}
-                          {user.orgRole === "admin" && myRole === "super_admin" && (
-                            <>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        {/* Role */}
+                        <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                          {canEditRole ? (
+                            <div className="flex items-center gap-2">
+                              <CustomSelect
+                                value={user.orgRole}
+                                options={[
+                                  { value: "user", label: "User" },
+                                  { value: "admin", label: "Admin" },
+                                  { value: "super_admin", label: "Super Admin" },
+                                ]}
+                                onChange={(v) => requestRoleChange(user, v as OrganizationRole)}
+                                disabled={saving === user.id}
+                                style={{ width: 140 }}
+                                fontSize={11}
+                              />
+                              {saving === user.id && (
+                                <span className="text-[11px] text-[var(--color-text-muted)] animate-pulse">Saving...</span>
+                              )}
+                            </div>
+                          ) : (
+                            <RoleBadge role={user.orgRole} icon={isSuperAdminUser} />
+                          )}
+                        </TableCell>
+
+                        {/* Last Login */}
+                        <TableCell className="hidden md:table-cell py-3">
+                          <div className="flex items-center gap-1.5 text-[12px] text-[var(--color-text-muted)]">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-faint)]">
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            {lastLogin ?? <span className="italic text-[var(--color-text-faint)]">Never Logged In</span>}
+                          </div>
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="pr-4 py-3">
+                          <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+                            {user.orgRole === "admin" && isSuperAdmin && (
+                              <button
+                                onClick={() => openPermissions(user)}
+                                className="dg-btn dg-btn-secondary"
+                                style={{ padding: "4px 10px", fontSize: 11 }}
+                              >
+                                {isMobile ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
+                                ) : "Configure"}
+                              </button>
+                            )}
+
+                            {!isYou && isSuperAdmin && (
+                              <button
+                                onClick={() => {
+                                  const name = getDisplayName(user) !== "—" ? getDisplayName(user) : user.email ?? "User";
+                                  setRevokeConfirm({ userId: user.id, userName: name });
+                                }}
+                                className="dg-btn dg-btn-danger"
+                                style={{ padding: "4px 10px", fontSize: 11 }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <line x1="15" y1="9" x2="9" y2="15" />
+                                  <line x1="9" y1="9" x2="15" y2="15" />
+                                </svg>
+                                {!isMobile && "Revoke Access"}
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Expanded permissions panel (admin only) */}
+                      {isExpanded && user.orgRole === "admin" && myRole === "super_admin" && (
+                        <TableRow className="hover:bg-transparent border-0">
+                          <TableCell colSpan={4} className="p-0 bg-[var(--color-bg)]">
+                            <div className="border-t border-[var(--color-border-light)]" style={{ padding: isMobile ? "16px" : "16px 16px 20px 52px" }}>
+                              {/* Permission groups */}
+                              <div className="flex flex-col gap-5">
                                 {PERM_GROUPS.map((group) => {
                                   const keys = group.keys.filter((k) => !SUPER_ADMIN_ONLY.has(k));
                                   if (keys.length === 0) return null;
                                   return (
-                                  <div key={group.label}>
-                                    <label style={labelStyle}>{group.label}</label>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                      {keys.map((key) => {
-                                        const alwaysOn = ALWAYS_ON.has(key);
-                                        const isOn = perms[key] ?? false;
-                                        const toggleDisabled = alwaysOn || savingPerms === user.id;
-                                        return (
-                                          <div
-                                            key={key}
-                                            role="button"
-                                            tabIndex={toggleDisabled ? -1 : 0}
-                                            onClick={() => { if (!toggleDisabled) handlePermToggle(user.id, key, !isOn); }}
-                                            onKeyDown={(e) => { if (!toggleDisabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handlePermToggle(user.id, key, !isOn); } }}
-                                            style={{
-                                              display: "flex", alignItems: "center", justifyContent: "space-between",
-                                              padding: "7px 10px", borderRadius: 8,
-                                              cursor: toggleDisabled ? "default" : "pointer",
-                                              opacity: alwaysOn ? 0.5 : 1,
-                                              transition: "background 150ms ease",
-                                            }}
-                                            onMouseEnter={(e) => { if (!toggleDisabled) e.currentTarget.style.background = "var(--color-border-light)"; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                          >
-                                            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
-                                              {PERM_LABELS[key]}
-                                            </span>
-                                            <div style={{
-                                              position: "relative", width: 34, height: 20, borderRadius: 10, flexShrink: 0,
-                                              background: isOn ? "var(--color-brand)" : "var(--color-border)",
-                                              transition: "background 150ms ease",
-                                            }}>
-                                              <div style={{
-                                                position: "absolute",
-                                                top: 2, left: isOn ? 16 : 2,
-                                                width: 16, height: 16, borderRadius: "50%",
-                                                background: "#fff",
-                                                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-                                                transition: "left 150ms ease",
-                                              }} />
+                                    <div key={group.label}>
+                                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-subtle)] mb-1.5">{group.label}</p>
+                                      <div className="flex flex-col gap-0.5">
+                                        {keys.map((key) => {
+                                          const alwaysOn = ALWAYS_ON.has(key);
+                                          const isOn = perms[key] ?? false;
+                                          const toggleDisabled = alwaysOn || savingPerms === user.id;
+                                          return (
+                                            <div
+                                              key={key}
+                                              role="button"
+                                              tabIndex={toggleDisabled ? -1 : 0}
+                                              onClick={() => { if (!toggleDisabled) handlePermToggle(user.id, key, !isOn); }}
+                                              onKeyDown={(e) => { if (!toggleDisabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handlePermToggle(user.id, key, !isOn); } }}
+                                              className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${toggleDisabled ? "cursor-default opacity-50" : "cursor-pointer hover:bg-[var(--color-bg-secondary)]"}`}
+                                            >
+                                              <span className="text-[12px] text-[var(--color-text-secondary)]">
+                                                {PERM_LABELS[key]}
+                                              </span>
+                                              <div
+                                                className="relative shrink-0 rounded-full transition-colors"
+                                                style={{
+                                                  width: 34, height: 20,
+                                                  background: isOn ? "var(--color-brand)" : "var(--color-border)",
+                                                }}
+                                              >
+                                                <div
+                                                  className="absolute top-0.5 rounded-full bg-white shadow-sm transition-[left]"
+                                                  style={{
+                                                    left: isOn ? 16 : 2,
+                                                    width: 16, height: 16,
+                                                  }}
+                                                />
+                                              </div>
                                             </div>
-                                          </div>
-                                        );
-                                      })}
+                                          );
+                                        })}
+                                      </div>
                                     </div>
-                                  </div>
                                   );
                                 })}
                               </div>
 
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 14, borderTop: "1px solid var(--color-border-light)" }}>
+                              {/* Save / Undo */}
+                              <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[var(--color-border-light)]">
                                 <button
                                   onClick={() => {
                                     if (hasUnsavedChanges) {
@@ -511,154 +744,174 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
                                   className="dg-btn dg-btn-primary"
                                   style={{ padding: "7px 14px" }}
                                 >
-                                  {savingPerms === user.id ? "Saving…" : "Save"}
+                                  {savingPerms === user.id ? "Saving..." : "Save"}
                                 </button>
                               </div>
-                            </>
-                          )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+      )}
 
-                          {/* Info for super_admin users */}
-                          {isSuperAdminUser && (
-                            <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
-                              Super Admins have full access to all organization features.
-                            </p>
-                          )}
-
-                          {/* Info for regular users */}
-                          {user.orgRole === "user" && myRole === "super_admin" && (
-                            <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
-                              Users have read-only access. Promote to Admin to configure permissions.
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Role change confirmation */}
-      {/* ── Pending Invitations ─────────────────────────────────────── */}
-      {(() => {
-        const now = new Date().toISOString();
-        const pending = invitations.filter((inv) => !inv.acceptedAt && !inv.revokedAt);
-        const pendingCount = pending.length;
-        if (pendingCount === 0 && !showInvitations) return null;
-        return (
-          <div style={{ marginTop: 24 }}>
-            <button
-              onClick={() => setShowInvitations((v) => !v)}
-              style={{
-                display: "flex", alignItems: "center", gap: 8, padding: 0, background: "none",
-                border: "none", cursor: "pointer", fontSize: "var(--dg-fs-body)", fontWeight: 600,
-                color: "var(--color-text-primary)",
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showInvitations ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-              Pending Invitations ({pendingCount})
-            </button>
-            {showInvitations && (
-              <div style={{ marginTop: 12, overflowX: "auto" }}>
-                {pending.length === 0 ? (
-                  <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>No pending invitations.</div>
-                ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--dg-fs-body-sm)" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</th>
-                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</th>
-                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Expires</th>
-                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</th>
-                        <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pending.map((inv) => {
-                        const isExpired = inv.expiresAt < now;
-                        return (
-                          <tr key={inv.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
-                            <td style={{ padding: "8px 12px" }}>{inv.email}</td>
-                            <td style={{ padding: "8px 12px" }}>
-                              <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "var(--dg-fs-footnote)", fontWeight: 600, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
-                                {inv.roleToAssign === "admin" ? "Admin" : "User"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "8px 12px", color: "var(--color-text-muted)" }}>
-                              {new Date(inv.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                            </td>
-                            <td style={{ padding: "8px 12px" }}>
-                              <span style={{
-                                padding: "2px 8px", borderRadius: 4, fontSize: "var(--dg-fs-footnote)", fontWeight: 600,
-                                background: isExpired ? "var(--color-danger-bg)" : "var(--color-warning-bg)",
-                                color: isExpired ? "var(--color-danger-dark)" : "var(--color-warning-text)",
-                              }}>
-                                {isExpired ? "Expired" : "Pending"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "8px 12px", textAlign: "right" }}>
-                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                                <button
-                                  disabled={invitationAction === inv.id}
-                                  onClick={async () => {
-                                    setInvitationAction(inv.id);
-                                    try {
-                                      await resendInvitation(inv.id, orgId);
-                                      const refreshed = await fetchInvitations(orgId);
-                                      setInvitations(refreshed);
-                                      toast.success("Invitation resent");
-                                    } catch { toast.error("Failed to resend"); }
-                                    finally { setInvitationAction(null); }
-                                  }}
-                                  style={{
-                                    padding: "4px 10px", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, borderRadius: 6,
-                                    border: "1px solid var(--color-primary)", background: "transparent",
-                                    color: "var(--color-primary)", cursor: invitationAction === inv.id ? "wait" : "pointer",
-                                  }}
-                                >
-                                  Resend
-                                </button>
-                                {!isExpired && (
-                                  <button
-                                    disabled={invitationAction === inv.id}
-                                    onClick={async () => {
-                                      setInvitationAction(inv.id);
-                                      try {
-                                        await revokeInvitation(inv.id, orgId);
-                                        const refreshed = await fetchInvitations(orgId);
-                                        setInvitations(refreshed);
-                                        toast.success("Invitation revoked");
-                                      } catch { toast.error("Failed to revoke"); }
-                                      finally { setInvitationAction(null); }
-                                    }}
-                                    style={{
-                                      padding: "4px 10px", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, borderRadius: 6,
-                                      border: "1px solid var(--color-danger-border)", background: "transparent",
-                                      color: "var(--color-danger-dark)", cursor: invitationAction === inv.id ? "wait" : "pointer",
-                                    }}
-                                  >
-                                    Revoke
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
+      {/* ── Pending Requests Tab ──────────────────────────────────────────── */}
+      {activeTab === "pending" && (
+          <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+            {pendingInvitations.length === 0 ? (
+              <div className="py-16 flex flex-col items-center gap-2">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-faint)]">
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+                <p className="text-[13px] text-[var(--color-text-muted)]">No pending invitations</p>
               </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent bg-[var(--color-bg)]">
+                    <TableHead className="pl-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Email</TableHead>
+                    <TableHead className="text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Role</TableHead>
+                    <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Expires</TableHead>
+                    <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Status</TableHead>
+                    <TableHead className="text-right pr-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingInvitations.map((inv) => {
+                    const now = new Date().toISOString();
+                    const isExpired = inv.expiresAt < now;
+                    return (
+                      <TableRow key={inv.id} className="hover:bg-[var(--color-bg)]">
+                        <TableCell className="pl-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback className="text-[11px] font-bold">
+                                {inv.email[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-[13px] text-[var(--color-text-primary)]">{inv.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <RoleBadge role={inv.roleToAssign} />
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell py-3 text-[12px] text-[var(--color-text-muted)]">
+                          {formatDateShort(inv.expiresAt)}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell py-3">
+                          {isExpired ? (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold border" style={{ background: "var(--color-danger-bg)", color: "var(--color-danger-text)", borderColor: "var(--color-danger-border)" }}>
+                              Expired
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold border" style={{ background: "#FFFBEB", color: "#92400E", borderColor: "#FDE68A" }}>
+                              Pending
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="pr-4 py-3">
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              disabled={invitationAction === inv.id}
+                              onClick={async () => {
+                                setInvitationAction(inv.id);
+                                try {
+                                  await resendInvitation(inv.id, orgId);
+                                  const refreshed = await fetchInvitations(orgId);
+                                  setInvitations(refreshed);
+                                  toast.success("Invitation resent");
+                                } catch { toast.error("Failed to resend"); }
+                                finally { setInvitationAction(null); }
+                              }}
+                              className="dg-btn dg-btn-secondary"
+                              style={{ padding: "4px 10px", fontSize: 11 }}
+                            >
+                              Resend
+                            </button>
+                            {!isExpired && (
+                              <button
+                                disabled={invitationAction === inv.id}
+                                onClick={async () => {
+                                  setInvitationAction(inv.id);
+                                  try {
+                                    await revokeInvitation(inv.id, orgId);
+                                    const refreshed = await fetchInvitations(orgId);
+                                    setInvitations(refreshed);
+                                    toast.success("Invitation revoked");
+                                  } catch { toast.error("Failed to revoke"); }
+                                  finally { setInvitationAction(null); }
+                                }}
+                                className="dg-btn dg-btn-danger"
+                                style={{ padding: "4px 10px", fontSize: 11 }}
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             )}
           </div>
-        );
-      })()}
+      )}
 
+      {/* ── Revoked Users Tab ─────────────────────────────────────────────── */}
+      {activeTab === "revoked" && (
+          <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+            {deniedInvitations.length === 0 ? (
+              <div className="py-16 flex flex-col items-center gap-2">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-faint)]">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                <p className="text-[13px] text-[var(--color-text-muted)]">No revoked users</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent bg-[var(--color-bg)]">
+                    <TableHead className="pl-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Email</TableHead>
+                    <TableHead className="text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Role</TableHead>
+                    <TableHead className="hidden md:table-cell text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Revoked</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deniedInvitations.map((inv) => (
+                    <TableRow key={inv.id} className="hover:bg-[var(--color-bg)]">
+                      <TableCell className="pl-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback className="text-[11px] font-bold">
+                              {inv.email[0].toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-[13px] text-[var(--color-text-primary)]">{inv.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <RoleBadge role={inv.roleToAssign} />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell py-3 text-[12px] text-[var(--color-text-muted)]">
+                        {formatDateShort(inv.revokedAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+      )}
+
+      {/* ── Confirm dialogs ─────────────────────────────────────────────────── */}
       {roleChangeConfirm && (
         <ConfirmDialog
           title="Change Role"
@@ -671,6 +924,17 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         />
       )}
 
+      {revokeConfirm && (
+        <ConfirmDialog
+          title="Revoke Access"
+          message={`Are you sure you want to revoke "${revokeConfirm.userName}"'s access to this organization? This action can be undone by re-inviting them.`}
+          confirmLabel="Revoke Access"
+          variant="danger"
+          isLoading={revoking}
+          onConfirm={handleRevokeAccess}
+          onCancel={() => setRevokeConfirm(null)}
+        />
+      )}
     </div>
   );
 }

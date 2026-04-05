@@ -98,7 +98,7 @@ function SetupContent() {
         ? `${employees.length} employee${employees.length === 1 ? "" : "s"} added`
         : "No employees yet",
       done: hasEmployees,
-      href: "/staff",
+      href: "/people",
     },
   ];
 

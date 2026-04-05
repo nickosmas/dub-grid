@@ -102,6 +102,7 @@ export default function CreateOrganizationForm({
         focusAreaLabel: focusAreaLabel.trim() || "Focus Areas",
         certificationLabel: certificationLabel.trim() || "Certifications",
         roleLabel: roleLabel.trim() || "Roles",
+        departmentLabel: "Departments",
         shiftDisplayMode: "code",
         timezone: timezone || null,
         enforceConflictPrevention: false,

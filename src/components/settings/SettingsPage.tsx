@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, CoverageRequirement, AbsenceType } from "@/types";
-import { saveCertifications, saveOrganizationRoles } from "@/lib/db";
+import { saveCertifications, saveOrganizationRoles, saveDepartments } from "@/lib/db";
 import { helpText } from "@/lib/help-content";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -46,6 +46,7 @@ export interface SettingsPageProps {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  departments: NamedItem[];
   onOrganizationSave: (organization: Organization) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
   onShiftCodesChange: (codes: ShiftCode[]) => void;
@@ -53,6 +54,7 @@ export interface SettingsPageProps {
   onIndicatorTypesChange: (types: IndicatorType[]) => void;
   onCertificationsChange: (items: NamedItem[]) => void;
   onOrgRolesChange: (items: NamedItem[]) => void;
+  onDepartmentsChange: (items: NamedItem[]) => void;
   canManageOrg: boolean;
   isSuperAdmin: boolean;
   isGridmaster: boolean;
@@ -77,6 +79,7 @@ export default function SettingsPage({
   indicatorTypes,
   certifications,
   orgRoles,
+  departments,
   onOrganizationSave,
   onFocusAreasChange,
   onShiftCodesChange,
@@ -84,6 +87,7 @@ export default function SettingsPage({
   onIndicatorTypesChange,
   onCertificationsChange,
   onOrgRolesChange,
+  onDepartmentsChange,
   canManageOrg,
   isSuperAdmin,
   isGridmaster,
@@ -117,13 +121,15 @@ export default function SettingsPage({
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
+  const departmentLabel = organization.departmentLabel || "Departments";
 
   const navGroups = useMemo(() => buildNavGroups(perms, {
     shiftCodesLabel: organization.shiftDisplayMode === "name" ? "Shifts" : "Schedule Codes",
     focusAreaLabel,
     certificationLabel,
     roleLabel,
-  }), [perms, organization.shiftDisplayMode, focusAreaLabel, certificationLabel, roleLabel]);
+    departmentLabel,
+  }), [perms, organization.shiftDisplayMode, focusAreaLabel, certificationLabel, roleLabel, departmentLabel]);
 
   const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
@@ -164,11 +170,11 @@ export default function SettingsPage({
 
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", width: "100%", overflow: "hidden", position: "relative" }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - var(--app-shell-header-h, 56px))", width: "100%", overflow: "hidden", position: "relative" }}>
         {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
         {!isMobile && (
-          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
-            <SidebarContent className="pt-2">
+          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }}>
+            <SidebarContent className="pt-2 overscroll-contain">
               {navGroups.map((group) => (
                 <SidebarGroup key={group.id}>
                   <SidebarGroupLabel
@@ -396,6 +402,29 @@ export default function SettingsPage({
                     toast.success("Roles saved");
                   } catch (err) {
                     toast.error("Failed to save roles");
+                    throw err;
+                  }
+                }}
+                canEdit={canManageOrgLabels}
+              />
+            </Section>
+          </div>
+        )}
+
+        {activeSection === "staff-departments" && canManageOrg && (
+          <div style={{ width: "100%", maxWidth }}>
+            <Section title={departmentLabel} noPadding>
+              <StringListSettings
+                label={`Define ${departmentLabel.toLowerCase()} for people who have app access but don\u2019t appear on the schedule (e.g. HR, Finance, Reception, Management).`}
+                items={departments}
+                placeholder="e.g. HR"
+                onSave={async (updated) => {
+                  try {
+                    const saved = await saveDepartments(organization.id, updated, departments);
+                    onDepartmentsChange(saved);
+                    toast.success("Departments saved");
+                  } catch (err) {
+                    toast.error("Failed to save departments");
                     throw err;
                   }
                 }}

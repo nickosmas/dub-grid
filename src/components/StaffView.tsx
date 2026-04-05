@@ -4,22 +4,25 @@ import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } fr
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
-import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode } from "@/types";
+import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode, DirectoryPerson } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { BulkImportModal } from "@/components/staff/BulkImportModal";
-import { fetchInvitations, revokeInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft } from "@/lib/db";
+import { fetchInvitations, revokeInvitation, resendInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft, removeUserFromOrganization, updateAppOnlyUser, updatePendingInvitation } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import * as Sentry from "@/lib/sentry";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
-import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useMediaQuery, MOBILE, TABLET, useDirectory } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { useStaffFilters, useStaffSelection, useStaffReorder, StaffTableRow, StaffEmptyState, StaffPagination, StaffDetailPanel, StaffToolbar, StaffFilterPopover, StaffContextBar } from "./staff";
+import { AppOnlyDetailPanel } from "./staff/AppOnlyDetailPanel";
 import type { EmployeeTab } from "./staff";
 import UserManagementSettings from "@/components/settings/UserManagement";
 import OrgActivityLog from "@/components/settings/ActivityLog";
@@ -38,7 +41,7 @@ import {
 
 const EMPTY_CODE_MAP = new Map<number, string>();
 
-type StaffSection = "members" | "users" | "activity" | "recurring-schedule";
+type StaffSection = "directory" | "access" | "activity" | "recurring-schedule";
 
 interface StaffViewProps {
   employees: Employee[];
@@ -57,6 +60,7 @@ interface StaffViewProps {
   /** Full code map (including archived) for resolving historical labels. */
   shiftCodeMap?: Map<number, string>;
   absenceTypes?: AbsenceType[];
+  departments?: NamedItem[];
   canEditShifts?: boolean;
   canManageEmployees?: boolean;
   isSuperAdmin?: boolean;
@@ -66,6 +70,317 @@ interface StaffViewProps {
   roleLabel?: string;
   orgName?: string;
   shiftDisplayMode?: ShiftDisplayMode;
+}
+
+// ── App-only users section (people with app access but no employee record) ──
+
+function AppOnlySection({
+  users,
+  isMobile,
+  isTablet,
+  canManageEmployees,
+  isSuperAdmin,
+  onInviteToApp,
+  departments = [],
+  departmentLabel = "Department",
+  onSaveAppOnlyUser,
+  onRevokeAccess,
+  onRevokeInvitation,
+  onResendInvitation,
+  onAddToSchedule,
+}: {
+  users: DirectoryPerson[];
+  isMobile: boolean;
+  isTablet: boolean;
+  canManageEmployees: boolean;
+  isSuperAdmin?: boolean;
+  onInviteToApp?: () => void;
+  departments?: NamedItem[];
+  departmentLabel?: string;
+  onSaveAppOnlyUser?: (person: DirectoryPerson, data: { firstName: string; lastName: string; phone: string; departmentId: number | null }) => Promise<void>;
+  onRevokeAccess?: (userId: string) => Promise<void>;
+  onRevokeInvitation?: (invitationId: string) => Promise<void>;
+  onResendInvitation?: (invitationId: string) => Promise<void>;
+  onAddToSchedule?: (person: DirectoryPerson) => void;
+}) {
+  const [filterDeptId, setFilterDeptId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
+
+  const filteredUsers = useMemo(() => {
+    let list = users;
+    // Department filter
+    if (filterDeptId === -1) list = list.filter((u) => !u.departmentId);
+    else if (filterDeptId !== null) list = list.filter((u) => u.departmentId === filterDeptId);
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((u) =>
+        `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.phone && u.phone.includes(q))
+      );
+    }
+    return list;
+  }, [users, filterDeptId, searchQuery]);
+
+  const selectedPerson = expandedPersonId ? users.find((u) => u.personId === expandedPersonId) ?? null : null;
+
+  // Build department counts for filter chips
+  const deptCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const u of users) {
+      if (u.departmentId) counts.set(u.departmentId, (counts.get(u.departmentId) ?? 0) + 1);
+    }
+    return counts;
+  }, [users]);
+
+  const noDeptCount = useMemo(() => users.filter((u) => !u.departmentId).length, [users]);
+
+  if (users.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-12 h-12 rounded-full bg-[var(--color-surface)] flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <p className="text-[var(--dg-fs-body)] font-semibold text-[var(--color-text-primary)] mb-1">
+          No app-only users yet
+        </p>
+        <p className="text-[var(--dg-fs-caption)] text-[var(--color-text-muted)] max-w-xs">
+          People like reception, HR, finance, or senior management who need app access but don&apos;t appear on the schedule will show here.
+        </p>
+        {canManageEmployees && onInviteToApp && (
+          <button className="dg-btn dg-btn-primary mt-4" onClick={onInviteToApp}>
+            Invite to App
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const roleLabel = (role: string | null) => {
+    if (!role) return "";
+    switch (role) {
+      case "super_admin": return "Super Admin";
+      case "admin": return "Admin";
+      case "user": return "User";
+      default: return role;
+    }
+  };
+
+  const roleBadgeColor = (role: string | null) => {
+    switch (role) {
+      case "super_admin": return { bg: "var(--color-brand-bg)", text: "var(--color-brand)" };
+      case "admin": return { bg: "rgba(59, 130, 246, 0.1)", text: "rgb(59, 130, 246)" };
+      default: return { bg: "var(--color-surface)", text: "var(--color-text-muted)" };
+    }
+  };
+
+  const gridCols = isMobile ? "1fr" : isTablet ? "1.5fr 0.8fr 1fr" : "1.2fr 0.7fr 0.8fr 1fr 0.8fr";
+
+  return (
+    <>
+    <div>
+      {/* Section header with search + invite */}
+      <div className="flex items-center gap-3 mb-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-xs">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-faint)] pointer-events-none">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 w-full rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] pl-8 pr-8 text-[13px] font-medium text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-border-focus)] focus:ring-[3px] focus:ring-[rgba(46,153,48,0.15)] outline-none transition-all"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--color-text-faint)] hover:text-[var(--color-text-secondary)]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          )}
+        </div>
+
+        <p className="text-[var(--dg-fs-caption)] text-[var(--color-text-muted)] shrink-0">
+          {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""}
+        </p>
+
+        {canManageEmployees && onInviteToApp && (
+          <button className="dg-btn dg-btn-primary dg-btn-sm shrink-0" onClick={onInviteToApp}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Invite to App
+          </button>
+        )}
+      </div>
+
+      {/* Department filter chips */}
+      {departments.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setFilterDeptId(null)}
+            className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+              filterDeptId === null
+                ? "bg-[var(--color-brand)] text-white"
+                : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
+            }`}
+          >
+            All ({users.length})
+          </button>
+          {departments.filter((d) => deptCounts.has(d.id)).map((dept) => (
+            <button
+              key={dept.id}
+              onClick={() => setFilterDeptId(filterDeptId === dept.id ? null : dept.id)}
+              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                filterDeptId === dept.id
+                  ? "bg-[var(--color-brand)] text-white"
+                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
+              }`}
+            >
+              {dept.name} ({deptCounts.get(dept.id) ?? 0})
+            </button>
+          ))}
+          {noDeptCount > 0 && (
+            <button
+              onClick={() => setFilterDeptId(-1)}
+              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                filterDeptId === -1
+                  ? "bg-[var(--color-brand)] text-white"
+                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
+              }`}
+            >
+              No dept ({noDeptCount})
+            </button>
+          )}
+        </div>
+      )}
+
+    <div className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
+      {/* Header row */}
+      {!isMobile && (
+        <div
+          className="grid border-b border-[var(--color-border-light)] bg-[var(--color-row-alt)] px-6 py-3"
+          style={{ gridTemplateColumns: gridCols }}
+        >
+          {(isTablet
+            ? ["Name", "Role", "Email"]
+            : ["Name", departmentLabel, "Role", "Email", "Status"]
+          ).map((h) => (
+            <div key={h} className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-[0.06em]">
+              {h}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* User rows */}
+      {filteredUsers.map((person) => {
+        const colors = roleBadgeColor(person.orgRole);
+        const dept = person.departmentId ? departments.find((d) => d.id === person.departmentId) : null;
+        const isPending = person.source === "pending_invite";
+        const isExpanded = person.personId === expandedPersonId;
+        return (
+          <div
+            key={person.personId}
+            onClick={() => setExpandedPersonId(isExpanded ? null : person.personId)}
+            className="grid items-center border-b border-[var(--color-border-light)] last:border-b-0 hover:bg-[var(--color-row-hover)] transition-colors cursor-pointer"
+            style={{
+              gridTemplateColumns: isMobile ? "1fr" : gridCols,
+              padding: isMobile ? "12px 16px" : "10px 24px",
+              opacity: isPending ? 0.7 : 1,
+              background: isExpanded ? "var(--color-brand-bg)" : undefined,
+            }}
+          >
+            {/* Name */}
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                style={{ background: isPending ? "var(--color-surface)" : "var(--color-primary-bg)", color: isPending ? "var(--color-text-muted)" : "var(--color-primary)" }}
+              >
+                {(person.firstName?.[0] ?? "").toUpperCase()}{(person.lastName?.[0] ?? "").toUpperCase() || "?"}
+              </div>
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
+                  {person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}
+                </div>
+                {isMobile && (
+                  <div className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">
+                    {person.email}{dept ? ` \u00b7 ${dept.name}` : ""} &middot; {roleLabel(person.orgRole)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Department */}
+            {!isMobile && !isTablet && (
+              <div className="text-[13px] text-[var(--color-text-muted)] truncate">
+                {dept?.name ?? "\u2014"}
+              </div>
+            )}
+
+            {/* Role badge */}
+            {!isMobile && (
+              <div>
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                  style={{ background: colors.bg, color: colors.text }}
+                >
+                  {roleLabel(person.orgRole)}
+                </span>
+              </div>
+            )}
+
+            {/* Email */}
+            {!isMobile && (
+              <div className="text-[13px] text-[var(--color-text-muted)] truncate">
+                {person.email}
+              </div>
+            )}
+
+            {/* Status */}
+            {!isMobile && !isTablet && (
+              <div>
+                {isPending ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }}>
+                    {person.invitationStatus === "expired" ? "Expired" : "Pending"}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--color-success-bg)", color: "var(--color-success-text)" }}>
+                    Active
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+    </div>
+
+      {/* Detail panel */}
+      {selectedPerson && (
+        <AppOnlyDetailPanel
+          person={selectedPerson}
+          departments={departments}
+          departmentLabel={departmentLabel}
+          canManageEmployees={canManageEmployees}
+          onClose={() => setExpandedPersonId(null)}
+          onSave={async (data) => {
+            if (onSaveAppOnlyUser) await onSaveAppOnlyUser(selectedPerson, data);
+          }}
+          onRevokeAccess={isSuperAdmin ? onRevokeAccess : undefined}
+          onRevokeInvitation={isSuperAdmin ? onRevokeInvitation : undefined}
+          onResendInvitation={isSuperAdmin ? onResendInvitation : undefined}
+          onAddToSchedule={canManageEmployees ? onAddToSchedule : undefined}
+        />
+      )}
+    </>
+  );
 }
 
 // ── Members section (the existing staff table) ────────────────────────────────
@@ -88,6 +403,8 @@ function MembersSection({
   roleLabel,
   orgId,
   orgName,
+  isSuperAdmin,
+  departments: departmentItems = [],
 }: {
   employees: Employee[];
   benchedEmployees: Employee[];
@@ -106,9 +423,12 @@ function MembersSection({
   roleLabel: string;
   orgId?: string;
   orgName?: string;
+  isSuperAdmin?: boolean;
+  departments?: NamedItem[];
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  const queryClient = useQueryClient();
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
@@ -160,6 +480,16 @@ function MembersSection({
     }
     return map;
   }, [pendingInvitations]);
+
+  // Directory data — for the "App Only" tab showing users without employee records
+  const { directory } = useDirectory(orgId ?? null);
+  const appOnlyUsers = useMemo(
+    () => directory.filter((p) => p.source === "user_only" || p.source === "pending_invite"),
+    [directory],
+  );
+
+  // App-only invite modal state
+  const [showAppOnlyInvite, setShowAppOnlyInvite] = useState(false);
 
   // Bulk import state
   const [showImport, setShowImport] = useState(false);
@@ -215,7 +545,8 @@ function MembersSection({
       : "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px";
 
   const tabItems: { key: EmployeeTab; label: string; count: number; color: string }[] = [
-    { key: "active", label: "Active", count: employees.length, color: "var(--color-today-text)" },
+    { key: "active", label: "On Schedule", count: employees.length, color: "var(--color-today-text)" },
+    { key: "app-only", label: "App Only", count: appOnlyUsers.length, color: "var(--color-primary)" },
     { key: "benched", label: "Benched", count: benchedEmployees.length, color: "var(--color-warning)" },
     { key: "terminated", label: "Terminated", count: terminatedEmployees.length, color: "var(--color-danger)" },
   ];
@@ -231,7 +562,7 @@ function MembersSection({
   return (
     <>
       {/* ── Sticky header: toolbar + context bar ── */}
-      <div className="sticky top-0 z-50">
+      <div style={{ position: "sticky", top: "var(--app-shell-header-h, 56px)", zIndex: 50, background: "var(--color-bg)" }}>
       <StaffToolbar
         tabs={tabItems}
         activeTab={activeTab}
@@ -253,10 +584,11 @@ function MembersSection({
         onFilterToggle={() => setFilterOpen((v) => !v)}
         filterOpen={filterOpen}
         filterBtnRef={filterBtnRef}
+        hideControls={activeTab === "app-only"}
       />
 
-      {/* Context bar: filter pills, bulk actions, or reorder bar */}
-      <StaffContextBar
+      {/* Context bar: filter pills, bulk actions, or reorder bar (hidden on app-only tab) */}
+      {activeTab !== "app-only" && <StaffContextBar
         filterFocusArea={filterFocusArea}
         filterRole={filterRole}
         hasActiveFilters={hasActiveFilters}
@@ -281,7 +613,7 @@ function MembersSection({
         isDirty={isDirty}
         onSaveOrder={handleSaveOrder}
         onCancelReorder={handleCancelReorder}
-      />
+      />}
       </div>
 
       {/* Filter popover */}
@@ -308,8 +640,45 @@ function MembersSection({
       <div
         className="px-4 md:px-6 lg:px-12 py-4 md:py-6 lg:py-10 pb-32"
       >
-        {/* Table & Empty States */}
-        {rawList.length > 0 ? (
+        {/* ── App Only tab: simplified user list ── */}
+        {activeTab === "app-only" && (
+          <AppOnlySection
+            users={appOnlyUsers}
+            isMobile={isMobile}
+            isTablet={isTablet}
+            canManageEmployees={canManageEmployees}
+            isSuperAdmin={isSuperAdmin}
+            onInviteToApp={isSuperAdmin ? () => setShowAppOnlyInvite(true) : undefined}
+            departments={departmentItems}
+            onSaveAppOnlyUser={orgId ? async (person, data) => {
+              if (person.source === "pending_invite") {
+                await updatePendingInvitation(person.personId.replace("inv:", ""), orgId, data);
+              } else if (person.userId) {
+                await updateAppOnlyUser(person.userId, orgId, data);
+              }
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+              toast.success("Changes saved");
+            } : undefined}
+            onRevokeAccess={orgId ? async (userId) => {
+              await removeUserFromOrganization(userId, orgId);
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+              toast.success("Access revoked");
+            } : undefined}
+            onRevokeInvitation={orgId ? async (invitationId) => {
+              await revokeInvitation(invitationId, orgId);
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+              toast.success("Invitation revoked");
+            } : undefined}
+            onResendInvitation={orgId ? async (invitationId) => {
+              await resendInvitation(invitationId, orgId);
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+              toast.success("Invitation resent");
+            } : undefined}
+          />
+        )}
+
+        {/* ── Schedule staff tabs: employee table & empty states ── */}
+        {activeTab !== "app-only" && rawList.length > 0 ? (
           <>
           <div data-testid="staff-table" className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
             {/* Header row */}
@@ -388,13 +757,13 @@ function MembersSection({
             onPageChange={setPage}
           />
           </>
-        ) : (
+        ) : activeTab !== "app-only" ? (
           <StaffEmptyState
             activeTab={activeTab}
             hasFilters={!!(searchQuery || filterFocusArea || filterRole || showOnlyUnlinked)}
             onClearFilters={clearFilters}
           />
-        )}
+        ) : null}
 
         {/* Bulk Import Modal */}
         {showImport && orgId && (
@@ -414,11 +783,31 @@ function MembersSection({
             onClose={() => { setInviteEmployee(null); setInviteQueue([]); }}
             onInvited={() => {
               refreshInvitations();
+              if (orgId) {
+                void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+              }
               if (inviteQueue.length > 0) {
                 setInviteEmployee(inviteQueue[0]);
                 setInviteQueue((q) => q.slice(1));
               } else {
                 setInviteEmployee(null);
+              }
+            }}
+          />
+        )}
+
+        {/* Invite App-Only User Modal */}
+        {showAppOnlyInvite && orgId && (
+          <InviteEmployeeModal
+            employee={null}
+            orgId={orgId}
+            orgName={orgName || "your organization"}
+            departments={departmentItems}
+            onClose={() => setShowAppOnlyInvite(false)}
+            onInvited={() => {
+              setShowAppOnlyInvite(false);
+              if (orgId) {
+                void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
               }
             }}
           />
@@ -445,6 +834,20 @@ function MembersSection({
           onClose={() => setExpandedEmpId(null)}
           onInvite={(e) => setInviteEmployee(e)}
           onRevoke={handleRevokeInvitation}
+          onRevokeAccess={isSuperAdmin && orgId ? async (userId: string) => {
+            try {
+              await removeUserFromOrganization(userId, orgId);
+              toast.success("App access revoked");
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            } catch {
+              toast.error("Failed to revoke app access");
+            }
+          } : undefined}
+          onRemoveFromSchedule={canManageEmployees ? (empId: string) => {
+            onDelete(empId);
+            setExpandedEmpId(null);
+            if (orgId) void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+          } : undefined}
         />
       )}
     </>
@@ -1330,6 +1733,7 @@ export default function StaffView({
   shiftCodes,
   shiftCodeMap,
   absenceTypes,
+  departments: departmentsProp = [],
   canEditShifts,
   canManageEmployees,
   isSuperAdmin = false,
@@ -1342,9 +1746,13 @@ export default function StaffView({
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
-  const VALID_SECTIONS: StaffSection[] = ["members", "users", "activity", "recurring-schedule"];
+  const VALID_SECTIONS: StaffSection[] = ["directory", "access", "activity", "recurring-schedule"];
   const sectionParam = searchParams.get("section") as StaffSection | null;
-  const activeSection: StaffSection = sectionParam && VALID_SECTIONS.includes(sectionParam) ? sectionParam : "members";
+  // Support legacy "members" and "users" section params for backwards compat
+  const resolvedSection = sectionParam === ("members" as string) ? "directory" as StaffSection
+    : sectionParam === ("users" as string) ? "access" as StaffSection
+    : sectionParam;
+  const activeSection: StaffSection = resolvedSection && VALID_SECTIONS.includes(resolvedSection) ? resolvedSection : "directory";
 
   const iconMembers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   const iconUserMgmt = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
@@ -1352,8 +1760,8 @@ export default function StaffView({
   const iconCalendar = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
 
   const links: { id: StaffSection; label: string; icon: React.ReactNode }[] = [
-    { id: "members", label: "Staff Members", icon: iconMembers },
-    ...((isSuperAdmin || isGridmaster) ? [{ id: "users" as StaffSection, label: "User Management", icon: iconUserMgmt }] : []),
+    { id: "directory", label: "Directory", icon: iconMembers },
+    ...((isSuperAdmin || isGridmaster) ? [{ id: "access" as StaffSection, label: "User Access", icon: iconUserMgmt }] : []),
     ...(orgId ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
     ...(isSuperAdmin ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: iconActivity }] : []),
   ];
@@ -1376,7 +1784,7 @@ export default function StaffView({
         id: link.id,
         label: link.label,
         icon: link.icon,
-        href: link.id === "members" ? "/staff" : `/staff?section=${link.id}`,
+        href: link.id === "directory" ? "/people" : `/people?section=${link.id}`,
         active: activeSection === link.id,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1388,11 +1796,11 @@ export default function StaffView({
     <SidebarProvider
       open={sidebarOpen}
       onOpenChange={handleSidebarOpenChange}
-      style={{ minHeight: "unset", height: "calc(100dvh - 56px)" }}
+      style={{ minHeight: "unset" }}
     >
       {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
       {!isMobile && (
-        <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
+        <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }} onWheel={(e: React.WheelEvent) => e.preventDefault()}>
           <SidebarContent className="pt-4">
             <SidebarGroup>
               <SidebarGroupContent>
@@ -1400,7 +1808,7 @@ export default function StaffView({
                   {links.map((link) => (
                     <SidebarMenuItem key={link.id}>
                       <SidebarMenuButton
-                        render={<Link href={link.id === "members" ? "/staff" : `/staff?section=${link.id}`} replace />}
+                        render={<Link href={link.id === "directory" ? "/people" : `/people?section=${link.id}`} replace />}
                         isActive={activeSection === link.id}
                         tooltip={link.label}
                         className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
@@ -1438,9 +1846,9 @@ export default function StaffView({
         </Sidebar>
       )}
 
-      {/* SidebarInset = scroll container. Toolbar is a DIRECT child → sticky works */}
-      <SidebarInset className="overflow-y-auto">
-        {activeSection === "members" && (
+      {/* SidebarInset — body handles scrolling, toolbar sticks below header */}
+      <SidebarInset>
+        {activeSection === "directory" && (
           <MembersSection
             employees={employees}
             benchedEmployees={benchedEmployees}
@@ -1459,12 +1867,14 @@ export default function StaffView({
             roleLabel={roleLabel}
             orgId={orgId}
             orgName={orgName}
+            isSuperAdmin={isSuperAdmin}
+            departments={departmentsProp}
           />
         )}
 
-        {activeSection !== "members" && (
+        {activeSection !== "directory" && (
           <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-            {activeSection === "users" && (isSuperAdmin || isGridmaster) && orgId && (
+            {activeSection === "access" && (isSuperAdmin || isGridmaster) && orgId && (
               <div style={{ width: "100%", maxWidth: 1100 }}>
                 <UserManagementSettings orgId={orgId} isSuperAdmin={isSuperAdmin} />
               </div>

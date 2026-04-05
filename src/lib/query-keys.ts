@@ -14,8 +14,10 @@ export const queryKeys = {
     indicatorTypes: (orgId: string) => ["org", orgId, "indicatorTypes"] as const,
     certifications: (orgId: string) => ["org", orgId, "certifications"] as const,
     orgRoles: (orgId: string) => ["org", orgId, "orgRoles"] as const,
+    departments: (orgId: string) => ["org", orgId, "departments"] as const,
     coverageRequirements: (orgId: string) => ["org", orgId, "coverageRequirements"] as const,
     users: (orgId: string) => ["org", orgId, "users"] as const,
+    directory: (orgId: string) => ["org", orgId, "directory"] as const,
     invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
   },
   employees: {

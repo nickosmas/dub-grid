@@ -88,6 +88,7 @@ export interface DbOrganization {
   focus_area_label: string | null;
   certification_label: string | null;
   role_label: string | null;
+  department_label: string | null;
   shift_display_mode: string | null;
   timezone: string | null;
   archived_at: string | null;
@@ -256,6 +257,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     focusAreaLabel: row.focus_area_label ?? 'Focus Areas',
     certificationLabel: row.certification_label ?? 'Certifications',
     roleLabel: row.role_label ?? 'Roles',
+    departmentLabel: row.department_label ?? 'Departments',
     shiftDisplayMode: (row.shift_display_mode as import("@/types").ShiftDisplayMode) ?? 'code',
     timezone: row.timezone ?? null,
     archivedAt: row.archived_at ?? null,
@@ -615,6 +617,84 @@ export async function saveOrganizationRoles(
   return fetchOrganizationRoles(orgId);
 }
 
+// ── Departments (for non-schedule org members) ──────────────────────────────
+
+export async function fetchDepartments(
+  orgId: string,
+  includeArchived = false,
+): Promise<NamedItem[]> {
+  if (includeArchived) {
+    const { data, error } = await supabase
+      .from("departments")
+      .select(NAMED_ITEM_COLS)
+      .eq("org_id", orgId)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToNamedItem);
+  }
+  return cacheThrough(CacheKey.departments(orgId), TTL.STABLE, async () => {
+    const { data, error } = await supabase
+      .from("departments")
+      .select(NAMED_ITEM_COLS)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToNamedItem);
+  });
+}
+
+export async function saveDepartments(
+  orgId: string,
+  items: NamedItem[],
+  existing: NamedItem[],
+): Promise<NamedItem[]> {
+  const existingIds = new Set(existing.map((e) => e.id));
+  const newIds = new Set(items.filter((i) => i.id).map((i) => i.id));
+
+  const toDelete = existing.filter((e) => !newIds.has(e.id));
+  if (toDelete.length > 0) {
+    const { error } = await supabase
+      .from("departments")
+      .update({ archived_at: new Date().toISOString() })
+      .in("id", toDelete.map((d) => d.id));
+    if (error) throw error;
+  }
+
+  const toUpdate = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id && existingIds.has(item.id));
+  const toInsert = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => !item.id || !existingIds.has(item.id));
+
+  const upsertRows = [
+    ...toUpdate.map(({ item, sortOrder }) => ({
+      id: item.id,
+      org_id: orgId,
+      name: item.name,
+      abbr: item.abbr || "",
+      sort_order: sortOrder,
+      archived_at: null,
+    })),
+    ...toInsert.map(({ item, sortOrder }) => ({
+      org_id: orgId,
+      name: item.name,
+      abbr: item.abbr || "",
+      sort_order: sortOrder,
+    })),
+  ];
+  if (upsertRows.length > 0) {
+    const { error } = await supabase
+      .from("departments")
+      .upsert(upsertRows, { onConflict: "id" });
+    if (error) throw error;
+  }
+
+  await cacheDel(CacheKey.departments(orgId));
+  return fetchDepartments(orgId);
+}
+
 // ── Organization Users (for user management panel) ──────────────────────────
 
 export async function fetchOrganizationUsers(orgId: string): Promise<OrganizationUser[]> {
@@ -637,6 +717,80 @@ export async function fetchOrganizationUsers(orgId: string): Promise<Organizatio
   });
 }
 
+// ── Organization Directory (unified people view) ──────────��─────────────────
+
+export async function fetchOrgDirectory(orgId: string): Promise<import("@/types").DirectoryPerson[]> {
+  return cacheThrough(CacheKey.orgDirectory(orgId), TTL.MODERATE, async () => {
+    const { data, error } = await supabase.rpc("get_org_directory", {
+      p_org_id: orgId,
+    });
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      personId: row.person_id as string,
+      source: row.source as 'employee' | 'user_only' | 'pending_invite',
+      employeeId: (row.employee_id as string | null) ?? null,
+      userId: (row.user_id as string | null) ?? null,
+      firstName: (row.first_name as string) ?? "",
+      lastName: (row.last_name as string) ?? "",
+      email: (row.email as string) ?? "",
+      phone: (row.phone as string) ?? "",
+      employeeStatus: (row.employee_status as import("@/types").EmployeeStatus | null) ?? null,
+      orgRole: (row.org_role as import("@/types").OrganizationRole | null) ?? null,
+      hasAppAccess: (row.has_app_access as boolean) ?? false,
+      focusAreaIds: ((row.focus_area_ids as number[]) ?? []),
+      certificationId: (row.certification_id as number | null) ?? null,
+      roleIds: ((row.role_ids as number[]) ?? []),
+      seniority: (row.seniority as number | null) ?? null,
+      lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+      invitationStatus: (row.invitation_status as 'pending' | 'expired' | null) ?? null,
+      departmentId: (row.department_id as number | null) ?? null,
+    }));
+  });
+}
+
+export async function invalidateOrgDirectory(orgId: string): Promise<void> {
+  await cacheDel(CacheKey.orgDirectory(orgId));
+}
+
+export async function updateAppOnlyUser(
+  userId: string,
+  orgId: string,
+  data: { firstName?: string; lastName?: string; phone?: string; departmentId?: number | null },
+): Promise<void> {
+  // Update profile name
+  if (data.firstName !== undefined || data.lastName !== undefined) {
+    const profileUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.firstName !== undefined) profileUpdate.first_name = data.firstName;
+    if (data.lastName !== undefined) profileUpdate.last_name = data.lastName;
+    const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", userId);
+    if (error) throw error;
+  }
+  // Update membership phone + department
+  if (data.phone !== undefined || data.departmentId !== undefined) {
+    const membershipUpdate: Record<string, unknown> = {};
+    if (data.phone !== undefined) membershipUpdate.phone = data.phone;
+    if (data.departmentId !== undefined) membershipUpdate.department_id = data.departmentId;
+    const { error } = await supabase.from("organization_memberships").update(membershipUpdate).eq("user_id", userId).eq("org_id", orgId);
+    if (error) throw error;
+  }
+  await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.orgUsers(orgId));
+}
+
+export async function updatePendingInvitation(
+  invitationId: string,
+  orgId: string,
+  data: { firstName?: string; lastName?: string; phone?: string; departmentId?: number | null },
+): Promise<void> {
+  const update: Record<string, unknown> = {};
+  if (data.firstName !== undefined) update.first_name = data.firstName;
+  if (data.lastName !== undefined) update.last_name = data.lastName;
+  if (data.phone !== undefined) update.phone = data.phone;
+  if (data.departmentId !== undefined) update.department_id = data.departmentId;
+  const { error } = await supabase.from("invitations").update(update).eq("id", invitationId).eq("org_id", orgId);
+  if (error) throw error;
+  await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));
+}
+
 export async function updateAdminPermissions(
   userId: string,
   permissions: import("@/types").AdminPermissions | null,
@@ -649,7 +803,7 @@ export async function updateAdminPermissions(
     .eq("user_id", userId)
     .eq("org_id", orgId);
   if (error) throw error;
-  await cacheDel(CacheKey.orgUsers(orgId));
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("permissions.updated", "permissions", userId, { permissions, targetEmail: targetEmail ?? null }, orgId);
 }
 
@@ -670,7 +824,7 @@ export async function changeOrganizationUserRole(
   });
   if (error) throw error;
   const keys = [CacheKey.allUsers(), CacheKey.mwProfile(targetUserId)];
-  if (orgId) keys.push(CacheKey.orgUsers(orgId));
+  if (orgId) keys.push(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
   await cacheDel(...keys);
   void logAudit("role.changed", "role", targetUserId, { newRole, targetEmail: targetEmail ?? null }, orgId);
 }
@@ -1100,7 +1254,7 @@ export async function insertEmployee(
     .select()
     .single();
   if (error) throw error;
-  await cacheDel(CacheKey.employees(orgId), CacheKey.tenantStats());
+  await cacheDel(CacheKey.employees(orgId), CacheKey.orgDirectory(orgId), CacheKey.tenantStats());
   const result = rowToEmployee(row as DbEmployee);
   void logAudit("employee.created", "employee", result.id, { firstName: data.firstName, lastName: data.lastName }, orgId);
   return result;
@@ -1112,7 +1266,7 @@ export async function updateEmployee(emp: Employee, orgId: string): Promise<void
     .update(employeeToRow(emp, orgId))
     .eq("id", emp.id);
   if (error) throw error;
-  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(emp.id));
+  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(emp.id), CacheKey.orgDirectory(orgId));
   void logAudit("employee.updated", "employee", emp.id, { firstName: emp.firstName, lastName: emp.lastName }, orgId);
 }
 
@@ -2033,7 +2187,7 @@ export async function assignOrgRoleByEmail(
     p_org_role: role,
   });
   if (error) throw error;
-  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.allUsers());
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.allUsers());
 }
 
 export async function fetchUserSessions() {
@@ -2178,14 +2332,20 @@ export async function sendInvitation(
   role: AssignableOrganizationRole,
   orgId: string,
   employeeId?: string,
+  opts?: { firstName?: string; lastName?: string; phone?: string; departmentId?: number },
 ): Promise<{ invitationId: string; token: string; expiresAt: string }> {
   const { data, error } = await supabase.rpc("send_invitation", {
     p_email: email,
     p_role: role,
     p_org_id: orgId,
     p_employee_id: employeeId ?? null,
+    p_first_name: opts?.firstName ?? null,
+    p_last_name: opts?.lastName ?? null,
+    p_phone: opts?.phone ?? null,
+    p_department_id: opts?.departmentId ?? null,
   });
   if (error) throw error;
+  await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));
   void logAudit("invitation.sent", "invitation", data.invitation_id, { email, role }, orgId);
   return {
     invitationId: data.invitation_id,
@@ -2258,7 +2418,7 @@ export async function linkEmployeeToUser(
     p_org_id: orgId,
   });
   if (error) throw error;
-  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(employeeId), CacheKey.orgUsers(orgId));
+  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(employeeId), CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
   return { status: data.status };
 }
 
@@ -2678,7 +2838,7 @@ export async function deactivateUser(userId: string, orgId: string): Promise<voi
     .update({ deactivated_at: new Date().toISOString(), deactivated_by: actor?.id ?? null })
     .eq("id", userId);
   if (error) throw error;
-  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.allUsers());
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.allUsers());
   void logAudit("user.deactivated", "role", userId, {}, orgId);
 }
 
@@ -2688,7 +2848,7 @@ export async function reactivateUser(userId: string, orgId: string): Promise<voi
     .update({ deactivated_at: null, deactivated_by: null })
     .eq("id", userId);
   if (error) throw error;
-  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.allUsers());
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.allUsers());
   void logAudit("user.reactivated", "role", userId, {}, orgId);
 }
 
@@ -2804,7 +2964,7 @@ export async function removeUserFromOrganization(
     .eq("user_id", userId)
     .eq("org_id", orgId);
   if (error) throw error;
-  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.employees(orgId), CacheKey.allUsers(), CacheKey.tenantStats());
+  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.employees(orgId), CacheKey.allUsers(), CacheKey.tenantStats());
   void logAudit("user.removed_from_org", "role", userId, {}, orgId);
 }
 

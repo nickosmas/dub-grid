@@ -6,13 +6,13 @@ import React from "react";
 export type SectionId =
   | "org-general" | "org-labels" | "org-display"
   | "schedule-rules" | "schedule-categories" | "schedule-codes" | "schedule-coverage"
-  | "staff-focus-areas" | "staff-certifications" | "staff-roles" | "staff-indicators"
+  | "staff-focus-areas" | "staff-certifications" | "staff-roles" | "staff-departments" | "staff-indicators"
   | "platform-impersonation";
 
 export const VALID_SECTIONS: SectionId[] = [
   "org-general", "org-labels", "org-display",
   "schedule-rules", "schedule-categories", "schedule-codes", "schedule-coverage",
-  "staff-focus-areas", "staff-certifications", "staff-roles", "staff-indicators",
+  "staff-focus-areas", "staff-certifications", "staff-roles", "staff-departments", "staff-indicators",
   "platform-impersonation",
 ];
 
@@ -45,6 +45,7 @@ const iconCoverage = <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
 const iconFocusArea = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
 const iconDesignations = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>;
 const iconRoles = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>;
+const iconDepartment = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
 const iconIndicator = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>;
 const iconImpersonate = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 
@@ -76,7 +77,7 @@ export interface NavPermissions {
 
 export function buildNavGroups(
   perms: NavPermissions,
-  overrides?: { shiftCodesLabel?: string; focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string },
+  overrides?: { shiftCodesLabel?: string; focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string; departmentLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
 
@@ -102,6 +103,7 @@ export function buildNavGroups(
     if (perms.canManageFocusAreas) staffItems.push({ id: "staff-focus-areas", label: overrides?.focusAreaLabel ?? "Focus Areas", icon: iconFocusArea });
     if (perms.canManageOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations });
     if (perms.canManageOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles });
+    if (perms.canManageOrgLabels) staffItems.push({ id: "staff-departments", label: overrides?.departmentLabel ?? "Departments", icon: iconDepartment });
     if (perms.canManageIndicatorTypes) staffItems.push({ id: "staff-indicators", label: "Indicators", icon: iconIndicator });
     if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff & Designations", items: staffItems });
   }

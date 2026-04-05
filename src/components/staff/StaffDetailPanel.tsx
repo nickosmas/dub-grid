@@ -32,6 +32,8 @@ interface StaffDetailPanelProps {
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
+  onRevokeAccess?: (userId: string) => void;
+  onRemoveFromSchedule?: (empId: string) => void;
 }
 
 export function StaffDetailPanel({
@@ -52,6 +54,8 @@ export function StaffDetailPanel({
   onClose,
   onInvite,
   onRevoke,
+  onRevokeAccess,
+  onRemoveFromSchedule,
 }: StaffDetailPanelProps) {
   const hue = hashCode(employee.id) % 360;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -168,7 +172,7 @@ export function StaffDetailPanel({
               </div>
             )}
             <Link
-              href={`/staff/${employee.id}`}
+              href={`/people/${employee.id}`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -212,6 +216,8 @@ export function StaffDetailPanel({
             onInvite={canManageEmployees && orgId ? onInvite : undefined}
             pendingInvitation={canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined}
             onRevoke={canManageEmployees ? onRevoke : undefined}
+            onRevokeAccess={canManageEmployees ? onRevokeAccess : undefined}
+            onRemoveFromSchedule={canManageEmployees ? onRemoveFromSchedule : undefined}
           />
         </div>
       </div>
