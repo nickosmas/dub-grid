@@ -27,6 +27,8 @@ export interface Organization {
   certificationLabel: string;
   /** Custom display label for roles (e.g. "Responsibilities"). Defaults to "Roles". */
   roleLabel: string;
+  /** Custom display label for departments (e.g. "Teams"). Defaults to "Departments". */
+  departmentLabel: string;
   /** Controls grid display: 'code' shows short labels (D, EVE), 'name' shows full names (Day Shift, Evening). */
   shiftDisplayMode: ShiftDisplayMode;
   /** IANA timezone for this organization, e.g. "America/New_York". Null = not set. */
@@ -446,6 +448,28 @@ export interface OrganizationUser {
   adminPermissions: AdminPermissions | null;
   createdAt: string;
   lastSignInAt: string | null;
+}
+
+/** A unified person record for the People Directory (union of employees + app-only users + pending invites). */
+export interface DirectoryPerson {
+  personId: string;
+  source: 'employee' | 'user_only' | 'pending_invite';
+  employeeId: string | null;
+  userId: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  employeeStatus: EmployeeStatus | null;
+  orgRole: OrganizationRole | null;
+  hasAppAccess: boolean;
+  focusAreaIds: number[];
+  certificationId: number | null;
+  roleIds: number[];
+  seniority: number | null;
+  lastSignInAt: string | null;
+  invitationStatus: 'pending' | 'expired' | null;
+  departmentId: number | null;
 }
 
 export interface UserSession {

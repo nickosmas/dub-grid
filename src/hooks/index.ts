@@ -17,6 +17,9 @@ export type { OrganizationData, SetupStatus } from "./useOrganizationData";
 export { useEmployees } from "./useEmployees";
 export type { EmployeesData } from "./useEmployees";
 
+export { useDirectory } from "./useDirectory";
+export type { DirectoryData } from "./useDirectory";
+
 export { useCellLocks } from "./useCellLocks";
 export type { CellLock, OnlineUser } from "./useCellLocks";
 

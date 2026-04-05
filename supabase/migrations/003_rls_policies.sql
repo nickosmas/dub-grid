@@ -15,6 +15,7 @@ ALTER TABLE public.organization_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.focus_areas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.certifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_codes ENABLE ROW LEVEL SECURITY;
@@ -223,6 +224,30 @@ CREATE POLICY "admin_update_certifications"
 
 CREATE POLICY "admin_delete_certifications"
   ON public.certifications FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
+
+
+-- ── departments ───────────────────────────────────────────────────────────────
+
+CREATE POLICY "gridmaster_all_departments"
+  ON public.departments FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_departments"
+  ON public.departments FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_departments"
+  ON public.departments FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
+
+CREATE POLICY "admin_update_departments"
+  ON public.departments FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin')
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_departments"
+  ON public.departments FOR DELETE TO authenticated
   USING (org_id = public.caller_org_id() AND public.caller_org_role() = 'super_admin');
 
 

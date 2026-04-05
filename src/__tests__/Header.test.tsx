@@ -84,10 +84,10 @@ describe("Header rendering", () => {
     expect(screen.queryByText(/Acme/)).not.toBeInTheDocument();
   });
 
-  it('renders nav links: "Schedule", "Staff", "Settings"', () => {
+  it('renders nav links: "Schedule", "People", "Settings"', () => {
     render(<Header />);
     expect(screen.getByRole("link", { name: /Schedule/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Staff/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /People/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
   });
 });
@@ -101,9 +101,9 @@ describe("Header active nav link", () => {
   });
 
   it("active nav link (staff) has active class", () => {
-    mockPathname = "/staff";
+    mockPathname = "/people";
     render(<Header />);
-    const link = screen.getByRole("link", { name: /Staff/i });
+    const link = screen.getByRole("link", { name: /People/i });
     expect(link.className).toContain("active");
   });
 
@@ -117,7 +117,7 @@ describe("Header active nav link", () => {
   it("inactive nav links do not have active class", () => {
     mockPathname = "/schedule";
     render(<Header />);
-    const staffLink = screen.getByRole("link", { name: /Staff/i });
+    const staffLink = screen.getByRole("link", { name: /People/i });
     expect(staffLink.className).not.toContain("active");
   });
 });
@@ -129,10 +129,10 @@ describe("Header nav link hrefs", () => {
     expect(link).toHaveAttribute("href", "/schedule");
   });
 
-  it("Staff link points to /staff", () => {
+  it("People link points to /people", () => {
     render(<Header />);
-    const link = screen.getByRole("link", { name: /Staff/i });
-    expect(link).toHaveAttribute("href", "/staff");
+    const link = screen.getByRole("link", { name: /People/i });
+    expect(link).toHaveAttribute("href", "/people");
   });
 
   it("Settings link points to /settings", () => {
@@ -146,7 +146,7 @@ describe("Header permission-based tab visibility", () => {
   it("hides Staff tab when user cannot view staff", () => {
     mockPermissions.canViewStaff = false;
     render(<Header />);
-    expect(screen.queryByRole("link", { name: /Staff/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /People/i })).not.toBeInTheDocument();
   });
 
   it("hides Settings tab when user has no org management perms", () => {

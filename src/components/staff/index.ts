@@ -9,3 +9,4 @@ export { StaffDetailPanel } from "./StaffDetailPanel";
 export { StaffToolbar } from "./StaffToolbar";
 export { StaffFilterPopover } from "./StaffFilterPopover";
 export { StaffContextBar } from "./StaffContextBar";
+export { AddPersonDropdown } from "./AddPersonDropdown";

@@ -156,7 +156,7 @@ export function StaffTableRow({
               }}
             >
               <Link
-                href={`/staff/${emp.id}`}
+                href={`/people/${emp.id}`}
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   color: "inherit",

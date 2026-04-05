@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
-import { Employee, OrganizationUser } from "@/types";
+import { Employee, OrganizationUser, NamedItem } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
@@ -17,11 +17,14 @@ const ROLE_OPTIONS = [
 ];
 
 interface InviteEmployeeModalProps {
-  employee: Employee;
+  /** Employee to invite. When null, operates in "app-only" mode (no employee link). */
+  employee: Employee | null;
   orgId: string;
   orgName: string;
   onClose: () => void;
   onInvited: () => void;
+  /** Available departments (for app-only mode). */
+  departments?: NamedItem[];
 }
 
 type ModalMode = "loading" | "link" | "invite";
@@ -32,8 +35,14 @@ export default function InviteEmployeeModal({
   orgName,
   onClose,
   onInvited,
+  departments = [],
 }: InviteEmployeeModalProps) {
-  const [email, setEmail] = useState(employee.email || "");
+  const isAppOnlyInvite = !employee;
+  const [email, setEmail] = useState(employee?.email || "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [role, setRole] = useState<AssignableOrganizationRole>("user");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +52,12 @@ export default function InviteEmployeeModal({
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [orgUsersLoaded, setOrgUsersLoaded] = useState(false);
 
-  // On mount, fetch org users
+  // On mount, fetch org users (only needed when linking an employee)
   useEffect(() => {
+    if (isAppOnlyInvite) {
+      setOrgUsersLoaded(true);
+      return;
+    }
     fetchOrganizationUsers(orgId)
       .then((users) => {
         setOrgUsers(users);
@@ -53,10 +66,10 @@ export default function InviteEmployeeModal({
         // fallback — leave empty
       })
       .finally(() => setOrgUsersLoaded(true));
-  }, [orgId]);
+  }, [orgId, isAppOnlyInvite]);
 
   // Derive mode and matchedUser inline
-  const matchedUser = orgUsersLoaded && email.trim()
+  const matchedUser = !isAppOnlyInvite && orgUsersLoaded && email.trim()
     ? orgUsers.find(
         (u) => u.email && u.email.toLowerCase() === email.trim().toLowerCase()
       ) ?? null
@@ -71,7 +84,7 @@ export default function InviteEmployeeModal({
   const canSend = z.string().email().safeParse(email.trim()).success && !sending && !sent;
 
   async function handleLink() {
-    if (!matchedUser) return;
+    if (!matchedUser || !employee) return;
     setSending(true);
     setError(null);
 
@@ -93,7 +106,12 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      const { token } = await sendInvitation(email.trim(), role, orgId, employee.id);
+      const { token } = await sendInvitation(email.trim(), role, orgId, employee?.id, isAppOnlyInvite ? {
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        departmentId: departmentId ?? undefined,
+      } : undefined);
 
       // Send the invitation email
       const res = await fetch("/api/send-invite-email", {
@@ -136,7 +154,7 @@ export default function InviteEmployeeModal({
 
   return (
     <Modal
-      title={mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
+      title={isAppOnlyInvite ? "Invite to App" : mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
       onClose={onClose}
       style={{ maxWidth: 480 }}
     >
@@ -196,9 +214,37 @@ export default function InviteEmployeeModal({
               color: "var(--color-text-secondary, #334766)",
             }}
           >
-            Sending an invitation to <strong>{getEmployeeDisplayName(employee)}</strong>. They will
-            receive an email with a link to set their password and join your organization.
+            {isAppOnlyInvite
+              ? "Invite someone who needs app access but won\u2019t appear on the schedule (e.g. HR, finance, reception, management)."
+              : <>Sending an invitation to <strong>{getEmployeeDisplayName(employee!)}</strong>. They will receive an email with a link to set their password and join your organization.</>
+            }
           </div>
+
+          {/* Name fields (app-only mode) */}
+          {isAppOnlyInvite && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>First name</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Jane"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Last name</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Smith"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Email */}
           <div>
@@ -212,14 +258,43 @@ export default function InviteEmployeeModal({
             />
           </div>
 
-          {/* Role */}
-          <div>
-            <label style={labelStyle}>Role</label>
-            <CustomSelect
-              value={role}
-              options={ROLE_OPTIONS}
-              onChange={(v) => setRole(v as AssignableOrganizationRole)}
-            />
+          {/* Phone (app-only mode, optional) */}
+          {isAppOnlyInvite && (
+            <div>
+              <label style={labelStyle}>Phone <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span></label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 555-123-4567"
+                style={inputStyle}
+              />
+            </div>
+          )}
+
+          {/* Department + Role row */}
+          <div style={{ display: "grid", gridTemplateColumns: isAppOnlyInvite && departments.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
+            {isAppOnlyInvite && departments.length > 0 && (
+              <div>
+                <label style={labelStyle}>Department</label>
+                <CustomSelect
+                  value={departmentId?.toString() ?? ""}
+                  options={[
+                    { value: "", label: "None" },
+                    ...departments.map((d) => ({ value: d.id.toString(), label: d.name })),
+                  ]}
+                  onChange={(v) => setDepartmentId(v ? Number(v) : null)}
+                />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Role</label>
+              <CustomSelect
+                value={role}
+                options={ROLE_OPTIONS}
+                onChange={(v) => setRole(v as AssignableOrganizationRole)}
+              />
+            </div>
           </div>
 
           {/* Error */}

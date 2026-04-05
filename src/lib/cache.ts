@@ -37,6 +37,7 @@ export const CacheKey = {
   indicatorTypes: (orgId: string) => `dg:org:${orgId}:indicatorTypes`,
   certifications: (orgId: string) => `dg:org:${orgId}:certifications`,
   orgRoles: (orgId: string) => `dg:org:${orgId}:orgRoles`,
+  departments: (orgId: string) => `dg:org:${orgId}:departments`,
   coverageReqs: (orgId: string) => `dg:org:${orgId}:coverageRequirements`,
   organization: (orgId: string) => `dg:org:${orgId}:organization`,
   allOrganizations: () => `dg:gm:allOrganizations`,
@@ -44,6 +45,7 @@ export const CacheKey = {
   // Moderate
   employees: (orgId: string) => `dg:org:${orgId}:employees`,
   orgUsers: (orgId: string) => `dg:org:${orgId}:orgUsers`,
+  orgDirectory: (orgId: string) => `dg:org:${orgId}:orgDirectory`,
   invitations: (orgId: string) => `dg:org:${orgId}:invitations`,
   employeeDetail: (empId: string) => `dg:emp:${empId}:detail`,
   allUsers: () => `dg:gm:allUsers`,

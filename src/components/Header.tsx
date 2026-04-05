@@ -58,9 +58,9 @@ const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNo
     ),
   },
   {
-    id: "staff",
-    href: "/staff",
-    label: "Staff",
+    id: "people",
+    href: "/people",
+    label: "People",
     icon: (
       <svg
         width="13"
@@ -188,8 +188,8 @@ export default function Header({ orgName }: HeaderProps) {
 
   const activeTab = pathname.startsWith("/dashboard")
     ? "dashboard"
-    : pathname.startsWith("/staff")
-      ? "staff"
+    : (pathname.startsWith("/people") || pathname.startsWith("/staff"))
+      ? "people"
       : pathname.startsWith("/settings")
         ? "settings"
         : "schedule";
@@ -197,7 +197,7 @@ export default function Header({ orgName }: HeaderProps) {
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === "dashboard") return true;
     if (item.id === "schedule") return true;
-    if (item.id === "staff") return canViewStaff;
+    if (item.id === "people") return canViewStaff;
     if (item.id === "settings") return canManageOrg || isSuperAdmin || isGridmaster;
     return false;
   });

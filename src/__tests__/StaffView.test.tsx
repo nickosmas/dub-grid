@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Employee, FocusArea, NamedItem } from "@/types";
 const DESIGNATIONS: NamedItem[] = [
@@ -27,7 +28,7 @@ vi.mock("@/components/EditEmployeePanel", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/staff",
+  usePathname: () => "/people",
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
@@ -133,22 +134,27 @@ const defaultProps = {
   canManageEmployees: true,
 };
 
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
 describe("StaffView", () => {
   describe("Controls", () => {
     it("renders 'Add' button", () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.getByRole("button", { name: /Add/ })).toBeInTheDocument();
     });
 
     it("clicking 'Add' button calls onAdd", async () => {
       const onAdd = vi.fn();
-      render(<StaffView {...defaultProps} onAdd={onAdd} />);
+      renderWithProviders(<StaffView {...defaultProps} onAdd={onAdd} />);
       await userEvent.click(screen.getByRole("button", { name: /Add/ }));
       expect(onAdd).toHaveBeenCalledTimes(1);
     });
 
     it("renders sort selector with Seniority as default", async () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       // Sort trigger shows current sort via aria-label
       expect(screen.getByRole("button", { name: /Sort by Seniority/ })).toBeInTheDocument();
     });
@@ -156,7 +162,7 @@ describe("StaffView", () => {
 
   describe("Expand/collapse", () => {
     it("clicking an employee row expands the inline editor", async () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.queryByTestId("edit-panel")).not.toBeInTheDocument();
       // Click the avatar initials (part of the row, not the name link)
       await userEvent.click(screen.getByText("AS"));
@@ -164,7 +170,7 @@ describe("StaffView", () => {
     });
 
     it("clicking the same expanded row again collapses the editor", async () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       // Click the avatar initials to expand
       await userEvent.click(screen.getByText("AS"));
       expect(screen.getByTestId("edit-panel")).toBeInTheDocument();
@@ -176,19 +182,19 @@ describe("StaffView", () => {
 
   describe("Avatar", () => {
     it("renders initials 'AS' for Alice Smith", () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.getByText("AS")).toBeInTheDocument();
     });
 
     it("renders initials 'BJ' for Bob Jones", () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.getByText("BJ")).toBeInTheDocument();
     });
   });
 
   describe("Employee count", () => {
     it("renders both employees in the list", () => {
-      render(<StaffView {...defaultProps} />);
+      renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
       expect(screen.getByText("Bob Jones")).toBeInTheDocument();
     });
@@ -230,7 +236,7 @@ describe("Property-based tests", () => {
     // Validates: Requirements 5.4, 8.2
     await fc.assert(
       fc.asyncProperty(arbUniqueEmployees, async (emps) => {
-        const { unmount, container } = render(
+        const { unmount, container } = renderWithProviders(
           <StaffView
             employees={emps}
             focusAreas={[]}
@@ -287,7 +293,7 @@ describe("Property-based tests", () => {
             (a, b) => a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName),
           );
 
-          const { unmount, container } = render(
+          const { unmount, container } = renderWithProviders(
             <StaffView
               employees={emps}
               focusAreas={[]}

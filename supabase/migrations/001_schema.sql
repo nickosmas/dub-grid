@@ -46,6 +46,7 @@ CREATE TABLE public.organizations (
   focus_area_label     TEXT,
   certification_label  TEXT,
   role_label           TEXT,
+  department_label     TEXT,
   shift_display_mode   TEXT DEFAULT 'code'
     CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
   timezone             TEXT NOT NULL DEFAULT 'UTC',
@@ -122,6 +123,8 @@ CREATE TABLE public.organization_memberships (
   schedule_last_viewed_at    TIMESTAMPTZ,
   archived_at                TIMESTAMPTZ,
   archived_by                UUID,
+  department_id              BIGINT,
+  phone                      TEXT,
 
   UNIQUE (user_id, org_id)
 );
@@ -166,6 +169,18 @@ CREATE TABLE public.certifications (
   org_id      UUID NOT NULL,
   name        TEXT NOT NULL,
   abbr        TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  archived_at TIMESTAMPTZ
+);
+
+
+-- ── departments (for non-schedule org members: HR, finance, reception, etc.) ─
+
+CREATE TABLE public.departments (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id      UUID NOT NULL,
+  name        TEXT NOT NULL,
+  abbr        TEXT NOT NULL DEFAULT '',
   sort_order  INTEGER NOT NULL DEFAULT 0,
   archived_at TIMESTAMPTZ
 );
@@ -420,7 +435,12 @@ CREATE TABLE public.invitations (
   revoked_at     TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   /** Employee record this invitation is for. Set when inviting from staff page. */
-  employee_id    UUID
+  employee_id    UUID,
+  /** For app-only invitations: store invitee details before account creation. */
+  first_name     TEXT,
+  last_name      TEXT,
+  phone          TEXT,
+  department_id  BIGINT
 );
 
 -- Only one pending (non-accepted, non-revoked) invitation per email per org.
@@ -709,6 +729,18 @@ ALTER TABLE public.focus_areas
 ALTER TABLE public.certifications
   ADD CONSTRAINT certifications_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
+-- departments
+ALTER TABLE public.departments
+  ADD CONSTRAINT departments_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+-- organization_memberships.department_id
+ALTER TABLE public.organization_memberships
+  ADD CONSTRAINT organization_memberships_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
+-- invitations.department_id
+ALTER TABLE public.invitations
+  ADD CONSTRAINT invitations_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
 -- employees
 ALTER TABLE public.employees
   ADD CONSTRAINT employees_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -878,6 +910,11 @@ CREATE INDEX idx_focus_areas_active ON public.focus_areas(org_id) WHERE archived
 CREATE INDEX idx_certifications_org_id ON public.certifications(org_id);
 CREATE UNIQUE INDEX certifications_org_name_active_unique ON public.certifications(org_id, name) WHERE archived_at IS NULL;
 CREATE INDEX idx_certifications_active ON public.certifications(org_id) WHERE archived_at IS NULL;
+
+-- departments
+CREATE INDEX idx_departments_org_id ON public.departments(org_id);
+CREATE UNIQUE INDEX departments_org_name_active_unique ON public.departments(org_id, name) WHERE archived_at IS NULL;
+CREATE INDEX idx_departments_active ON public.departments(org_id) WHERE archived_at IS NULL;
 
 -- employees
 CREATE INDEX idx_employees_org_id ON public.employees(org_id);
