@@ -1200,10 +1200,14 @@ GRANT EXECUTE ON FUNCTION public.apply_recurring_schedules(UUID, DATE, DATE) TO 
 -- ── send_invitation ───────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.send_invitation(
-  p_email        TEXT,
-  p_role         TEXT,
-  p_org_id       UUID,
-  p_employee_id  UUID DEFAULT NULL
+  p_email          TEXT,
+  p_role           TEXT,
+  p_org_id         UUID,
+  p_employee_id    UUID DEFAULT NULL,
+  p_first_name     TEXT DEFAULT NULL,
+  p_last_name      TEXT DEFAULT NULL,
+  p_phone          TEXT DEFAULT NULL,
+  p_department_id  BIGINT DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -1266,8 +1270,8 @@ BEGIN
     RAISE EXCEPTION 'An active invitation already exists for this email';
   END IF;
 
-  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id)
-    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id)
+  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id, first_name, last_name, phone, department_id)
+    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id, p_first_name, p_last_name, p_phone, p_department_id)
   RETURNING * INTO v_invite;
 
   RETURN jsonb_build_object(
@@ -1278,7 +1282,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID, TEXT, TEXT, TEXT, BIGINT) TO authenticated;
 
 
 -- ── accept_invitation ─────────────────────────────────────────────────────────
@@ -1332,6 +1336,10 @@ BEGIN
     SELECT first_name, last_name INTO v_emp_first_name, v_emp_last_name
     FROM public.employees
     WHERE id = v_invite.employee_id AND org_id = v_invite.org_id;
+  ELSE
+    -- App-only invite: use name from invitation record
+    v_emp_first_name := v_invite.first_name;
+    v_emp_last_name := v_invite.last_name;
   END IF;
 
   INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name)
@@ -1345,10 +1353,11 @@ BEGIN
   -- Bypass guard_org_role_change trigger — this is an authorised role path.
   PERFORM set_config('app.allow_role_change', 'true', true);
 
-  INSERT INTO public.organization_memberships (user_id, org_id, org_role)
-  VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign)
+  INSERT INTO public.organization_memberships (user_id, org_id, org_role, department_id, phone)
+  VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign, v_invite.department_id, v_invite.phone)
   ON CONFLICT (user_id, org_id) DO UPDATE
-    SET org_role = EXCLUDED.org_role;
+    SET org_role = EXCLUDED.org_role,
+        department_id = COALESCE(EXCLUDED.department_id, organization_memberships.department_id);
 
   UPDATE public.profiles
   SET org_id = v_invite.org_id, updated_at = NOW()
@@ -2011,6 +2020,115 @@ $$;
 GRANT EXECUTE ON FUNCTION public.shift_times_overlap(INT8[], INT8[]) TO authenticated;
 
 
+-- ── resolve_shift_time_ranges ──────────────────────────────────────────────
+-- Resolves effective time ranges for a set of shift codes using the cascade:
+-- 1. Instance custom times (pipe-delimited TEXT params)
+-- 2. Shift code default_start_time / default_end_time
+-- 3. Shift category start_time / end_time
+-- 4. No row returned = duration-based (no conflict possible)
+
+CREATE OR REPLACE FUNCTION public.resolve_shift_time_ranges(
+  p_shift_code_ids   BIGINT[],
+  p_custom_start     TEXT DEFAULT NULL,  -- pipe-delimited per code
+  p_custom_end       TEXT DEFAULT NULL   -- pipe-delimited per code
+) RETURNS TABLE(start_time TIME, end_time TIME)
+LANGUAGE PLPGSQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_starts TEXT[];
+  v_ends TEXT[];
+  v_code_id BIGINT;
+  v_idx INT := 1;
+  v_start TEXT;
+  v_end TEXT;
+  v_sc RECORD;
+  v_cat RECORD;
+BEGIN
+  v_starts := string_to_array(COALESCE(p_custom_start, ''), '|');
+  v_ends := string_to_array(COALESCE(p_custom_end, ''), '|');
+
+  FOREACH v_code_id IN ARRAY p_shift_code_ids LOOP
+    v_start := NULLIF(TRIM(v_starts[v_idx]), '');
+    v_end := NULLIF(TRIM(v_ends[v_idx]), '');
+
+    -- Level 1: Instance custom times
+    IF v_start IS NOT NULL AND v_end IS NOT NULL THEN
+      start_time := v_start::TIME;
+      end_time := v_end::TIME;
+      RETURN NEXT;
+    ELSE
+      -- Level 2: Shift code defaults
+      SELECT sc.default_start_time, sc.default_end_time, sc.category_id
+      INTO v_sc
+      FROM public.shift_codes sc WHERE sc.id = v_code_id;
+
+      IF v_sc IS NOT NULL AND v_sc.default_start_time IS NOT NULL AND v_sc.default_end_time IS NOT NULL THEN
+        start_time := v_sc.default_start_time;
+        end_time := v_sc.default_end_time;
+        RETURN NEXT;
+      ELSIF v_sc IS NOT NULL AND v_sc.category_id IS NOT NULL THEN
+        -- Level 3: Category times
+        SELECT cat.start_time, cat.end_time INTO v_cat
+        FROM public.shift_categories cat WHERE cat.id = v_sc.category_id;
+
+        IF v_cat IS NOT NULL AND v_cat.start_time IS NOT NULL AND v_cat.end_time IS NOT NULL THEN
+          start_time := v_cat.start_time;
+          end_time := v_cat.end_time;
+          RETURN NEXT;
+        END IF;
+        -- Level 4: No times (duration-based) — skip, no row returned
+      END IF;
+    END IF;
+
+    v_idx := v_idx + 1;
+  END LOOP;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.resolve_shift_time_ranges(BIGINT[], TEXT, TEXT) TO authenticated;
+
+
+-- ── shift_times_overlap_v2 ─────────────────────────────────────────────────
+-- Full-cascade version: resolves times from custom → code default → category
+-- before checking overlap. Use this instead of shift_times_overlap.
+
+CREATE OR REPLACE FUNCTION public.shift_times_overlap_v2(
+  p_code_ids_a      BIGINT[],
+  p_custom_start_a  TEXT,
+  p_custom_end_a    TEXT,
+  p_code_ids_b      BIGINT[],
+  p_custom_start_b  TEXT,
+  p_custom_end_b    TEXT
+) RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.resolve_shift_time_ranges(p_code_ids_a, p_custom_start_a, p_custom_end_a) a
+    CROSS JOIN public.resolve_shift_time_ranges(p_code_ids_b, p_custom_start_b, p_custom_end_b) b
+    WHERE (
+      CASE
+        -- Both normal (start < end): standard overlap
+        WHEN a.start_time < a.end_time AND b.start_time < b.end_time THEN
+          a.start_time < b.end_time AND b.start_time < a.end_time
+        -- a overnight, b normal
+        WHEN a.start_time >= a.end_time AND b.start_time < b.end_time THEN
+          (b.end_time > a.start_time) OR (b.start_time < a.end_time)
+        -- a normal, b overnight
+        WHEN a.start_time < a.end_time AND b.start_time >= b.end_time THEN
+          (a.end_time > b.start_time) OR (a.start_time < b.end_time)
+        -- Both overnight: always overlap
+        ELSE TRUE
+      END
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.shift_times_overlap_v2(BIGINT[], TEXT, TEXT, BIGINT[], TEXT, TEXT) TO authenticated;
+
+
 -- ── create_shift_request ────────────────────────────────────────────────────
 -- Creates a pickup, swap, or calloff request. Validates shift ownership and snapshots data.
 
@@ -2304,19 +2422,25 @@ BEGIN
     WHERE s.emp_id = p_claimer_emp_id
       AND s.date = v_request.requester_shift_date
       AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-      AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
+      AND public.shift_times_overlap_v2(
+            s.published_shift_code_ids, s.published_custom_start_time, s.published_custom_end_time,
+            v_request.requester_shift_code_ids, v_request.requester_custom_start_time, v_request.requester_custom_end_time
+          )
   ) THEN
     RAISE EXCEPTION 'You have a shift with overlapping times on this date';
   END IF;
 
-  -- Block if claimer is already involved in another active request on this date
+  -- Block if claimer is already involved in another active request on this date.
+  -- Exclude calloff-spawned pickups where the claimer is the former shift owner
+  -- (they called off and should still be able to pick up a different shift).
   IF EXISTS (
     SELECT 1 FROM public.shift_requests sr
     WHERE sr.org_id = v_request.org_id
       AND sr.id != p_request_id
       AND sr.status IN ('open', 'pending_approval')
       AND (
-        (sr.requester_emp_id = p_claimer_emp_id AND sr.requester_shift_date = v_request.requester_shift_date)
+        (sr.requester_emp_id = p_claimer_emp_id AND sr.requester_shift_date = v_request.requester_shift_date
+         AND NOT (sr.type = 'pickup' AND sr.parent_request_id IS NOT NULL))
         OR (sr.target_emp_id = p_claimer_emp_id AND sr.target_shift_date = v_request.requester_shift_date)
       )
   ) THEN
@@ -2619,7 +2743,10 @@ BEGIN
         WHERE s.emp_id = v_request.requester_emp_id
           AND s.date = v_request.requester_shift_date
           AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
+          AND public.shift_times_overlap_v2(
+                s.published_shift_code_ids, s.published_custom_start_time, s.published_custom_end_time,
+                v_request.requester_shift_code_ids, v_request.requester_custom_start_time, v_request.requester_custom_end_time
+              )
       ) THEN
         RAISE EXCEPTION 'The volunteer has an overlapping shift on this date. Cannot approve.';
       END IF;
@@ -2673,7 +2800,10 @@ BEGIN
         WHERE s.emp_id = v_request.target_emp_id
           AND s.date = v_request.requester_shift_date
           AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
+          AND public.shift_times_overlap_v2(
+                s.published_shift_code_ids, s.published_custom_start_time, s.published_custom_end_time,
+                v_request.requester_shift_code_ids, v_request.requester_custom_start_time, v_request.requester_custom_end_time
+              )
       ) THEN
         RAISE EXCEPTION 'The target employee has an overlapping shift on this date. Cannot approve.';
       END IF;
@@ -2733,12 +2863,15 @@ BEGIN
       RAISE EXCEPTION 'The target''s shift has been modified since the request was created. Please ask the employees to resubmit.';
     END IF;
 
-    -- Block if shifts have overlapping time slots (via shift_categories start/end times).
+    -- Block if shifts have overlapping time slots (full cascade: custom → code default → category).
     -- Applies to both same-day and cross-day swaps.
 
     -- Same-day: block if requester and target shifts overlap in time (pointless swap)
     IF v_request.requester_shift_date = v_request.target_shift_date THEN
-      IF public.shift_times_overlap(v_request.requester_shift_code_ids, v_request.target_shift_code_ids) THEN
+      IF public.shift_times_overlap_v2(
+           v_request.requester_shift_code_ids, v_request.requester_custom_start_time, v_request.requester_custom_end_time,
+           v_request.target_shift_code_ids, v_request.target_custom_start_time, v_request.target_custom_end_time
+         ) THEN
         RAISE EXCEPTION 'Cannot approve: shifts have overlapping time slots';
       END IF;
     ELSE
@@ -2747,7 +2880,10 @@ BEGIN
         SELECT 1 FROM public.shifts s
         WHERE s.emp_id = v_request.requester_emp_id AND s.date = v_request.target_shift_date
           AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.target_shift_code_ids)
+          AND public.shift_times_overlap_v2(
+                s.published_shift_code_ids, s.published_custom_start_time, s.published_custom_end_time,
+                v_request.target_shift_code_ids, v_request.target_custom_start_time, v_request.target_custom_end_time
+              )
       ) THEN
         RAISE EXCEPTION 'Cannot approve: requester would have overlapping shift times on the target''s date';
       END IF;
@@ -2757,7 +2893,10 @@ BEGIN
         SELECT 1 FROM public.shifts s
         WHERE s.emp_id = v_request.target_emp_id AND s.date = v_request.requester_shift_date
           AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-          AND public.shift_times_overlap(s.published_shift_code_ids, v_request.requester_shift_code_ids)
+          AND public.shift_times_overlap_v2(
+                s.published_shift_code_ids, s.published_custom_start_time, s.published_custom_end_time,
+                v_request.requester_shift_code_ids, v_request.requester_custom_start_time, v_request.requester_custom_end_time
+              )
       ) THEN
         RAISE EXCEPTION 'Cannot approve: target would have overlapping shift times on the requester''s date';
       END IF;
@@ -2990,19 +3129,25 @@ BEGIN
     WHERE s.emp_id = p_emp_id
       AND s.date = p_shift_date
       AND array_length(s.published_shift_code_ids, 1) IS NOT NULL
-      AND public.shift_times_overlap(s.published_shift_code_ids, p_shift_code_ids)
+      AND public.shift_times_overlap_v2(
+            s.published_shift_code_ids, s.published_custom_start_time, s.published_custom_end_time,
+            p_shift_code_ids, p_custom_start_time, p_custom_end_time
+          )
   ) THEN
     RAISE EXCEPTION 'You have a shift with overlapping times on this date';
   END IF;
 
-  -- Check no active request already exists for this employee on this date
+  -- Check no active request already exists for this employee on this date.
+  -- Exclude calloff-spawned pickups where the employee is the former shift owner
+  -- (they called off and should still be able to volunteer for a different shift).
   IF EXISTS (
-    SELECT 1 FROM public.shift_requests
-    WHERE org_id = p_org_id
-      AND status IN ('open', 'pending_approval')
+    SELECT 1 FROM public.shift_requests sr
+    WHERE sr.org_id = p_org_id
+      AND sr.status IN ('open', 'pending_approval')
       AND (
-        (requester_emp_id = p_emp_id AND requester_shift_date = p_shift_date)
-        OR (target_emp_id = p_emp_id AND target_shift_date = p_shift_date)
+        (sr.requester_emp_id = p_emp_id AND sr.requester_shift_date = p_shift_date
+         AND NOT (sr.type = 'pickup' AND sr.parent_request_id IS NOT NULL))
+        OR (sr.target_emp_id = p_emp_id AND sr.target_shift_date = p_shift_date)
       )
   ) THEN
     RAISE EXCEPTION 'You are involved in another active shift request on this date';
@@ -3478,3 +3623,152 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.remove_focus_area_from_employees IS 'Removes a focus area ID from all employee arrays in a single UPDATE.';
+
+
+-- ── People Directory (union of employees + app-only users) ──────────────────
+
+CREATE OR REPLACE FUNCTION public.get_org_directory(p_org_id UUID)
+RETURNS TABLE (
+  person_id         TEXT,
+  source            TEXT,
+  employee_id       UUID,
+  user_id           UUID,
+  first_name        TEXT,
+  last_name         TEXT,
+  email             TEXT,
+  phone             TEXT,
+  employee_status   TEXT,
+  org_role          TEXT,
+  has_app_access    BOOLEAN,
+  focus_area_ids    BIGINT[],
+  certification_id  BIGINT,
+  role_ids          BIGINT[],
+  seniority         INTEGER,
+  last_sign_in_at   TIMESTAMPTZ,
+  invitation_status TEXT,
+  department_id     BIGINT
+)
+LANGUAGE PLPGSQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  -- Require at least admin-level access (canViewStaff is always true for admin+)
+  IF NOT (
+    public.is_gridmaster()
+    OR (
+      public.caller_org_id() = p_org_id
+      AND public.caller_org_role() IN ('super_admin', 'admin')
+    )
+  ) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  RETURN QUERY
+
+  -- Part 1: All employees (schedule people), left-joined to org memberships
+  SELECT
+    e.id::TEXT                              AS person_id,
+    'employee'::TEXT                        AS source,
+    e.id                                    AS employee_id,
+    e.user_id                               AS user_id,
+    e.first_name,
+    e.last_name,
+    e.email,
+    e.phone,
+    e.status::TEXT                          AS employee_status,
+    cm.org_role::TEXT                       AS org_role,
+    (cm.user_id IS NOT NULL)               AS has_app_access,
+    e.focus_area_ids,
+    e.certification_id,
+    e.role_ids,
+    e.seniority,
+    au.last_sign_in_at,
+    (
+      SELECT CASE
+        WHEN inv.revoked_at IS NOT NULL THEN NULL
+        WHEN inv.accepted_at IS NOT NULL THEN NULL
+        WHEN inv.expires_at < NOW() THEN 'expired'
+        ELSE 'pending'
+      END
+      FROM public.invitations inv
+      WHERE inv.employee_id = e.id
+        AND inv.org_id = p_org_id
+        AND inv.accepted_at IS NULL
+        AND inv.revoked_at IS NULL
+      ORDER BY inv.created_at DESC
+      LIMIT 1
+    )                                       AS invitation_status,
+    cm.department_id
+  FROM public.employees e
+  LEFT JOIN public.organization_memberships cm
+    ON cm.user_id = e.user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
+  LEFT JOIN auth.users au ON au.id = e.user_id
+  WHERE e.org_id = p_org_id
+    AND e.archived_at IS NULL
+
+  UNION ALL
+
+  -- Part 2: App-only users (accepted — org members with no linked employee)
+  SELECT
+    ('u:' || cm2.user_id::TEXT)            AS person_id,
+    'user_only'::TEXT                      AS source,
+    NULL::UUID                             AS employee_id,
+    cm2.user_id                            AS user_id,
+    p.first_name,
+    p.last_name,
+    au2.email::TEXT                        AS email,
+    COALESCE(cm2.phone, '')               AS phone,
+    NULL::TEXT                             AS employee_status,
+    cm2.org_role::TEXT                     AS org_role,
+    TRUE                                   AS has_app_access,
+    '{}'::BIGINT[]                         AS focus_area_ids,
+    NULL::BIGINT                           AS certification_id,
+    '{}'::BIGINT[]                         AS role_ids,
+    NULL::INTEGER                          AS seniority,
+    au2.last_sign_in_at,
+    NULL::TEXT                             AS invitation_status,
+    cm2.department_id
+  FROM public.organization_memberships cm2
+  JOIN public.profiles p ON p.id = cm2.user_id
+  JOIN auth.users au2 ON au2.id = cm2.user_id
+  WHERE cm2.org_id = p_org_id
+    AND cm2.archived_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM public.employees emp
+      WHERE emp.user_id = cm2.user_id
+        AND emp.org_id = p_org_id
+    )
+
+  UNION ALL
+
+  -- Part 3: Pending app-only invitations (no employee_id, not yet accepted)
+  SELECT
+    ('inv:' || inv3.id::TEXT)              AS person_id,
+    'pending_invite'::TEXT                 AS source,
+    NULL::UUID                             AS employee_id,
+    NULL::UUID                             AS user_id,
+    COALESCE(inv3.first_name, '')          AS first_name,
+    COALESCE(inv3.last_name, '')           AS last_name,
+    inv3.email                             AS email,
+    COALESCE(inv3.phone, '')               AS phone,
+    NULL::TEXT                             AS employee_status,
+    inv3.role_to_assign::TEXT              AS org_role,
+    FALSE                                  AS has_app_access,
+    '{}'::BIGINT[]                         AS focus_area_ids,
+    NULL::BIGINT                           AS certification_id,
+    '{}'::BIGINT[]                         AS role_ids,
+    NULL::INTEGER                          AS seniority,
+    NULL::TIMESTAMPTZ                      AS last_sign_in_at,
+    CASE WHEN inv3.expires_at < NOW() THEN 'expired' ELSE 'pending' END AS invitation_status,
+    inv3.department_id
+  FROM public.invitations inv3
+  WHERE inv3.org_id = p_org_id
+    AND inv3.employee_id IS NULL
+    AND inv3.accepted_at IS NULL
+    AND inv3.revoked_at IS NULL
+
+  ORDER BY seniority NULLS LAST, first_name, last_name;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_org_directory(UUID) TO authenticated;

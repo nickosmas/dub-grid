@@ -24,6 +24,10 @@ export interface EditEmployeePanelProps {
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
+  /** Called when terminating AND user chose to also revoke app access. */
+  onRevokeAccess?: (userId: string) => void;
+  /** Called to remove employee from schedule but keep app access. */
+  onRemoveFromSchedule?: (empId: string) => void;
 }
 
 type EditForm = {
@@ -53,6 +57,8 @@ export default function EditEmployeePanel({
   onInvite,
   pendingInvitation,
   onRevoke,
+  onRevokeAccess,
+  onRemoveFromSchedule,
 }: EditEmployeePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState<EditForm>({
@@ -67,7 +73,9 @@ export default function EditEmployeePanel({
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [alsoRevokeAccess, setAlsoRevokeAccess] = useState(false);
   const [showBenchConfirm, setShowBenchConfirm] = useState(false);
+  const [showRemoveFromSchedule, setShowRemoveFromSchedule] = useState(false);
   const [benchNote, setBenchNote] = useState(employee.statusNote || "");
   const [revoking, setRevoking] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -515,20 +523,51 @@ export default function EditEmployeePanel({
             <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-danger-text)", lineHeight: 1.4 }}>
               Terminate {getEmployeeDisplayName(employee)}? They will be permanently removed from the schedule and staff list. Historical shift data will be preserved.
             </span>
+            {employee.userId && onRevokeAccess && (
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-danger-text)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={alsoRevokeAccess}
+                  onChange={(e) => setAlsoRevokeAccess(e.target.checked)}
+                  className="accent-[var(--color-danger)] w-3.5 h-3.5"
+                />
+                Also revoke app access
+              </label>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button
-                onClick={() => onDelete(employee.id)}
+                onClick={() => {
+                  onDelete(employee.id);
+                  if (alsoRevokeAccess && employee.userId && onRevokeAccess) {
+                    onRevokeAccess(employee.userId);
+                  }
+                }}
                 className="dg-btn dg-btn-primary"
                 style={{ background: "var(--color-danger)", border: "none", color: "var(--color-text-inverse)" }}
               >
                 Confirm Termination
               </button>
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => { setShowDeleteConfirm(false); setAlsoRevokeAccess(false); }}
                 className="dg-btn dg-btn-secondary"
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        ) : showRemoveFromSchedule && employee.userId && onRemoveFromSchedule ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-info-bg)", padding: "14px 16px", borderRadius: 10, border: "1px solid var(--color-info-border)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-info-text)", lineHeight: 1.4 }}>
+              Remove {getEmployeeDisplayName(employee)} from the schedule? They will keep their app access but no longer appear on shifts.
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => { onRemoveFromSchedule(employee.id); }}
+                className="dg-btn dg-btn-primary"
+              >
+                Confirm
+              </button>
+              <button onClick={() => setShowRemoveFromSchedule(false)} className="dg-btn dg-btn-secondary">Cancel</button>
             </div>
           </div>
         ) : (
@@ -601,6 +640,15 @@ export default function EditEmployeePanel({
                       <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
                     </svg>
                     Terminate
+                  </button>
+                )}
+                {employee.userId && onRemoveFromSchedule && employee.status !== "terminated" && !showRemoveFromSchedule && (
+                  <button
+                    onClick={() => setShowRemoveFromSchedule(true)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", padding: "5px 10px" }}
+                  >
+                    Remove from Schedule
                   </button>
                 )}
               </div>

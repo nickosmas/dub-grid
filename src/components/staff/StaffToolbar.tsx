@@ -35,6 +35,8 @@ interface StaffToolbarProps {
   onFilterToggle: () => void;
   filterOpen: boolean;
   filterBtnRef?: React.RefObject<HTMLButtonElement | null>;
+  /** Hide search/sort/filter/reorder controls (e.g. on the App Only tab). */
+  hideControls?: boolean;
 }
 
 const SORT_ICON = (
@@ -70,6 +72,7 @@ export function StaffToolbar({
   onFilterToggle,
   filterOpen,
   filterBtnRef,
+  hideControls = false,
 }: StaffToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -191,7 +194,7 @@ export function StaffToolbar({
           </div>
 
           {/* Controls row — invisible during reorder to preserve height */}
-            <div className={`flex items-center gap-2 px-3 py-2${isReordering ? " invisible pointer-events-none" : ""}`}>
+            <div className={`flex items-center gap-2 px-3 py-2${(isReordering || hideControls) ? " invisible pointer-events-none" : ""}`}>
               {/* Search - full width on mobile */}
               <div className="relative flex-1">
                 <svg
@@ -282,8 +285,8 @@ export function StaffToolbar({
             </div>
         </div>
       ) : (
-        /* Desktop & Tablet: single row */
-        <div className="flex items-center gap-1 border-b border-[var(--color-border)] px-4">
+        /* Desktop & Tablet: single row — matches schedule toolbar height */
+        <div className="flex items-center gap-1 border-b border-[var(--color-border)] px-4 py-3">
           {/* Tabs */}
           {tabButtons}
 
@@ -291,7 +294,7 @@ export function StaffToolbar({
           <div className="flex-1" />
 
           {/* Right zone: search + sort + filter + add — invisible during reorder to preserve height */}
-            <div className={`flex items-center gap-2 py-2${isReordering ? " invisible pointer-events-none" : ""}`}>
+            <div className={`flex items-center gap-2${(isReordering || hideControls) ? " invisible pointer-events-none" : ""}`}>
               {/* Search */}
               <div className="relative">
                 <svg

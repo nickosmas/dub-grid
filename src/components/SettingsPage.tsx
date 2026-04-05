@@ -4750,11 +4750,11 @@ export default function SettingsPage({
 
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - 56px)", width: "100%", overflow: "hidden", position: "relative" }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - var(--app-shell-header-h, 56px))", width: "100%", overflow: "hidden", position: "relative" }}>
         {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
         {!isMobile && (
-          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
-            <SidebarContent className="pt-4">
+          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }}>
+            <SidebarContent className="pt-4 overscroll-contain">
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>

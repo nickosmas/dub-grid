@@ -201,7 +201,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         <div className="text-center">
           <p className="text-muted-foreground mb-4">{error}</p>
           <button
-            onClick={() => router.push("/staff")}
+            onClick={() => router.push("/people")}
             className="px-5 py-2 rounded-lg border border-border bg-card text-card-foreground font-semibold text-sm cursor-pointer hover:bg-muted transition-colors"
           >
             Back to Staff

@@ -30,8 +30,8 @@ export default function CoverageRequirementsSettings({
   shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const isNameMode = shiftDisplayMode === "name";
-  // Expand key = "focusAreaId-categoryId"
-  const [expanded, setExpanded] = useState<string | null>(null);
+  // Which section is currently being edited — "focusAreaId-categoryId"
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   // Draft edits keyed by "focusAreaId-categoryId"
@@ -53,16 +53,13 @@ export default function CoverageRequirementsSettings({
     [shiftCodes],
   );
 
-  const getDraft = useCallback(
+  // Build a draft entry from existing coverage requirements (or empty)
+  const buildDraftFromRequirements = useCallback(
     (focusAreaId: number, categoryId: number): DraftEntry => {
-      const key = `${focusAreaId}-${categoryId}`;
-      if (drafts[key]) return drafts[key];
-
       const codes = getCodesForGroup(focusAreaId, categoryId);
       const makeEmptyCodeReqs = (): CodeReq[] =>
         codes.map((sc) => ({ shiftCodeId: sc.id, minStaff: 0 }));
 
-      // Build from existing requirements for codes in this group
       const codeIds = new Set(codes.map((sc) => sc.id));
       const existing = coverageRequirements.filter(
         (r) => r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId),
@@ -92,18 +89,57 @@ export default function CoverageRequirementsSettings({
       }
       return { everyDay: false, rows };
     },
-    [coverageRequirements, drafts, getCodesForGroup],
+    [coverageRequirements, getCodesForGroup],
+  );
+
+  // Get the current draft for a section (only exists while editing)
+  const getDraft = useCallback(
+    (focusAreaId: number, categoryId: number): DraftEntry | undefined => {
+      return drafts[`${focusAreaId}-${categoryId}`];
+    },
+    [drafts],
+  );
+
+  // Get the read-only view data (always derived from saved requirements)
+  const getDisplayData = useCallback(
+    (focusAreaId: number, categoryId: number): DraftEntry => {
+      return buildDraftFromRequirements(focusAreaId, categoryId);
+    },
+    [buildDraftFromRequirements],
   );
 
   const setDraft = useCallback((focusAreaId: number, categoryId: number, entry: DraftEntry) => {
     setDrafts((prev) => ({ ...prev, [`${focusAreaId}-${categoryId}`]: entry }));
   }, []);
 
+  const handleEdit = useCallback(
+    (focusAreaId: number, categoryId: number) => {
+      const key = `${focusAreaId}-${categoryId}`;
+      const entry = buildDraftFromRequirements(focusAreaId, categoryId);
+      setDrafts((prev) => ({ ...prev, [key]: entry }));
+      setEditingKey(key);
+    },
+    [buildDraftFromRequirements],
+  );
+
+  const handleCancel = useCallback(
+    (focusAreaId: number, categoryId: number) => {
+      const key = `${focusAreaId}-${categoryId}`;
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setEditingKey(null);
+    },
+    [],
+  );
+
   const handleToggleEveryDay = useCallback(
     (focusAreaId: number, categoryId: number) => {
       const current = getDraft(focusAreaId, categoryId);
+      if (!current) return;
       if (current.everyDay) {
-        // Switch to per-day: duplicate current every-day row to all 7 days
         const val = current.rows[0]?.codeRequirements ?? [];
         const rows: DraftRow[] = [];
         for (let d = 0; d < 7; d++) {
@@ -111,13 +147,11 @@ export default function CoverageRequirementsSettings({
         }
         setDraft(focusAreaId, categoryId, { everyDay: false, rows });
       } else {
-        // Check if per-day values differ — warn before collapsing
         const allValues = current.rows.map((r) => JSON.stringify(r.codeRequirements.map((c) => c.minStaff)));
         const hasDifferentDays = new Set(allValues).size > 1;
         if (hasDifferentDays && !window.confirm("Per-day values differ. Switching to 'Same every day' will keep only Monday's values. Continue?")) {
           return;
         }
-        // Switch to every-day: use Monday's values (index 1)
         const mon = current.rows.find((r) => r.dayOfWeek === 1) ?? current.rows[0];
         const codeReqs = mon?.codeRequirements.map((c) => ({ ...c })) ?? [];
         setDraft(focusAreaId, categoryId, {
@@ -132,6 +166,7 @@ export default function CoverageRequirementsSettings({
   const handleCodeChange = useCallback(
     (focusAreaId: number, categoryId: number, rowIndex: number, codeIndex: number, value: number) => {
       const current = getDraft(focusAreaId, categoryId);
+      if (!current) return;
       const rows = current.rows.map((r, ri) => {
         if (ri !== rowIndex) return r;
         const codeRequirements = r.codeRequirements.map((c, ci) => {
@@ -148,12 +183,12 @@ export default function CoverageRequirementsSettings({
   const handleSave = useCallback(
     async (focusAreaId: number, categoryId: number) => {
       const draft = getDraft(focusAreaId, categoryId);
+      if (!draft) return;
       const codes = getCodesForGroup(focusAreaId, categoryId);
       const codeIds = new Set(codes.map((sc) => sc.id));
       const key = `${focusAreaId}-${categoryId}`;
       setSavingKey(key);
       try {
-        // Save per code — collect all saved results
         const allSaved: CoverageRequirement[] = [];
         for (const code of codes) {
           const rows = draft.rows.map((r) => {
@@ -163,17 +198,17 @@ export default function CoverageRequirementsSettings({
           const saved = await saveCoverageRequirements(orgId, focusAreaId, code.id, rows);
           allSaved.push(...saved);
         }
-        // Update parent state: remove old entries for codes in this group, add new ones
         const remaining = coverageRequirements.filter(
           (r) => !(r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId)),
         );
         onCoverageRequirementsChange([...remaining, ...allSaved]);
-        // Clear draft
+        // Clear draft and exit editing
         setDrafts((prev) => {
           const next = { ...prev };
-          delete next[`${focusAreaId}-${categoryId}`];
+          delete next[key];
           return next;
         });
+        setEditingKey(null);
         toast.success("Coverage requirements saved");
       } catch (e) {
         Sentry.captureException(e);
@@ -214,6 +249,8 @@ export default function CoverageRequirementsSettings({
     textAlign: "center",
   };
 
+  const codeLabel = (sc: ShiftCode) => isNameMode ? (sc.name || sc.label) : sc.label;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: 0 }}>
@@ -247,7 +284,7 @@ export default function CoverageRequirementsSettings({
             {fa.name}
           </div>
 
-          {/* Categories */}
+          {/* Categories — always visible */}
           {activeCategories.map((cat) => {
             if (cat.focusAreaId != null && cat.focusAreaId !== fa.id) return null;
 
@@ -255,78 +292,126 @@ export default function CoverageRequirementsSettings({
             if (codes.length === 0) return null;
 
             const key = `${fa.id}-${cat.id}`;
-            const isExpanded = expanded === key;
+            const isEditing = editingKey === key;
+            const isSaving = savingKey === key;
             const draft = getDraft(fa.id, cat.id);
-            const hasValues = draft.rows.some((r) =>
+            const display = getDisplayData(fa.id, cat.id);
+            const data = isEditing && draft ? draft : display;
+            const hasValues = display.rows.some((r) =>
               r.codeRequirements.some((c) => c.minStaff > 0),
+            );
+            // Compare draft to saved state to determine if changes were made
+            const hasChanges = isEditing && draft != null && (
+              draft.everyDay !== display.everyDay ||
+              JSON.stringify(draft.rows.map((r) => r.codeRequirements.map((c) => c.minStaff)))
+                !== JSON.stringify(display.rows.map((r) => r.codeRequirements.map((c) => c.minStaff)))
             );
 
             return (
               <div key={cat.id} style={{ borderTop: "1px solid var(--color-border)" }}>
-                {/* Category row */}
-                <button
-                  onClick={() => setExpanded(isExpanded ? null : key)}
+                {/* Category header with Edit button */}
+                <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    width: "100%",
                     padding: "10px 16px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 600,
                     color: "var(--color-text-secondary)",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}>
                     {cat.name}
-                    {hasValues && (
-                      <span
-                        style={{
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 700,
-                          color: "var(--color-brand)",
-                          background: "var(--color-brand-bg)",
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                        }}
-                      >
-                        configured
+                    {!hasValues && !isEditing && (
+                      <span style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        color: "var(--color-text-muted)",
+                        fontStyle: "italic",
+                      }}>
+                        not configured
+                      </span>
+                    )}
+                    {isEditing && (
+                      <span style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        color: "var(--color-brand)",
+                      }}>
+                        editing
                       </span>
                     )}
                   </span>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    style={{
-                      transition: "transform 150ms ease",
-                      transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
-                    }}
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
 
-                {/* Expanded editor */}
-                {isExpanded && (
-                  <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                    {/* Every day toggle */}
-                    <div
+                  {/* Action buttons */}
+                  {canEdit && !isEditing && (
+                    <button
+                      onClick={() => handleEdit(fa.id, cat.id)}
+                      disabled={editingKey !== null}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
+                        padding: "4px 12px",
+                        fontSize: "var(--dg-fs-caption)",
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: "1px solid var(--color-border)",
+                        background: "none",
+                        color: editingKey !== null ? "var(--color-text-muted)" : "var(--color-text-secondary)",
+                        cursor: editingKey !== null ? "not-allowed" : "pointer",
                       }}
                     >
-                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>Same every day</span>
+                      Edit
+                    </button>
+                  )}
+                  {isEditing && (
+                    <div style={{ display: "flex", gap: 6 }}>
                       <button
-                        disabled={!canEdit}
+                        onClick={() => handleCancel(fa.id, cat.id)}
+                        disabled={isSaving}
+                        style={{
+                          padding: "4px 12px",
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          borderRadius: 6,
+                          border: "1px solid var(--color-border)",
+                          background: "none",
+                          color: "var(--color-text-secondary)",
+                          cursor: isSaving ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSave(fa.id, cat.id)}
+                        disabled={isSaving || !hasChanges}
+                        style={{
+                          padding: "4px 12px",
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          borderRadius: 6,
+                          border: "none",
+                          background: hasChanges ? "var(--color-brand)" : "var(--color-border)",
+                          color: hasChanges ? "var(--color-text-inverse)" : "var(--color-text-muted)",
+                          cursor: isSaving || !hasChanges ? "not-allowed" : "pointer",
+                          opacity: isSaving ? 0.7 : 1,
+                        }}
+                      >
+                        {isSaving ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content — always visible */}
+                <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {/* Every day toggle — only in edit mode, compact inline */}
+                  {isEditing && draft && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
                         onClick={() => handleToggleEveryDay(fa.id, cat.id)}
                         style={{
                           width: 34,
@@ -334,9 +419,10 @@ export default function CoverageRequirementsSettings({
                           borderRadius: 10,
                           background: draft.everyDay ? "var(--color-brand)" : "var(--color-border)",
                           border: "none",
-                          cursor: canEdit ? "pointer" : "default",
+                          cursor: "pointer",
                           position: "relative",
                           padding: 0,
+                          flexShrink: 0,
                           transition: "background 150ms ease",
                         }}
                       >
@@ -354,89 +440,179 @@ export default function CoverageRequirementsSettings({
                           }}
                         />
                       </button>
+                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>Same every day</span>
                     </div>
+                  )}
 
-                    {/* Per-code vertical list */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {codes.map((sc, ci) => (
-                        <div key={sc.id}>
-                          {/* Shift code badge */}
+                  {data.everyDay ? (
+                    /* ── Every-day: one row per code ── */
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {codes.map((sc, ci) => {
+                        const val = data.rows[0]?.codeRequirements[ci]?.minStaff ?? 0;
+                        return (
                           <div
+                            key={sc.id}
                             style={{
-                              display: "inline-flex",
+                              display: "flex",
                               alignItems: "center",
-                              padding: "3px 10px",
+                              justifyContent: "space-between",
+                              padding: "6px 10px",
                               borderRadius: 8,
-                              fontSize: "var(--dg-fs-caption)",
-                              fontWeight: 700,
-                              color: sc.text || "var(--color-text-secondary)",
-                              background: sc.color || "#EEEFEC",
-                              marginBottom: 6,
+                              background: "var(--color-bg)",
                             }}
                           >
-                            {isNameMode ? (sc.name || sc.label) : sc.label}
-                          </div>
-                          {/* Inputs */}
-                          {draft.everyDay ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
-                              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", width: 60 }}>Min staff</span>
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                fontSize: "var(--dg-fs-caption)",
+                                fontWeight: 700,
+                                color: sc.text || "var(--color-text-secondary)",
+                                background: sc.color || "#EEEFEC",
+                              }}
+                            >
+                              {codeLabel(sc)}
+                            </span>
+                            {isEditing ? (
                               <input
                                 type="number"
                                 min={0}
                                 max={999}
-                                value={draft.rows[0]?.codeRequirements[ci]?.minStaff ?? 0}
+                                value={val}
                                 onChange={(e) => handleCodeChange(fa.id, cat.id, 0, ci, parseInt(e.target.value) || 0)}
-                                disabled={!canEdit}
                                 style={inputStyle}
                               />
-                            </div>
-                          ) : (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 4 }}>
-                              {draft.rows.map((row, ri) => (
-                                <div key={ri} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                  <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", width: 28 }}>
-                                    {DAY_NAMES[row.dayOfWeek ?? 0]}
-                                  </span>
+                            ) : (
+                              <span style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                minWidth: 32,
+                                padding: "2px 10px",
+                                borderRadius: 6,
+                                fontSize: "var(--dg-fs-caption)",
+                                fontWeight: 700,
+                                background: val > 0 ? "var(--color-brand-bg)" : "var(--color-border-light)",
+                                color: val > 0 ? "var(--color-brand)" : "var(--color-text-muted)",
+                              }}>
+                                {val}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* ── Per-day: data grid with day columns ── */
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: `auto repeat(7, 1fr)`,
+                      gap: 0,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      border: "1px solid var(--color-border-light)",
+                    }}>
+                      {/* Header row: empty corner + day names */}
+                      <div style={{
+                        padding: "5px 10px",
+                        background: "var(--color-bg)",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }} />
+                      {DAY_NAMES.map((day) => (
+                        <div
+                          key={day}
+                          style={{
+                            padding: "5px 0",
+                            textAlign: "center",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "var(--color-text-muted)",
+                            background: "var(--color-bg)",
+                            borderBottom: "1px solid var(--color-border-light)",
+                            borderLeft: "1px solid var(--color-border-light)",
+                          }}
+                        >
+                          {day}
+                        </div>
+                      ))}
+
+                      {/* Data rows: code badge + 7 day cells */}
+                      {codes.map((sc, ci) => (
+                        <React.Fragment key={sc.id}>
+                          <div style={{
+                            padding: "6px 10px",
+                            display: "flex",
+                            alignItems: "center",
+                            background: "var(--color-bg)",
+                            borderBottom: ci < codes.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                          }}>
+                            <span style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "2px 8px",
+                              borderRadius: 6,
+                              fontSize: "var(--dg-fs-footnote)",
+                              fontWeight: 700,
+                              color: sc.text || "var(--color-text-secondary)",
+                              background: sc.color || "#EEEFEC",
+                              whiteSpace: "nowrap",
+                            }}>
+                              {codeLabel(sc)}
+                            </span>
+                          </div>
+                          {data.rows.map((row, ri) => {
+                            const val = row.codeRequirements[ci]?.minStaff ?? 0;
+                            return (
+                              <div
+                                key={ri}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: "4px 2px",
+                                  borderLeft: "1px solid var(--color-border-light)",
+                                  borderBottom: ci < codes.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                                }}
+                              >
+                                {isEditing ? (
                                   <input
                                     type="number"
                                     min={0}
                                     max={999}
-                                    value={row.codeRequirements[ci]?.minStaff ?? 0}
+                                    value={val}
                                     onChange={(e) => handleCodeChange(fa.id, cat.id, ri, ci, parseInt(e.target.value) || 0)}
-                                    disabled={!canEdit}
-                                    style={{ ...inputStyle, width: 42 }}
+                                    style={{ ...inputStyle, width: "100%", maxWidth: 40 }}
                                   />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                                ) : (
+                                  <span style={{
+                                    fontSize: "var(--dg-fs-caption)",
+                                    fontWeight: 600,
+                                    color: val > 0 ? "var(--color-text-secondary)" : "var(--color-text-muted)",
+                                  }}>
+                                    {val}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
                       ))}
                     </div>
+                  )}
 
-                    {/* Save button */}
-                    {canEdit && (
-                      <button
-                        onClick={() => handleSave(fa.id, cat.id)}
-                        disabled={savingKey === key}
-                        style={{
-                          alignSelf: "flex-start",
-                          padding: "7px 16px",
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 600,
-                          borderRadius: 8,
-                          border: "none",
-                          background: "var(--color-brand)",
-                          color: "var(--color-text-inverse)",
-                          cursor: savingKey === key ? "not-allowed" : "pointer",
-                          opacity: savingKey === key ? 0.7 : 1,
-                        }}
-                      >
-                        {savingKey === key ? "Saving..." : "Save"}
-                      </button>
-                    )}
-                  </div>
-                )}
+                  {/* Mode label — read-only indicator */}
+                  {!isEditing && (
+                    <span style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-muted)",
+                      fontStyle: "italic",
+                    }}>
+                      {data.everyDay ? "Same every day" : "Per-day schedule"}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

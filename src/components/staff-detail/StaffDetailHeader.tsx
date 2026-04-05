@@ -49,11 +49,11 @@ export function StaffDetailHeader({
     <div className="flex flex-col mb-4">
       {/* Back link */}
       <Link
-        href="/staff"
+        href="/people"
         className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors mb-5 w-fit"
       >
         <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
-        Staff
+        People
       </Link>
 
       {/* Hero card */}

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Employee } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
-export type EmployeeTab = "active" | "benched" | "terminated";
+export type EmployeeTab = "active" | "benched" | "terminated" | "app-only";
 export type SortBy = "seniority" | "name";
 
 const PAGE_SIZE = 15;

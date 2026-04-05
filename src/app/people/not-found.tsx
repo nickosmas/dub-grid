@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function StaffNotFound() {
+export default function PeopleNotFound() {
   return (
     <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 24 }}>
       <p style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>Page not found</p>

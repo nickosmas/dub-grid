@@ -438,7 +438,7 @@ export default function DashboardView({
             {[
               { done: focusAreas.length > 0, label: "Configure focus areas", href: "/settings/focus-areas" },
               { done: shiftCodes.length > 0, label: "Add shift codes", href: "/settings/shift-codes" },
-              { done: false, label: "Add employees", href: "/staff" },
+              { done: false, label: "Add employees", href: "/people" },
               { done: false, label: "Create your first schedule", href: "/schedule" },
             ].map((step) => (
               <a
@@ -562,7 +562,7 @@ export default function DashboardView({
 
 const stickyBarStyle = {
   position: "sticky" as const,
-  top: 56,
+  top: "var(--app-shell-header-h, 56px)",
   zIndex: 99,
   background: "var(--color-bg)",
 };

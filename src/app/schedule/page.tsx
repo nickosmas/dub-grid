@@ -818,6 +818,10 @@ function SchedulerContent() {
           continue;
         }
         const sc = shiftCodes.find(c => c.id === entry.shiftCodeIds[i]);
+        if (sc?.defaultStartTime && sc?.defaultEndTime) {
+          ranges.push({ start: sc.defaultStartTime, end: sc.defaultEndTime });
+          continue;
+        }
         if (sc?.categoryId != null) {
           const cat = shiftCategories.find(c => c.id === sc.categoryId);
           if (cat?.startTime && cat?.endTime) {
@@ -2195,7 +2199,7 @@ function SchedulerContent() {
             className="no-print"
             style={{
               position: "sticky",
-              top: 56,
+              top: "var(--app-shell-header-h, 56px)",
               zIndex: 99,
               background: "var(--color-bg)",
             }}
@@ -2704,12 +2708,19 @@ function SchedulerContent() {
             const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
             if (myRanges.length === 0) return true;
             const pickupRanges: TimeRange[] = [];
-            for (const codeId of req.requesterShiftCodeIds) {
-              const sc = shiftCodes.find(c => c.id === codeId);
-              if (sc?.categoryId != null) {
-                const cat = shiftCategories.find(c => c.id === sc.categoryId);
-                if (cat?.startTime && cat?.endTime) {
-                  pickupRanges.push({ start: cat.startTime, end: cat.endTime });
+            // Use request custom times as highest priority
+            if (req.requesterCustomStartTime && req.requesterCustomEndTime) {
+              pickupRanges.push({ start: req.requesterCustomStartTime, end: req.requesterCustomEndTime });
+            } else {
+              for (const codeId of req.requesterShiftCodeIds) {
+                const sc = shiftCodes.find(c => c.id === codeId);
+                if (sc?.defaultStartTime && sc?.defaultEndTime) {
+                  pickupRanges.push({ start: sc.defaultStartTime, end: sc.defaultEndTime });
+                } else if (sc?.categoryId != null) {
+                  const cat = shiftCategories.find(c => c.id === sc.categoryId);
+                  if (cat?.startTime && cat?.endTime) {
+                    pickupRanges.push({ start: cat.startTime, end: cat.endTime });
+                  }
                 }
               }
             }

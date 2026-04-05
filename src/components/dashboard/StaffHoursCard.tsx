@@ -45,7 +45,7 @@ export default function StaffHoursCard({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Link
-            href="/staff"
+            href="/people"
             style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
           >
             All staff &rarr;

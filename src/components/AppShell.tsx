@@ -1,12 +1,13 @@
 "use client";
 
+import { useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
 import { useOrganizationData, usePermissions } from "@/hooks";
 
-const APP_ROUTES = ["/dashboard", "/schedule", "/staff", "/settings"];
+const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/staff", "/settings"];
 
 function isAppRoute(pathname: string): boolean {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
@@ -29,6 +30,21 @@ function AppHeader() {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isGridmaster, isLoading } = usePermissions();
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Publish the actual sticky-header height as a CSS custom property so that
+  // sidebar layouts (StaffView, SettingsPage, etc.) can subtract the correct
+  // value instead of a hardcoded 56px.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([entry]) => {
+      const h = entry.contentRect.height;
+      document.documentElement.style.setProperty("--app-shell-header-h", `${h}px`);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Show the org header on app routes, but not when gridmaster is at /dashboard
   // (the gridmaster portal renders its own header).
@@ -40,6 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div
+        ref={headerRef}
         className="no-print"
         style={{
           position: "sticky",
