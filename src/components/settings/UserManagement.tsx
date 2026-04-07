@@ -240,7 +240,6 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
       const oldRole = target?.orgRole ?? "user";
       await changeOrganizationUserRole(userId, newRole, orgId, target?.email ?? undefined);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
-      if (newRole === "user") setExpandedUserId((prev) => prev === userId ? null : prev);
       toast.success("Role updated");
       queueNotification({ action: "role_changed", orgId, targetUserId: userId, fromRole: oldRole, toRole: newRole });
     } catch (e) {
@@ -281,12 +280,12 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
   const openPermissions = (user: OrganizationUser) => {
     if (expandedUserId === user.id) { setExpandedUserId(null); return; }
     setExpandedUserId(user.id);
-    if (!editingPerms[user.id]) {
-      setEditingPerms((prev) => ({
-        ...prev,
-        [user.id]: { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) },
-      }));
-    }
+    // Always re-initialize from the user's current permissions to avoid stale data
+    // (e.g. if another super_admin changed their permissions since last open).
+    setEditingPerms((prev) => ({
+      ...prev,
+      [user.id]: { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) },
+    }));
   };
 
   const handlePermToggle = (userId: string, key: keyof AdminPermissions, value: boolean) => {
@@ -663,7 +662,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                         {/* Actions */}
                         <TableCell className="pr-4 py-3">
                           <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
-                            {user.orgRole === "admin" && isSuperAdmin && (
+                            {(user.orgRole === "admin" || user.orgRole === "user") && isSuperAdmin && (
                               <button
                                 onClick={() => openPermissions(user)}
                                 className="dg-btn dg-btn-secondary"
@@ -699,11 +698,23 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                         </TableCell>
                       </TableRow>
 
-                      {/* Expanded permissions panel (admin only) */}
-                      {isExpanded && user.orgRole === "admin" && myRole === "super_admin" && (
+                      {/* Expanded permissions panel (admin + user) */}
+                      {isExpanded && (user.orgRole === "admin" || user.orgRole === "user") && myRole === "super_admin" && (
                         <TableRow className="hover:bg-transparent border-0">
                           <TableCell colSpan={4} className="p-0 bg-[var(--color-bg)]">
                             <div className="border-t border-[var(--color-border-light)]" style={{ padding: isMobile ? "16px" : "16px 16px 20px 52px" }}>
+                              {/* Info banner for user-role members */}
+                              {user.orgRole === "user" && (
+                                <div className="text-[12px] text-[var(--color-text-muted)] mb-1 p-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)]">
+                                  <strong>Custom Permissions</strong> — Combined with department permissions (most permissive wins).
+                                  {(user.departmentIds?.length ?? 0) > 0 && (
+                                    <span className="block mt-1 text-[11px] text-[var(--color-text-faint)]">
+                                      Departments: {user.departmentIds?.map((id: number) => deptNameById.get(id)).filter(Boolean).join(", ") || "—"}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
                               {/* Permission groups */}
                               <div className="flex flex-col gap-5">
                                 {PERM_GROUPS.map((group) => {

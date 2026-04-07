@@ -125,7 +125,8 @@ export interface Permissions extends AdminPermissions {
   atLeast: (role: string) => boolean;
 }
 
-function buildPerms(
+/** @internal Exported for unit tests only. */
+export function buildPerms(
   role: string,
   orgId: string | null,
   isLoading: boolean,
@@ -144,9 +145,19 @@ function buildPerms(
     p = adminPerms
       ? { ...adminPerms, canViewSchedule: true }
       : READ_ONLY_PERMS;
-  } else if (role === "user" && departmentPerms) {
-    // Management department members: use their department-derived permissions
-    p = { ...departmentPerms, canViewSchedule: true, canViewStaff: true, canManageOrgSettings: false };
+  } else if (role === "user") {
+    // Union direct user permissions with department-derived permissions (most permissive wins).
+    const sources: AdminPermissions[] = [];
+    if (adminPerms) sources.push(adminPerms);
+    if (departmentPerms) sources.push(departmentPerms);
+    if (sources.length > 0) {
+      p = unionPermissions(sources);
+    } else {
+      p = { ...READ_ONLY_PERMS };
+    }
+    p.canViewSchedule = true;
+    p.canViewStaff = true;
+    p.canManageOrgSettings = false;
   } else {
     p = READ_ONLY_PERMS;
   }
@@ -363,8 +374,37 @@ export function usePermissions(): Permissions {
             return;
           }
 
-          // user role
-          setPermsAndCache(buildPerms("user", targetOrgId, false, null, true), sessionUserId);
+          // user role — fetch direct permissions + department permissions
+          {
+            const { data: mem } = await supabase
+              .from("organization_memberships")
+              .select("admin_permissions, department_ids")
+              .eq("user_id", imp.targetUserId)
+              .eq("org_id", targetOrgId)
+              .single();
+
+            if (!mounted) return;
+
+            let deptPerms: AdminPermissions | null = null;
+            const deptIds: number[] = (mem?.department_ids as number[]) ?? [];
+            if (deptIds.length > 0) {
+              const { data: depts } = await supabase
+                .from("departments")
+                .select("permissions")
+                .in("id", deptIds)
+                .eq("type", "management")
+                .not("permissions", "is", null);
+              if (depts && depts.length > 0) {
+                deptPerms = unionPermissions(
+                  depts.map((d: { permissions: unknown }) => d.permissions as AdminPermissions),
+                );
+              }
+            }
+
+            if (mounted) {
+              setPermsAndCache(buildPerms("user", targetOrgId, false, mem?.admin_permissions ?? null, true, deptPerms), sessionUserId);
+            }
+          }
           return;
         }
       }
