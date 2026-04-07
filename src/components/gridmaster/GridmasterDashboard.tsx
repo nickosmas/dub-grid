@@ -61,7 +61,7 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
           {entry.orgName}
         </span>
       )}
-      <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", flexShrink: 0, whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", flexShrink: 0, whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
         {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         {" "}
         {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
@@ -186,12 +186,12 @@ export default function GridmasterDashboard({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-warning-bg, #fff8e6)",
-            border: "1px solid var(--color-warning, #b08800)",
+            background: "var(--color-warning-bg)",
+            border: "1px solid var(--color-warning)",
             borderRadius: 10,
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
-            color: "var(--color-warning, #b08800)",
+            color: "var(--color-warning)",
             marginBottom: 20,
           }}
         >
@@ -277,7 +277,7 @@ export default function GridmasterDashboard({
                     {c.suspendedAt ? (
                       <span style={{ fontWeight: 600, color: "var(--color-danger)", background: "var(--color-danger-bg)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Suspended</span>
                     ) : (
-                      <span style={{ fontWeight: 600, color: "var(--color-success, #1a8a1a)", background: "var(--color-success-bg, #e6f9e6)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Active</span>
+                      <span style={{ fontWeight: 600, color: "var(--color-success)", background: "var(--color-success-bg)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Active</span>
                     )}
                   </td>
                   <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>

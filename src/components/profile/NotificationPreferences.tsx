@@ -33,7 +33,7 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   system: "Impersonation notices and system updates",
 };
 
-export function NotificationPreferences() {
+export function NotificationPreferences({ visibleCategories }: { visibleCategories?: string[] } = {}) {
   const [prefs, setPrefs] = useState<AllPrefs>(DEFAULT_PREFS);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -123,7 +123,7 @@ export function NotificationPreferences() {
       </div>
 
       {/* Category rows */}
-      {Object.entries(CATEGORY_LABELS).map(([category, label]) => (
+      {Object.entries(CATEGORY_LABELS).filter(([category]) => !visibleCategories || visibleCategories.includes(category)).map(([category, label]) => (
         <div
           key={category}
           style={{

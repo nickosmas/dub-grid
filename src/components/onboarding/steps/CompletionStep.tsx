@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ArrowRight } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { toast } from "sonner";
+import * as Sentry from "@/lib/sentry";
 
 interface CompletionStepProps {
   role: string;
@@ -28,19 +30,21 @@ export default function CompletionStep({ role, onComplete }: CompletionStepProps
       : "Your account is set up and ready. Head to the dashboard to get started.";
 
   const ctaLabel = isSuperAdmin
-    ? "Go to Dashboard"
+    ? "Go to People"
     : isUser
       ? "View My Schedule"
       : "Go to Dashboard";
 
-  const destination = isUser ? "/schedule" : "/dashboard";
+  const destination = isUser ? "/schedule" : isSuperAdmin ? "/people" : "/dashboard";
 
   async function handleComplete() {
     setLoading(true);
     try {
-      await onComplete();
       router.push(destination);
-    } catch {
+      await onComplete();
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("Something went wrong. Please try again.");
       setLoading(false);
     }
   }

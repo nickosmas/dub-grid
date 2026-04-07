@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import { DubGridLogo } from "@/components/Logo";
 import StepperBar from "./StepperBar";
 import { useOnboardingState, type StepConfig } from "./useOnboardingState";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useOrganizationData } from "@/hooks";
+import { toast } from "sonner";
+import * as Sentry from "@/lib/sentry";
 
 // Steps
 import WelcomeStep from "./steps/WelcomeStep";
@@ -12,8 +16,13 @@ import DepartmentsStep from "./steps/DepartmentsStep";
 import RolesStep from "./steps/RolesStep";
 import CertificationsStep from "./steps/CertificationsStep";
 import ShiftCodesStep from "./steps/ShiftCodesStep";
+import DisplayModeStep from "./steps/DisplayModeStep";
+import ShiftCodesDetailStep from "./steps/ShiftCodesDetailStep";
 import AdminOrientationStep from "./steps/AdminOrientationStep";
+import CustomLabelsStep from "./steps/CustomLabelsStep";
 import CompletionStep from "./steps/CompletionStep";
+
+import type { ShiftDisplayMode } from "@/types";
 
 interface OnboardingWizardProps {
   role: string;
@@ -21,15 +30,21 @@ interface OnboardingWizardProps {
   userId: string;
 }
 
-const SUPER_ADMIN_STEPS: StepConfig[] = [
-  { id: "welcome", label: "Welcome" },
-  { id: "org-details", label: "Details" },
-  { id: "departments", label: "Departments" },
-  { id: "roles", label: "Roles" },
-  { id: "certifications", label: "Certifications" },
-  { id: "shift-codes", label: "Shift Codes" },
-  { id: "completion", label: "Done" },
-];
+function buildSuperAdminSteps(displayMode: ShiftDisplayMode): StepConfig[] {
+  const shiftsLabel = displayMode === "name" ? "Names" : "Codes";
+  return [
+    { id: "welcome", label: "Welcome" },
+    { id: "org-details", label: "Details" },
+    { id: "custom-labels", label: "Labels" },
+    { id: "departments", label: "Depts" },
+    { id: "roles", label: "Roles" },
+    { id: "certifications", label: "Certs" },
+    { id: "display-mode", label: "Display" },
+    { id: "shift-categories", label: "Categories" },
+    { id: "shift-codes", label: shiftsLabel },
+    { id: "completion", label: "Done" },
+  ];
+}
 
 const ADMIN_STEPS: StepConfig[] = [
   { id: "welcome", label: "Welcome" },
@@ -42,18 +57,19 @@ const USER_STEPS: StepConfig[] = [
   { id: "completion", label: "Done" },
 ];
 
-function getSteps(role: string): StepConfig[] {
-  if (role === "super_admin") return SUPER_ADMIN_STEPS;
-  if (role === "admin") return ADMIN_STEPS;
-  return USER_STEPS;
-}
-
 export default function OnboardingWizard({
   role,
   orgId,
   userId,
 }: OnboardingWizardProps) {
-  const steps = useMemo(() => getSteps(role), [role]);
+  const { org } = useOrganizationData();
+  const displayMode = org?.shiftDisplayMode ?? "code";
+
+  const steps = useMemo(() => {
+    if (role === "super_admin") return buildSuperAdminSteps(displayMode);
+    if (role === "admin") return ADMIN_STEPS;
+    return USER_STEPS;
+  }, [role, displayMode]);
   const {
     currentStepIndex,
     currentStep,
@@ -64,13 +80,16 @@ export default function OnboardingWizard({
   } = useOnboardingState(userId, orgId, steps);
 
   const [skipLoading, setSkipLoading] = useState(false);
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   async function handleSkip() {
     setSkipLoading(true);
     try {
       await completeOnboarding();
       window.location.reload();
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("Failed to skip setup. Please try again.");
       setSkipLoading(false);
     }
   }
@@ -84,14 +103,20 @@ export default function OnboardingWizard({
         return <WelcomeStep role={role} onNext={goNext} />;
       case "org-details":
         return <OrgDetailsStep onNext={goNext} onBack={goBack} />;
+      case "custom-labels":
+        return <CustomLabelsStep onNext={goNext} onBack={goBack} />;
+      case "display-mode":
+        return <DisplayModeStep onNext={goNext} onBack={goBack} />;
       case "departments":
         return <DepartmentsStep onNext={goNext} onBack={goBack} />;
       case "roles":
         return <RolesStep onNext={goNext} onBack={goBack} />;
       case "certifications":
         return <CertificationsStep onNext={goNext} onBack={goBack} />;
-      case "shift-codes":
+      case "shift-categories":
         return <ShiftCodesStep onNext={goNext} onBack={goBack} />;
+      case "shift-codes":
+        return <ShiftCodesDetailStep onNext={goNext} onBack={goBack} />;
       case "orientation":
         return <AdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "completion":
@@ -154,7 +179,7 @@ export default function OnboardingWizard({
         {/* Skip link */}
         {currentStep.id !== "completion" && (
           <button
-            onClick={handleSkip}
+            onClick={() => setShowSkipConfirm(true)}
             disabled={skipLoading}
             type="button"
             style={{
@@ -179,7 +204,7 @@ export default function OnboardingWizard({
         <div
           style={{
             padding: "0 24px 24px",
-            maxWidth: 640,
+            maxWidth: 860,
             margin: "0 auto",
             width: "100%",
           }}
@@ -219,6 +244,23 @@ export default function OnboardingWizard({
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {showSkipConfirm && (
+        <ConfirmDialog
+          title="Skip Setup?"
+          message={
+            role === "super_admin"
+              ? "Skipping will leave your workspace unconfigured. You\u2019ll need to set things up later in Settings before your team can use the app."
+              : "Are you sure you want to skip? You can configure your preferences later in Settings."
+          }
+          confirmLabel="Yes, skip"
+          cancelLabel="Go back"
+          variant="warning"
+          isLoading={skipLoading}
+          onConfirm={handleSkip}
+          onCancel={() => setShowSkipConfirm(false)}
+        />
+      )}
     </div>
   );
 }

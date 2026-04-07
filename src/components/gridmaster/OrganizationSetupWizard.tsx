@@ -10,10 +10,15 @@ import {
   upsertFocusArea,
   saveCertifications,
   saveOrganizationRoles,
+  saveDepartments,
+  upsertShiftCategory,
+  upsertShiftCode,
+  updateOrganization,
 } from "@/lib/db";
 import type { Organization, AssignableOrganizationRole } from "@/types";
 import * as Sentry from "@/lib/sentry";
 import CustomSelect from "@/components/CustomSelect";
+import StepperBar from "@/components/StepperBar";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 
@@ -78,6 +83,28 @@ interface NamedItemRow {
   abbr: string;
 }
 
+interface DeptRow {
+  id: string;
+  name: string;
+  abbr: string;
+  type: "scheduled" | "management";
+}
+
+interface ShiftCatRow {
+  id: string;
+  name: string;
+  color: string;
+  startTime: string;
+  endTime: string;
+}
+
+interface ShiftCodeRow {
+  id: string;
+  label: string;
+  name: string;
+  color: string;
+}
+
 interface EmployeeRow {
   id: string;
   firstName: string;
@@ -101,78 +128,16 @@ interface InvitationRow {
   role: AssignableOrganizationRole;
 }
 
-// ── Stepper Bar ───────────────────────────────────────────────────────────────
+// ── Stepper Bar (uses shared StepperBar component) ──────────────────────────
 
-function WizardStepper({ currentStep, orgCreated }: { currentStep: StepKey; orgCreated: boolean }) {
-  const visibleSteps = STEPS.filter((s) => s.key !== "decision");
-  const currentIdx = visibleSteps.findIndex((s) => s.key === currentStep);
-  // Decision step maps to between super-admin and config
+function WizardStepper({ currentStep }: { currentStep: StepKey; orgCreated?: boolean }) {
+  const visibleSteps = STEPS.filter((s) => s.key !== "decision").map((s) => ({ id: s.key, label: s.label }));
+  const currentIdx = visibleSteps.findIndex((s) => s.id === currentStep);
   const effectiveIdx = currentStep === "decision" ? 2 : currentIdx;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 24 }}>
-      {visibleSteps.map((step, idx) => {
-        const isPhase2 = idx >= 2;
-        const isActive = idx === effectiveIdx;
-        const isComplete = idx < effectiveIdx;
-        const isDimmed = isPhase2 && !orgCreated && !isActive;
-
-        return (
-          <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < visibleSteps.length - 1 ? 1 : undefined }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  background: isActive
-                    ? "var(--color-primary)"
-                    : isComplete
-                      ? "var(--color-success)"
-                      : "var(--color-bg-secondary)",
-                  color: isActive || isComplete ? "#fff" : "var(--color-text-muted)",
-                  opacity: isDimmed ? 0.4 : 1,
-                  transition: "all 200ms ease",
-                }}
-              >
-                {isComplete ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  idx + 1
-                )}
-              </div>
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                  opacity: isDimmed ? 0.4 : 1,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {step.label}
-              </span>
-            </div>
-            {idx < visibleSteps.length - 1 && (
-              <div
-                style={{
-                  flex: 1,
-                  height: 2,
-                  background: isComplete ? "var(--color-success)" : "var(--color-border-light)",
-                  margin: "0 12px",
-                  opacity: isDimmed ? 0.3 : 1,
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
+    <div style={{ marginBottom: 24 }}>
+      <StepperBar steps={visibleSteps} currentStepIndex={effectiveIdx} />
     </div>
   );
 }
@@ -213,9 +178,13 @@ export default function OrganizationSetupWizard({
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // ── Step 3: Config ────────────────────────────────────────────────────────
+  const [shiftDisplayMode, setShiftDisplayMode] = useState<"code" | "name">("code");
+  const [departments, setDepartments] = useState<DeptRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" }]);
   const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([{ id: crypto.randomUUID(), name: "", colorBg: COLOR_PRESETS[0] }]);
   const [certifications, setCertifications] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
   const [orgRoles, setOrgRoles] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
+  const [shiftCategories, setShiftCategories] = useState<ShiftCatRow[]>([{ id: crypto.randomUUID(), name: "", color: COLOR_PRESETS[0], startTime: "", endTime: "" }]);
+  const [shiftCodes, setShiftCodes] = useState<ShiftCodeRow[]>([{ id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[0] }]);
 
   // ── Step 4: Employees ─────────────────────────────────────────────────────
   const [employeeRows, setEmployeeRows] = useState<EmployeeRow[]>(
@@ -280,7 +249,7 @@ export default function OrganizationSetupWizard({
         certificationLabel: certificationLabel.trim() || "Certifications",
         roleLabel: roleLabel.trim() || "Roles",
         departmentLabel: "Departments",
-        shiftDisplayMode: "code",
+        shiftDisplayMode,
         timezone: timezone || null,
         enforceConflictPrevention: false,
         dataRetentionDays: 365,
@@ -336,7 +305,7 @@ export default function OrganizationSetupWizard({
         // If direct assignment failed, create an invitation record (email not sent yet)
         if (!assigned) {
           try {
-            const invResult = await sendInvitation(email, "admin", org.id, employeeId);
+            const invResult = await sendInvitation(email, "super_admin", org.id, employeeId);
             setPendingInvite({ token: invResult.token, email, name: displayName });
             toast.success("Organization created & invitation ready");
             toast.info("Send the invitation email from the next screen.");
@@ -355,7 +324,7 @@ export default function OrganizationSetupWizard({
     } finally {
       setSaving(false);
     }
-  }, [name, slug, address, phone, employeeCount, focusAreaLabel, certificationLabel, roleLabel, timezone, superAdminFirstName, superAdminLastName, superAdminEmail, superAdminPhone]);
+  }, [name, slug, address, phone, employeeCount, focusAreaLabel, certificationLabel, roleLabel, timezone, shiftDisplayMode, superAdminFirstName, superAdminLastName, superAdminEmail, superAdminPhone]);
 
   // ── Step 3: Save config ───────────────────────────────────────────────────
 
@@ -363,6 +332,31 @@ export default function OrganizationSetupWizard({
     if (!createdOrg) return;
     setSaving(true);
     try {
+      let savedCount = 0;
+
+      // Save display mode if changed from default
+      if (shiftDisplayMode !== "code") {
+        await updateOrganization({ ...createdOrg, shiftDisplayMode });
+      }
+
+      // Save departments
+      const validDepts = departments.filter((d) => d.name.trim());
+      if (validDepts.length > 0) {
+        await saveDepartments(
+          createdOrg.id,
+          validDepts.map((d, i) => ({
+            id: -(i + 1),
+            orgId: createdOrg.id,
+            name: d.name.trim(),
+            abbr: d.abbr.trim(),
+            type: d.type,
+            sortOrder: i,
+          })),
+          [],
+        );
+        savedCount += validDepts.length;
+      }
+
       // Save focus areas
       const validFocusAreas = focusAreas.filter((fa) => fa.name.trim());
       for (let i = 0; i < validFocusAreas.length; i++) {
@@ -376,6 +370,7 @@ export default function OrganizationSetupWizard({
           sortOrder: i,
         });
       }
+      savedCount += validFocusAreas.length;
 
       // Save certifications
       const validCerts = certifications.filter((c) => c.name.trim());
@@ -391,6 +386,7 @@ export default function OrganizationSetupWizard({
           })),
           [],
         );
+        savedCount += validCerts.length;
       }
 
       // Save org roles
@@ -407,9 +403,50 @@ export default function OrganizationSetupWizard({
           })),
           [],
         );
+        savedCount += validRoles.length;
       }
 
-      const savedCount = validFocusAreas.length + validCerts.length + validRoles.length;
+      // Save shift categories
+      const validCats = shiftCategories.filter((c) => c.name.trim());
+      for (let i = 0; i < validCats.length; i++) {
+        const cat = validCats[i];
+        await upsertShiftCategory({
+          orgId: createdOrg.id,
+          name: cat.name.trim(),
+          color: cat.color,
+          startTime: cat.startTime || null,
+          endTime: cat.endTime || null,
+          sortOrder: i,
+          focusAreaId: null,
+          breakMinutes: null,
+        });
+      }
+      savedCount += validCats.length;
+
+      // Save shift codes
+      const validCodes = shiftCodes.filter((c) => c.label.trim() || c.name.trim());
+      for (let i = 0; i < validCodes.length; i++) {
+        const code = validCodes[i];
+        await upsertShiftCode({
+          orgId: createdOrg.id,
+          label: code.label.trim() || code.name.trim().slice(0, 3).toUpperCase(),
+          name: code.name.trim() || code.label.trim(),
+          color: code.color,
+          border: code.color,
+          text: "#FFFFFF",
+          sortOrder: i,
+          isGeneral: false,
+          focusAreaId: null,
+          categoryId: null,
+          requiredCertificationIds: [],
+          defaultStartTime: null,
+          defaultEndTime: null,
+          defaultDurationHours: null,
+          defaultDurationMinutes: null,
+        });
+      }
+      savedCount += validCodes.length;
+
       if (savedCount > 0) toast.success(`Saved ${savedCount} configuration items`);
       setCurrentStep("employees");
     } catch (err: unknown) {
@@ -417,7 +454,7 @@ export default function OrganizationSetupWizard({
     } finally {
       setSaving(false);
     }
-  }, [createdOrg, focusAreas, certifications, orgRoles]);
+  }, [createdOrg, shiftDisplayMode, departments, focusAreas, certifications, orgRoles, shiftCategories, shiftCodes]);
 
   // ── Step 4: Save employees ────────────────────────────────────────────────
 
@@ -862,7 +899,7 @@ export default function OrganizationSetupWizard({
             style={{
               ...sectionStyle,
               marginBottom: 24,
-              border: "1px solid var(--color-warning, #F59E0B)",
+              border: "1px solid var(--color-warning)",
             }}
           >
             <div style={{ ...sectionBodyStyle, display: "flex", alignItems: "center", gap: 16 }}>
@@ -919,6 +956,100 @@ export default function OrganizationSetupWizard({
   function renderConfig() {
     return (
       <>
+        {/* Display Mode */}
+        <div style={{ ...sectionStyle, marginBottom: 20 }}>
+          <div style={sectionHeaderStyle}>Shift Display Mode</div>
+          <div style={sectionBodyStyle}>
+            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              How shift codes appear on the schedule grid.
+            </p>
+            <div style={{ display: "flex", gap: 16 }}>
+              {([["code", "Code", "D"], ["name", "Full Name", "Day Shift"]] as const).map(([value, label, example]) => (
+                <label
+                  key={value}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    border: `2px solid ${shiftDisplayMode === value ? "var(--color-primary)" : "var(--color-border)"}`,
+                    background: shiftDisplayMode === value ? "var(--color-primary-bg)" : "transparent",
+                    cursor: "pointer",
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 500,
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="displayMode"
+                    value={value}
+                    checked={shiftDisplayMode === value}
+                    onChange={() => setShiftDisplayMode(value)}
+                    style={{ accentColor: "var(--color-primary)" }}
+                  />
+                  <span>
+                    <span style={{ color: "var(--color-text-primary)" }}>{label}</span>
+                    <span style={{ color: "var(--color-text-muted)", marginLeft: 6 }}>({example})</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Departments */}
+        <div style={{ ...sectionStyle, marginBottom: 20 }}>
+          <div style={sectionHeaderStyle}>Departments</div>
+          <div style={sectionBodyStyle}>
+            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              Organizational departments. &quot;Scheduled&quot; departments appear on the scheduling grid; &quot;Management&quot; departments are for hierarchy only.
+            </p>
+            {departments.map((dept, idx) => (
+              <div key={dept.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <input
+                  className="dg-input"
+                  value={dept.name}
+                  onChange={(e) => setDepartments((prev) => prev.map((d, i) => (i === idx ? { ...d, name: e.target.value } : d)))}
+                  placeholder="e.g. Emergency"
+                  style={{ flex: 2 }}
+                />
+                <input
+                  className="dg-input"
+                  value={dept.abbr}
+                  onChange={(e) => setDepartments((prev) => prev.map((d, i) => (i === idx ? { ...d, abbr: e.target.value } : d)))}
+                  placeholder="e.g. ER"
+                  style={{ flex: 1, maxWidth: 100 }}
+                />
+                <CustomSelect
+                  value={dept.type}
+                  options={[
+                    { value: "scheduled", label: "Scheduled" },
+                    { value: "management", label: "Management" },
+                  ]}
+                  onChange={(val) => setDepartments((prev) => prev.map((d, i) => (i === idx ? { ...d, type: val as "scheduled" | "management" } : d)))}
+                  style={{ width: 140 }}
+                />
+                {departments.length > 1 && (
+                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setDepartments((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: "6px 8px" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={() => setDepartments((prev) => [...prev, { id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" }])}
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            >
+              + Add department
+            </button>
+          </div>
+        </div>
+
         {/* Focus Areas */}
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>{focusAreaLabel}</div>
@@ -1028,6 +1159,113 @@ export default function OrganizationSetupWizard({
             ))}
             <button type="button" className="dg-btn dg-btn-ghost" onClick={() => addNamedItemRow(setOrgRoles)} style={{ fontSize: "var(--dg-fs-label)" }}>
               + Add {roleLabel.replace(/s$/, "").toLowerCase()}
+            </button>
+          </div>
+        </div>
+
+        {/* Shift Categories */}
+        <div style={{ ...sectionStyle, marginBottom: 20 }}>
+          <div style={sectionHeaderStyle}>Shift Categories</div>
+          <div style={sectionBodyStyle}>
+            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              Time-window categories that group shift codes (e.g. Day, Evening, Night).
+            </p>
+            {shiftCategories.map((cat, idx) => (
+              <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <input
+                  type="color"
+                  value={cat.color}
+                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, color: e.target.value } : c)))}
+                  style={{ width: 36, height: 36, border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: 2 }}
+                />
+                <input
+                  className="dg-input"
+                  value={cat.name}
+                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)))}
+                  placeholder="e.g. Day Shift"
+                  style={{ flex: 2 }}
+                />
+                <input
+                  className="dg-input"
+                  type="time"
+                  value={cat.startTime}
+                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, startTime: e.target.value } : c)))}
+                  style={{ width: 120 }}
+                  title="Start time"
+                />
+                <input
+                  className="dg-input"
+                  type="time"
+                  value={cat.endTime}
+                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, endTime: e.target.value } : c)))}
+                  style={{ width: 120 }}
+                  title="End time"
+                />
+                {shiftCategories.length > 1 && (
+                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setShiftCategories((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: "6px 8px" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={() => setShiftCategories((prev) => [...prev, { id: crypto.randomUUID(), name: "", color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length], startTime: "", endTime: "" }])}
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            >
+              + Add category
+            </button>
+          </div>
+        </div>
+
+        {/* Shift Codes */}
+        <div style={{ ...sectionStyle, marginBottom: 20 }}>
+          <div style={sectionHeaderStyle}>Shift Codes</div>
+          <div style={sectionBodyStyle}>
+            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              Individual shift codes that appear on the schedule (e.g. &quot;D&quot; for Day, &quot;N&quot; for Night).
+            </p>
+            {shiftCodes.map((code, idx) => (
+              <div key={code.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <input
+                  type="color"
+                  value={code.color}
+                  onChange={(e) => setShiftCodes((prev) => prev.map((c, i) => (i === idx ? { ...c, color: e.target.value } : c)))}
+                  style={{ width: 36, height: 36, border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: 2 }}
+                />
+                <input
+                  className="dg-input"
+                  value={code.label}
+                  onChange={(e) => setShiftCodes((prev) => prev.map((c, i) => (i === idx ? { ...c, label: e.target.value } : c)))}
+                  placeholder="e.g. D"
+                  style={{ flex: 1, maxWidth: 80 }}
+                />
+                <input
+                  className="dg-input"
+                  value={code.name}
+                  onChange={(e) => setShiftCodes((prev) => prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)))}
+                  placeholder="e.g. Day Shift"
+                  style={{ flex: 2 }}
+                />
+                {shiftCodes.length > 1 && (
+                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setShiftCodes((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: "6px 8px" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={() => setShiftCodes((prev) => [...prev, { id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length] }])}
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            >
+              + Add shift code
             </button>
           </div>
         </div>

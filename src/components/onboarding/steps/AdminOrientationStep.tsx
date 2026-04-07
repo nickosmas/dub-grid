@@ -46,7 +46,7 @@ export default function AdminOrientationStep({
       description="Here's a quick overview of the main sections you'll be working with."
       onNext={onNext}
       onBack={onBack}
-      nextLabel="Finish"
+      nextLabel="Continue"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {sections.map((s) => (

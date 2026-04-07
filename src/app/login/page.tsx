@@ -32,7 +32,7 @@ function DomainSelector() {
   const [showHelp, setShowHelp] = useState(false);
 
   function showToast(msg: string) {
-    toast.error(msg);
+    toast.error(msg, { id: "login-error" });
   }
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;

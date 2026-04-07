@@ -21,15 +21,15 @@ export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) 
 
   if (!org) return null;
 
-  const hasShiftCodes = shiftCodes.length > 0;
+  const hasCategories = shiftCategories.length > 0;
 
   return (
     <StepLayout
-      title="Shift Codes"
-      description="Define the types of shifts your staff work (e.g., Day, Evening, Night). Shift codes are organized into categories per focus area and define start/end times."
+      title="Shift Categories"
+      description="Organize your shifts into categories per focus area. Categories define time windows (e.g., Day, Evening, Night) that shift codes inherit."
       onNext={onNext}
       onBack={onBack}
-      nextDisabled={!hasShiftCodes}
+      nextDisabled={!hasCategories}
       wide
     >
       <div
@@ -50,7 +50,7 @@ export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) 
           onShiftCodesChange={handleShiftCodesChange}
         />
       </div>
-      {!hasShiftCodes && (
+      {!hasCategories && (
         <p
           style={{
             fontSize: 13,
@@ -59,7 +59,7 @@ export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) 
             textAlign: "center",
           }}
         >
-          Add at least one shift code to continue.
+          Add at least one shift category to continue.
         </p>
       )}
     </StepLayout>

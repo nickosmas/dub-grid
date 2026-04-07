@@ -312,7 +312,7 @@ function ProfilePageContent() {
         boxShadow: "var(--shadow-raised)",
       }}>
         <button
-          onClick={() => window.history.length > 1 ? router.back() : router.push("/schedule")}
+          onClick={() => window.history.length > 1 ? router.back() : router.push(role === "gridmaster" ? "/gridmaster" : "/schedule")}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -547,11 +547,14 @@ function ProfilePageContent() {
                   </button>
                 </div>
               )}
-              <Field label="Organization role" value={ROLE_LABELS[role] ?? "User"} />
-              {role === "gridmaster" && (
+              {role === "gridmaster" ? (
                 <Field label="Platform role" value="Gridmaster" />
+              ) : (
+                <>
+                  <Field label="Organization role" value={ROLE_LABELS[role] ?? "User"} />
+                  <Field label="Organization ID" value={orgId} />
+                </>
               )}
-              <Field label="Organization ID" value={orgId} />
               <Field label="Member since" value={createdAt} />
               <Field label="Last sign in" value={lastSignIn} />
             </div>
@@ -675,12 +678,12 @@ function ProfilePageContent() {
               <span style={cardHeaderLabelStyle}>Notifications</span>
             </div>
             <div style={{ padding: "20px 24px" }}>
-              <NotificationPreferences />
+              <NotificationPreferences visibleCategories={role === "gridmaster" ? ["system"] : undefined} />
             </div>
           </div>
 
-          {/* Calendar Subscription card */}
-          <div style={cardStyle}>
+          {/* Calendar Subscription card (not relevant for gridmaster — no shifts) */}
+          {role !== "gridmaster" && <div style={cardStyle}>
             <div style={cardHeaderStyle}>
               <span style={cardHeaderLabelStyle}>Calendar Subscription</span>
             </div>
@@ -725,7 +728,7 @@ function ProfilePageContent() {
                 Note: You must be logged in for the calendar feed to work. This URL returns your shifts for the next 4 weeks.
               </p>
             </div>
-          </div>
+          </div>}
 
           {/* Sessions card */}
           <div style={cardStyle}>
@@ -773,7 +776,11 @@ function ProfilePageContent() {
               <span style={{ ...cardHeaderLabelStyle, color: "var(--color-danger)" }}>Danger Zone</span>
             </div>
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {!showDeleteConfirm ? (
+              {role === "gridmaster" ? (
+                <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
+                  Gridmaster accounts cannot be deleted through self-service. Contact another gridmaster or use direct database access to remove this account.
+                </p>
+              ) : !showDeleteConfirm ? (
                 <>
                   <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
                     Permanently delete your account and all associated data. This action cannot be undone.
