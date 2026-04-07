@@ -8,6 +8,7 @@ import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { inputStyle } from "./shared";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function Indicators({
   indicatorTypes,
@@ -95,20 +96,10 @@ export default function Indicators({
         Indicators appear as colored dots on shift cells. Add, rename, or recolor them here.
       </p>
       {local.length === 0 && (
-        <div style={{
-          border: "1px dashed var(--color-border)",
-          borderRadius: 12,
-          padding: "40px 20px",
-          textAlign: "center",
-          color: "var(--color-text-muted)",
-          fontSize: "var(--dg-fs-label)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 12,
-        }}>
-          <span>No indicators defined yet</span>
-          {canManageIndicatorTypes && (
+        <EmptyState
+          compact
+          title="No indicators defined yet"
+          action={canManageIndicatorTypes ? (
             <button
               onClick={handleAdd}
               className="dg-btn dg-btn-secondary"
@@ -116,8 +107,8 @@ export default function Indicators({
             >
               + Add Indicator
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       )}
       {local.map((indicator) => {
         const isSavingThis = saving === indicator.id;

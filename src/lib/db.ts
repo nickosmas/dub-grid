@@ -17,6 +17,8 @@ export function assertSafeFilterValue(value: string, label: string): void {
 }
 
 import {
+  Department,
+  DepartmentType,
   Employee,
   EmployeeStatus,
   ShiftMap,
@@ -106,12 +108,23 @@ export interface DbOrganization {
 export interface DbFocusArea {
   id: number;
   org_id: string;
+  department_id: number | null;
   name: string;
   color_bg: string;
   color_text: string;
   sort_order: number;
-  break_minutes: number | null;
   archived_at: string | null;
+}
+
+interface DbDepartment {
+  id: number;
+  org_id: string;
+  name: string;
+  abbr: string;
+  type: string;
+  sort_order: number;
+  archived_at: string | null;
+  permissions: Record<string, boolean> | null;
 }
 
 interface DbShiftCategory {
@@ -173,6 +186,7 @@ export interface DbEmployee {
   contact_notes: string;
   archived_at: string | null;
   user_id: string | null;
+  department_ids: number[];
 }
 
 interface DbShift {
@@ -211,12 +225,13 @@ interface DbScheduleNote {
 
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
-const ORGANIZATION_COLS = "id, name, slug, address, phone, employee_count, focus_area_label, certification_label, role_label, shift_display_mode, timezone, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides";
-const FOCUS_AREA_COLS = "id, org_id, name, color_bg, color_text, sort_order, break_minutes, archived_at";
+const ORGANIZATION_COLS = "id, name, slug, address, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides";
+const FOCUS_AREA_COLS = "id, org_id, department_id, name, color_bg, color_text, sort_order, archived_at";
+const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
 const SHIFT_CODE_COLS = "id, org_id, label, name, color, border_color, text_color, category_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
 const SHIFT_CATEGORY_COLS = "id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes, archived_at";
-const NAMED_ITEM_COLS = "id, org_id, name, abbr, sort_order, archived_at";
-const EMPLOYEE_COLS = "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id";
+const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_id, sort_order, archived_at";
+const EMPLOYEE_COLS = "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids";
 const COVERAGE_REQ_COLS = "id, org_id, focus_area_id, shift_code_id, day_of_week, min_staff";
 const ABSENCE_TYPE_COLS = "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 const INDICATOR_TYPE_COLS = "id, org_id, name, color, sort_order, archived_at";
@@ -231,6 +246,7 @@ interface DbNamedItem {
   org_id: string;
   name: string;
   abbr: string;
+  department_id: number | null;
   sort_order: number;
   archived_at: string | null;
 }
@@ -241,8 +257,22 @@ function rowToNamedItem(row: DbNamedItem): NamedItem {
     orgId: row.org_id,
     name: row.name,
     abbr: row.abbr,
+    departmentId: row.department_id ?? null,
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
+  };
+}
+
+function rowToDepartment(row: DbDepartment): Department {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    name: row.name,
+    abbr: row.abbr,
+    type: row.type as DepartmentType,
+    sortOrder: row.sort_order,
+    archivedAt: row.archived_at ?? null,
+    permissions: (row.permissions as unknown as import("@/types").AdminPermissions) ?? null,
   };
 }
 
@@ -277,11 +307,11 @@ export function rowToFocusArea(row: DbFocusArea): FocusArea {
   return {
     id: row.id,
     orgId: row.org_id,
+    departmentId: row.department_id ?? null,
     name: row.name,
     colorBg: row.color_bg,
     colorText: row.color_text,
     sortOrder: row.sort_order,
-    breakMinutes: row.break_minutes ?? null,
     archivedAt: row.archived_at ?? null,
   };
 }
@@ -379,6 +409,7 @@ export function rowToEmployee(row: DbEmployee): Employee {
     contactNotes: row.contact_notes ?? "",
     archivedAt: row.archived_at ?? null,
     userId: row.user_id ?? null,
+    departmentIds: row.department_ids ?? [],
   };
 }
 
@@ -394,6 +425,7 @@ export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<Db
     phone: emp.phone,
     email: emp.email,
     contact_notes: emp.contactNotes,
+    department_ids: emp.departmentIds ?? [],
   };
 }
 
@@ -451,6 +483,7 @@ export async function updateOrganization(org: Organization): Promise<void> {
       focus_area_label: org.focusAreaLabel || null,
       certification_label: org.certificationLabel || null,
       role_label: org.roleLabel || null,
+      department_label: org.departmentLabel || null,
       shift_display_mode: org.shiftDisplayMode || 'code',
       timezone: org.timezone || null,
       enforce_conflict_prevention: org.enforceConflictPrevention ?? false,
@@ -516,7 +549,7 @@ export async function saveCertifications(
   for (const { item, sortOrder } of toUpdate) {
     const { error } = await supabase
       .from("certifications")
-      .update({ name: item.name, abbr: item.abbr, sort_order: sortOrder, archived_at: null })
+      .update({ name: item.name, abbr: item.abbr, department_id: item.departmentId ?? null, sort_order: sortOrder, archived_at: null })
       .eq("id", item.id);
     if (error) throw error;
   }
@@ -527,6 +560,7 @@ export async function saveCertifications(
         org_id: orgId,
         name: item.name,
         abbr: item.abbr,
+        department_id: item.departmentId ?? null,
         sort_order: sortOrder,
       })));
     if (error) throw error;
@@ -589,7 +623,7 @@ export async function saveOrganizationRoles(
   for (const { item, sortOrder } of toUpdate) {
     const { error } = await supabase
       .from("organization_roles")
-      .update({ name: item.name, abbr: item.abbr, sort_order: sortOrder, archived_at: null })
+      .update({ name: item.name, abbr: item.abbr, department_id: item.departmentId ?? null, sort_order: sortOrder, archived_at: null })
       .eq("id", item.id);
     if (error) throw error;
   }
@@ -600,6 +634,7 @@ export async function saveOrganizationRoles(
         org_id: orgId,
         name: item.name,
         abbr: item.abbr,
+        department_id: item.departmentId ?? null,
         sort_order: sortOrder,
       })));
     if (error) throw error;
@@ -609,38 +644,40 @@ export async function saveOrganizationRoles(
   return fetchOrganizationRoles(orgId);
 }
 
-// ── Departments (for non-schedule org members) ──────────────────────────────
+// ── Departments ───────────────────────────────────────────────────────────────
+// Two types: 'scheduled' (contain focus areas, appear on grid) and
+// 'management' (standalone, for non-schedule staff like HR, Reception).
 
 export async function fetchDepartments(
   orgId: string,
   includeArchived = false,
-): Promise<NamedItem[]> {
+): Promise<Department[]> {
   if (includeArchived) {
     const { data, error } = await supabase
       .from("departments")
-      .select(NAMED_ITEM_COLS)
+      .select(DEPARTMENT_COLS)
       .eq("org_id", orgId)
       .order("sort_order", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map(rowToNamedItem);
+    return (data ?? []).map(rowToDepartment);
   }
   return cacheThrough(CacheKey.departments(orgId), TTL.STABLE, async () => {
     const { data, error } = await supabase
       .from("departments")
-      .select(NAMED_ITEM_COLS)
+      .select(DEPARTMENT_COLS)
       .eq("org_id", orgId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map(rowToNamedItem);
+    return (data ?? []).map(rowToDepartment);
   });
 }
 
 export async function saveDepartments(
   orgId: string,
-  items: NamedItem[],
-  existing: NamedItem[],
-): Promise<NamedItem[]> {
+  items: Department[],
+  existing: Department[],
+): Promise<Department[]> {
   const existingIds = new Set(existing.map((e) => e.id));
   const newIds = new Set(items.filter((i) => i.id).map((i) => i.id));
 
@@ -664,7 +701,7 @@ export async function saveDepartments(
   for (const { item, sortOrder } of toUpdate) {
     const { error } = await supabase
       .from("departments")
-      .update({ name: item.name, abbr: item.abbr || "", sort_order: sortOrder, archived_at: null })
+      .update({ name: item.name, abbr: item.abbr || "", type: item.type, sort_order: sortOrder, archived_at: null, permissions: item.permissions ?? null })
       .eq("id", item.id);
     if (error) throw error;
   }
@@ -675,13 +712,59 @@ export async function saveDepartments(
         org_id: orgId,
         name: item.name,
         abbr: item.abbr || "",
+        type: item.type,
         sort_order: sortOrder,
+        permissions: item.permissions ?? null,
       })));
     if (error) throw error;
   }
 
   await cacheDel(CacheKey.departments(orgId));
   return fetchDepartments(orgId);
+}
+
+/** Update the permission template for a management department. */
+export async function updateDepartmentPermissions(
+  departmentId: number,
+  permissions: import("@/types").AdminPermissions,
+  orgId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("departments")
+    .update({ permissions })
+    .eq("id", departmentId)
+    .eq("org_id", orgId);
+  if (error) throw error;
+  await cacheDel(CacheKey.departments(orgId));
+}
+
+/** Fetch department-based permissions for a user (union of all their management dept permissions). */
+export async function fetchUserDepartmentPermissions(
+  userId: string,
+  orgId: string,
+): Promise<import("@/types").AdminPermissions | null> {
+  const { data: membership } = await supabase
+    .from("organization_memberships")
+    .select("department_ids")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .single();
+
+  const deptIds: number[] = (membership?.department_ids as number[]) ?? [];
+  if (deptIds.length === 0) return null;
+
+  const { data: depts } = await supabase
+    .from("departments")
+    .select("permissions")
+    .in("id", deptIds)
+    .eq("type", "management")
+    .not("permissions", "is", null);
+
+  if (!depts || depts.length === 0) return null;
+
+  // Union: most permissive wins per boolean field
+  const { unionPermissions } = await import("@/hooks/usePermissions");
+  return unionPermissions(depts.map((d: { permissions: unknown }) => d.permissions as import("@/types").AdminPermissions));
 }
 
 // ── Organization Users (for user management panel) ──────────────────────────
@@ -702,6 +785,7 @@ export async function fetchOrganizationUsers(orgId: string): Promise<Organizatio
       adminPermissions: (row.admin_permissions ?? null) as import("@/types").AdminPermissions | null,
       createdAt: row.created_at as string,
       lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+      departmentIds: (row.department_ids as number[]) ?? [],
     }));
   });
 }
@@ -732,7 +816,7 @@ export async function fetchOrgDirectory(orgId: string): Promise<import("@/types"
       seniority: (row.seniority as number | null) ?? null,
       lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
       invitationStatus: (row.invitation_status as 'pending' | 'expired' | null) ?? null,
-      departmentId: (row.department_id as number | null) ?? null,
+      departmentIds: ((row.department_ids as number[]) ?? []),
     }));
   });
 }
@@ -744,7 +828,7 @@ export async function invalidateOrgDirectory(orgId: string): Promise<void> {
 export async function updateAppOnlyUser(
   userId: string,
   orgId: string,
-  data: { firstName?: string; lastName?: string; phone?: string; departmentId?: number | null },
+  data: { firstName?: string; lastName?: string; phone?: string; departmentIds?: number[] },
 ): Promise<void> {
   // Update profile name
   if (data.firstName !== undefined || data.lastName !== undefined) {
@@ -754,11 +838,11 @@ export async function updateAppOnlyUser(
     const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", userId);
     if (error) throw error;
   }
-  // Update membership phone + department
-  if (data.phone !== undefined || data.departmentId !== undefined) {
+  // Update membership phone + departments
+  if (data.phone !== undefined || data.departmentIds !== undefined) {
     const membershipUpdate: Record<string, unknown> = {};
     if (data.phone !== undefined) membershipUpdate.phone = data.phone;
-    if (data.departmentId !== undefined) membershipUpdate.department_id = data.departmentId;
+    if (data.departmentIds !== undefined) membershipUpdate.department_ids = data.departmentIds;
     const { error } = await supabase.from("organization_memberships").update(membershipUpdate).eq("user_id", userId).eq("org_id", orgId);
     if (error) throw error;
   }
@@ -768,13 +852,13 @@ export async function updateAppOnlyUser(
 export async function updatePendingInvitation(
   invitationId: string,
   orgId: string,
-  data: { firstName?: string; lastName?: string; phone?: string; departmentId?: number | null },
+  data: { firstName?: string; lastName?: string; phone?: string; departmentIds?: number[] },
 ): Promise<void> {
   const update: Record<string, unknown> = {};
   if (data.firstName !== undefined) update.first_name = data.firstName;
   if (data.lastName !== undefined) update.last_name = data.lastName;
   if (data.phone !== undefined) update.phone = data.phone;
-  if (data.departmentId !== undefined) update.department_id = data.departmentId;
+  if (data.departmentIds !== undefined) update.department_ids = data.departmentIds;
   const { error } = await supabase.from("invitations").update(update).eq("id", invitationId).eq("org_id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));
@@ -843,9 +927,54 @@ export async function fetchFocusAreas(orgId: string, includeArchived = false): P
   return (data as DbFocusArea[]).map(rowToFocusArea);
 }
 
+/**
+ * Auto-migration: if focus areas exist without a department_id and no scheduled
+ * departments exist yet, create a default scheduled department and assign all
+ * orphaned focus areas to it.
+ * - 1 FA: department takes the FA's name
+ * - 2+ FAs: department is named "Schedule"
+ * Returns true if migration occurred, false if not needed.
+ */
+export async function autoMigrateOrphanedFocusAreas(orgId: string): Promise<boolean> {
+  const [depts, fas] = await Promise.all([
+    fetchDepartments(orgId),
+    fetchFocusAreas(orgId),
+  ]);
+
+  const scheduledDepts = depts.filter(d => d.type === 'scheduled');
+  const orphanedFAs = fas.filter(fa => fa.departmentId === null);
+
+  // Nothing to migrate if there are scheduled depts or no orphaned FAs
+  if (scheduledDepts.length > 0 || orphanedFAs.length === 0) return false;
+
+  // Create a default scheduled department
+  const deptName = orphanedFAs.length === 1 ? orphanedFAs[0].name : "Schedule";
+  const { data: inserted, error: insertErr } = await supabase
+    .from("departments")
+    .insert({ org_id: orgId, name: deptName, abbr: "", type: "scheduled", sort_order: 0 })
+    .select("id")
+    .single();
+  if (insertErr) throw insertErr;
+
+  const newDeptId = inserted.id as number;
+
+  // Assign all orphaned FAs to this department
+  const faIds = orphanedFAs.map(fa => fa.id);
+  const { error: updateErr } = await supabase
+    .from("focus_areas")
+    .update({ department_id: newDeptId })
+    .in("id", faIds);
+  if (updateErr) throw updateErr;
+
+  // Bust caches
+  await cacheDel(CacheKey.departments(orgId), CacheKey.focusAreas(orgId));
+  return true;
+}
+
 export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: number }): Promise<FocusArea> {
   const row = {
     org_id: focusArea.orgId,
+    department_id: focusArea.departmentId ?? null,
     name: focusArea.name,
     color_bg: focusArea.colorBg,
     color_text: focusArea.colorText,
@@ -1257,6 +1386,15 @@ export async function updateEmployee(emp: Employee, orgId: string): Promise<void
   if (error) throw error;
   await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(emp.id), CacheKey.orgDirectory(orgId));
   void logAudit("employee.updated", "employee", emp.id, { firstName: emp.firstName, lastName: emp.lastName }, orgId);
+}
+
+export async function updateEmployeeDepartments(employeeId: string, departmentIds: number[], orgId: string): Promise<void> {
+  const { error } = await supabase
+    .from("employees")
+    .update({ department_ids: departmentIds })
+    .eq("id", employeeId);
+  if (error) throw error;
+  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(employeeId), CacheKey.orgDirectory(orgId));
 }
 
 export async function deleteEmployee(empId: string, orgId?: string): Promise<void> {
@@ -2275,6 +2413,8 @@ export async function fetchNotifications(options?: {
   return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     type: row.type as import("@/types").NotificationType,
+    channel: (row.channel as 'in_app' | 'email') ?? 'in_app',
+    category: (row.category as string | null) ?? null,
     title: row.title as string,
     message: row.message as string,
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
@@ -2321,7 +2461,7 @@ export async function sendInvitation(
   role: AssignableOrganizationRole,
   orgId: string,
   employeeId?: string,
-  opts?: { firstName?: string; lastName?: string; phone?: string; departmentId?: number },
+  opts?: { firstName?: string; lastName?: string; phone?: string; departmentIds?: number[] },
 ): Promise<{ invitationId: string; token: string; expiresAt: string }> {
   const { data, error } = await supabase.rpc("send_invitation", {
     p_email: email,
@@ -2331,7 +2471,7 @@ export async function sendInvitation(
     p_first_name: opts?.firstName ?? null,
     p_last_name: opts?.lastName ?? null,
     p_phone: opts?.phone ?? null,
-    p_department_id: opts?.departmentId ?? null,
+    p_department_ids: opts?.departmentIds ?? [],
   });
   if (error) throw error;
   await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));
@@ -2789,7 +2929,12 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
       focus_area_label: data.focusAreaLabel || null,
       certification_label: data.certificationLabel || null,
       role_label: data.roleLabel || null,
+      department_label: data.departmentLabel || null,
+      shift_display_mode: data.shiftDisplayMode || 'code',
       timezone: data.timezone || null,
+      enforce_conflict_prevention: data.enforceConflictPrevention ?? false,
+      data_retention_days: data.dataRetentionDays ?? 365,
+      feature_overrides: data.featureOverrides ?? {},
     })
     .select()
     .single();
@@ -3504,4 +3649,33 @@ export async function fetchCalloffOpenShifts(
       needed: 1,
     };
   });
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+
+export async function fetchOnboardingStatus(
+  userId: string,
+  orgId: string,
+): Promise<{ completed: boolean; completedAt: string | null }> {
+  const { data, error } = await supabase
+    .from("organization_memberships")
+    .select("onboarding_completed_at")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    completed: !!data?.onboarding_completed_at,
+    completedAt: data?.onboarding_completed_at ?? null,
+  };
+}
+
+export async function completeOnboarding(
+  _userId: string,
+  orgId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("complete_onboarding", {
+    p_org_id: orgId,
+  });
+  if (error) throw error;
 }

@@ -54,6 +54,7 @@ export function Section({
 }) {
   return (
     <div
+      className="dg-page-enter"
       style={{
         ...sectionStyle,
         width: "100%",

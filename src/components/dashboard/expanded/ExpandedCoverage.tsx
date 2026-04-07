@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
+import CustomSelect from "@/components/CustomSelect";
 
 const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
@@ -55,16 +56,16 @@ export default function ExpandedCoverage({
             <span style={{ fontWeight: 700 }}>{totalFilled}</span>
             <span style={{ color: "var(--color-text-subtle)" }}>/ {totalRequired} filled</span>
           </div>
-          <select
+          <CustomSelect
             value={filter === "all" ? "all" : String(filter)}
-            onChange={(e) => setFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-            style={{ ...selectStyle, marginLeft: "auto" }}
-          >
-            <option value="all">All sections</option>
-            {focusAreas.map((fa) => (
-              <option key={fa.id} value={fa.id}>{fa.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: "all", label: "All sections" },
+              ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
+            ]}
+            onChange={(val) => setFilter(val === "all" ? "all" : Number(val))}
+            style={{ marginLeft: "auto" }}
+            fontSize="var(--dg-fs-label)"
+          />
         </div>
 
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
@@ -190,16 +191,6 @@ const summaryBadgeStyle = {
   borderRadius: 8,
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
-};
-
-const selectStyle = {
-  fontSize: 12,
-  padding: "5px 10px",
-  borderRadius: 6,
-  border: "1px solid var(--color-border)",
-  background: "var(--color-surface)",
-  color: "var(--color-text-primary)",
-  cursor: "pointer" as const,
 };
 
 const heatmapLabelStyle = {

@@ -4,7 +4,7 @@ import React, { memo, useMemo, useRef, useLayoutEffect, useState, useEffect, use
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { resolveRequirement, computeCoverageStatus } from "@/lib/schedule-logic";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType, ShiftDisplayMode, GridOpenShift } from "@/types";
+import { Employee, ShiftCategory, ShiftCode, FocusArea, Department, IndicatorType, NamedItem, DraftKind, PublishChange, CoverageRequirement, CoverageStatus, AbsenceType, ShiftDisplayMode, GridOpenShift } from "@/types";
 import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, DRAFT_BORDER_COLORS } from "@/lib/colors";
 import DroppableCell from "./DroppableCell";
@@ -61,6 +61,7 @@ interface ScheduleGridProps {
   today: Date;
   highlightEmpIds?: Set<string>;
   focusAreas: FocusArea[];
+  departments: Department[];
   shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
@@ -672,6 +673,7 @@ const SectionBlock = memo(function SectionBlock({
               <div
                 key={emp.id}
                 role="row"
+                className="dg-row-enter"
                 style={{
                   ...rowGrid,
                   background: rowBg,
@@ -1553,6 +1555,7 @@ const SectionBlock = memo(function SectionBlock({
             return (
             <div
               key={row.id}
+              className="dg-row-enter"
               style={{
                 ...rowGrid,
                 borderTop: ci === 0 ? "2px solid var(--color-dark)" : undefined,
@@ -1631,6 +1634,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
   today,
   highlightEmpIds,
   focusAreas,
+  departments,
   shiftCodes,
   shiftCategories,
   indicatorTypes = [],
@@ -1695,14 +1699,46 @@ const ScheduleGrid = memo(function ScheduleGrid({
     };
   }, [hideTooltipFn]);
 
-  const sections = useMemo(() => {
-    const allNames = focusAreas.map((w) => w.name);
-    if (activeFocusArea == null) return allNames;
-    const activeFA = focusAreas.find((fa) => fa.id === activeFocusArea);
-    return activeFA ? allNames.filter((name) => name === activeFA.name) : allNames;
-  }, [focusAreas, activeFocusArea]);
+  const departmentSections = useMemo(() => {
+    // Get scheduled departments, sorted
+    const scheduledDepts = departments
+      .filter(d => d.type === 'scheduled')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
+    // Group focus areas by department
+    const result = scheduledDepts.map(dept => ({
+      department: dept,
+      focusAreas: focusAreas
+        .filter(fa => fa.departmentId === dept.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    }));
+
+    // Handle orphaned focus areas (no department)
+    const orphaned = focusAreas.filter(fa => !fa.departmentId);
+    if (orphaned.length > 0) {
+      result.push({
+        department: { id: -1, orgId: '', name: 'Ungrouped', abbr: '', type: 'scheduled' as const, sortOrder: 999 },
+        focusAreas: orphaned.sort((a, b) => a.sortOrder - b.sortOrder),
+      });
+    }
+
+    // If activeFocusArea is set, filter to only the dept containing that FA
+    if (activeFocusArea != null) {
+      return result.filter(({ focusAreas: fas }) =>
+        fas.some(fa => fa.id === activeFocusArea)
+      );
+    }
+
+    return result;
+  }, [departments, focusAreas, activeFocusArea]);
+
+  // Flat list of all visible FA names (for exclusiveCodeIdsPerSection compatibility)
+  const sections = useMemo(
+    () => departmentSections.flatMap(({ focusAreas: fas }) => fas.map(fa => fa.name)),
+    [departmentSections],
+  );
+
+  const allDates = useMemo(() => spanWeeks === 2 ? [...week1, ...week2] : week1, [spanWeeks, week1, week2]);
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1747,7 +1783,8 @@ const ScheduleGrid = memo(function ScheduleGrid({
     );
   }, [sections, shiftCodes, focusAreaIdByName]);
 
-  const renderedSections = sections.filter(section => {
+  // Helper: check if a focus area (by name) has any employees to show
+  const sectionHasEmployees = useCallback((section: string) => {
     const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
     const sectionId = focusAreaIdByName[section];
     const rawHomeEmps = filteredEmployees.filter((e) => sectionId != null && e.focusAreaIds.includes(sectionId));
@@ -1768,12 +1805,25 @@ const ScheduleGrid = memo(function ScheduleGrid({
           return codeIds.some(id => exclusiveCodeIds.has(id));
         }),
     );
-    return [...homeEmps, ...guestEmps].length > 0;
-  });
+    return homeEmps.length > 0 || guestEmps.length > 0;
+  }, [exclusiveCodeIdsPerSection, focusAreaIdByName, filteredEmployees, allEmployees, isCellInteractive, allDates, shiftCodeIdsForKey, shiftCodes]);
+
+  // Filter department sections to only those with visible FAs
+  const renderedDepartmentSections = useMemo(() =>
+    departmentSections
+      .map(({ department, focusAreas: fas }) => ({
+        department,
+        focusAreas: fas.filter(fa => sectionHasEmployees(fa.name)),
+      }))
+      .filter(({ focusAreas: fas }) => fas.length > 0),
+    [departmentSections, sectionHasEmployees],
+  );
+
+  const hasAnySections = renderedDepartmentSections.length > 0;
 
   return (
     <div ref={containerRef} data-shift-display={shiftDisplayMode} style={{ width: "100%", maxWidth: "100%", position: "relative", "--dg-grid-col-min": shiftDisplayMode === "name" ? "160px" : "72px" } as React.CSSProperties}>
-      {renderedSections.length === 0 ? (
+      {!hasAnySections ? (
         <div
           style={{
             padding: "48px 20px",
@@ -1853,79 +1903,87 @@ const ScheduleGrid = memo(function ScheduleGrid({
               }}
             />
           </div>
-          {renderedSections.map((section) => {
-        const exclusiveCodeIds = exclusiveCodeIdsPerSection[section] ?? new Set<number>();
-        const sectionId = focusAreaIdByName[section];
-        const rawHomeEmps = filteredEmployees.filter((e) =>
-          sectionId != null && e.focusAreaIds.includes(sectionId),
-        );
-        const homeEmps = isCellInteractive
-          ? rawHomeEmps
-          : rawHomeEmps.filter((emp) =>
-              allDates.some((date) => {
-                const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
-                return codeIds.some(id => exclusiveCodeIds.has(id) || (shiftCodes.find(sc => sc.id === id)?.focusAreaId === null));
-              }),
-            );
-        const guestEmps = allEmployees.filter(
-          (e) =>
-            e.focusAreaIds.length > 0 &&
-            (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
-            allDates.some((date) => {
-              const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
-              return codeIds.some(id => exclusiveCodeIds.has(id));
-            }),
-        );
-        const sectionEmps = [...homeEmps, ...guestEmps];
-        return (
-          <SectionBlock
-            key={section}
-            sectionName={section}
-            exclusiveCodeIds={exclusiveCodeIds}
-            employees={sectionEmps}
-            weekDates={allDates}
-            todayKey={todayKey}
-            shiftForKey={shiftForKey}
-            shiftCodeIdsForKey={shiftCodeIdsForKey}
-            getShiftStyle={getShiftStyle}
-            handleCellClick={handleCellClick}
-            colWidth={colWidth}
-            splitAtIndex={splitAtIndex}
-            highlightEmpIds={highlightEmpIds}
-            focusAreas={focusAreas}
-            shiftCodes={shiftCodes}
-            shiftCategories={shiftCategories}
-            indicatorTypes={indicatorTypes}
-            isCellInteractive={isCellInteractive}
-            canDragShifts={canDragShifts ?? isCellInteractive}
-            activeIndicatorIdsForKey={activeIndicatorIdsForKey}
-            showTooltip={showTooltipFn}
-            hideTooltip={hideTooltipFn}
-            getCustomShiftTimes={getCustomShiftTimes}
-            draftKindForKey={draftKindForKey}
-            showDiffOverlay={showDiffOverlay}
-            publishedLabelForKey={publishedLabelForKey}
-            publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
-            hasTimeChangesForKey={hasTimeChangesForKey}
-            publishDiffForKey={publishDiffForKey}
-            recentlyPublishedKeys={recentlyPublishedKeys}
-            certifications={certifications}
-            orgRoles={orgRoles}
-            cellLocks={cellLocks}
-            showAudit={showAudit}
-            createdByNameForKey={createdByNameForKey}
-            onCellHover={onCellHover}
-            onCellContextMenu={onCellContextMenu}
-            coverageRequirements={coverageRequirements}
-            absenceTypeMap={absenceTypeMap}
-            absenceTypeIdForKey={absenceTypeIdForKey}
-            shiftDisplayMode={shiftDisplayMode}
-            resolvePublisherName={resolvePublisherName}
-            openShifts={openShifts?.filter(os => sectionId != null && os.focusAreaId === sectionId)}
-            onClaimOpenShift={onClaimOpenShift}
-          />
-        );
-      })}
+          {/* Flat FA sections — departments provide ordering but don't appear visually */}
+          {renderedDepartmentSections.map(({ department: dept, focusAreas: deptFAs }) => (
+              <div key={dept.id}>
+                {deptFAs.map(fa => {
+                  const sectionName = fa.name;
+                  const sectionId = focusAreaIdByName[fa.name] ?? fa.id;
+                  const exclusiveCodeIds = exclusiveCodeIdsPerSection[fa.name] ?? new Set<number>();
+
+                  const rawHomeEmps = filteredEmployees.filter((e) =>
+                    sectionId != null && e.focusAreaIds.includes(sectionId),
+                  );
+                  const homeEmps = isCellInteractive
+                    ? rawHomeEmps
+                    : rawHomeEmps.filter((emp) =>
+                        allDates.some((date) => {
+                          const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                          return codeIds.some(id => exclusiveCodeIds.has(id) || (shiftCodes.find(sc => sc.id === id)?.focusAreaId === null));
+                        }),
+                      );
+                  const guestEmps = allEmployees.filter(
+                    (e) =>
+                      e.focusAreaIds.length > 0 &&
+                      (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
+                      allDates.some((date) => {
+                        const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+                        return codeIds.some(id => exclusiveCodeIds.has(id));
+                      }),
+                  );
+                  const sectionEmps = [...homeEmps, ...guestEmps];
+
+                  return (
+                    <SectionBlock
+                      key={fa.id}
+                      sectionName={sectionName}
+                      exclusiveCodeIds={exclusiveCodeIds}
+                      employees={sectionEmps}
+                      weekDates={allDates}
+                      todayKey={todayKey}
+                      shiftForKey={shiftForKey}
+                      shiftCodeIdsForKey={shiftCodeIdsForKey}
+                      getShiftStyle={getShiftStyle}
+                      handleCellClick={handleCellClick}
+                      colWidth={colWidth}
+                      splitAtIndex={splitAtIndex}
+                      highlightEmpIds={highlightEmpIds}
+                      focusAreas={focusAreas}
+                      shiftCodes={shiftCodes}
+                      shiftCategories={shiftCategories}
+                      indicatorTypes={indicatorTypes}
+                      isCellInteractive={isCellInteractive}
+                      canDragShifts={canDragShifts ?? isCellInteractive}
+                      activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                      showTooltip={showTooltipFn}
+                      hideTooltip={hideTooltipFn}
+                      getCustomShiftTimes={getCustomShiftTimes}
+                      draftKindForKey={draftKindForKey}
+                      showDiffOverlay={showDiffOverlay}
+                      publishedLabelForKey={publishedLabelForKey}
+                      publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+                      hasTimeChangesForKey={hasTimeChangesForKey}
+                      publishDiffForKey={publishDiffForKey}
+                      recentlyPublishedKeys={recentlyPublishedKeys}
+                      certifications={certifications}
+                      orgRoles={orgRoles}
+                      cellLocks={cellLocks}
+                      showAudit={showAudit}
+                      createdByNameForKey={createdByNameForKey}
+                      onCellHover={onCellHover}
+                      onCellContextMenu={onCellContextMenu}
+                      coverageRequirements={coverageRequirements}
+                      absenceTypeMap={absenceTypeMap}
+                      absenceTypeIdForKey={absenceTypeIdForKey}
+                      shiftDisplayMode={shiftDisplayMode}
+                      resolvePublisherName={resolvePublisherName}
+                      openShifts={openShifts?.filter(os => sectionId != null && os.focusAreaId === sectionId)}
+                      onClaimOpenShift={onClaimOpenShift}
+                    />
+                  );
+                })}
+              </div>
+          ))}
         </>
       )}
     </div>

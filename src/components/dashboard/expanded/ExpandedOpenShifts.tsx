@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import Modal from "@/components/Modal";
+import CustomSelect from "@/components/CustomSelect";
 
 const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; border: string; label: string }> = {
   high: { bg: "var(--color-danger-bg)", color: "var(--color-danger)", border: "var(--color-danger-border)", label: "Urgent" },
@@ -37,27 +38,24 @@ export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpen
         {/* Filters */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <span style={filterLabelStyle}>Filter:</span>
-          <select
+          <CustomSelect
             value={urgencyFilter}
-            onChange={(e) => setUrgencyFilter(e.target.value as typeof urgencyFilter)}
-            style={selectStyle}
-          >
-            {URGENCY_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt === "all" ? "All urgency" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-              </option>
-            ))}
-          </select>
-          <select
+            options={URGENCY_OPTIONS.map((opt) => ({
+              value: opt,
+              label: opt === "all" ? "All urgency" : opt.charAt(0).toUpperCase() + opt.slice(1),
+            }))}
+            onChange={(val) => setUrgencyFilter(val as typeof urgencyFilter)}
+            fontSize="var(--dg-fs-label)"
+          />
+          <CustomSelect
             value={focusAreaFilter}
-            onChange={(e) => setFocusAreaFilter(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="all">All sections</option>
-            {focusAreaNames.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+            options={[
+              { value: "all", label: "All sections" },
+              ...focusAreaNames.map((name) => ({ value: name, label: name })),
+            ]}
+            onChange={setFocusAreaFilter}
+            fontSize="var(--dg-fs-label)"
+          />
           <span style={{ fontSize: 11, color: "var(--color-text-subtle)", marginLeft: "auto" }}>
             {filtered.length} shift{filtered.length !== 1 ? "s" : ""}
           </span>
@@ -123,16 +121,6 @@ const filterLabelStyle = {
   color: "var(--color-text-subtle)",
   textTransform: "uppercase" as const,
   letterSpacing: "0.04em",
-};
-
-const selectStyle = {
-  fontSize: 12,
-  padding: "5px 10px",
-  borderRadius: 6,
-  border: "1px solid var(--color-border)",
-  background: "var(--color-surface)",
-  color: "var(--color-text-primary)",
-  cursor: "pointer" as const,
 };
 
 const itemStyle = {

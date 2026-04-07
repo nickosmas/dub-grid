@@ -13,7 +13,7 @@ export interface EmployeesData {
   benchedEmployees: Employee[];
   terminatedEmployees: Employee[];
   loading: boolean;
-  handleAddEmployee: (dataList: Omit<Employee, "id" | "seniority">[]) => Promise<void>;
+  handleAddEmployee: (dataList: Omit<Employee, "id" | "seniority">[]) => Promise<Employee[] | undefined>;
   handleSaveEmployee: (emp: Employee) => Promise<void>;
   handleDeleteEmployee: (empId: string) => Promise<void>;
   handleBenchEmployee: (empId: string, note?: string) => Promise<void>;
@@ -83,9 +83,11 @@ export function useEmployees(orgId: string | null): EmployeesData {
         setAllLocal((prev) => [...prev, ...added]);
         toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
         invalidateEmployees();
+        return added;
       } catch (err) {
         toast.error("Failed to add employee");
         Sentry.captureException(err);
+        return undefined;
       }
     },
     [orgId, invalidateEmployees],

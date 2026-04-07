@@ -104,7 +104,7 @@ export function SessionList() {
 
   if (sessions.length === 0) {
     return (
-      <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+      <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
         No active sessions
       </div>
     );

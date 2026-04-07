@@ -23,6 +23,9 @@ function DashboardPageContent() {
     shiftCodeMap,
     absenceTypeMap,
     absenceTypes,
+    certifications,
+    orgRoles,
+    departments,
     loading: refLoading,
     loadError,
   } = useOrganizationData();
@@ -69,6 +72,9 @@ function DashboardPageContent() {
           shiftCodeById={shiftCodeById}
           absenceTypeMap={absenceTypeMap}
           absenceTypes={absenceTypes}
+          certifications={certifications}
+          orgRoles={orgRoles}
+          departments={departments}
           employees={employees}
           permissions={perms}
         />

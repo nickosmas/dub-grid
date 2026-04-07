@@ -28,11 +28,14 @@ import * as Sentry from "@/lib/sentry";
  * on Vercel Edge — it contains no env-derived secrets, only public keys.
  * Supports both ES256 (asymmetric) and HS256 (symmetric) Supabase projects.
  */
+let _cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 function getJwks() {
+  if (_cachedJwks) return _cachedJwks;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) return null;
   const jwksUrl = new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
-  return createRemoteJWKSet(jwksUrl);
+  _cachedJwks = createRemoteJWKSet(jwksUrl);
+  return _cachedJwks;
 }
 
 /**
@@ -337,8 +340,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const level = getRoleLevel(effectiveRole);
-
   // ── Organization suspension check ──────────────────────────────────────
   // The JWT hook filters out suspended orgs on token refresh, but a user
   // with a pre-suspension JWT can still access the app until it expires
@@ -398,16 +399,13 @@ export async function middleware(req: NextRequest) {
   }
 
   // Route guards - Requirements 11.2, 11.3
-
-  // People page (formerly Staff): requires admin+ (level >= 2)
-  if ((pathname.startsWith("/people") || pathname.startsWith("/staff")) && level < 2) {
-    return NextResponse.redirect(new URL("/schedule", req.url));
-  }
-
-  // Settings page: requires admin+ (level >= 2); component enforces fine-grained access
-  if (pathname.startsWith("/settings") && level < 2) {
-    return NextResponse.redirect(new URL("/schedule", req.url));
-  }
+  // Note: /people and /settings are accessible to all authenticated org members.
+  // Management department users (org_role = 'user') may have elevated permissions
+  // granted via their department's permission template. Since department permissions
+  // are resolved client-side (not in JWT), the middleware cannot gate on them.
+  // Client-side guards in the page components enforce fine-grained access:
+  //   - People page: canViewStaff (always true) + canManageEmployees for mutations
+  //   - Settings page: each section guarded by its specific permission flag
 
   // Gridmaster-only route — always allow actual gridmasters (even during impersonation,
   // since /gridmaster access auto-ends impersonation above)

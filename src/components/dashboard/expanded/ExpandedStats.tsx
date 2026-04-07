@@ -41,7 +41,6 @@ interface ExpandedStatsProps {
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
   categoryById: Map<number, ShiftCategory>;
-  focusAreaById: Map<number, FocusArea>;
   showOT: boolean;
   hasRequirements: boolean;
   onClose: () => void;
@@ -57,7 +56,6 @@ export default function ExpandedStats({
   shiftCodeById,
   coverageRequirements,
   categoryById,
-  focusAreaById,
   showOT,
   hasRequirements,
   onClose,
@@ -84,7 +82,7 @@ export default function ExpandedStats({
 
       const hours = computeAllEmployeeHours(
         activeEmployees, dateKeys, periodShifts,
-        shiftCodeById, 40, categoryById, focusAreaById,
+        shiftCodeById, 40, categoryById,
       );
       const otCount = computeOTAlerts(hours, activeEmployees, focusAreas).length;
 
@@ -99,7 +97,7 @@ export default function ExpandedStats({
     return rows;
   }, [
     allShifts, currentWeekStart, periodDays, activeEmployees, focusAreas, shiftCodes,
-    shiftCodeById, coverageRequirements, categoryById, focusAreaById,
+    shiftCodeById, coverageRequirements, categoryById,
   ]);
 
   const columns = [

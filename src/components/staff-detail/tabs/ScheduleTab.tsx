@@ -201,7 +201,6 @@ export function ScheduleTab({
                             entry.customStartTime,
                             entry.customEndTime,
                             categoryById,
-                            focusAreaById,
                           );
                           const date = new Date(entry.dateKey + "T00:00:00");
                           const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];

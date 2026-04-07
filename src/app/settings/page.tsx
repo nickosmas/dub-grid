@@ -8,14 +8,20 @@ import { useOrganizationData, usePermissions } from "@/hooks";
 function SettingsPageContent() {
   const {
     canManageOrg,
+    canAccessSettings,
     isSuperAdmin,
     isGridmaster,
     canManageOrgLabels,
+    canViewOrgLabels,
     canManageFocusAreas,
+    canViewFocusAreas,
     canManageShiftCodes,
+    canViewShiftCodes,
     canManageIndicatorTypes,
+    canViewIndicatorTypes,
     canManageOrgSettings,
     canManageCoverageRequirements,
+    canViewCoverageRequirements,
   } = usePermissions();
   const {
     org, focusAreas, shiftCodes, absenceTypes, shiftCategories, indicatorTypes,
@@ -63,16 +69,22 @@ function SettingsPageContent() {
           onOrgRolesChange={setOrgRoles}
           onDepartmentsChange={setDepartments}
           canManageOrg={canManageOrg}
+          canAccessSettings={canAccessSettings}
           isSuperAdmin={isSuperAdmin}
           isGridmaster={isGridmaster}
           canManageOrgLabels={canManageOrgLabels}
+          canViewOrgLabels={canViewOrgLabels}
           canManageFocusAreas={canManageFocusAreas}
+          canViewFocusAreas={canViewFocusAreas}
           canManageShiftCodes={canManageShiftCodes}
+          canViewShiftCodes={canViewShiftCodes}
           canManageIndicatorTypes={canManageIndicatorTypes}
+          canViewIndicatorTypes={canViewIndicatorTypes}
           canManageOrgSettings={canManageOrgSettings}
           coverageRequirements={coverageRequirements}
           onCoverageRequirementsChange={setCoverageRequirements}
           canManageCoverageRequirements={canManageCoverageRequirements}
+          canViewCoverageRequirements={canViewCoverageRequirements}
           absenceTypes={absenceTypes}
           onAbsenceTypesChange={handleAbsenceTypesChange}
         />

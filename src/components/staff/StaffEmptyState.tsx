@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import type { EmployeeTab } from "./useStaffFilters";
 
 interface StaffEmptyStateProps {
@@ -15,8 +16,8 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       ? "No active employees"
       : activeTab === "benched"
         ? "No benched employees"
-        : activeTab === "app-only"
-          ? "No app-only users"
+        : activeTab === "departments"
+          ? "No department members"
           : "No terminated employees";
 
   const description = hasFilters
@@ -25,37 +26,13 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       ? "Get started by adding your first staff member."
       : activeTab === "benched"
         ? "Employees you bench will appear here."
-        : activeTab === "app-only"
-          ? "Invite people who need app access but don\u2019t appear on the schedule."
+        : activeTab === "departments"
+          ? "People assigned to a department will appear here."
           : "Terminated employees will appear here.";
 
   return (
-    <div
-      style={{
-        padding: "64px 24px",
-        textAlign: "center",
-        background: "var(--color-surface)",
-        borderRadius: 14,
-        border: "1px solid var(--color-border)",
-        color: "var(--color-text-muted)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 16,
-      }}
-    >
-      <div
-        style={{
-          color: "var(--color-text-faint)",
-          background: "var(--color-bg)",
-          padding: 20,
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "var(--shadow-raised)",
-        }}
-      >
+    <EmptyState
+      icon={
         <svg
           width="32"
           height="32"
@@ -71,18 +48,14 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
           <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-          {title}
-        </div>
-        <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>{description}</p>
-      </div>
-      {hasFilters && (
+      }
+      title={title}
+      description={description}
+      action={hasFilters ? (
         <button onClick={onClearFilters} className="dg-btn dg-btn-secondary" style={{ marginTop: 8 }}>
           Clear filters
         </button>
-      )}
-    </div>
+      ) : undefined}
+    />
   );
 }

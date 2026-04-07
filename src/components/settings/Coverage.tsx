@@ -5,6 +5,7 @@ import { CoverageRequirement, FocusArea, ShiftCategory, ShiftCode, ShiftDisplayM
 import { saveCoverageRequirements } from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Coverage Requirements Settings ────────────────────────────────────────────
 
@@ -225,18 +226,15 @@ export default function CoverageRequirementsSettings({
 
   if (activeFocusAreas.length === 0 || activeCategories.length === 0) {
     return (
-      <div style={{
-        border: "1px dashed var(--color-border)",
-        borderRadius: 12,
-        padding: "40px 20px",
-        textAlign: "center",
-        color: "var(--color-text-muted)",
-        fontSize: "var(--dg-fs-label)",
-      }}>
-        {activeFocusAreas.length === 0
+      <EmptyState
+        compact
+        title={activeFocusAreas.length === 0
+          ? "No focus areas yet"
+          : "No shift categories yet"}
+        description={activeFocusAreas.length === 0
           ? "Create focus areas first to configure coverage requirements."
           : "Create shift categories first to configure coverage requirements."}
-      </div>
+      />
     );
   }
 

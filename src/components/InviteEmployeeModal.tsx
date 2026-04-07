@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
-import { Employee, OrganizationUser, NamedItem } from "@/types";
-import type { AssignableOrganizationRole } from "@/types";
+import { Employee, OrganizationUser, NamedItem, Department } from "@/types";
+import type { AssignableOrganizationRole, AdminPermissions } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
 import { toast } from "sonner";
 import { z } from "zod";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { unionPermissions } from "@/hooks/usePermissions";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -23,8 +24,8 @@ interface InviteEmployeeModalProps {
   orgName: string;
   onClose: () => void;
   onInvited: () => void;
-  /** Available departments (for app-only mode). */
-  departments?: NamedItem[];
+  /** Available departments (for app-only mode). Accepts NamedItem[] or Department[]. */
+  departments?: (NamedItem | Department)[];
 }
 
 type ModalMode = "loading" | "link" | "invite";
@@ -42,11 +43,40 @@ export default function InviteEmployeeModal({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [departmentIds, setDepartmentIds] = useState<number[]>([]);
   const [role, setRole] = useState<AssignableOrganizationRole>("user");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  // Management departments only (filtered from all departments — only Department has .type)
+  const managementDepts = useMemo(
+    () => departments.filter((d): d is Department => "type" in d && d.type === "management"),
+    [departments],
+  );
+
+  // Permission preview: compute union of selected departments' permissions
+  const permissionPreview = useMemo(() => {
+    const selectedDepts = managementDepts.filter((d) => departmentIds.includes(d.id));
+    const permsWithValues = selectedDepts.filter((d) => d.permissions);
+    if (permsWithValues.length === 0) return [];
+    const union = unionPermissions(permsWithValues.map((d) => d.permissions as AdminPermissions));
+    const labels: string[] = [];
+    if (union.canEditShifts) labels.push("Edit Shifts");
+    if (union.canPublishSchedule) labels.push("Publish Schedule");
+    if (union.canApplyRecurringSchedule) labels.push("Apply Recurring Schedule");
+    if (union.canApproveShiftRequests) labels.push("Approve Shift Requests");
+    if (union.canEditNotes) labels.push("Edit Notes");
+    if (union.canManageRecurringShifts) labels.push("Manage Recurring Shifts");
+    if (union.canManageShiftSeries) labels.push("Manage Shift Series");
+    if (union.canManageEmployees) labels.push("Manage Employees");
+    if (union.canManageFocusAreas) labels.push("Manage Focus Areas");
+    if (union.canManageShiftCodes) labels.push("Manage Shift Codes");
+    if (union.canManageIndicatorTypes) labels.push("Manage Indicators");
+    if (union.canManageOrgLabels) labels.push("Manage Custom Labels");
+    if (union.canManageCoverageRequirements) labels.push("Manage Coverage");
+    return labels;
+  }, [managementDepts, departmentIds]);
 
   // Existing user detection
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
@@ -110,7 +140,7 @@ export default function InviteEmployeeModal({
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
-        departmentId: departmentId ?? undefined,
+        departmentIds: departmentIds.length > 0 ? departmentIds : undefined,
       } : undefined);
 
       // Send the invitation email
@@ -272,29 +302,55 @@ export default function InviteEmployeeModal({
             </div>
           )}
 
-          {/* Department + Role row */}
-          <div style={{ display: "grid", gridTemplateColumns: isAppOnlyInvite && departments.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
-            {isAppOnlyInvite && departments.length > 0 && (
-              <div>
-                <label style={labelStyle}>Department</label>
-                <CustomSelect
-                  value={departmentId?.toString() ?? ""}
-                  options={[
-                    { value: "", label: "None" },
-                    ...departments.map((d) => ({ value: d.id.toString(), label: d.name })),
-                  ]}
-                  onChange={(v) => setDepartmentId(v ? Number(v) : null)}
-                />
-              </div>
-            )}
+          {/* Departments (multi-select for app-only invites) */}
+          {isAppOnlyInvite && managementDepts.length > 0 && (
             <div>
-              <label style={labelStyle}>Role</label>
-              <CustomSelect
-                value={role}
-                options={ROLE_OPTIONS}
-                onChange={(v) => setRole(v as AssignableOrganizationRole)}
-              />
+              <label style={labelStyle}>Departments</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {managementDepts.map((d) => {
+                  const selected = departmentIds.includes(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDepartmentIds((prev) =>
+                        selected ? prev.filter((id) => id !== d.id) : [...prev, d.id],
+                      )}
+                      style={{
+                        padding: "4px 12px",
+                        fontSize: "var(--dg-fs-label)",
+                        borderRadius: 6,
+                        border: selected ? "1px solid var(--color-brand)" : "1px solid var(--color-border-light)",
+                        background: selected ? "var(--color-brand-light, #E0E7FF)" : "var(--color-surface)",
+                        color: selected ? "var(--color-brand, #4338CA)" : "var(--color-text-secondary)",
+                        fontWeight: selected ? 600 : 400,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {d.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          {/* Permission preview for selected departments */}
+          {isAppOnlyInvite && permissionPreview.length > 0 && (
+            <div style={{ padding: "8px 12px", borderRadius: 8, background: "var(--color-surface-subtle, #F9FAFB)", border: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-caption)" }}>
+              <span style={{ fontWeight: 600, color: "var(--color-text-subtle)" }}>This person will be able to: </span>
+              <span style={{ color: "var(--color-text-secondary)" }}>{permissionPreview.join(", ")}</span>
+            </div>
+          )}
+
+          {/* Role */}
+          <div style={{ maxWidth: 200 }}>
+            <label style={labelStyle}>Role</label>
+            <CustomSelect
+              value={role}
+              options={ROLE_OPTIONS}
+              onChange={(v) => setRole(v as AssignableOrganizationRole)}
+            />
           </div>
 
           {/* Error */}

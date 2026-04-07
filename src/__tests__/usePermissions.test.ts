@@ -37,7 +37,11 @@ import {
   clearPermsCache,
   usePermissions,
   ROLE_LEVEL,
+  unionPermissions,
+  applyViewImplications,
+  READ_ONLY_PERMS,
 } from "@/hooks/usePermissions";
+import { ALL_FALSE_PERMS } from "./factories";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -355,5 +359,256 @@ describe("usePermissions hook", () => {
     expect(result.current.role).toBe("user");
     expect(result.current.canEditShifts).toBe(false);
     expect(result.current.canViewSchedule).toBe(true);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part E: unionPermissions
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("unionPermissions", () => {
+  it("returns READ_ONLY_PERMS baseline for empty input", () => {
+    const result = unionPermissions([]);
+    expect(result).toEqual({ ...READ_ONLY_PERMS, canManageOrgSettings: false });
+  });
+
+  it("returns the single permission set when given one input", () => {
+    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canManageEmployees: true };
+    const result = unionPermissions([perms]);
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canManageEmployees).toBe(true);
+    expect(result.canPublishSchedule).toBe(false);
+  });
+
+  it("unions multiple permission sets (most permissive wins)", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
+    const deptB = { ...ALL_FALSE_PERMS, canManageEmployees: true, canEditNotes: true };
+    const result = unionPermissions([deptA, deptB]);
+
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canManageEmployees).toBe(true);
+    expect(result.canEditNotes).toBe(true);
+    expect(result.canPublishSchedule).toBe(false);
+  });
+
+  it("always blocks canManageOrgSettings regardless of input", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
+    const result = unionPermissions([perms]);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+
+  it("preserves canViewSchedule and canViewStaff from READ_ONLY baseline", () => {
+    const result = unionPermissions([ALL_FALSE_PERMS]);
+    expect(result.canViewSchedule).toBe(true);
+    expect(result.canViewStaff).toBe(true);
+  });
+
+  it("handles three departments with disjoint permissions", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canEditShifts: true };
+    const deptB = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
+    const deptC = { ...ALL_FALSE_PERMS, canApproveShiftRequests: true };
+    const result = unionPermissions([deptA, deptB, deptC]);
+
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canManageFocusAreas).toBe(true);
+    expect(result.canApproveShiftRequests).toBe(true);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part F: applyViewImplications
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("applyViewImplications", () => {
+  it("canManageEmployees implies canViewEmployeeDetails", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageEmployees: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewEmployeeDetails).toBe(true);
+    expect(result.canManageEmployees).toBe(true);
+  });
+
+  it("canManageFocusAreas implies canViewFocusAreas", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewFocusAreas).toBe(true);
+  });
+
+  it("canManageShiftCodes implies canViewShiftCodes", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageShiftCodes: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewShiftCodes).toBe(true);
+  });
+
+  it("canManageIndicatorTypes implies canViewIndicatorTypes", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageIndicatorTypes: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewIndicatorTypes).toBe(true);
+  });
+
+  it("canManageCoverageRequirements implies canViewCoverageRequirements", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageCoverageRequirements: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewCoverageRequirements).toBe(true);
+  });
+
+  it("canManageRecurringShifts implies canViewRecurringShifts", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageRecurringShifts: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewRecurringShifts).toBe(true);
+  });
+
+  it("canManageOrgLabels implies canViewOrgLabels", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgLabels: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewOrgLabels).toBe(true);
+  });
+
+  it("does not set canView when canManage is false", () => {
+    const result = applyViewImplications(ALL_FALSE_PERMS);
+    expect(result.canViewEmployeeDetails).toBe(false);
+    expect(result.canViewFocusAreas).toBe(false);
+    expect(result.canViewShiftCodes).toBe(false);
+    expect(result.canViewIndicatorTypes).toBe(false);
+    expect(result.canViewCoverageRequirements).toBe(false);
+    expect(result.canViewRecurringShifts).toBe(false);
+    expect(result.canViewOrgLabels).toBe(false);
+    expect(result.canViewDashboardAnalytics).toBe(false);
+  });
+
+  it("preserves explicit canView when canManage is false (view-only mode)", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true, canManageFocusAreas: false };
+    const result = applyViewImplications(perms);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canManageFocusAreas).toBe(false);
+  });
+
+  it("sets canViewDashboardAnalytics when any edit permission is true", () => {
+    const perms1 = { ...ALL_FALSE_PERMS, canEditShifts: true };
+    expect(applyViewImplications(perms1).canViewDashboardAnalytics).toBe(true);
+
+    const perms2 = { ...ALL_FALSE_PERMS, canManageEmployees: true };
+    expect(applyViewImplications(perms2).canViewDashboardAnalytics).toBe(true);
+
+    const perms3 = { ...ALL_FALSE_PERMS, canPublishSchedule: true };
+    expect(applyViewImplications(perms3).canViewDashboardAnalytics).toBe(true);
+
+    const perms4 = { ...ALL_FALSE_PERMS, canApproveShiftRequests: true };
+    expect(applyViewImplications(perms4).canViewDashboardAnalytics).toBe(true);
+  });
+
+  it("backward compat: admin with old-style permissions gets view implied", () => {
+    // Simulates an admin whose JSONB has manage perms but no view keys
+    const oldStylePerms = {
+      ...ALL_FALSE_PERMS,
+      canManageEmployees: true,
+      canManageFocusAreas: true,
+      canManageShiftCodes: true,
+      // canViewEmployeeDetails, canViewFocusAreas, canViewShiftCodes are false (not in JSONB)
+    };
+    const result = applyViewImplications(oldStylePerms);
+    expect(result.canViewEmployeeDetails).toBe(true);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canViewShiftCodes).toBe(true);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part G: canAccessSettings
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("canAccessSettings", () => {
+  it("is true for super_admin", async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: "tok" } },
+      error: null,
+    });
+    mockDecodeJwt.mockReturnValue({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+      org_slug: "acme",
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.canAccessSettings).toBe(true);
+  });
+
+  it("is true for admin with view-only permissions", async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: "tok", user: { id: "user-1" } } },
+      error: null,
+    });
+    mockDecodeJwt.mockReturnValue({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "acme",
+    });
+    mockSupabaseFrom.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            single: () => ({
+              data: {
+                org_role: "admin",
+                admin_permissions: {
+                  ...ALL_FALSE_PERMS,
+                  canViewFocusAreas: true,
+                },
+              },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.canAccessSettings).toBe(true);
+    expect(result.current.canManageOrg).toBe(false);
+  });
+
+  it("is false for user with no view or manage permissions", async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: "tok" } },
+      error: null,
+    });
+    mockDecodeJwt.mockReturnValue({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+      org_slug: "acme",
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.canAccessSettings).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part H: unionPermissions with view permissions
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("unionPermissions with view permissions", () => {
+  it("unions canView permissions from multiple departments", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const deptB = { ...ALL_FALSE_PERMS, canViewShiftCodes: true };
+    const result = unionPermissions([deptA, deptB]);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canViewShiftCodes).toBe(true);
+    expect(result.canManageFocusAreas).toBe(false);
+    expect(result.canManageShiftCodes).toBe(false);
+  });
+
+  it("preserves view permissions alongside manage permissions", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const deptB = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
+    const result = unionPermissions([deptA, deptB]);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canManageFocusAreas).toBe(true);
   });
 });

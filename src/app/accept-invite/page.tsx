@@ -364,7 +364,7 @@ function SuccessState({
       <h1 style={headingStyle}>You&apos;re All Set</h1>
       <p style={subtextStyle}>
         Your account has been created and invitation accepted.
-        For security, please sign in with the password you just created.
+        Sign in to get started with your onboarding.
         Redirecting{countdown > 0 ? ` in ${countdown}...` : "..."}
       </p>
       <button

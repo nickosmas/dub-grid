@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements } from "@/lib/db";
+import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements, autoMigrateOrphanedFocusAreas } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
@@ -16,6 +16,7 @@ import type {
   ShiftCategory,
   IndicatorType,
   NamedItem,
+  Department,
   CoverageRequirement,
 } from "@/types";
 
@@ -44,7 +45,7 @@ export interface OrganizationData {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  departments: NamedItem[];
+  departments: Department[];
   shiftCodeMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
   loading: boolean;
@@ -58,7 +59,7 @@ export interface OrganizationData {
   setIndicatorTypes: (types: IndicatorType[]) => void;
   handleCertificationsChange: (items: NamedItem[]) => Promise<void>;
   setOrgRoles: (items: NamedItem[]) => void;
-  setDepartments: (items: NamedItem[]) => void;
+  setDepartments: (items: Department[]) => void;
   coverageRequirements: CoverageRequirement[];
   setCoverageRequirements: (reqs: CoverageRequirement[]) => void;
 }
@@ -247,6 +248,27 @@ export function useOrganizationData(): OrganizationData {
     [allAbsenceTypes],
   );
 
+  // Auto-migrate orphaned focus areas → create default scheduled department
+  const migrationRanRef = useRef(false);
+  const focusAreasData = focusAreasQuery.data;
+  const departmentsData = departmentsQuery.data;
+  const refetchFocusAreas = focusAreasQuery.refetch;
+  const refetchDepartments = departmentsQuery.refetch;
+  useEffect(() => {
+    if (!effectiveOrgId || migrationRanRef.current) return;
+    if (!focusAreasData || !departmentsData) return;
+    const orphaned = focusAreasData.filter(fa => fa.departmentId === null);
+    const hasScheduledDepts = departmentsData.some(d => d.type === 'scheduled');
+    if (orphaned.length === 0 || hasScheduledDepts) return;
+    migrationRanRef.current = true;
+    autoMigrateOrphanedFocusAreas(effectiveOrgId).then((migrated) => {
+      if (migrated) {
+        void refetchFocusAreas();
+        void refetchDepartments();
+      }
+    }).catch(() => { /* silent — non-critical */ });
+  }, [effectiveOrgId, focusAreasData, departmentsData, refetchFocusAreas, refetchDepartments]);
+
   const allShiftCodesRef = useRef<ShiftCode[]>(allShiftCodes);
   useEffect(() => { allShiftCodesRef.current = allShiftCodes; }, [allShiftCodes]);
 
@@ -278,7 +300,8 @@ export function useOrganizationData(): OrganizationData {
     indicatorTypesQuery.isLoading ||
     certificationsQuery.isLoading ||
     orgRolesQuery.isLoading ||
-    coverageReqsQuery.isLoading;
+    coverageReqsQuery.isLoading ||
+    departmentsQuery.isLoading;
 
   const loading = ctx.isGridmaster
     ? !ctx.resolved
@@ -382,7 +405,7 @@ export function useOrganizationData(): OrganizationData {
     }
   }, [queryClient, effectiveOrgId]);
 
-  const setDepartments = useCallback((items: NamedItem[]) => {
+  const setDepartments = useCallback((items: Department[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.departments(effectiveOrgId), items);
     }

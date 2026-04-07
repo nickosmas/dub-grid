@@ -13,6 +13,7 @@ const mockPermissions = {
   isGridmaster: false,
   isSuperAdmin: false,
   canManageOrg: true,
+  canAccessSettings: true,
   canEditShifts: true,
   canEditNotes: true,
   canViewStaff: true,
@@ -71,6 +72,7 @@ beforeEach(() => {
   mockPermissions.canEditShifts = true;
   mockPermissions.canViewStaff = true;
   mockPermissions.canManageOrg = true;
+  mockPermissions.canAccessSettings = true;
 });
 
 describe("Header rendering", () => {
@@ -151,6 +153,7 @@ describe("Header permission-based tab visibility", () => {
 
   it("hides Settings tab when user has no org management perms", () => {
     mockPermissions.canManageOrg = false;
+    mockPermissions.canAccessSettings = false;
     mockPermissions.isSuperAdmin = false;
     mockPermissions.isGridmaster = false;
     render(<Header />);
@@ -159,6 +162,7 @@ describe("Header permission-based tab visibility", () => {
 
   it("shows Settings tab for super admins", () => {
     mockPermissions.canManageOrg = false;
+    mockPermissions.canAccessSettings = false;
     mockPermissions.isSuperAdmin = true;
     render(<Header />);
     expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();

@@ -22,6 +22,8 @@ interface StaffDetailPanelProps {
   roleLabel: string;
   focusAreaLabel: string;
   certificationLabel: string;
+  departments?: NamedItem[];
+  departmentLabel?: string;
   canManageEmployees: boolean;
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
@@ -44,6 +46,8 @@ export function StaffDetailPanel({
   roleLabel,
   focusAreaLabel,
   certificationLabel,
+  departments,
+  departmentLabel,
   canManageEmployees,
   orgId,
   pendingInviteByEmployeeId,
@@ -208,6 +212,8 @@ export function StaffDetailPanel({
             roleLabel={roleLabel}
             focusAreaLabel={focusAreaLabel}
             certificationLabel={certificationLabel}
+            departments={departments}
+            departmentLabel={departmentLabel}
             onSave={onSave}
             onDelete={onDelete}
             onBench={(empId, note) => onBench(empId, note)}

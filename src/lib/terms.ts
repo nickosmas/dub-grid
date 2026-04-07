@@ -24,14 +24,17 @@ export async function hasAcceptedCurrentTerms(userId: string): Promise<boolean> 
  * Record a user's acceptance of the current terms version.
  */
 export async function acceptTerms(userId: string): Promise<void> {
-  // Insert immutable acceptance record
+  // Insert immutable acceptance record (ignore duplicate — user may have
+  // already accepted this version on a different org/session)
   const { error: insertError } = await supabase
     .from("terms_acceptances")
     .insert({
       user_id: userId,
       terms_version: CURRENT_TERMS_VERSION,
     });
-  if (insertError) throw insertError;
+  if (insertError && !insertError.message?.includes("duplicate")) {
+    throw insertError;
+  }
 
   // Update profile with latest acceptance
   const { error: updateError } = await supabase

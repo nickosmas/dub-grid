@@ -1207,7 +1207,7 @@ CREATE OR REPLACE FUNCTION public.send_invitation(
   p_first_name     TEXT DEFAULT NULL,
   p_last_name      TEXT DEFAULT NULL,
   p_phone          TEXT DEFAULT NULL,
-  p_department_id  BIGINT DEFAULT NULL
+  p_department_ids BIGINT[] DEFAULT '{}'
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -1270,8 +1270,8 @@ BEGIN
     RAISE EXCEPTION 'An active invitation already exists for this email';
   END IF;
 
-  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id, first_name, last_name, phone, department_id)
-    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id, p_first_name, p_last_name, p_phone, p_department_id)
+  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id, first_name, last_name, phone, department_ids)
+    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id, p_first_name, p_last_name, p_phone, p_department_ids)
   RETURNING * INTO v_invite;
 
   RETURN jsonb_build_object(
@@ -1282,7 +1282,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID, TEXT, TEXT, TEXT, BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID, TEXT, TEXT, TEXT, BIGINT[]) TO authenticated;
 
 
 -- ── accept_invitation ─────────────────────────────────────────────────────────
@@ -1353,11 +1353,11 @@ BEGIN
   -- Bypass guard_org_role_change trigger — this is an authorised role path.
   PERFORM set_config('app.allow_role_change', 'true', true);
 
-  INSERT INTO public.organization_memberships (user_id, org_id, org_role, department_id, phone)
-  VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign, v_invite.department_id, v_invite.phone)
+  INSERT INTO public.organization_memberships (user_id, org_id, org_role, department_ids, phone)
+  VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign, v_invite.department_ids, v_invite.phone)
   ON CONFLICT (user_id, org_id) DO UPDATE
     SET org_role = EXCLUDED.org_role,
-        department_id = COALESCE(EXCLUDED.department_id, organization_memberships.department_id);
+        department_ids = CASE WHEN EXCLUDED.department_ids != '{}' THEN EXCLUDED.department_ids ELSE organization_memberships.department_ids END;
 
   UPDATE public.profiles
   SET org_id = v_invite.org_id, updated_at = NOW()
@@ -1493,9 +1493,15 @@ BEGIN
     RAISE EXCEPTION 'User is already linked to another employee in this organization';
   END IF;
 
-  -- Link them
+  -- Link them + carry over departments from org membership if employee has none
   UPDATE public.employees
-  SET user_id = p_user_id, updated_at = NOW()
+  SET user_id = p_user_id,
+      department_ids = CASE WHEN department_ids = '{}' THEN COALESCE((
+        SELECT cm.department_ids FROM public.organization_memberships cm
+        WHERE cm.user_id = p_user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
+        LIMIT 1
+      ), '{}') ELSE department_ids END,
+      updated_at = NOW()
   WHERE id = p_employee_id AND org_id = p_org_id;
 
   RETURN jsonb_build_object('status', 'linked', 'employee_id', p_employee_id, 'user_id', p_user_id);
@@ -1733,6 +1739,8 @@ CREATE OR REPLACE FUNCTION public.get_notifications(
 RETURNS TABLE (
   id         UUID,
   type       TEXT,
+  channel    TEXT,
+  category   TEXT,
   title      TEXT,
   message    TEXT,
   metadata   JSONB,
@@ -1744,7 +1752,7 @@ SET search_path = 'public'
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT n.id, n.type, n.title, n.message, n.metadata, n.read_at, n.created_at
+  SELECT n.id, n.type, n.channel, n.category, n.title, n.message, n.metadata, n.read_at, n.created_at
   FROM notifications n
   WHERE n.user_id = auth.uid()
     AND (n.org_id = public.caller_org_id() OR n.org_id IS NULL)
@@ -1868,7 +1876,8 @@ RETURNS TABLE (
   org_name        TEXT,
   org_slug        TEXT,
   created_at      TIMESTAMPTZ,
-  last_sign_in_at TIMESTAMPTZ
+  last_sign_in_at TIMESTAMPTZ,
+  deactivated_at  TIMESTAMPTZ
 )
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -1879,7 +1888,7 @@ BEGIN
   RETURN QUERY
   SELECT u.id, u.email::TEXT, p.platform_role,
     COALESCE(cm.org_role, 'user'::public.org_role), p.org_id,
-    o.name, o.slug, p.created_at, u.last_sign_in_at
+    o.name, o.slug, p.created_at, u.last_sign_in_at, p.deactivated_at
   FROM auth.users u
   LEFT JOIN public.profiles p ON u.id = p.id
   LEFT JOIN public.organization_memberships cm ON cm.user_id = p.id AND cm.org_id = p.org_id
@@ -1899,7 +1908,8 @@ RETURNS TABLE (
   org_role          public.org_role,
   admin_permissions JSONB,
   created_at        TIMESTAMPTZ,
-  last_sign_in_at   TIMESTAMPTZ
+  last_sign_in_at   TIMESTAMPTZ,
+  department_ids    BIGINT[]
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
@@ -1918,7 +1928,7 @@ BEGIN
   RETURN QUERY
   SELECT p.id, u.email::TEXT, p.first_name, p.last_name, p.platform_role,
     cm.org_role, cm.admin_permissions, p.created_at,
-    u.last_sign_in_at
+    u.last_sign_in_at, cm.department_ids
   FROM public.organization_memberships cm
   JOIN public.profiles p ON p.id = cm.user_id
   JOIN auth.users u ON u.id = cm.user_id
@@ -3646,7 +3656,7 @@ RETURNS TABLE (
   seniority         INTEGER,
   last_sign_in_at   TIMESTAMPTZ,
   invitation_status TEXT,
-  department_id     BIGINT
+  department_ids    BIGINT[]
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
@@ -3698,7 +3708,7 @@ BEGIN
       ORDER BY inv.created_at DESC
       LIMIT 1
     )                                       AS invitation_status,
-    cm.department_id
+    CASE WHEN e.department_ids != '{}' THEN e.department_ids ELSE COALESCE(cm.department_ids, '{}') END AS department_ids
   FROM public.employees e
   LEFT JOIN public.organization_memberships cm
     ON cm.user_id = e.user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
@@ -3727,7 +3737,7 @@ BEGIN
     NULL::INTEGER                          AS seniority,
     au2.last_sign_in_at,
     NULL::TEXT                             AS invitation_status,
-    cm2.department_id
+    cm2.department_ids
   FROM public.organization_memberships cm2
   JOIN public.profiles p ON p.id = cm2.user_id
   JOIN auth.users au2 ON au2.id = cm2.user_id
@@ -3760,7 +3770,7 @@ BEGIN
     NULL::INTEGER                          AS seniority,
     NULL::TIMESTAMPTZ                      AS last_sign_in_at,
     CASE WHEN inv3.expires_at < NOW() THEN 'expired' ELSE 'pending' END AS invitation_status,
-    inv3.department_id
+    inv3.department_ids
   FROM public.invitations inv3
   WHERE inv3.org_id = p_org_id
     AND inv3.employee_id IS NULL
@@ -3772,3 +3782,91 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_org_directory(UUID) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- DEPARTMENT HIERARCHY VALIDATION TRIGGERS
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- ── Validate department_ids array values exist in departments table ───────────
+-- Applied to: employees, organization_memberships, invitations
+-- These tables use BIGINT[] arrays (no FK constraints possible), so we validate
+-- via trigger that all referenced department IDs exist and are not archived.
+
+CREATE OR REPLACE FUNCTION public.validate_department_ids()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL AS $$
+BEGIN
+  IF NEW.department_ids != '{}' THEN
+    IF EXISTS (
+      SELECT 1 FROM unnest(NEW.department_ids) AS did
+      WHERE did NOT IN (SELECT id FROM public.departments WHERE archived_at IS NULL)
+    ) THEN
+      RAISE EXCEPTION 'Invalid department_ids: one or more department IDs do not exist or are archived';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_employees_validate_dept_ids
+  BEFORE INSERT OR UPDATE OF department_ids ON public.employees
+  FOR EACH ROW EXECUTE FUNCTION public.validate_department_ids();
+
+CREATE TRIGGER trg_memberships_validate_dept_ids
+  BEFORE INSERT OR UPDATE OF department_ids ON public.organization_memberships
+  FOR EACH ROW EXECUTE FUNCTION public.validate_department_ids();
+
+CREATE TRIGGER trg_invitations_validate_dept_ids
+  BEFORE INSERT OR UPDATE OF department_ids ON public.invitations
+  FOR EACH ROW EXECUTE FUNCTION public.validate_department_ids();
+
+
+-- ── Validate focus_areas.department_id references a scheduled department ──────
+-- Prevents linking a focus area to a management department.
+
+CREATE OR REPLACE FUNCTION public.validate_focus_area_department()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL AS $$
+BEGIN
+  IF NEW.department_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.departments
+      WHERE id = NEW.department_id AND type = 'scheduled'
+    ) THEN
+      RAISE EXCEPTION 'Focus areas can only belong to scheduled departments, not management departments';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_focus_areas_validate_dept_type
+  BEFORE INSERT OR UPDATE OF department_id ON public.focus_areas
+  FOR EACH ROW EXECUTE FUNCTION public.validate_focus_area_department();
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ONBOARDING
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Lets any authenticated user mark their own onboarding as completed.
+-- SECURITY DEFINER so it bypasses RLS (users can't UPDATE memberships directly).
+CREATE OR REPLACE FUNCTION public.complete_onboarding(p_org_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.organization_memberships
+  SET onboarding_completed_at = NOW()
+  WHERE user_id = auth.uid()
+    AND org_id = p_org_id
+    AND onboarding_completed_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No pending onboarding found for this user/org';
+  END IF;
+END;
+$$;

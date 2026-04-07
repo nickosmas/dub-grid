@@ -121,23 +121,18 @@ export function calcTimeDuration(start: string | null | undefined, end: string |
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-/** Calculate net duration after break deduction, resolving via category → focus area hierarchy. */
+/** Calculate net duration after break deduction. */
 export function calcNetDuration(
   start: string | null | undefined,
   end: string | null | undefined,
   breakMinutes: number | null | undefined,
-  focusAreaId: number | null | undefined,
-  focusAreas: Array<{ id: number; breakMinutes?: number | null }>,
 ): string | null {
   if (!start || !end) return null;
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   let diff = (eh * 60 + em) - (sh * 60 + sm);
   if (diff <= 0) diff += 24 * 60;
-  const effectiveBreak = breakMinutes ?? (focusAreaId != null
-    ? focusAreas.find((fa) => fa.id === focusAreaId)?.breakMinutes ?? 0
-    : 0);
-  diff = Math.max(0, diff - effectiveBreak);
+  diff = Math.max(0, diff - (breakMinutes ?? 0));
   const h = Math.floor(diff / 60);
   const m = diff % 60;
   return m ? `${h}h ${m}m` : `${h}h`;
@@ -146,14 +141,8 @@ export function calcNetDuration(
 /** Resolve effective break minutes for display. Returns the break in minutes or 0. */
 export function resolveEffectiveBreak(
   breakMinutes: number | null | undefined,
-  focusAreaId: number | null | undefined,
-  focusAreas: Array<{ id: number; breakMinutes?: number | null }>,
 ): number {
-  if (breakMinutes != null) return breakMinutes;
-  if (focusAreaId != null) {
-    return focusAreas.find((fa) => fa.id === focusAreaId)?.breakMinutes ?? 0;
-  }
-  return 0;
+  return breakMinutes ?? 0;
 }
 
 export function formatRelativeTime(date: Date | string): string {
