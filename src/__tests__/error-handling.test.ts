@@ -97,6 +97,6 @@ describe("handleApiError", () => {
 
   it("handles generic error with 'Something went wrong' toast", async () => {
     await handleApiError(new Error("some unknown error"));
-    expect(mockToastError).toHaveBeenCalledWith("Something went wrong. Please try again.");
+    expect(mockToastError).toHaveBeenCalledWith("Something went wrong. Please try again.", expect.any(Object));
   });
 });

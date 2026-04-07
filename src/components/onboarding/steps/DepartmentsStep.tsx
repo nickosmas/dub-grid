@@ -20,7 +20,7 @@ export default function DepartmentsStep({ onNext, onBack }: DepartmentsStepProps
   return (
     <StepLayout
       title={`${org.departmentLabel || "Departments"} & ${org.focusAreaLabel || "Focus Areas"}`}
-      description={`Create your organizational structure. Scheduled ${(org.departmentLabel || "departments").toLowerCase()} appear on the schedule grid and contain ${(org.focusAreaLabel || "focus areas").toLowerCase()} (e.g., wings, floors). Management ${(org.departmentLabel || "departments").toLowerCase()} are for non-schedule staff like HR or admin.`}
+      description={`Create your organizational structure. Scheduled ${(org.departmentLabel || "departments").toLowerCase()} appear on the schedule grid and contain ${(org.focusAreaLabel || "focus areas").toLowerCase()}. Management ${(org.departmentLabel || "departments").toLowerCase()} are for non-schedule staff like HR or admin.`}
       onNext={onNext}
       onBack={onBack}
       nextDisabled={!hasDepartments}

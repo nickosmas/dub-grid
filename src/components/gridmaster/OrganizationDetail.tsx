@@ -2,7 +2,7 @@
 import CustomSelect from "@/components/CustomSelect";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail } from "@/lib/db";
 import { queueNotification } from "@/lib/notify";
@@ -274,6 +274,8 @@ export default function OrganizationDetail({
 
       {/* Tab bar */}
       <div
+        role="tablist"
+        aria-label="Organization sections"
         style={{
           display: "flex",
           gap: 0,
@@ -284,15 +286,18 @@ export default function OrganizationDetail({
         {TABS.map((t) => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls={`tabpanel-${t.id}`}
             onClick={() => setTab(t.id)}
             style={{
               padding: "10px 18px",
               fontSize: "var(--dg-fs-label)",
               fontWeight: tab === t.id ? 700 : 500,
-              color: tab === t.id ? "var(--color-text-primary)" : "var(--color-text-muted)",
+              color: tab === t.id ? "var(--color-brand)" : "var(--color-text-muted)",
               background: "transparent",
               border: "none",
-              borderBottom: tab === t.id ? "2px solid var(--color-text-primary)" : "2px solid transparent",
+              borderBottom: tab === t.id ? "2px solid var(--color-brand)" : "2px solid transparent",
               marginBottom: -2,
               cursor: "pointer",
               fontFamily: "inherit",
@@ -396,7 +401,7 @@ function OverviewTab({
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
 
-  // Reset edit state when organization changes
+  // Reset edit state when switching to a different organization
   useEffect(() => {
     setEditing(false);
     setEditName(organization.name);
@@ -409,7 +414,7 @@ function OverviewTab({
     setEditShiftDisplayMode(organization.shiftDisplayMode);
     setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
     setEditDataRetentionDays(organization.dataRetentionDays ?? 365);
-  }, [organization.id, organization.name, organization.address, organization.phone, organization.timezone, organization.focusAreaLabel, organization.certificationLabel, organization.roleLabel, organization.shiftDisplayMode, organization.enforceConflictPrevention, organization.dataRetentionDays]);
+  }, [organization.id]); // eslint-disable-line react-hooks/exhaustive-deps -- only reset when org identity changes, not individual fields
 
   async function handleSave() {
     setSaving(true);
@@ -483,7 +488,19 @@ function OverviewTab({
         <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Organization Details</span>
           {!editing && (
-            <button className="dg-btn dg-btn-ghost" style={{ fontSize: "var(--dg-fs-caption)" }} onClick={() => setEditing(true)}>
+            <button className="dg-btn dg-btn-ghost" style={{ fontSize: "var(--dg-fs-caption)" }} onClick={() => {
+                setEditName(organization.name);
+                setEditAddress(organization.address);
+                setEditPhone(organization.phone);
+                setEditTimezone(organization.timezone ?? "");
+                setEditFocusAreaLabel(organization.focusAreaLabel);
+                setEditCertLabel(organization.certificationLabel);
+                setEditRoleLabel(organization.roleLabel);
+                setEditShiftDisplayMode(organization.shiftDisplayMode);
+                setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
+                setEditDataRetentionDays(organization.dataRetentionDays ?? 365);
+                setEditing(true);
+              }}>
               Edit
             </button>
           )}
@@ -783,6 +800,17 @@ function UsersTab({
   const [addRole, setAddRole] = useState<"admin" | "user">("user");
   const [adding, setAdding] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenuId(null);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openMenuId]);
 
   async function handleRoleChange(userId: string, newRole: OrganizationRole) {
     setChangingRole(userId);
@@ -893,8 +921,8 @@ function UsersTab({
       )}
 
       {/* Users table */}
-      <div style={sectionStyle}>
-        <div style={{ overflowX: "auto" }}>
+      <div style={{ ...sectionStyle, overflow: "visible" }}>
+        <div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -949,26 +977,59 @@ function UsersTab({
                       )}
                     </td>
                     <td style={tdStyle}>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {onImpersonate && u.platformRole !== "gridmaster" && (
+                      {(onImpersonate && u.platformRole !== "gridmaster") || u.orgRole !== "super_admin" ? (
+                        <div style={{ position: "relative" }} ref={openMenuId === u.id ? menuRef : undefined}>
                           <button
                             className="dg-btn dg-btn-ghost"
-                            style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px" }}
-                            onClick={() => onImpersonate(u.id, orgId)}
+                            style={{ padding: "4px 8px", lineHeight: 1 }}
+                            onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)}
                           >
-                            Impersonate
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
+                            </svg>
                           </button>
-                        )}
-                        {u.orgRole !== "super_admin" && (
-                          <button
-                            className="dg-btn dg-btn-ghost"
-                            style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px", color: "var(--color-danger)" }}
-                            onClick={() => setRemoveConfirm(u)}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
+                          {openMenuId === u.id && (
+                            <div className="dg-menu" style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 200, minWidth: 150 }}>
+                              {onImpersonate && u.platformRole !== "gridmaster" && (
+                                <button
+                                  className="dg-menu-item"
+                                  onClick={() => { setOpenMenuId(null); onImpersonate(u.id, orgId); }}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                                  </svg>
+                                  Impersonate
+                                </button>
+                              )}
+                              {u.orgRole === "admin" && (
+                                <button
+                                  className="dg-menu-item"
+                                  onClick={() => { setOpenMenuId(null); setEditingPerms(u); }}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                  </svg>
+                                  Permissions
+                                </button>
+                              )}
+                              {u.orgRole !== "super_admin" && (
+                                <>
+                                  <div className="dg-menu-divider" />
+                                  <button
+                                    className="dg-menu-item dg-menu-item--danger"
+                                    onClick={() => { setOpenMenuId(null); setRemoveConfirm(u); }}
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                    </svg>
+                                    Remove
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))

@@ -375,8 +375,8 @@ export type PlatformRole = 'gridmaster' | 'none';
  * user: read-only staff
  */
 export type OrganizationRole = 'super_admin' | 'admin' | 'user';
-/** Roles assignable by super_admin from the user management panel. */
-export type AssignableOrganizationRole = 'admin' | 'user';
+/** Roles assignable via invitation (super_admin assignable by gridmaster during org setup). */
+export type AssignableOrganizationRole = 'super_admin' | 'admin' | 'user';
 
 /**
  * Fine-grained permissions for admin users. Stored as JSONB in organization_memberships.admin_permissions.

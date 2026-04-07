@@ -1,23 +1,30 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { fetchImpersonationHistory } from "@/lib/db";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 
-function StatusBadge({ entry }: { entry: ImpersonationHistoryEntry }) {
-  // eslint-disable-next-line react-hooks/purity -- Date.now() is intentionally impure; value is stable per mount
-  const now = useMemo(() => Date.now(), []);
+function useNow(intervalMs = 60_000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function StatusBadge({ entry, now }: { entry: ImpersonationHistoryEntry; now: number }) {
   const isEnded = entry.endedAt !== null;
   const isExpired = !isEnded && new Date(entry.expiresAt).getTime() < now;
   const isActive = !isEnded && !isExpired;
 
   const config = isActive
-    ? { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A", label: "Active" }
+    ? { bg: "var(--color-warning-bg)", text: "var(--color-warning)", border: "var(--color-warning-border)", label: "Active" }
     : isEnded
-      ? { bg: "#F0F7F0", text: "#004501", border: "#BFDFBF", label: "Ended" }
-      : { bg: "#F1F5F9", text: "#64748B", border: "#CBD5E1", label: "Expired" };
+      ? { bg: "var(--color-success-bg)", text: "var(--color-success)", border: "var(--color-success-border)", label: "Ended" }
+      : { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)", border: "var(--color-border)", label: "Expired" };
 
   return (
     <span
@@ -39,11 +46,11 @@ function StatusBadge({ entry }: { entry: ImpersonationHistoryEntry }) {
   );
 }
 
-function formatDuration(startStr: string, endStr: string | null, expiresStr: string): string {
+function formatDuration(startStr: string, endStr: string | null, expiresStr: string, now: number): string {
   const start = new Date(startStr).getTime();
   const end = endStr
     ? new Date(endStr).getTime()
-    : Math.min(Date.now(), new Date(expiresStr).getTime());
+    : Math.min(now, new Date(expiresStr).getTime());
   const diffMs = Math.max(0, end - start);
   const mins = Math.floor(diffMs / 60000);
   const secs = Math.floor((diffMs % 60000) / 1000);
@@ -65,6 +72,7 @@ function formatReason(reason: string | null): string {
 }
 
 export default function ImpersonationHistory() {
+  const now = useNow();
   const [entries, setEntries] = useState<ImpersonationHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +86,7 @@ export default function ImpersonationHistory() {
     setError(null);
     fetchImpersonationHistory({ limit: PAGE_SIZE, offset: page * PAGE_SIZE })
       .then((data) => { if (!cancelled) setEntries(data); })
-      .catch((err) => { if (!cancelled) setError(err.message); })
+      .catch((err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load impersonation history"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [page]);
@@ -99,8 +107,19 @@ export default function ImpersonationHistory() {
       )}
 
       {loading ? (
-        <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
-          Loading...
+        <div style={sectionStyle}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "8%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "16%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "14%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "14%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "18%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "12%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "12%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "6%" }} />
+            </div>
+          ))}
         </div>
       ) : (
         <>
@@ -129,7 +148,7 @@ export default function ImpersonationHistory() {
                       return (
                         <tr key={e.sessionId}>
                           <td style={tdStyle}>
-                            <StatusBadge entry={e} />
+                            <StatusBadge entry={e} now={now} />
                           </td>
                           <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
                             {e.targetEmail}
@@ -148,12 +167,12 @@ export default function ImpersonationHistory() {
                               {e.justification || "—"}
                             </span>
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
                             {startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                             {" "}
                             {startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
                             {endDate
                               ? <>
                                   {endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -164,7 +183,7 @@ export default function ImpersonationHistory() {
                             }
                           </td>
                           <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono, monospace)" }}>
-                            {formatDuration(e.createdAt, e.endedAt, e.expiresAt)}
+                            {formatDuration(e.createdAt, e.endedAt, e.expiresAt, now)}
                           </td>
                           <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
                             {formatReason(e.endReason)}
@@ -192,23 +211,21 @@ export default function ImpersonationHistory() {
           )}
 
           {/* Pagination */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", alignItems: "center", marginTop: 16 }}>
             <button
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={page === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 12px" }}
             >
               Previous
             </button>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", display: "flex", alignItems: "center" }}>
-              Page {page + 1}
+            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace" }}>
+              {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + entries.length}
             </span>
             <button
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={entries.length < PAGE_SIZE}
               onClick={() => setPage((p) => p + 1)}
-              style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 12px" }}
             >
               Next
             </button>

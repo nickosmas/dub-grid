@@ -66,8 +66,12 @@ export function useOnboardingState(
   const completeOnboarding = useCallback(async () => {
     await dbCompleteOnboarding(userId, orgId);
     localStorage.removeItem(key);
-    // Invalidate the onboarding status query so OnboardingGate re-evaluates
-    queryClient.invalidateQueries({ queryKey: ["onboarding-status", userId, orgId] });
+    // Synchronously update cache (not invalidate) to avoid async refetch race
+    // that flashes the underlying route before navigation completes
+    queryClient.setQueryData(
+      ["onboarding-status", userId, orgId],
+      { completed: true, completedAt: new Date().toISOString() },
+    );
   }, [userId, orgId, key, queryClient]);
 
   return {

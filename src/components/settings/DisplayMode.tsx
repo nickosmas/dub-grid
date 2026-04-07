@@ -12,7 +12,7 @@ const SAMPLE_SHIFTS = [
   { label: "N", name: "Night Shift", color: "#EDE9FE", text: "#5B21B6", border: "#C4B5FD" },
 ];
 
-function DisplayModeSample({ mode, shiftCodes }: { mode: ShiftDisplayMode; shiftCodes: ShiftCode[] }) {
+export function DisplayModeSample({ mode, shiftCodes }: { mode: ShiftDisplayMode; shiftCodes: ShiftCode[] }) {
   const samples = shiftCodes.length >= 3
     ? shiftCodes.slice(0, 3).map(sc => ({
         label: sc.label,
@@ -71,6 +71,29 @@ function DisplayModeSample({ mode, shiftCodes }: { mode: ShiftDisplayMode; shift
   );
 }
 
+export const DISPLAY_MODES: { id: ShiftDisplayMode; title: string; description: string; details: string[] }[] = [
+  {
+    id: "code",
+    title: "Short Codes",
+    description: "Display abbreviations like D, EVE, N on the grid. Best for organizations that use standardized shift codes.",
+    details: [
+      "The schedule grid shows short codes in each cell",
+      "Both the code and full name are visible when creating shifts",
+      "Compact display fits well in all views including 2-week",
+    ],
+  },
+  {
+    id: "name",
+    title: "Full Names",
+    description: "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
+    details: [
+      "The schedule grid shows the full shift name in each cell",
+      "Short codes are hidden throughout the app",
+      "When creating shifts, you only need to provide a name",
+    ],
+  },
+];
+
 export default function DisplayMode({
   organization,
   shiftCodes,
@@ -99,28 +122,7 @@ export default function DisplayMode({
     }
   }, [organization, selected, onSave]);
 
-  const modes: { id: ShiftDisplayMode; title: string; description: string; details: string[] }[] = [
-    {
-      id: "code",
-      title: "Short Codes",
-      description: "Display abbreviations like D, EVE, N on the grid. Best for organizations that use standardized shift codes.",
-      details: [
-        "The schedule grid shows short codes in each cell",
-        "Both the code and full name are visible when creating shifts",
-        "Compact display fits well in all views including 2-week",
-      ],
-    },
-    {
-      id: "name",
-      title: "Full Names",
-      description: "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
-      details: [
-        "The schedule grid shows the full shift name in each cell",
-        "Short codes are hidden throughout the app",
-        "When creating shifts, you only need to provide a name",
-      ],
-    },
-  ];
+  const modes = DISPLAY_MODES;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

@@ -2,24 +2,26 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchUserSessions, revokeUserSession } from "@/lib/db";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Monitor, Smartphone, Trash2 } from "lucide-react";
 
 interface UserSession {
   id: string;
-  deviceInfo: string;
+  deviceLabel: string;
   ipAddress: string | null;
   lastActiveAt: string;
+  refreshTokenHash: string;
   isCurrent: boolean;
 }
 
-function parseDeviceInfo(info: string): { icon: "mobile" | "desktop"; label: string } {
-  const lower = info.toLowerCase();
+function parseDeviceLabel(label: string): { icon: "mobile" | "desktop"; label: string } {
+  const lower = label.toLowerCase();
   if (lower.includes("mobile") || lower.includes("iphone") || lower.includes("android")) {
-    return { icon: "mobile", label: info };
+    return { icon: "mobile", label };
   }
-  return { icon: "desktop", label: info };
+  return { icon: "desktop", label };
 }
 
 function formatRelative(dateStr: string): string {
@@ -39,31 +41,31 @@ export function SessionList() {
   const [loading, setLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  const fetchSessions = useCallback(async () => {
+  const loadSessions = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data, error } = await supabase
-        .from("user_sessions")
-        .select("id, device_info, ip_address, last_active_at, session_token")
-        .eq("user_id", session.user.id)
-        .order("last_active_at", { ascending: false });
+      const rows = await fetchUserSessions() as Array<{ id: string; deviceLabel: string | null; ipAddress: string | null; lastActiveAt: string; refreshTokenHash: string }>;
 
-      if (error) throw error;
-
-      // Determine which is the current session (best effort via access token match)
-      const currentToken = session.access_token?.slice(-20);
+      // Match current session using the stable per-browser session ID (same as AuthProvider)
+      let currentHash = "";
+      const storageKey = `dg_session_id:${session.user.id}`;
+      const sessionId = localStorage.getItem(storageKey);
+      if (sessionId) {
+        const encoder = new TextEncoder();
+        const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(sessionId));
+        currentHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      }
 
       setSessions(
-        (data ?? []).map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          deviceInfo: (row.device_info as string) ?? "Unknown device",
-          ipAddress: row.ip_address as string | null,
-          lastActiveAt: row.last_active_at as string,
-          isCurrent: currentToken
-            ? ((row.session_token as string) ?? "").endsWith(currentToken)
-            : false,
+        rows.map((row) => ({
+          id: row.id,
+          deviceLabel: row.deviceLabel ?? "Unknown device",
+          ipAddress: row.ipAddress,
+          lastActiveAt: row.lastActiveAt,
+          refreshTokenHash: row.refreshTokenHash,
+          isCurrent: currentHash !== "" && row.refreshTokenHash === currentHash,
         })),
       );
     } catch {
@@ -74,18 +76,14 @@ export function SessionList() {
   }, []);
 
   useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
+    loadSessions();
+  }, [loadSessions]);
 
-  async function handleRevoke(sessionId: string) {
-    setRevokingId(sessionId);
+  async function handleRevoke(session: UserSession) {
+    setRevokingId(session.id);
     try {
-      const { error } = await supabase
-        .from("user_sessions")
-        .delete()
-        .eq("id", sessionId);
-      if (error) throw error;
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      await revokeUserSession(session.refreshTokenHash);
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
       toast.success("Session revoked");
     } catch {
       toast.error("Failed to revoke session");
@@ -113,7 +111,7 @@ export function SessionList() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {sessions.map((s) => {
-        const device = parseDeviceInfo(s.deviceInfo);
+        const device = parseDeviceLabel(s.deviceLabel);
         return (
           <div
             key={s.id}
@@ -147,12 +145,12 @@ export function SessionList() {
                 )}
               </div>
               <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
-                {s.ipAddress ?? "Unknown IP"} &middot; {formatRelative(s.lastActiveAt)}
+                {s.ipAddress === "::1" ? "localhost" : s.ipAddress ?? "Unknown IP"} &middot; {formatRelative(s.lastActiveAt)}
               </div>
             </div>
             {!s.isCurrent && (
               <button
-                onClick={() => handleRevoke(s.id)}
+                onClick={() => handleRevoke(s)}
                 disabled={revokingId === s.id}
                 className="dg-btn dg-btn-ghost"
                 style={{ padding: "4px 8px", color: "var(--color-danger)" }}
