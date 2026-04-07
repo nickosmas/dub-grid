@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
+import CustomSelect from "@/components/CustomSelect";
 
 type SortMode = "hours" | "name" | "ot";
 
@@ -94,16 +95,15 @@ export default function ExpandedStaffHours({
             })}
           </div>
 
-          <select
+          <CustomSelect
             value={faFilter === "all" ? "all" : String(faFilter)}
-            onChange={(e) => setFaFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-            style={selectStyle}
-          >
-            <option value="all">All sections</option>
-            {focusAreas.map((fa) => (
-              <option key={fa.id} value={fa.id}>{fa.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: "all", label: "All sections" },
+              ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
+            ]}
+            onChange={(val) => setFaFilter(val === "all" ? "all" : Number(val))}
+            fontSize="var(--dg-fs-label)"
+          />
 
           <span style={{ fontSize: 11, color: "var(--color-text-subtle)", marginLeft: "auto" }}>
             {sorted.length} staff &middot; {otCount} OT &middot; {otThreshold}h limit
@@ -173,7 +173,7 @@ export default function ExpandedStaffHours({
                         color: delta > 0 ? "var(--color-danger)" : "var(--color-brand)",
                       }}
                     >
-                      {delta > 0 ? "+" : ""}{delta}h
+                      {delta > 0 ? "+" : ""}{Math.round(delta * 10) / 10}h
                     </span>
                   )}
 
@@ -208,16 +208,6 @@ export default function ExpandedStaffHours({
 }
 
 const modalStyle = { maxWidth: 700, width: "90vw" };
-
-const selectStyle = {
-  fontSize: 12,
-  padding: "5px 10px",
-  borderRadius: 6,
-  border: "1px solid var(--color-border)",
-  background: "var(--color-surface)",
-  color: "var(--color-text-primary)",
-  cursor: "pointer" as const,
-};
 
 const emptyStyle = {
   fontSize: 13,

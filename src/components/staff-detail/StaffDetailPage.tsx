@@ -152,9 +152,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       shiftCodeById,
       40,
       categoryById,
-      focusAreaById,
     );
-  }, [employee, shifts, shiftCodeById, categoryById, focusAreaById]);
+  }, [employee, shifts, shiftCodeById, categoryById]);
 
   // Batch-fetch profile names for shift audit display (who created/edited each shift)
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
@@ -247,7 +246,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 shifts={shifts}
                 shiftCodeById={shiftCodeById}
                 categoryById={categoryById}
-                focusAreaById={focusAreaById}
                 certifications={certifications}
                 orgRoles={orgRoles}
                 shiftDisplayMode={org?.shiftDisplayMode}

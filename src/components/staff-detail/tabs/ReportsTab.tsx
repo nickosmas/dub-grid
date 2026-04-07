@@ -28,7 +28,6 @@ interface ReportsTabProps {
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   categoryById: Map<number, ShiftCategory>;
-  focusAreaById: Map<number, FocusArea>;
   recurringShifts: RecurringShift[];
 }
 
@@ -42,12 +41,11 @@ export function ReportsTab({
   certifications,
   orgRoles,
   categoryById,
-  focusAreaById,
   recurringShifts,
 }: ReportsTabProps) {
   const hoursHistory = useMemo(
-    () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById, focusAreaById),
-    [employee.id, shifts, shiftCodeById, categoryById, focusAreaById],
+    () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById),
+    [employee.id, shifts, shiftCodeById, categoryById],
   );
   const shiftDist = useMemo(
     () => computeShiftDistribution(employee.id, shifts, shiftCodeById),

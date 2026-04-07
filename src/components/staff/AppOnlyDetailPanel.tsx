@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { DirectoryPerson, NamedItem } from "@/types";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { DirectoryPerson, NamedItem, Department, AdminPermissions } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { unionPermissions } from "@/hooks/usePermissions";
 
 interface AppOnlyDetailPanelProps {
   person: DirectoryPerson;
@@ -11,7 +12,7 @@ interface AppOnlyDetailPanelProps {
   departmentLabel: string;
   canManageEmployees: boolean;
   onClose: () => void;
-  onSave: (data: { firstName: string; lastName: string; phone: string; departmentId: number | null }) => Promise<void>;
+  onSave: (data: { firstName: string; lastName: string; phone: string; departmentIds: number[] }) => Promise<void>;
   onRevokeAccess?: (userId: string) => Promise<void>;
   onRevokeInvitation?: (invitationId: string) => Promise<void>;
   onResendInvitation?: (invitationId: string) => Promise<void>;
@@ -37,7 +38,7 @@ export function AppOnlyDetailPanel({
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName);
   const [phone, setPhone] = useState(person.phone);
-  const [deptId, setDeptId] = useState<number | null>(person.departmentId);
+  const [deptIds, setDeptIds] = useState<number[]>(person.departmentIds);
   const [saving, setSaving] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [resending, setResending] = useState(false);
@@ -48,9 +49,9 @@ export function AppOnlyDetailPanel({
     setFirstName(person.firstName);
     setLastName(person.lastName);
     setPhone(person.phone);
-    setDeptId(person.departmentId);
+    setDeptIds(person.departmentIds);
     setShowRevokeConfirm(false);
-  }, [person.personId, person.firstName, person.lastName, person.phone, person.departmentId]);
+  }, [person.personId, person.firstName, person.lastName, person.phone, person.departmentIds]);
 
   const handleClose = useCallback(() => {
     setClosing(true);
@@ -63,14 +64,15 @@ export function AppOnlyDetailPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleClose]);
 
-  const isModified = firstName !== person.firstName || lastName !== person.lastName || phone !== person.phone || deptId !== person.departmentId;
+  const isModified = firstName !== person.firstName || lastName !== person.lastName || phone !== person.phone || JSON.stringify(deptIds) !== JSON.stringify(person.departmentIds);
   const isPending = person.source === "pending_invite";
+  const isEmployee = person.source === "employee";
   const isExpired = person.invitationStatus === "expired";
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(), departmentId: deptId });
+      await onSave({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(), departmentIds: deptIds });
     } finally {
       setSaving(false);
     }
@@ -101,8 +103,34 @@ export function AppOnlyDetailPanel({
     }
   };
 
-  const dept = person.departmentId ? departments.find((d) => d.id === person.departmentId) : null;
+  const personDepts = person.departmentIds
+    .map(id => departments.find(d => d.id === id))
+    .filter((d): d is NonNullable<typeof d> => d != null);
   const initials = `${(person.firstName?.[0] ?? "").toUpperCase()}${(person.lastName?.[0] ?? "").toUpperCase() || "?"}`;
+
+  // Compute department-granted permissions for display
+  const deptPermissionLabels = useMemo(() => {
+    const mgmtDepts = departments
+      .filter((d): d is Department => "type" in d && (d as Department).type === "management")
+      .filter((d) => person.departmentIds.includes(d.id) && d.permissions);
+    if (mgmtDepts.length === 0) return [];
+    const union = unionPermissions(mgmtDepts.map((d) => d.permissions as AdminPermissions));
+    const labels: string[] = [];
+    if (union.canEditShifts) labels.push("Edit Shifts");
+    if (union.canPublishSchedule) labels.push("Publish Schedule");
+    if (union.canApplyRecurringSchedule) labels.push("Apply Recurring Schedule");
+    if (union.canApproveShiftRequests) labels.push("Approve Shift Requests");
+    if (union.canEditNotes) labels.push("Edit Notes");
+    if (union.canManageRecurringShifts) labels.push("Manage Recurring Shifts");
+    if (union.canManageShiftSeries) labels.push("Manage Shift Series");
+    if (union.canManageEmployees) labels.push("Manage Employees");
+    if (union.canManageFocusAreas) labels.push("Manage Focus Areas");
+    if (union.canManageShiftCodes) labels.push("Manage Shift Codes");
+    if (union.canManageIndicatorTypes) labels.push("Manage Indicators");
+    if (union.canManageOrgLabels) labels.push("Manage Custom Labels");
+    if (union.canManageCoverageRequirements) labels.push("Manage Coverage");
+    return labels;
+  }, [departments, person.departmentIds]);
 
   const roleLabel = (role: string | null) => {
     switch (role) {
@@ -168,19 +196,31 @@ export function AppOnlyDetailPanel({
                 {person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}
               </div>
               <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-                {person.email}{dept ? ` · ${dept.name}` : ""}
+                {person.email}{personDepts.length > 0 ? ` · ${personDepts.map(d => d.name).join(", ")}` : ""}
               </div>
             </div>
-            <span
-              style={{
-                padding: "3px 10px", borderRadius: 999,
-                fontSize: "var(--dg-fs-micro)", fontWeight: 700,
-                background: statusConfig.bg, color: statusConfig.text,
-                flexShrink: 0,
-              }}
-            >
-              {statusConfig.label}
-            </span>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              {isEmployee && (
+                <span
+                  style={{
+                    padding: "3px 10px", borderRadius: 999,
+                    fontSize: "var(--dg-fs-micro)", fontWeight: 700,
+                    background: "var(--color-today-bg)", color: "var(--color-today-text)",
+                  }}
+                >
+                  On Schedule
+                </span>
+              )}
+              <span
+                style={{
+                  padding: "3px 10px", borderRadius: 999,
+                  fontSize: "var(--dg-fs-micro)", fontWeight: 700,
+                  background: statusConfig.bg, color: statusConfig.text,
+                }}
+              >
+                {statusConfig.label}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -189,32 +229,37 @@ export function AppOnlyDetailPanel({
           {/* Editable fields */}
           {canManageEmployees && (
             <>
+              {isEmployee && (
+                <div style={{ padding: "8px 12px", borderRadius: 8, background: "var(--color-today-bg)", fontSize: "var(--dg-fs-caption)", color: "var(--color-today-text)", fontWeight: 500, lineHeight: 1.5 }}>
+                  This person is also on the schedule. Edit their full profile from the On Schedule tab.
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>First name</label>
-                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} disabled={isEmployee} />
                 </div>
                 <div>
                   <label style={labelStyle}>Last name</label>
-                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} disabled={isEmployee} />
                 </div>
               </div>
 
               <div>
                 <label style={labelStyle}>Phone</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" style={inputStyle} />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" style={inputStyle} disabled={isEmployee} />
               </div>
 
               {departments.length > 0 && (
                 <div>
                   <label style={labelStyle}>{departmentLabel}</label>
                   <CustomSelect
-                    value={deptId?.toString() ?? ""}
+                    value={deptIds.length > 0 ? deptIds[0].toString() : ""}
                     options={[
                       { value: "", label: "None" },
                       ...departments.map((d) => ({ value: d.id.toString(), label: d.name })),
                     ]}
-                    onChange={(v) => setDeptId(v ? Number(v) : null)}
+                    onChange={(v) => setDeptIds(v ? [Number(v)] : [])}
                   />
                 </div>
               )}
@@ -229,6 +274,15 @@ export function AppOnlyDetailPanel({
                   Change roles in the User Access section.
                 </p>
               </div>
+
+              {deptPermissionLabels.length > 0 && (
+                <div>
+                  <label style={labelStyle}>Permissions via department</label>
+                  <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.6 }}>
+                    {deptPermissionLabels.join(", ")}
+                  </div>
+                </div>
+              )}
 
               {/* Save button */}
               {isModified && (
@@ -249,8 +303,16 @@ export function AppOnlyDetailPanel({
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div><label style={labelStyle}>Email</label><div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>{person.email}</div></div>
               {person.phone && <div><label style={labelStyle}>Phone</label><div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>{person.phone}</div></div>}
-              {dept && <div><label style={labelStyle}>{departmentLabel}</label><div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>{dept.name}</div></div>}
+              {personDepts.length > 0 && <div><label style={labelStyle}>{departmentLabel}</label><div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>{personDepts.map(d => d.name).join(", ")}</div></div>}
               <div><label style={labelStyle}>Role</label><div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>{roleLabel(person.orgRole)}</div></div>
+              {deptPermissionLabels.length > 0 && (
+                <div>
+                  <label style={labelStyle}>Permissions via department</label>
+                  <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.6 }}>
+                    {deptPermissionLabels.join(", ")}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

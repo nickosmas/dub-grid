@@ -10,6 +10,8 @@ export interface NamedItem {
   name: string;
   abbr: string;
   sortOrder: number;
+  /** FK to departments.id. Null = org-wide (not scoped to any department). */
+  departmentId?: number | null;
   /** Non-null when the item has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
@@ -56,15 +58,29 @@ export interface Organization {
 }
 
 
+export type DepartmentType = 'scheduled' | 'management';
+
+export interface Department {
+  id: number;
+  orgId: string;
+  name: string;
+  abbr: string;
+  type: DepartmentType;
+  sortOrder: number;
+  archivedAt?: string | null;
+  /** Permission template for management departments. Null for scheduled departments. */
+  permissions?: AdminPermissions | null;
+}
+
 export interface FocusArea {
   id: number;
   orgId: string;
+  /** Parent scheduled department. Null if not yet assigned. */
+  departmentId: number | null;
   name: string;
   colorBg: string;
   colorText: string;
   sortOrder: number;
-  /** Default break duration in minutes for shifts in this focus area. NULL = no break. */
-  breakMinutes?: number | null;
   /** Non-null when the focus area has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
@@ -201,6 +217,8 @@ export interface Employee {
   archivedAt?: string | null;
   /** Linked Supabase auth user ID. Null if no account linked. */
   userId: string | null;
+  /** Management department IDs (explicit assignment for non-schedule departments). */
+  departmentIds: number[];
 }
 
 export type DraftKind = 'new' | 'modified' | 'deleted' | null;
@@ -379,6 +397,8 @@ export interface AdminPermissions {
   /** Add / edit / delete schedule notes (indicators) */
   canEditNotes: boolean;
   // Recurring Shifts
+  /** View recurring shift templates (read-only). Implied by canManageRecurringShifts. */
+  canViewRecurringShifts: boolean;
   /** Create / edit / delete recurring shift templates */
   canManageRecurringShifts: boolean;
   /** Create / edit / delete shift series */
@@ -386,25 +406,40 @@ export interface AdminPermissions {
   // Staff
   /** View employee list and profiles (always true for all authenticated users) */
   canViewStaff: boolean;
+  /** View employee detail panel — profile, contact info, certifications. Implied by canManageEmployees. */
+  canViewEmployeeDetails: boolean;
   /** Add / edit / delete employee records */
   canManageEmployees: boolean;
   // Organization Configuration
+  /** View departments / focus areas settings (read-only). Implied by canManageFocusAreas. */
+  canViewFocusAreas: boolean;
   /** Add / edit / delete focus areas (departments) */
   canManageFocusAreas: boolean;
+  /** View shift code definitions (read-only). Implied by canManageShiftCodes. */
+  canViewShiftCodes: boolean;
   /** Add / edit / delete shift code definitions */
   canManageShiftCodes: boolean;
+  /** View indicator type configuration (read-only). Implied by canManageIndicatorTypes. */
+  canViewIndicatorTypes: boolean;
   /** Add / edit / delete indicator / note type definitions */
   canManageIndicatorTypes: boolean;
   /** Edit organization name, address, phone, employee count, timezone (super_admin only) */
   canManageOrgSettings: boolean;
+  /** View custom terminology labels (read-only). Implied by canManageOrgLabels. */
+  canViewOrgLabels: boolean;
   /** Edit custom terminology labels — focus areas, certifications, roles (delegatable to admin) */
   canManageOrgLabels: boolean;
   // Coverage
+  /** View coverage requirements (read-only). Implied by canManageCoverageRequirements. */
+  canViewCoverageRequirements: boolean;
   /** Create / edit / delete coverage requirements for shift staffing minimums */
   canManageCoverageRequirements: boolean;
   // Shift Requests
   /** Approve or reject employee shift pickup/swap requests */
   canApproveShiftRequests: boolean;
+  // Dashboard
+  /** View dashboard analytics and statistics cards */
+  canViewDashboardAnalytics: boolean;
 }
 
 export interface Profile {
@@ -448,6 +483,7 @@ export interface OrganizationUser {
   adminPermissions: AdminPermissions | null;
   createdAt: string;
   lastSignInAt: string | null;
+  departmentIds: number[];
 }
 
 /** A unified person record for the People Directory (union of employees + app-only users + pending invites). */
@@ -469,7 +505,7 @@ export interface DirectoryPerson {
   seniority: number | null;
   lastSignInAt: string | null;
   invitationStatus: 'pending' | 'expired' | null;
-  departmentId: number | null;
+  departmentIds: number[];
 }
 
 export interface UserSession {
@@ -661,6 +697,7 @@ export interface OrganizationMembership {
   orgRole: OrganizationRole;
   adminPermissions: AdminPermissions | null;
   joinedAt: string;
+  onboardingCompletedAt: string | null;
   email: string | null;
   firstName: string | null;
   lastName: string | null;

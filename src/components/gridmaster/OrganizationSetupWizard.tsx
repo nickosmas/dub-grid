@@ -314,6 +314,7 @@ export default function OrganizationSetupWizard({
             statusChangedAt: null,
             statusNote: "",
             userId: null,
+            departmentIds: [],
           }, org.id);
           employeeId = emp.id;
         } catch (empErr: unknown) {
@@ -368,11 +369,11 @@ export default function OrganizationSetupWizard({
         const fa = validFocusAreas[i];
         await upsertFocusArea({
           orgId: createdOrg.id,
+          departmentId: null,
           name: fa.name.trim(),
           colorBg: fa.colorBg,
           colorText: "#FFFFFF",
           sortOrder: i,
-          breakMinutes: 0,
         });
       }
 
@@ -443,6 +444,7 @@ export default function OrganizationSetupWizard({
             statusChangedAt: null,
             statusNote: "",
             userId: null,
+            departmentIds: [],
           },
           createdOrg.id,
         );

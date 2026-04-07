@@ -45,19 +45,43 @@ const TENANTS = [
       { name: "Respite Care", color_bg: "#FECACA", color_text: "#991B1B" },
     ],
     certifications: [
-      { name: "Registered Nurse", abbr: "RN" },
-      { name: "Licensed Practical Nurse", abbr: "LPN" },
-      { name: "Certified Nursing Assistant", abbr: "CNA" },
-      { name: "Home Health Aide", abbr: "HHA" },
-      { name: "Medication Aide", abbr: "MA" },
-      { name: "Other", abbr: "Other" },
+      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
+      { name: "Licensed Practical Nurse", abbr: "LPN", deptIndex: 0 },
+      { name: "Certified Nursing Assistant", abbr: "CNA", deptIndex: 0 },
+      { name: "Home Health Aide", abbr: "HHA", deptIndex: 1 },
+      { name: "Medication Aide", abbr: "MA", deptIndex: null },
+      { name: "Other", abbr: "Other", deptIndex: null },
     ],
     orgRoles: [
-      { name: "Charge Nurse", abbr: "CN" },
-      { name: "Supervisor", abbr: "SUP" },
-      { name: "Activities Director", abbr: "AD" },
-      { name: "Med Tech", abbr: "MT" },
+      { name: "Charge Nurse", abbr: "CN", deptIndex: 0 },
+      { name: "Supervisor", abbr: "SUP", deptIndex: null },
+      { name: "Activities Director", abbr: "AD", deptIndex: 1 },
+      { name: "Med Tech", abbr: "MT", deptIndex: 0 },
     ],
+    departments: [
+      // Scheduled departments — focus areas linked to these
+      { name: "Nursing", type: "scheduled" as const },
+      { name: "Residential", type: "scheduled" as const },
+      // Management departments (with permission templates)
+      { name: "Administration", type: "management" as const, permissions: {
+        canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
+        canEditNotes: true, canManageRecurringShifts: true, canManageShiftSeries: true,
+        canViewStaff: true, canManageEmployees: true, canManageFocusAreas: true,
+        canManageShiftCodes: true, canManageIndicatorTypes: true, canManageOrgSettings: false,
+        canManageOrgLabels: true, canManageCoverageRequirements: true, canApproveShiftRequests: true,
+      }},
+      { name: "Human Resources", type: "management" as const, permissions: {
+        canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
+        canEditNotes: false, canManageRecurringShifts: false, canManageShiftSeries: false,
+        canViewStaff: true, canManageEmployees: true, canManageFocusAreas: false,
+        canManageShiftCodes: false, canManageIndicatorTypes: false, canManageOrgSettings: false,
+        canManageOrgLabels: false, canManageCoverageRequirements: false, canApproveShiftRequests: false,
+      }},
+      { name: "Maintenance", type: "management" as const },
+    ],
+    // Memory Care → Nursing (0), Assisted Living → Residential (1),
+    // Independent Living → Residential (1), Respite Care → Nursing (0)
+    focusAreaDeptIndex: [0, 1, 1, 0],
     shiftCategories: [
       { name: "Day Shift", color: "#C7D2FE", start_time: "07:00", end_time: "15:00", faIndex: 0 },
       { name: "Evening Shift", color: "#FDE68A", start_time: "15:00", end_time: "23:00", faIndex: 0 },
@@ -114,19 +138,29 @@ const TENANTS = [
       { name: "Outpatient", color_bg: "#FBCFE8", color_text: "#9D174D" },
     ],
     certifications: [
-      { name: "Registered Nurse", abbr: "RN" },
-      { name: "Licensed Vocational Nurse", abbr: "LVN" },
-      { name: "Certified Nursing Assistant", abbr: "CNA" },
-      { name: "Physical Therapist", abbr: "PT" },
-      { name: "Occupational Therapist", abbr: "OT" },
-      { name: "Other", abbr: "Other" },
+      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
+      { name: "Licensed Vocational Nurse", abbr: "LVN", deptIndex: 0 },
+      { name: "Certified Nursing Assistant", abbr: "CNA", deptIndex: 0 },
+      { name: "Physical Therapist", abbr: "PT", deptIndex: 1 },
+      { name: "Occupational Therapist", abbr: "OT", deptIndex: 1 },
+      { name: "Other", abbr: "Other", deptIndex: null },
     ],
     orgRoles: [
-      { name: "Charge Nurse", abbr: "CN" },
-      { name: "Floor Lead", abbr: "FL" },
-      { name: "Rehab Tech", abbr: "RT" },
-      { name: "Case Manager", abbr: "CM" },
+      { name: "Charge Nurse", abbr: "CN", deptIndex: 0 },
+      { name: "Floor Lead", abbr: "FL", deptIndex: 0 },
+      { name: "Rehab Tech", abbr: "RT", deptIndex: 1 },
+      { name: "Case Manager", abbr: "CM", deptIndex: 2 },
     ],
+    departments: [
+      { name: "Nursing", type: "scheduled" as const },
+      { name: "Rehabilitation", type: "scheduled" as const },
+      { name: "Palliative Services", type: "scheduled" as const },
+      { name: "Administration", type: "management" as const },
+      { name: "Human Resources", type: "management" as const },
+    ],
+    // Skilled Nursing → Nursing (0), Rehabilitation → Rehabilitation (1),
+    // Hospice → Palliative Services (2), Outpatient → Nursing (0)
+    focusAreaDeptIndex: [0, 1, 2, 0],
     shiftCategories: [
       { name: "Day Shift", color: "#E9D5FF", start_time: "06:00", end_time: "14:00", faIndex: 0 },
       { name: "Swing Shift", color: "#BFDBFE", start_time: "14:00", end_time: "22:00", faIndex: 0 },
@@ -181,17 +215,26 @@ const TENANTS = [
       { name: "North Wing", color_bg: "#FECACA", color_text: "#991B1B" },
     ],
     certifications: [
-      { name: "Caregiver", abbr: "CG" },
-      { name: "Medication Technician", abbr: "MT" },
-      { name: "Activity Director", abbr: "AD" },
-      { name: "Senior Caregiver", abbr: "SC" },
-      { name: "Other", abbr: "Other" },
+      { name: "Caregiver", abbr: "CG", deptIndex: 0 },
+      { name: "Medication Technician", abbr: "MT", deptIndex: 0 },
+      { name: "Activity Director", abbr: "AD", deptIndex: 1 },
+      { name: "Senior Caregiver", abbr: "SC", deptIndex: 0 },
+      { name: "Other", abbr: "Other", deptIndex: null },
     ],
     orgRoles: [
-      { name: "Lead Caregiver", abbr: "LC" },
-      { name: "Medication Aide", abbr: "MA" },
-      { name: "Shift Supervisor", abbr: "SS" },
+      { name: "Lead Caregiver", abbr: "LC", deptIndex: 0 },
+      { name: "Medication Aide", abbr: "MA", deptIndex: 0 },
+      { name: "Shift Supervisor", abbr: "SS", deptIndex: null },
     ],
+    departments: [
+      { name: "Caregiving", type: "scheduled" as const },
+      { name: "Activities & Enrichment", type: "scheduled" as const },
+      { name: "Administration", type: "management" as const },
+      { name: "Facilities", type: "management" as const },
+    ],
+    // East Wing → Caregiving (0), West Wing → Caregiving (0),
+    // Garden Wing → Activities & Enrichment (1), North Wing → Caregiving (0)
+    focusAreaDeptIndex: [0, 0, 1, 0],
     shiftCategories: [
       { name: "Morning", color: "#A5F3FC", start_time: "07:00", end_time: "15:00", faIndex: 0 },
       { name: "Afternoon", color: "#99F6E4", start_time: "15:00", end_time: "23:00", faIndex: 0 },
@@ -251,21 +294,33 @@ const TENANTS = [
       { name: "Behavioral Health", color_bg: "#FECACA", color_text: "#991B1B" },
     ],
     certifications: [
-      { name: "Doctor of Medicine", abbr: "MD" },
-      { name: "Registered Nurse", abbr: "RN" },
-      { name: "Physician Assistant", abbr: "PA" },
-      { name: "Medical Assistant", abbr: "MA" },
-      { name: "Respiratory Therapist", abbr: "RT" },
-      { name: "Social Worker", abbr: "SW" },
-      { name: "Other", abbr: "Other" },
+      { name: "Doctor of Medicine", abbr: "MD", deptIndex: null },
+      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
+      { name: "Physician Assistant", abbr: "PA", deptIndex: null },
+      { name: "Medical Assistant", abbr: "MA", deptIndex: null },
+      { name: "Respiratory Therapist", abbr: "RT", deptIndex: 0 },
+      { name: "Social Worker", abbr: "SW", deptIndex: null },
+      { name: "Other", abbr: "Other", deptIndex: null },
     ],
     orgRoles: [
-      { name: "Attending", abbr: "ATT" },
-      { name: "Charge Nurse", abbr: "CN" },
-      { name: "Nurse Manager", abbr: "NM" },
-      { name: "Technician", abbr: "Tech" },
-      { name: "Social Worker", abbr: "SW" },
+      { name: "Attending", abbr: "ATT", deptIndex: null },
+      { name: "Charge Nurse", abbr: "CN", deptIndex: 0 },
+      { name: "Nurse Manager", abbr: "NM", deptIndex: 0 },
+      { name: "Technician", abbr: "Tech", deptIndex: null },
+      { name: "Social Worker", abbr: "SW", deptIndex: null },
     ],
+    departments: [
+      { name: "Nursing", type: "scheduled" as const },
+      { name: "Outpatient Services", type: "scheduled" as const },
+      { name: "Emergency Medicine", type: "scheduled" as const },
+      { name: "Administration", type: "management" as const },
+      { name: "Finance", type: "management" as const },
+      { name: "Quality Assurance", type: "management" as const },
+    ],
+    // Acute Care → Nursing (0), Long-term Care → Nursing (0),
+    // Outpatient → Outpatient Services (1), Emergency → Emergency Medicine (2),
+    // Behavioral Health → Nursing (0)
+    focusAreaDeptIndex: [0, 0, 1, 2, 0],
     shiftCategories: [
       { name: "Day Shift (12hr)", color: "#F5D0FE", start_time: "07:00", end_time: "19:00", faIndex: 0 },
       { name: "Night Shift (12hr)", color: "#A5F3FC", start_time: "19:00", end_time: "07:00", faIndex: 0 },
@@ -322,18 +377,27 @@ const TENANTS = [
       { name: "Bereavement", color_bg: "#BBF7D0", color_text: "#166534" },
     ],
     certifications: [
-      { name: "Registered Nurse", abbr: "RN" },
-      { name: "Licensed Practical Nurse", abbr: "LPN" },
-      { name: "Social Worker", abbr: "SW" },
-      { name: "Chaplain", abbr: "CH" },
-      { name: "Volunteer", abbr: "VOL" },
-      { name: "Other", abbr: "Other" },
+      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
+      { name: "Licensed Practical Nurse", abbr: "LPN", deptIndex: 0 },
+      { name: "Social Worker", abbr: "SW", deptIndex: null },
+      { name: "Chaplain", abbr: "CH", deptIndex: null },
+      { name: "Volunteer", abbr: "VOL", deptIndex: 3 },
+      { name: "Other", abbr: "Other", deptIndex: null },
     ],
     orgRoles: [
-      { name: "Case Manager", abbr: "CM" },
-      { name: "Team Lead", abbr: "TL" },
-      { name: "On-Call", abbr: "OC" },
+      { name: "Case Manager", abbr: "CM", deptIndex: 0 },
+      { name: "Team Lead", abbr: "TL", deptIndex: null },
+      { name: "On-Call", abbr: "OC", deptIndex: 0 },
     ],
+    departments: [
+      { name: "Clinical Services", type: "scheduled" as const },
+      { name: "Community Outreach", type: "scheduled" as const },
+      { name: "Administration", type: "management" as const },
+      { name: "Volunteer Coordination", type: "management" as const },
+    ],
+    // Inpatient Hospice → Clinical Services (0), Home Care → Clinical Services (0),
+    // Bereavement → Community Outreach (1)
+    focusAreaDeptIndex: [0, 0, 1],
     shiftCategories: [
       { name: "Day Shift", color: "#BBF7D0", start_time: "07:00", end_time: "15:00", faIndex: 0 },
       { name: "Evening Shift", color: "#FECDD3", start_time: "15:00", end_time: "23:00", faIndex: 0 },
@@ -451,10 +515,11 @@ async function main() {
         public.indicator_types,
         public.organization_roles,
         public.certifications,
-        public.focus_areas
+        public.focus_areas,
+        public.departments
       CASCADE;
       DELETE FROM public.organizations
-      WHERE slug IN ('sunrise-senior', 'harbor-health', 'evergreen-care', 'pacific-wellness', 'mountain-view', 'calmhaven');
+      WHERE slug IN ('sunrise-senior', 'harbor-health', 'evergreen-care', 'pacific-wellness', 'mountain-view', 'calmhaven', 'ardenwood');
     EXCEPTION WHEN undefined_table THEN
       NULL; -- Tables don't exist yet on first run
     END $$;
@@ -477,43 +542,62 @@ async function main() {
     );
     const orgId: string = org.id;
 
-    // 2. Focus Areas
+    // 2. Departments
+    const deptIds: number[] = [];
+    if (tenant.departments) {
+      for (let i = 0; i < tenant.departments.length; i++) {
+        const dept = tenant.departments[i];
+        const { rows: [row] } = await db.query(
+          `INSERT INTO public.departments (org_id, name, type, sort_order, permissions)
+           VALUES ($1, $2, $3::department_type, $4, $5::jsonb) RETURNING id`,
+          [orgId, dept.name, dept.type, i, dept.permissions ? JSON.stringify(dept.permissions) : null]
+        );
+        deptIds.push(id(row.id));
+      }
+    }
+
+    // 3. Focus Areas
     const focusAreaIds: number[] = [];
     for (let i = 0; i < tenant.focusAreas.length; i++) {
       const fa = tenant.focusAreas[i];
+      const deptId = tenant.focusAreaDeptIndex?.[i] != null
+        ? deptIds[tenant.focusAreaDeptIndex[i]]
+        : null;
       const { rows: [row] } = await db.query(
-        `INSERT INTO public.focus_areas (org_id, name, color_bg, color_text, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [orgId, fa.name, fa.color_bg, fa.color_text, i]
+        `INSERT INTO public.focus_areas (org_id, department_id, name, color_bg, color_text, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [orgId, deptId, fa.name, fa.color_bg, fa.color_text, i]
       );
       focusAreaIds.push(id(row.id));
     }
 
-    // 3. Certifications
+    // 4. Certifications
     const certIds: number[] = [];
     for (let i = 0; i < tenant.certifications.length; i++) {
       const c = tenant.certifications[i];
+      const deptId = c.deptIndex != null ? deptIds[c.deptIndex] : null;
       const { rows: [row] } = await db.query(
-        `INSERT INTO public.certifications (org_id, name, abbr, sort_order)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [orgId, c.name, c.abbr, i]
+        `INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [orgId, deptId, c.name, c.abbr, i]
       );
       certIds.push(id(row.id));
     }
 
-    // 4. Organization Roles
+    // 5. Organization Roles
     const roleIds: number[] = [];
     for (let i = 0; i < tenant.orgRoles.length; i++) {
       const r = tenant.orgRoles[i];
+      const deptId = r.deptIndex != null ? deptIds[r.deptIndex] : null;
       const { rows: [row] } = await db.query(
-        `INSERT INTO public.organization_roles (org_id, name, abbr, sort_order)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [orgId, r.name, r.abbr, i]
+        `INSERT INTO public.organization_roles (org_id, department_id, name, abbr, sort_order)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [orgId, deptId, r.name, r.abbr, i]
       );
       roleIds.push(id(row.id));
     }
 
-    // 5. Shift Categories
+    // 6. Shift Categories
     const catIds: number[] = [];
     for (let i = 0; i < tenant.shiftCategories.length; i++) {
       const cat = tenant.shiftCategories[i];
@@ -526,7 +610,7 @@ async function main() {
       catIds.push(id(row.id));
     }
 
-    // 6a. Absence Types
+    // 7a. Absence Types
     interface AbsenceTypeRow { id: number; label: string }
     const absenceTypeRows: AbsenceTypeRow[] = [];
     for (let i = 0; i < tenant.absenceTypes.length; i++) {
@@ -541,7 +625,7 @@ async function main() {
       absenceTypeRows.push({ id: id(row.id), label: row.label });
     }
 
-    // 6b. Shift Codes
+    // 7b. Shift Codes
     interface ShiftCodeRow { id: number; label: string; focus_area_id: number | null }
     const shiftCodeRows: ShiftCodeRow[] = [];
     for (let i = 0; i < tenant.shiftCodes.length; i++) {
@@ -565,7 +649,7 @@ async function main() {
       });
     }
 
-    // 7. Indicator Types
+    // 8. Indicator Types
     for (let i = 0; i < tenant.indicatorTypes.length; i++) {
       const it = tenant.indicatorTypes[i];
       await db.query(
@@ -575,7 +659,7 @@ async function main() {
       );
     }
 
-    // 8. Employees — spread across focus areas
+    // 9. Employees — spread across focus areas
     const empNames: string[] = [];
     for (let i = 0; i < tenant.employeeCount; i++) {
       empNames.push(EMPLOYEE_NAMES[globalNameIdx % EMPLOYEE_NAMES.length]);
@@ -617,7 +701,21 @@ async function main() {
       });
     }
 
-    // 9. Shifts (March 22 – April 4, 2026 — 2 weeks of data)
+    // 9b. Assign ~20% of employees to management departments
+    const mgmtDeptIds = deptIds.filter((_, idx) => tenant.departments?.[idx]?.type === 'management');
+    if (mgmtDeptIds.length > 0) {
+      for (let i = 0; i < employees.length; i++) {
+        if (i % 5 === 0) {
+          const mgmtId = mgmtDeptIds[i % mgmtDeptIds.length];
+          await db.query(
+            `UPDATE public.employees SET department_ids = $1 WHERE id = $2`,
+            [[mgmtId], employees[i].id]
+          );
+        }
+      }
+    }
+
+    // 10. Shifts (March 22 – April 4, 2026 — 2 weeks of data)
     const offAbsenceType = absenceTypeRows[0]; // First absence type (e.g., "Off")
     let shiftCount = 0;
 
@@ -692,7 +790,7 @@ async function main() {
       );
     }
 
-    console.log(`    ✓ ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.shiftCodes.length} codes, ${employees.length} employees, ${shiftCount} shifts`);
+    console.log(`    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.shiftCodes.length} codes, ${employees.length} employees, ${shiftCount} shifts`);
   }
 
   // ── Calm Haven (6th tenant) — from SQL seed file ────────────────────
@@ -711,25 +809,41 @@ async function main() {
   // Uses a DO $$ block (same pattern as seed_calm_haven.sql) to avoid
   // pg driver prepared-statement type inference issues.
 
+  // ── Bare Arden Wood org (for onboarding testing) ─────────────────────
+  // No departments, focus areas, shift codes, certifications, roles, or employees.
+  // The onboarding wizard will fire for users assigned to this org.
+  console.log("\n  Creating bare Arden Wood org (onboarding test)...");
+  await db.query(
+    `INSERT INTO public.organizations (name, slug, address, phone, timezone, employee_count)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    ["Arden Wood", "ardenwood", "445 Wawona Street\nSan Francisco, CA 94116", "(415) 425-3334", "America/Los_Angeles", 50]
+  );
+  console.log("    ✓ Arden Wood (bare org — no config data)");
+
   console.log("\n  Creating test users...");
 
-  // Get default and Calm Haven organization IDs
+  // Get organization IDs for user assignment
   const { rows: orgs } = await db.query(
-    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven')`
+    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven', 'ardenwood')`
   );
   const defaultOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'sunrise-senior')?.id;
   const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'calmhaven')?.id;
+  const ardenwoodOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'ardenwood')?.id;
 
   const TEST_USERS = [
     { email: "nicokosmas.dev@gmail.com",     platform_role: "gridmaster", org_role: "user",        label: "gridmaster",  first_name: "Nicodamus", last_name: "Kosmas", preferred_org: "sunrise-senior" },
-    { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "calmhaven" },
+    { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "ardenwood" },
     { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "calmhaven" },
   ];
 
   const allAdminPerms = `'{"canEditShifts":true,"canPublishSchedule":true,"canApplyRecurringSchedule":true,"canEditNotes":true,"canManageRecurringShifts":true,"canManageShiftSeries":true,"canManageEmployees":true,"canManageFocusAreas":true,"canManageShiftCodes":true,"canManageIndicatorTypes":true,"canManageOrgSettings":true}'::jsonb`;
 
   for (const user of TEST_USERS) {
-    const orgIdStr = user.preferred_org === 'calmhaven' ? calmhavenOrgId : defaultOrgId;
+    const orgIdStr = user.preferred_org === 'ardenwood'
+      ? ardenwoodOrgId
+      : user.preferred_org === 'calmhaven'
+        ? calmhavenOrgId
+        : defaultOrgId;
     const orgIdSql = user.platform_role === "gridmaster" ? "NULL" : `'${orgIdStr}'`;
 
     await db.query(`
@@ -815,7 +929,7 @@ async function main() {
     console.log(`    ✓ ${user.label}: ${allOrgs.length} organizations`);
   }
 
-  console.log("\n✅ All 6 tenants + 3 test users + memberships seeded successfully!");
+  console.log("\n✅ All 7 tenants (6 configured + 1 bare) + 3 test users + memberships seeded successfully!");
   await db.end();
   process.exit(0);
 }

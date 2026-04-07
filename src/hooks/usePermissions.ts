@@ -20,38 +20,86 @@ const ALL_PERMS: AdminPermissions = {
   canPublishSchedule: true,
   canApplyRecurringSchedule: true,
   canEditNotes: true,
+  canViewRecurringShifts: true,
   canManageRecurringShifts: true,
   canManageShiftSeries: true,
   canViewStaff: true,
+  canViewEmployeeDetails: true,
   canManageEmployees: true,
+  canViewFocusAreas: true,
   canManageFocusAreas: true,
+  canViewShiftCodes: true,
   canManageShiftCodes: true,
+  canViewIndicatorTypes: true,
   canManageIndicatorTypes: true,
   canManageOrgSettings: true,
+  canViewOrgLabels: true,
   canManageOrgLabels: true,
+  canViewCoverageRequirements: true,
   canManageCoverageRequirements: true,
   canApproveShiftRequests: true,
+  canViewDashboardAnalytics: true,
 };
 
 /** Read-only baseline — used for user role (and admin with no configured perms). */
-const READ_ONLY_PERMS: AdminPermissions = {
+export const READ_ONLY_PERMS: AdminPermissions = {
   canViewSchedule: true,
   canEditShifts: false,
   canPublishSchedule: false,
   canApplyRecurringSchedule: false,
   canEditNotes: false,
+  canViewRecurringShifts: false,
   canManageRecurringShifts: false,
   canManageShiftSeries: false,
   canViewStaff: true,
+  canViewEmployeeDetails: false,
   canManageEmployees: false,
+  canViewFocusAreas: false,
   canManageFocusAreas: false,
+  canViewShiftCodes: false,
   canManageShiftCodes: false,
+  canViewIndicatorTypes: false,
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,
+  canViewOrgLabels: false,
   canManageOrgLabels: false,
+  canViewCoverageRequirements: false,
   canManageCoverageRequirements: false,
   canApproveShiftRequests: false,
+  canViewDashboardAnalytics: false,
 };
+
+/**
+ * Enforce view implications: canManage* implies canView* for each paired permission.
+ * Also sets canViewDashboardAnalytics when the user has any edit/manage permission.
+ */
+export function applyViewImplications(p: AdminPermissions): AdminPermissions {
+  const result = { ...p };
+  result.canViewEmployeeDetails = result.canViewEmployeeDetails || result.canManageEmployees;
+  result.canViewFocusAreas = result.canViewFocusAreas || result.canManageFocusAreas;
+  result.canViewShiftCodes = result.canViewShiftCodes || result.canManageShiftCodes;
+  result.canViewIndicatorTypes = result.canViewIndicatorTypes || result.canManageIndicatorTypes;
+  result.canViewCoverageRequirements = result.canViewCoverageRequirements || result.canManageCoverageRequirements;
+  result.canViewRecurringShifts = result.canViewRecurringShifts || result.canManageRecurringShifts;
+  result.canViewOrgLabels = result.canViewOrgLabels || result.canManageOrgLabels;
+  result.canViewDashboardAnalytics = result.canViewDashboardAnalytics ||
+    result.canEditShifts || result.canManageEmployees || result.canPublishSchedule ||
+    result.canApproveShiftRequests;
+  return result;
+}
+
+/** Union multiple permission sets — most permissive wins per boolean field. */
+export function unionPermissions(permsList: AdminPermissions[]): AdminPermissions {
+  const result: AdminPermissions = { ...READ_ONLY_PERMS };
+  for (const p of permsList) {
+    for (const key of Object.keys(result) as (keyof AdminPermissions)[]) {
+      if (p[key]) (result as unknown as Record<string, boolean>)[key] = true;
+    }
+  }
+  // canManageOrgSettings must never be granted via department permissions
+  result.canManageOrgSettings = false;
+  return result;
+}
 
 export interface Permissions extends AdminPermissions {
   role: string;
@@ -66,8 +114,10 @@ export interface Permissions extends AdminPermissions {
   isUserViewActive: boolean;
   /** The user's actual role level (unaffected by user view toggle). */
   actualLevel: number;
-  /** True if user can access the settings page (has any config-level permission). */
+  /** True if user can edit any org config (has any manage-level config permission). */
   canManageOrg: boolean;
+  /** True if user can access the settings page (has any view or manage config permission). */
+  canAccessSettings: boolean;
   /** True if user can invite / change roles of org members (super_admin+ only). */
   canManageUsers: boolean;
   /** True if user can configure per-admin permissions (super_admin+ only). */
@@ -81,6 +131,7 @@ function buildPerms(
   isLoading: boolean,
   adminPerms?: AdminPermissions | null,
   isImpersonating = false,
+  departmentPerms?: AdminPermissions | null,
 ): Permissions {
   const level = ROLE_LEVEL[role] ?? 0;
   const isGridmaster = level >= 4;
@@ -93,6 +144,9 @@ function buildPerms(
     p = adminPerms
       ? { ...adminPerms, canViewSchedule: true }
       : READ_ONLY_PERMS;
+  } else if (role === "user" && departmentPerms) {
+    // Management department members: use their department-derived permissions
+    p = { ...departmentPerms, canViewSchedule: true, canViewStaff: true, canManageOrgSettings: false };
   } else {
     p = READ_ONLY_PERMS;
   }
@@ -114,6 +168,9 @@ function buildPerms(
     };
   }
 
+  // ── Apply view implications: canManage* → canView* ────────────────
+  p = applyViewImplications(p);
+
   const canManageOrg =
     isGridmaster ||
     isSuperAdmin ||
@@ -123,6 +180,14 @@ function buildPerms(
     p.canManageOrgSettings ||
     p.canManageOrgLabels ||
     p.canManageCoverageRequirements;
+
+  const canAccessSettings =
+    canManageOrg ||
+    p.canViewFocusAreas ||
+    p.canViewShiftCodes ||
+    p.canViewIndicatorTypes ||
+    p.canViewOrgLabels ||
+    p.canViewCoverageRequirements;
 
   return {
     ...p,
@@ -136,6 +201,7 @@ function buildPerms(
     isUserViewActive: false,
     actualLevel: level,
     canManageOrg,
+    canAccessSettings,
     canManageUsers: isImpersonating ? false : (isSuperAdmin || isGridmaster),
     canConfigureAdminPermissions: isImpersonating ? false : (isSuperAdmin || isGridmaster),
     atLeast: (r: string) => level >= (ROLE_LEVEL[r] ?? 0),
@@ -345,17 +411,38 @@ export function usePermissions(): Permissions {
           if (profile.org_id) {
             const { data: membership } = await supabase
               .from("organization_memberships")
-              .select("org_role, admin_permissions")
+              .select("org_role, admin_permissions, department_ids")
               .eq("user_id", session.user.id)
               .eq("org_id", profile.org_id)
               .single();
 
             if (mounted && membership) {
+              // For user role with management department memberships, resolve dept permissions
+              let deptPerms: AdminPermissions | null = null;
+              if (membership.org_role === "user") {
+                const deptIds: number[] = (membership.department_ids as number[]) ?? [];
+                if (deptIds.length > 0) {
+                  const { data: depts } = await supabase
+                    .from("departments")
+                    .select("permissions")
+                    .in("id", deptIds)
+                    .eq("type", "management")
+                    .not("permissions", "is", null);
+                  if (depts && depts.length > 0) {
+                    deptPerms = unionPermissions(
+                      depts.map((d: { permissions: unknown }) => d.permissions as AdminPermissions),
+                    );
+                  }
+                }
+              }
+
               setPermsAndCache(buildPerms(
                 membership.org_role,
                 profile.org_id,
                 false,
                 membership.admin_permissions ?? null,
+                false,
+                deptPerms,
               ), sessionUserId);
               return;
             }
@@ -396,14 +483,22 @@ export function usePermissions(): Permissions {
       loadSession(session);
     });
 
-    // ── Realtime: invalidate permission cache on membership changes ────
+    // ── Realtime: invalidate permission cache on membership/department changes ──
     // When another session (e.g. super_admin) updates the current user's
-    // admin_permissions or org_role, we get a Postgres change event and
-    // immediately re-resolve permissions instead of waiting up to 10s.
+    // admin_permissions, org_role, or a department's permissions template,
+    // we get a Postgres change event and immediately re-resolve.
     let membershipChannel: ReturnType<typeof supabase.channel> | null = null;
+    let departmentChannel: ReturnType<typeof supabase.channel> | null = null;
     // Unique channel name per effect instance avoids reusing an already-subscribed
     // channel during React strict-mode double-mounts.
     const channelId = `perms:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
+    const reResolve = () => {
+      clearPermsCache();
+      supabase.auth.getSession().then(({ data: { session: fresh } }: { data: { session: Session | null } }) => {
+        if (mounted) loadSession(fresh);
+      });
+    };
 
     if (typeof supabase.channel === "function") {
       supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
@@ -419,15 +514,27 @@ export function usePermissions(): Permissions {
               table: "organization_memberships",
               filter: `user_id=eq.${uid}`,
             } as Record<string, unknown>,
-            () => {
-              // Bust the cache so the next resolve reads fresh DB data.
-              clearPermsCache();
-              supabase.auth.getSession().then(({ data: { session: fresh } }: { data: { session: Session | null } }) => {
-                if (mounted) loadSession(fresh);
-              });
-            },
+            reResolve,
           )
           .subscribe();
+
+        // Listen for department permission template changes (scoped to user's org)
+        const { orgId: userOrgId } = extractJwtClaims(s.access_token);
+        if (userOrgId) {
+          departmentChannel = supabase
+            .channel(`dept-perms:${channelId}`)
+            .on(
+              "postgres_changes" as "system",
+              {
+                event: "UPDATE",
+                schema: "public",
+                table: "departments",
+                filter: `org_id=eq.${userOrgId}`,
+              } as Record<string, unknown>,
+              reResolve,
+            )
+            .subscribe();
+        }
       });
     }
 
@@ -435,6 +542,7 @@ export function usePermissions(): Permissions {
       mounted = false;
       subscription.unsubscribe();
       if (membershipChannel) supabase.removeChannel(membershipChannel);
+      if (departmentChannel) supabase.removeChannel(departmentChannel);
     };
   }, []);
 
@@ -454,6 +562,7 @@ export function usePermissions(): Permissions {
       isUserViewActive: true,
       actualLevel: perms.level,
       canManageOrg: false,
+      canAccessSettings: false,
       canManageUsers: false,
       canConfigureAdminPermissions: false,
       atLeast: (r: string) => 0 >= (ROLE_LEVEL[r] ?? 0),

@@ -11,9 +11,11 @@ import { labelStyle } from "./shared";
 export default function OrganizationLabels({
   organization,
   onSave,
+  readOnly = false,
 }: {
   organization: Organization;
   onSave: (o: Organization) => void;
+  readOnly?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState({
@@ -76,6 +78,7 @@ export default function OrganizationLabels({
             placeholder="Focus Areas"
             maxLength={30}
             className="dg-input"
+            readOnly={readOnly}
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Focus Areas, Departments, Units
@@ -89,6 +92,7 @@ export default function OrganizationLabels({
             placeholder="Certifications"
             maxLength={30}
             className="dg-input"
+            readOnly={readOnly}
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Certifications, Designations
@@ -102,6 +106,7 @@ export default function OrganizationLabels({
             placeholder="Roles"
             maxLength={30}
             className="dg-input"
+            readOnly={readOnly}
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Responsibilities, Positions
@@ -115,6 +120,7 @@ export default function OrganizationLabels({
             placeholder="Departments"
             maxLength={30}
             className="dg-input"
+            readOnly={readOnly}
           />
           <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             e.g. Departments, Teams, Divisions
@@ -122,7 +128,7 @@ export default function OrganizationLabels({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {!readOnly && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <button
           onClick={handleSave}
           disabled={!isModified || saving}
@@ -144,7 +150,7 @@ export default function OrganizationLabels({
             Saved!
           </span>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

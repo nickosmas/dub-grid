@@ -34,6 +34,7 @@ const focusAreas: FocusArea[] = [
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
     sortOrder: 1,
+    departmentId: null,
   },
   {
     id: 2,
@@ -42,6 +43,7 @@ const focusAreas: FocusArea[] = [
     colorBg: "#F0FDF4",
     colorText: "#166534",
     sortOrder: 2,
+    departmentId: null,
   },
 ];
 
@@ -60,6 +62,7 @@ const employee: Employee = {
   email: "alice@example.com",
   contactNotes: "",
   userId: null,
+  departmentIds: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -289,6 +292,7 @@ describe("EditEmployeePanel", () => {
         email: fc.string({ maxLength: 30 }),
         contactNotes: fc.string({ maxLength: 50 }),
         userId: fc.constant(null as string | null),
+        departmentIds: fc.constant([] as number[]),
       });
 
       fc.assert(
@@ -301,6 +305,7 @@ describe("EditEmployeePanel", () => {
             colorBg: "#EFF6FF",
             colorText: "#1D4ED8",
             sortOrder: i + 1,
+            departmentId: null,
           }));
 
           const { unmount, container } = render(

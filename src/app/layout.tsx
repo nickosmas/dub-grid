@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CookieConsent from "@/components/CookieConsent";
 import TermsAcceptanceGate from "@/components/TermsAcceptanceGate";
+import OnboardingGate from "@/components/onboarding/OnboardingGate";
 
 import PostHogProvider from "@/components/PostHogProvider";
 
@@ -62,11 +63,13 @@ export default function RootLayout({
             <PostHogProvider>
             <QueryProvider>
               <TermsAcceptanceGate>
-                <MobileSubNavProvider>
-                  <TooltipProvider>
-                    <AppShell>{children}</AppShell>
-                  </TooltipProvider>
-                </MobileSubNavProvider>
+                <OnboardingGate>
+                  <MobileSubNavProvider>
+                    <TooltipProvider>
+                      <AppShell>{children}</AppShell>
+                    </TooltipProvider>
+                  </MobileSubNavProvider>
+                </OnboardingGate>
               </TermsAcceptanceGate>
             </QueryProvider>
             </PostHogProvider>

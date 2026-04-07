@@ -83,7 +83,7 @@ describe("rowToFocusArea", () => {
       color_bg: "#ff0000",
       color_text: "#ffffff",
       sort_order: 3,
-      break_minutes: null,
+      department_id: null,
       archived_at: null,
     };
 
@@ -95,7 +95,6 @@ describe("rowToFocusArea", () => {
     expect(result.colorBg).toBe("#ff0000");
     expect(result.colorText).toBe("#ffffff");
     expect(result.sortOrder).toBe(3);
-    expect(result.breakMinutes).toBeNull();
     expect(result.archivedAt).toBeNull();
   });
 
@@ -107,7 +106,7 @@ describe("rowToFocusArea", () => {
       color_bg: "#ccc",
       color_text: "#000",
       sort_order: 4,
-      break_minutes: null,
+      department_id: null,
       archived_at: "2026-03-10T12:00:00Z",
     };
 
@@ -299,6 +298,7 @@ const baseEmployeeRow: DbEmployee = {
   email: "alice@example.com",
   contact_notes: "Call after 9am",
   user_id: null,
+  department_ids: [],
   archived_at: null,
 };
 
@@ -357,6 +357,7 @@ describe("employeeToRow", () => {
     email: "bob@example.com",
     contactNotes: "Prefers text",
     userId: null,
+    departmentIds: [],
   };
 
   it("maps all fields correctly to snake_case", () => {
@@ -405,6 +406,7 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     email: fc.string(),
     contact_notes: fc.string(),
     user_id: fc.constant(null as string | null),
+    department_ids: fc.constant([] as number[]),
     archived_at: fc.constant(null as string | null),
   });
 

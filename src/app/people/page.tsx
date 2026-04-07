@@ -6,13 +6,15 @@ import StaffView from "@/components/StaffView";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
-import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
+import { useOrganizationData, useEmployees, usePermissions, useDirectory } from "@/hooks";
+import { linkEmployeeToUser } from "@/lib/db";
+import type { NewEmployeeData } from "@/components/AddEmployeeModal";
 
 function PeoplePageContent() {
-  const { canViewStaff, canEditShifts, canManageEmployees, isSuperAdmin, isGridmaster, isLoading: permsLoading, orgId } = usePermissions();
+  const { canViewStaff, canViewEmployeeDetails, canEditShifts, canManageEmployees, isSuperAdmin, isGridmaster, isLoading: permsLoading, orgId } = usePermissions();
   const {
     org, focusAreas, shiftCodes, certifications, orgRoles, departments, shiftCodeMap, absenceTypes,
-    loading: refLoading, loadError,
+    loading: refLoading, loadError, setupStatus,
   } = useOrganizationData();
   const {
     employees, benchedEmployees, terminatedEmployees,
@@ -21,6 +23,7 @@ function PeoplePageContent() {
     handleBenchEmployee, handleActivateEmployee,
   } = useEmployees(orgId ?? org?.id ?? null);
 
+  const { directory } = useDirectory(orgId ?? org?.id ?? null);
   const [showAddModal, setShowAddModal] = useState(false);
   const isLoading = refLoading || empLoading || permsLoading;
 
@@ -75,7 +78,9 @@ function PeoplePageContent() {
             shiftCodeMap={shiftCodeMap}
             absenceTypes={absenceTypes}
             departments={departments}
+            departmentLabel={org?.departmentLabel}
             canEditShifts={canEditShifts}
+            canViewEmployeeDetails={canViewEmployeeDetails}
             canManageEmployees={canManageEmployees}
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
@@ -84,14 +89,32 @@ function PeoplePageContent() {
             roleLabel={org?.roleLabel}
             orgName={org?.name}
             shiftDisplayMode={org?.shiftDisplayMode}
+            setupIncomplete={!setupStatus.isComplete}
           />
 
           {showAddModal && (
             <AddEmployeeModal
               focusAreas={focusAreas}
               certifications={certifications}
-              onAdd={async (dataList) => {
-                await handleAddEmployee(dataList);
+              directory={directory}
+              onAdd={async (dataList: NewEmployeeData[]) => {
+                const created = await handleAddEmployee(dataList);
+                // Auto-link any matched app-only users
+                const effectiveOrgId = orgId ?? org?.id;
+                if (created && effectiveOrgId) {
+                  for (let i = 0; i < dataList.length; i++) {
+                    const item = dataList[i];
+                    const emp = created[i];
+                    if (item._linkToUserId && emp?.id) {
+                      try {
+                        await linkEmployeeToUser(emp.id, item._linkToUserId, effectiveOrgId);
+                      } catch {
+                        // Non-blocking — employee was created, link failed
+                        toast.error(`Created employee but failed to link app account for ${item.firstName} ${item.lastName}`);
+                      }
+                    }
+                  }
+                }
                 setShowAddModal(false);
               }}
               onClose={() => setShowAddModal(false)}

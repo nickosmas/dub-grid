@@ -21,11 +21,9 @@ export default function QuickActionsBar({
 }: QuickActionsBarProps) {
   const actions: QuickAction[] = [];
 
-  if (permissions.level === 0) {
-    // User role
-    actions.push({ label: "View my schedule", href: "/schedule", variant: "primary" });
-    actions.push({ label: "Browse open shifts", href: "/schedule?panel=requests" });
-  } else if (permissions.level >= 3) {
+  const hasAdminCapability = permissions.level >= 2 || permissions.canManageOrg || permissions.canEditShifts || permissions.canManageEmployees || permissions.canViewDashboardAnalytics;
+
+  if (permissions.level >= 3) {
     // Super admin
     actions.push({ label: "Manage users", href: "/settings", variant: "primary" });
     actions.push({ label: "Go to schedule", href: "/schedule" });
@@ -36,19 +34,23 @@ export default function QuickActionsBar({
         badge: pendingApprovalCount,
       });
     }
-  } else {
-    // Admin
+  } else if (hasAdminCapability) {
+    // Admin or department-permissioned user with management capabilities
     actions.push({ label: "Go to schedule", href: "/schedule", variant: "primary" });
-    if (pendingApprovalCount > 0) {
+    if (permissions.canApproveShiftRequests && pendingApprovalCount > 0) {
       actions.push({
         label: "Review requests",
         href: "/schedule?panel=requests",
         badge: pendingApprovalCount,
       });
     }
-    if (draftCount > 0) {
+    if (permissions.canPublishSchedule && draftCount > 0) {
       actions.push({ label: "Publish changes", href: "/schedule", badge: draftCount });
     }
+  } else {
+    // Read-only user
+    actions.push({ label: "View my schedule", href: "/schedule", variant: "primary" });
+    actions.push({ label: "Browse open shifts", href: "/schedule?panel=requests" });
   }
 
   return (

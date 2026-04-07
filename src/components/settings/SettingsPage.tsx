@@ -4,8 +4,8 @@ import React, { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, CoverageRequirement, AbsenceType } from "@/types";
-import { saveCertifications, saveOrganizationRoles, saveDepartments } from "@/lib/db";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType } from "@/types";
+import { saveCertifications, saveOrganizationRoles } from "@/lib/db";
 import { helpText } from "@/lib/help-content";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -33,8 +33,8 @@ import ScheduleRules from "./ScheduleRules";
 import ShiftCategories from "./ShiftCategories";
 import ShiftCodes from "./ShiftCodes";
 import Coverage from "./Coverage";
-import FocusAreas from "./FocusAreas";
 import StringListSettings from "./StringListSettings";
+import DepartmentsSettings from "./DepartmentsSettings";
 import Indicators from "./Indicators";
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ export interface SettingsPageProps {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  departments: NamedItem[];
+  departments: Department[];
   onOrganizationSave: (organization: Organization) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
   onShiftCodesChange: (codes: ShiftCode[]) => void;
@@ -54,18 +54,24 @@ export interface SettingsPageProps {
   onIndicatorTypesChange: (types: IndicatorType[]) => void;
   onCertificationsChange: (items: NamedItem[]) => void;
   onOrgRolesChange: (items: NamedItem[]) => void;
-  onDepartmentsChange: (items: NamedItem[]) => void;
+  onDepartmentsChange: (items: Department[]) => void;
   canManageOrg: boolean;
+  canAccessSettings: boolean;
   isSuperAdmin: boolean;
   isGridmaster: boolean;
   canManageOrgLabels: boolean;
+  canViewOrgLabels: boolean;
   canManageFocusAreas: boolean;
+  canViewFocusAreas: boolean;
   canManageShiftCodes: boolean;
+  canViewShiftCodes: boolean;
   canManageIndicatorTypes: boolean;
+  canViewIndicatorTypes: boolean;
   canManageOrgSettings: boolean;
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
   canManageCoverageRequirements: boolean;
+  canViewCoverageRequirements: boolean;
   absenceTypes: AbsenceType[];
   onAbsenceTypesChange: (types: AbsenceType[]) => void;
 }
@@ -89,16 +95,22 @@ export default function SettingsPage({
   onOrgRolesChange,
   onDepartmentsChange,
   canManageOrg,
+  canAccessSettings,
   isSuperAdmin,
   isGridmaster,
   canManageOrgLabels,
+  canViewOrgLabels,
   canManageFocusAreas,
+  canViewFocusAreas,
   canManageShiftCodes,
+  canViewShiftCodes,
   canManageIndicatorTypes,
+  canViewIndicatorTypes,
   canManageOrgSettings,
   coverageRequirements,
   onCoverageRequirementsChange,
   canManageCoverageRequirements,
+  canViewCoverageRequirements,
   absenceTypes,
   onAbsenceTypesChange,
 }: SettingsPageProps) {
@@ -108,15 +120,21 @@ export default function SettingsPage({
 
   const perms: NavPermissions = useMemo(() => ({
     canManageOrg,
+    canAccessSettings,
     isSuperAdmin,
     isGridmaster,
     canManageOrgLabels,
+    canViewOrgLabels,
     canManageFocusAreas,
+    canViewFocusAreas,
     canManageShiftCodes,
+    canViewShiftCodes,
     canManageIndicatorTypes,
+    canViewIndicatorTypes,
     canManageOrgSettings,
     canManageCoverageRequirements,
-  }), [canManageOrg, isSuperAdmin, isGridmaster, canManageOrgLabels, canManageFocusAreas, canManageShiftCodes, canManageIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements]);
+    canViewCoverageRequirements,
+  }), [canManageOrg, canAccessSettings, isSuperAdmin, isGridmaster, canManageOrgLabels, canViewOrgLabels, canManageFocusAreas, canViewFocusAreas, canManageShiftCodes, canViewShiftCodes, canManageIndicatorTypes, canViewIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements, canViewCoverageRequirements]);
 
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
@@ -235,8 +253,8 @@ export default function SettingsPage({
           </h1>
         )}
 
-        {/* Permission info for admins with limited access */}
-        {canManageOrg && !isSuperAdmin && !isGridmaster && (
+        {/* Permission info for users with limited access */}
+        {canAccessSettings && !isSuperAdmin && !isGridmaster && (
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "8px 14px", marginBottom: 16,
@@ -265,12 +283,13 @@ export default function SettingsPage({
           </div>
         )}
 
-        {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels) && (
+        {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
             <Section title="Custom Labels" helpText={helpText.settings.orgLabels}>
               <OrganizationLabels
                 organization={organization}
                 onSave={onOrganizationSave}
+                readOnly={!isSuperAdmin && !canManageOrgLabels}
               />
             </Section>
           </div>
@@ -301,7 +320,7 @@ export default function SettingsPage({
           </div>
         )}
 
-        {activeSection === "schedule-categories" && canManageOrg && (
+        {activeSection === "schedule-categories" && (canManageShiftCodes || canViewShiftCodes) && (
           <div style={{ width: "100%", maxWidth }}>
             <ShiftCategories
               shiftCategories={shiftCategories}
@@ -315,7 +334,7 @@ export default function SettingsPage({
           </div>
         )}
 
-        {activeSection === "schedule-codes" && canManageOrg && (
+        {activeSection === "schedule-codes" && (canManageShiftCodes || canViewShiftCodes) && (
           <div style={{ width: "100%", maxWidth }}>
             <ShiftCodes
               shiftCodes={shiftCodes}
@@ -334,7 +353,7 @@ export default function SettingsPage({
           </div>
         )}
 
-        {activeSection === "schedule-coverage" && canManageOrg && (
+        {activeSection === "schedule-coverage" && (canManageCoverageRequirements || canViewCoverageRequirements) && (
           <div style={{ width: "100%", maxWidth }}>
             <Coverage
               orgId={organization.id}
@@ -351,21 +370,9 @@ export default function SettingsPage({
 
         {/* ── Staff & Designations group ──────────────────────── */}
 
-        {activeSection === "staff-focus-areas" && canManageOrg && (
-          <div style={{ width: "100%", maxWidth }}>
-            <Section title={focusAreaLabel} noPadding helpText={helpText.staff.focusAreas}>
-              <FocusAreas
-                focusAreas={focusAreas}
-                orgId={organization.id}
-                label={focusAreaLabel.replace(/s$/, "")}
-                onChange={onFocusAreasChange}
-                canManageFocusAreas={canManageFocusAreas}
-              />
-            </Section>
-          </div>
-        )}
+        {/* Focus areas section removed — now managed under Departments */}
 
-        {activeSection === "staff-certifications" && canManageOrg && (
+        {activeSection === "staff-certifications" && (canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
             <Section title={certificationLabel} noPadding helpText={helpText.staff.certification}>
               <StringListSettings
@@ -383,12 +390,13 @@ export default function SettingsPage({
                   }
                 }}
                 canEdit={canManageOrgLabels}
+                departments={departments}
               />
             </Section>
           </div>
         )}
 
-        {activeSection === "staff-roles" && canManageOrg && (
+        {activeSection === "staff-roles" && (canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
             <Section title={roleLabel} noPadding helpText={helpText.staff.roles}>
               <StringListSettings
@@ -406,36 +414,29 @@ export default function SettingsPage({
                   }
                 }}
                 canEdit={canManageOrgLabels}
+                departments={departments}
               />
             </Section>
           </div>
         )}
 
-        {activeSection === "staff-departments" && canManageOrg && (
+        {activeSection === "staff-departments" && (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title={departmentLabel} noPadding>
-              <StringListSettings
-                label={`Define ${departmentLabel.toLowerCase()} for people who have app access but don\u2019t appear on the schedule (e.g. HR, Finance, Reception, Management).`}
-                items={departments}
-                placeholder="e.g. HR"
-                hideAbbr
-                onSave={async (updated) => {
-                  try {
-                    const saved = await saveDepartments(organization.id, updated, departments);
-                    onDepartmentsChange(saved);
-                    toast.success("Departments saved");
-                  } catch (err) {
-                    toast.error("Failed to save departments");
-                    throw err;
-                  }
-                }}
-                canEdit={canManageOrgLabels}
-              />
-            </Section>
+            <DepartmentsSettings
+              departments={departments}
+              focusAreas={focusAreas}
+              orgId={organization.id}
+              focusAreaLabel={focusAreaLabel}
+              departmentLabel={departmentLabel}
+              canManageFocusAreas={canManageFocusAreas}
+              canManageOrgLabels={canManageOrgLabels}
+              onDepartmentsChange={onDepartmentsChange}
+              onFocusAreasChange={onFocusAreasChange}
+            />
           </div>
         )}
 
-        {activeSection === "staff-indicators" && canManageOrg && (
+        {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
           <div style={{ width: "100%", maxWidth }}>
             <Section title="Indicators">
               <Indicators

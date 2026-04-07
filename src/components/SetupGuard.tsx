@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 import { useLogout } from "@/hooks";
 
@@ -10,36 +8,21 @@ import { useLogout } from "@/hooks";
  * before the organization is fully set up.
  *
  * - Gridmaster users: guard is skipped (no org)
- * - Super admin / admin on incomplete org: redirected to /setup
+ * - Super admin / admin: handled by OnboardingGate's inline wizard
  * - Regular users on incomplete org: shown a "setup pending" message
  * - Complete org: children rendered normally
  */
 export default function SetupGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const perms = usePermissions();
   const { setupStatus, loading: orgLoading, org } = useOrganizationData();
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
   const { signOutLocal } = useLogout();
-  const redirected = useRef(false);
 
   const isLoading = orgLoading || empLoading || perms.isLoading;
   const hasEmployees = employees.length > 0;
   const isComplete = setupStatus.isComplete && hasEmployees;
-  // If org data exists from cache, treat setup as complete during revalidation
-  // to avoid blanking the screen on every navigation.
   const hasCachedOrgData = !!org && !orgLoading;
   const isGridmasterBypass = perms.isGridmaster && !perms.isImpersonating;
-
-  useEffect(() => {
-    if (isGridmasterBypass) return;
-    if (isLoading || isComplete || redirected.current) return;
-
-    // Super admin or admin → redirect to setup checklist
-    if (perms.isSuperAdmin || perms.canManageOrg) {
-      redirected.current = true;
-      router.replace("/setup");
-    }
-  }, [isGridmasterBypass, isLoading, isComplete, perms.isSuperAdmin, perms.canManageOrg, router]);
 
   // Gridmaster users have no org — skip the guard entirely
   if (isGridmasterBypass) {
@@ -140,6 +123,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
     );
   }
 
-  // Admin/super_admin — redirect in progress
-  return null;
+  // Admin/super_admin on incomplete org — OnboardingGate handles the wizard,
+  // but if they somehow get past it, render children rather than blocking.
+  return <>{children}</>;
 }

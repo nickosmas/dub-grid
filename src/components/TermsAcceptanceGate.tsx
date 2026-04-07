@@ -47,7 +47,25 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
       }
       await acceptTerms(session.user.id);
       setNeedsAcceptance(false);
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message: unknown }).message)
+          : JSON.stringify(err);
+      console.error("Terms acceptance failed:", msg, err);
+      // Stale session after db:reset — force re-login
+      const isStaleSession =
+        msg.includes("JWT") ||
+        msg.includes("expired") ||
+        msg.includes("foreign key") ||
+        msg.includes("not found");
+      if (isStaleSession) {
+        toast.error("Session expired. Please sign in again.");
+        await supabase.auth.signOut();
+        window.location.href = "/login";
+        return;
+      }
       toast.error("Failed to record acceptance. Please try again.");
     } finally {
       setLoading(false);

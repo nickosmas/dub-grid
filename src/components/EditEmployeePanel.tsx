@@ -16,6 +16,8 @@ export interface EditEmployeePanelProps {
   roles: NamedItem[];
   roleLabel?: string;
   focusAreaLabel?: string;
+  departments?: NamedItem[];
+  departmentLabel?: string;
   onSave: (updatedEmployee: Employee) => void;
   onDelete: (empId: string) => void;
   onBench: (empId: string, note?: string) => void;
@@ -36,6 +38,7 @@ type EditForm = {
   certificationId: number | null;
   focusAreaIds: number[];
   roleIds: number[];
+  departmentIds: number[];
   phone: string;
   email: string;
   contactNotes: string;
@@ -49,6 +52,8 @@ export default function EditEmployeePanel({
   roles,
   roleLabel = "Roles",
   focusAreaLabel = "Focus Areas",
+  departments = [],
+  departmentLabel = "Department",
   onSave,
   onDelete,
   onBench,
@@ -67,6 +72,7 @@ export default function EditEmployeePanel({
     certificationId: employee.certificationId,
     focusAreaIds: employee.focusAreaIds,
     roleIds: employee.roleIds,
+    departmentIds: employee.departmentIds,
     phone: employee.phone,
     email: employee.email,
     contactNotes: employee.contactNotes,
@@ -98,6 +104,7 @@ export default function EditEmployeePanel({
       certificationId: employee.certificationId ?? null,
       focusAreaIds: employee.focusAreaIds || [],
       roleIds: employee.roleIds || [],
+      departmentIds: employee.departmentIds || [],
       phone: employee.phone || "",
       email: employee.email || "",
       contactNotes: employee.contactNotes || "",
@@ -120,7 +127,9 @@ export default function EditEmployeePanel({
       form.focusAreaIds.length !== employee.focusAreaIds.length ||
       form.focusAreaIds.some((id) => !employee.focusAreaIds.includes(id)) ||
       form.roleIds.length !== employee.roleIds.length ||
-      form.roleIds.some((id) => !employee.roleIds.includes(id))
+      form.roleIds.some((id) => !employee.roleIds.includes(id)) ||
+      form.departmentIds.length !== employee.departmentIds.length ||
+      form.departmentIds.some((id) => !employee.departmentIds.includes(id))
     );
   }, [form, employee]);
 
@@ -140,6 +149,7 @@ export default function EditEmployeePanel({
       certificationId: form.certificationId,
       focusAreaIds: form.focusAreaIds,
       roleIds: form.roleIds,
+      departmentIds: form.departmentIds,
       phone: form.phone.trim(),
       email: form.email.trim(),
       contactNotes: form.contactNotes.trim(),
@@ -315,6 +325,22 @@ export default function EditEmployeePanel({
                 style={{ width: "100%" }}
               />
             </div>
+
+            {departments.length > 0 && (
+              <div>
+                <label style={fieldLabel}>{departmentLabel}</label>
+                <CustomSelect
+                  value={form.departmentIds.length > 0 ? String(form.departmentIds[0]) : ""}
+                  options={[
+                    { value: "", label: "— None —" },
+                    ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+                  ]}
+                  onChange={(v) => setForm((p) => ({ ...p, departmentIds: v ? [Number(v)] : [] }))}
+                  disabled={readOnly}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            )}
 
             <div>
               <label style={fieldLabel}>{focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span></label>

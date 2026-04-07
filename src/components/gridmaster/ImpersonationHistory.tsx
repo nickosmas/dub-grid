@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { fetchImpersonationHistory } from "@/lib/db";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
+import { EmptyState } from "@/components/EmptyState";
 
 function StatusBadge({ entry }: { entry: ImpersonationHistoryEntry }) {
   // eslint-disable-next-line react-hooks/purity -- Date.now() is intentionally impure; value is stable per mount
@@ -179,30 +180,15 @@ export default function ImpersonationHistory() {
               </div>
             </div>
           ) : (
-            <div
-              style={{
-                padding: "48px 20px",
-                textAlign: "center",
-                background: "var(--color-surface)",
-                borderRadius: 12,
-                border: "1px dashed var(--color-border)",
-                color: "var(--color-text-muted)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <div style={{ color: "var(--color-text-faint)", background: "var(--color-bg)", padding: 12, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <EmptyState
+              icon={
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
-              </div>
-              <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600 }}>
-                No impersonation sessions yet
-              </div>
-            </div>
+              }
+              title="No impersonation sessions yet"
+            />
           )}
 
           {/* Pagination */}

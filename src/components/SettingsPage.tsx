@@ -753,6 +753,7 @@ function FocusAreasSettings({
           upsertFocusArea({
             id: fa.isNew ? undefined : fa.id,
             orgId,
+            departmentId: fa.departmentId ?? null,
             name: fa.name,
             colorBg: fa.colorBg,
             colorText: fa.colorText,
@@ -775,6 +776,7 @@ function FocusAreasSettings({
     const tmp: FocusArea & { isNew: boolean } = {
       id: nextTmpId.current--,
       orgId: orgId,
+      departmentId: null,
       name: "",
       colorBg: PREDEFINED_COLORS[0].bg,
       colorText: PREDEFINED_COLORS[0].text,
@@ -2983,14 +2985,14 @@ function ShiftCategoriesSettings({
             {(cat.startTime || cat.endTime) && (
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
                 {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
-                {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas) && (
+                {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
                   <span style={{ marginLeft: 8, fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                    ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas)})
+                    ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
                   </span>
                 )}
-                {resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas) > 0 && (
+                {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
                   <span style={{ marginLeft: 6, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
-                    incl. {resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas)}m break
+                    incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
                   </span>
                 )}
               </span>
@@ -3077,30 +3079,18 @@ function ShiftCategoriesSettings({
                 const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
                 handleChange(cat.id, "breakMinutes", val);
               }}
-              placeholder={(() => {
-                if (!cat.focusAreaId) return "No break";
-                const fa = focusAreas.find((f) => f.id === cat.focusAreaId);
-                return fa?.breakMinutes ? `Inherits ${fa.breakMinutes}m` : "No break";
-              })()}
+              placeholder="No break"
               style={{ ...inputStyle, width: 140 }}
               disabled={!canManageShiftCodes}
             />
-            {cat.breakMinutes == null && cat.focusAreaId != null && (() => {
-              const fa = focusAreas.find((f) => f.id === cat.focusAreaId);
-              return fa?.breakMinutes ? (
-                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                  Inherits {fa.breakMinutes}m from {fa.name}
-                </span>
-              ) : null;
-            })()}
           </div>
         </div>
         {calcTimeDuration(cat.startTime, cat.endTime) && (
           <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 10 }}>
             {(() => {
-              const effectiveBreak = resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas);
+              const effectiveBreak = resolveEffectiveBreak(cat.breakMinutes);
               const gross = calcTimeDuration(cat.startTime, cat.endTime);
-              const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas);
+              const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes);
               if (effectiveBreak > 0) {
                 return <>Gross: {gross} · Break: {effectiveBreak}m · Net: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{net}</span></>;
               }
@@ -3257,9 +3247,10 @@ function ShiftCategoriesSettings({
 const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
   { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRecurringSchedule", "canApproveShiftRequests"] },
   { label: "Notes", keys: ["canEditNotes"] },
-  { label: "Recurring", keys: ["canManageRecurringShifts", "canManageShiftSeries"] },
-  { label: "Staff", keys: ["canManageEmployees"] },
-  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings", "canManageOrgLabels", "canManageCoverageRequirements"] },
+  { label: "Recurring", keys: ["canViewRecurringShifts", "canManageRecurringShifts", "canManageShiftSeries"] },
+  { label: "Staff", keys: ["canViewEmployeeDetails", "canManageEmployees"] },
+  { label: "Configuration", keys: ["canViewFocusAreas", "canManageFocusAreas", "canViewShiftCodes", "canManageShiftCodes", "canViewIndicatorTypes", "canManageIndicatorTypes", "canManageOrgSettings", "canViewOrgLabels", "canManageOrgLabels", "canViewCoverageRequirements", "canManageCoverageRequirements"] },
+  { label: "Dashboard", keys: ["canViewDashboardAnalytics"] },
 ];
 
 const PERM_LABELS: Record<keyof AdminPermissions, string> = {
@@ -3268,17 +3259,25 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canPublishSchedule: "Publish Schedule",
   canApplyRecurringSchedule: "Apply Recurring Schedule",
   canEditNotes: "Edit Notes / Indicators",
+  canViewRecurringShifts: "View Recurring Shifts",
   canManageRecurringShifts: "Manage Recurring Shifts",
   canManageShiftSeries: "Manage Shift Series",
   canViewStaff: "View Staff",
+  canViewEmployeeDetails: "View Employee Details",
   canManageEmployees: "Manage Employees",
-  canManageFocusAreas: "Manage Focus Areas",
+  canViewFocusAreas: "View Departments",
+  canManageFocusAreas: "Manage Departments",
+  canViewShiftCodes: "View Shift Codes",
   canManageShiftCodes: "Manage Shift Codes",
+  canViewIndicatorTypes: "View Indicator Types",
   canManageIndicatorTypes: "Manage Indicator Types",
   canManageOrgSettings: "Manage Organization Settings",
+  canViewOrgLabels: "View Custom Labels",
   canManageOrgLabels: "Manage Custom Labels",
+  canViewCoverageRequirements: "View Coverage Requirements",
   canManageCoverageRequirements: "Manage Coverage Requirements",
   canApproveShiftRequests: "Approve Shift Requests",
+  canViewDashboardAnalytics: "View Dashboard Analytics",
 };
 
 /** Permissions that are always on and cannot be toggled off. */
@@ -3294,17 +3293,25 @@ function emptyAdminPerms(): AdminPermissions {
     canPublishSchedule: false,
     canApplyRecurringSchedule: false,
     canEditNotes: false,
+    canViewRecurringShifts: false,
     canManageRecurringShifts: false,
     canManageShiftSeries: false,
     canViewStaff: true,
+    canViewEmployeeDetails: false,
     canManageEmployees: false,
+    canViewFocusAreas: false,
     canManageFocusAreas: false,
+    canViewShiftCodes: false,
     canManageShiftCodes: false,
+    canViewIndicatorTypes: false,
     canManageIndicatorTypes: false,
     canManageOrgSettings: false,
+    canViewOrgLabels: false,
     canManageOrgLabels: false,
+    canViewCoverageRequirements: false,
     canManageCoverageRequirements: false,
     canApproveShiftRequests: false,
+    canViewDashboardAnalytics: false,
   };
 }
 

@@ -6,7 +6,6 @@ import type {
   ShiftMap,
   ShiftCode,
   ShiftCategory,
-  FocusArea,
   NamedItem,
   ShiftDisplayMode,
 } from "@/types";
@@ -25,7 +24,6 @@ interface OverviewTabProps {
   shifts: ShiftMap;
   shiftCodeById: Map<number, ShiftCode>;
   categoryById: Map<number, ShiftCategory>;
-  focusAreaById: Map<number, FocusArea>;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   shiftDisplayMode?: ShiftDisplayMode;
@@ -36,15 +34,14 @@ export function OverviewTab({
   shifts,
   shiftCodeById,
   categoryById,
-  focusAreaById,
   certifications,
   orgRoles,
   shiftDisplayMode,
 }: OverviewTabProps) {
   const isNameMode = shiftDisplayMode === "name";
   const hoursHistory = useMemo(
-    () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById, focusAreaById),
-    [employee.id, shifts, shiftCodeById, categoryById, focusAreaById]
+    () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById),
+    [employee.id, shifts, shiftCodeById, categoryById]
   );
 
   const shiftDist = useMemo(

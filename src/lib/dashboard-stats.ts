@@ -189,19 +189,14 @@ export function filterShiftsByWeek(
 
 // ─── Hour Computation ───────────────────────────────────
 
-/** Resolve effective break minutes for a shift code: category → focus area → 0. */
+/** Resolve effective break minutes for a shift code: category → 0. */
 export function resolveBreakMinutes(
   shiftCode: ShiftCode,
   categoryById?: Map<number, ShiftCategory>,
-  focusAreaById?: Map<number, FocusArea>,
 ): number {
   if (categoryById && shiftCode.categoryId != null) {
     const cat = categoryById.get(shiftCode.categoryId);
     if (cat?.breakMinutes != null) return cat.breakMinutes;
-  }
-  if (focusAreaById && shiftCode.focusAreaId != null) {
-    const fa = focusAreaById.get(shiftCode.focusAreaId);
-    if (fa?.breakMinutes != null) return fa.breakMinutes;
   }
   return 0;
 }
@@ -212,7 +207,6 @@ export function computeShiftDurationHours(
   customStartTime?: string | null,
   customEndTime?: string | null,
   categoryById?: Map<number, ShiftCategory>,
-  focusAreaById?: Map<number, FocusArea>,
 ): number {
   if (customStartTime && customEndTime) {
     // Handle pipe-delimited per-pill custom times (e.g. "07:00|09:00")
@@ -226,11 +220,11 @@ export function computeShiftDurationHours(
         const sc = shiftCodeIds[i] != null ? shiftCodeById.get(shiftCodeIds[i]) : undefined;
         if (s && e) {
           let h = durationHoursFromTimes(s, e);
-          if (sc) h = Math.max(0, h - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+          if (sc) h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
           total += h;
         } else if (sc?.defaultStartTime && sc.defaultEndTime) {
           let h = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
-          h = Math.max(0, h - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+          h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
           total += h;
         }
       }
@@ -241,7 +235,7 @@ export function computeShiftDurationHours(
     for (const codeId of shiftCodeIds) {
       const sc = shiftCodeById.get(codeId);
       if (sc) {
-        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
         break;
       }
     }
@@ -254,20 +248,20 @@ export function computeShiftDurationHours(
     if (sc.defaultStartTime && sc.defaultEndTime) {
       // Level 2: shift code custom times
       let hours = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
-      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
       total += hours;
     } else if (categoryById && sc.categoryId != null) {
       // Level 1: fall back to shift category times
       const cat = categoryById.get(sc.categoryId);
       if (cat?.startTime && cat?.endTime) {
         let hours = durationHoursFromTimes(cat.startTime, cat.endTime);
-        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
         total += hours;
       }
     } else if (sc.defaultDurationHours != null || sc.defaultDurationMinutes != null) {
       // General codes: use duration
       let hours = (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
-      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById, focusAreaById) / 60);
+      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
       total += hours;
     }
   }
@@ -281,7 +275,6 @@ export function computeEmployeeWeeklyHours(
   shiftCodeById: Map<number, ShiftCode>,
   otThreshold = 40,
   categoryById?: Map<number, ShiftCategory>,
-  focusAreaById?: Map<number, FocusArea>,
 ): EmployeeHours {
   const dailyHours: Record<string, number> = {};
   let totalHours = 0;
@@ -298,7 +291,6 @@ export function computeEmployeeWeeklyHours(
       entry.customStartTime,
       entry.customEndTime,
       categoryById,
-      focusAreaById,
     );
     dailyHours[dateKey] = hours;
     totalHours += hours;
@@ -321,10 +313,9 @@ export function computeAllEmployeeHours(
   shiftCodeById: Map<number, ShiftCode>,
   otThreshold = 40,
   categoryById?: Map<number, ShiftCategory>,
-  focusAreaById?: Map<number, FocusArea>,
 ): EmployeeHours[] {
   return employees.map((emp) =>
-    computeEmployeeWeeklyHours(emp.id, weekDateKeys, shifts, shiftCodeById, otThreshold, categoryById, focusAreaById),
+    computeEmployeeWeeklyHours(emp.id, weekDateKeys, shifts, shiftCodeById, otThreshold, categoryById),
   );
 }
 
