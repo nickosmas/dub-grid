@@ -836,7 +836,27 @@ async function main() {
     { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "calmhaven" },
   ];
 
-  const allAdminPerms = `'{"canEditShifts":true,"canPublishSchedule":true,"canApplyRecurringSchedule":true,"canEditNotes":true,"canManageRecurringShifts":true,"canManageShiftSeries":true,"canManageEmployees":true,"canManageFocusAreas":true,"canManageShiftCodes":true,"canManageIndicatorTypes":true,"canManageOrgSettings":true}'::jsonb`;
+  // All admin permissions (full edit access — for admin-role users)
+  const allAdminPerms = `'${JSON.stringify({
+    canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
+    canEditNotes: true, canViewRecurringShifts: true, canManageRecurringShifts: true, canManageShiftSeries: true,
+    canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: true,
+    canViewFocusAreas: true, canManageFocusAreas: true, canViewShiftCodes: true, canManageShiftCodes: true,
+    canViewIndicatorTypes: true, canManageIndicatorTypes: true, canManageOrgSettings: true,
+    canViewOrgLabels: true, canManageOrgLabels: true, canViewCoverageRequirements: true, canManageCoverageRequirements: true,
+    canApproveShiftRequests: true, canViewDashboardAnalytics: true,
+  })}'::jsonb`;
+
+  // View-only permissions for user-role members (no edit access, can see everything)
+  const userViewPerms = `'${JSON.stringify({
+    canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
+    canEditNotes: false, canViewRecurringShifts: true, canManageRecurringShifts: false, canManageShiftSeries: false,
+    canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: false,
+    canViewFocusAreas: true, canManageFocusAreas: false, canViewShiftCodes: true, canManageShiftCodes: false,
+    canViewIndicatorTypes: true, canManageIndicatorTypes: false, canManageOrgSettings: false,
+    canViewOrgLabels: true, canManageOrgLabels: false, canViewCoverageRequirements: true, canManageCoverageRequirements: false,
+    canApproveShiftRequests: false, canViewDashboardAnalytics: true,
+  })}'::jsonb`;
 
   for (const user of TEST_USERS) {
     const orgIdStr = user.preferred_org === 'ardenwood'
@@ -911,7 +931,9 @@ async function main() {
   const memberUsers = TEST_USERS.filter((u) => u.platform_role !== "gridmaster");
 
   for (const user of memberUsers) {
-    const adminPermsSql = user.org_role === "admin" ? allAdminPerms : "NULL";
+    const adminPermsSql = user.org_role === "admin" ? allAdminPerms
+      : user.org_role === "user" ? userViewPerms
+      : "NULL";
 
     for (const org of allOrgs) {
       await db.query(`
