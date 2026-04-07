@@ -16,6 +16,8 @@ import type {
   AbsenceType,
   ShiftMap,
   PublishHistoryEntry,
+  NamedItem,
+  Department,
 } from "@/types";
 import { fetchShifts, fetchRecentPublishHistory, fetchPublishedDateRanges } from "@/lib/db";
 import { buildPublishedDateSet } from "@/lib/schedule-logic";
@@ -44,6 +46,7 @@ import DashboardHeader from "./DashboardHeader";
 import UserDashboard from "./UserDashboard";
 import AdminDashboard from "./AdminDashboard";
 import SuperAdminDashboard from "./SuperAdminDashboard";
+import { EmptyState } from "@/components/EmptyState";
 const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), { ssr: false });
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), { ssr: false });
 const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), { ssr: false });
@@ -63,6 +66,9 @@ interface DashboardViewProps {
   shiftCodeById: Map<number, ShiftCode>;
   absenceTypeMap: Map<number, string>;
   absenceTypes: AbsenceType[];
+  certifications: NamedItem[];
+  orgRoles: NamedItem[];
+  departments: Department[];
   employees: Employee[];
   permissions: Permissions;
 }
@@ -77,6 +83,9 @@ export default function DashboardView({
   shiftCodeById,
   absenceTypeMap,
   absenceTypes,
+  certifications,
+  orgRoles,
+  departments,
   employees,
   permissions,
 }: DashboardViewProps) {
@@ -132,7 +141,7 @@ export default function DashboardView({
   const [shiftsLoading, setShiftsLoading] = useState(true);
 
   const orgId = org.id;
-  const isScheduler = permissions.level >= 2;
+  const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
@@ -211,20 +220,15 @@ export default function DashboardView({
     () => new Map(shiftCategories.map((c) => [c.id, c])),
     [shiftCategories],
   );
-  const focusAreaById = useMemo(
-    () => new Map(focusAreas.map((fa) => [fa.id, fa])),
-    [focusAreas],
-  );
-
   // Employee hours (current + prev period)
   const currentHours = useMemo(
-    () => computeAllEmployeeHours(activeEmployees, periodDateKeys, currentPeriodShifts, shiftCodeById, 40, categoryById, focusAreaById),
-    [activeEmployees, periodDateKeys, currentPeriodShifts, shiftCodeById, categoryById, focusAreaById],
+    () => computeAllEmployeeHours(activeEmployees, periodDateKeys, currentPeriodShifts, shiftCodeById, 40, categoryById),
+    [activeEmployees, periodDateKeys, currentPeriodShifts, shiftCodeById, categoryById],
   );
 
   const prevHours = useMemo(
-    () => computeAllEmployeeHours(activeEmployees, prevPeriodDateKeys, prevPeriodShifts, shiftCodeById, 40, categoryById, focusAreaById),
-    [activeEmployees, prevPeriodDateKeys, prevPeriodShifts, shiftCodeById, categoryById, focusAreaById],
+    () => computeAllEmployeeHours(activeEmployees, prevPeriodDateKeys, prevPeriodShifts, shiftCodeById, 40, categoryById),
+    [activeEmployees, prevPeriodDateKeys, prevPeriodShifts, shiftCodeById, categoryById],
   );
 
   // OT alerts
@@ -394,12 +398,16 @@ export default function DashboardView({
   };
 
   // ─── Pick role-specific layout ─────────────────────────
-  const showOT = permissions.level >= 2 && permissions.canEditShifts;
+  const showOT = permissions.canEditShifts;
+
+  // Department-permissioned users (level 0 but with admin-like permissions)
+  // should see the admin dashboard if they have any management capability.
+  const hasAdminCapability = permissions.level >= 2 || permissions.canManageOrg || permissions.canEditShifts || permissions.canManageEmployees || permissions.canViewDashboardAnalytics;
 
   let DashboardContent;
   if (permissions.level >= 3) {
     DashboardContent = SuperAdminDashboard;
-  } else if (permissions.level >= 2) {
+  } else if (hasAdminCapability) {
     DashboardContent = AdminDashboard;
   } else {
     DashboardContent = UserDashboard;
@@ -417,82 +425,81 @@ export default function DashboardView({
       {/* Content */}
       <div style={contentStyle}>
 
-      {/* Onboarding checklist for new orgs (pre-dispatch) */}
-      {employees.length === 0 && permissions.level >= 2 && (
-        <div
-          style={{
-            padding: "32px 24px",
-            background: "var(--color-surface)",
-            borderRadius: 14,
-            border: "1px dashed var(--color-border)",
-            marginBottom: 16,
-          }}
-        >
-          <h3 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-            Get started with DubGrid
-          </h3>
-          <p style={{ margin: "0 0 20px", fontSize: "var(--dg-fs-body)", color: "var(--color-text-muted)" }}>
-            Complete these steps to set up your organization.
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[
-              { done: focusAreas.length > 0, label: "Configure focus areas", href: "/settings/focus-areas" },
-              { done: shiftCodes.length > 0, label: "Add shift codes", href: "/settings/shift-codes" },
-              { done: false, label: "Add employees", href: "/people" },
-              { done: false, label: "Create your first schedule", href: "/schedule" },
-            ].map((step) => (
-              <a
-                key={step.label}
-                href={step.href}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  background: step.done ? "var(--color-success-bg)" : "var(--color-bg)",
-                  border: `1px solid ${step.done ? "var(--color-success)" : "var(--color-border)"}`,
-                  textDecoration: "none",
-                  color: step.done ? "var(--color-success-text)" : "var(--color-text-primary)",
-                  fontSize: "var(--dg-fs-body)",
-                  fontWeight: 500,
-                  transition: "background 0.15s",
-                }}
-              >
-                <span style={{
-                  width: 20, height: 20, borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: step.done ? "var(--color-success)" : "var(--color-border)",
-                  color: step.done ? "#fff" : "var(--color-text-faint)",
-                  fontSize: 12, fontWeight: 700, flexShrink: 0,
-                }}>
-                  {step.done ? "\u2713" : "\u00B7"}
-                </span>
-                {step.label}
-              </a>
-            ))}
+      {/* Onboarding checklist — shown until all setup steps are complete */}
+      {hasAdminCapability && (() => {
+        const setupSteps = [
+          { done: focusAreas.length > 0, label: `Configure ${org.focusAreaLabel || "focus areas"}`, href: "/settings?section=staff-departments" },
+          { done: departments.length > 0, label: "Add departments", href: "/settings?section=staff-departments" },
+          { done: orgRoles.length > 0, label: `Add ${org.roleLabel || "roles"}`, href: "/settings?section=staff-roles" },
+          { done: certifications.length > 0, label: `Add ${org.certificationLabel || "certifications"}`, href: "/settings?section=staff-certifications" },
+          { done: shiftCodes.length > 0, label: "Add shift codes", href: "/settings?section=schedule-codes" },
+          { done: employees.length > 0, label: "Add employees", href: "/people" },
+          { done: employees.length > 0 && shiftCodes.length > 0, label: "Create your first schedule", href: "/schedule" },
+        ];
+        const allDone = setupSteps.every(s => s.done);
+        if (allDone) return null;
+        const doneCount = setupSteps.filter(s => s.done).length;
+        return (
+          <div
+            style={{
+              padding: "32px 24px",
+              background: "var(--color-surface)",
+              borderRadius: 14,
+              border: "1px dashed var(--color-border)",
+              marginBottom: 16,
+            }}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              Get started with DubGrid
+            </h3>
+            <p style={{ margin: "0 0 20px", fontSize: "var(--dg-fs-body)", color: "var(--color-text-muted)" }}>
+              Complete these steps to set up your organization. {doneCount} of {setupSteps.length} done.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {setupSteps.map((step) => (
+                <a
+                  key={step.label}
+                  href={step.href}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    background: step.done ? "var(--color-success-bg)" : "var(--color-bg)",
+                    border: `1px solid ${step.done ? "var(--color-success)" : "var(--color-border)"}`,
+                    textDecoration: "none",
+                    color: step.done ? "var(--color-success-text)" : "var(--color-text-primary)",
+                    fontSize: "var(--dg-fs-body)",
+                    fontWeight: 500,
+                    transition: "background 0.15s",
+                  }}
+                >
+                  {/* Checkbox indicator */}
+                  <span style={{
+                    width: 20, height: 20, borderRadius: 4,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: step.done ? "var(--color-success)" : "transparent",
+                    border: step.done ? "none" : "2px solid var(--color-border)",
+                    color: "#fff",
+                    fontSize: 12, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {step.done ? "\u2713" : null}
+                  </span>
+                  {step.label}
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Users see a "setup in progress" message if no employee record */}
-      {employees.length === 0 && permissions.level === 0 && (
-        <div
-          style={{
-            padding: "32px 24px",
-            background: "var(--color-surface)",
-            borderRadius: 14,
-            border: "1px dashed var(--color-border)",
-            textAlign: "center",
-          }}
-        >
-          <h3 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-            Your workspace is being set up
-          </h3>
-          <p style={{ margin: "0", fontSize: "var(--dg-fs-body)", color: "var(--color-text-muted)" }}>
-            Your administrator is configuring the organization. Check back soon.
-          </p>
-        </div>
+      {employees.length === 0 && !hasAdminCapability && (
+        <EmptyState
+          title="Your workspace is being set up"
+          description="Your administrator is configuring the organization. Check back soon."
+        />
       )}
 
       {/* ─── Role-specific dashboard content ─────────────── */}
@@ -511,7 +518,6 @@ export default function DashboardView({
           shiftCategories={shiftCategories}
           coverageRequirements={coverageRequirements}
           categoryById={categoryById}
-          focusAreaById={focusAreaById}
           showOT={showOT}
           hasRequirements={coverageRequirements.length > 0}
           onClose={closeExpanded}

@@ -1,48 +1,27 @@
 import { useMemo } from "react";
-import dynamic from "next/dynamic";
 import type { DashboardContentProps } from "./DashboardContentProps";
-import QuickActionsBar from "./QuickActionsBar";
-import AlertBanner from "./AlertBanner";
+import DashboardStatusBar from "./DashboardStatusBar";
 import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
-import DraftStatusCard from "./DraftStatusCard";
-import ShiftRequestsSummaryCard from "./ShiftRequestsSummaryCard";
-import MyScheduleCard from "./MyScheduleCard";
-import StatCardsRow from "./StatCardsRow";
 import CoverageBySectionCard from "./CoverageBySectionCard";
 import OpenShiftsCard from "./OpenShiftsCard";
-import StaffHoursCard from "./StaffHoursCard";
-import ShiftBreakdownCard from "./ShiftBreakdownCard";
 import ActivityFeed from "./ActivityFeed";
-
-const AnalyticsCharts = dynamic(() => import("@/components/dashboard/AnalyticsCharts"), { ssr: false });
 
 export default function AdminDashboard(props: DashboardContentProps) {
   const {
     org,
-    focusAreas,
     coverageRequirements,
-    shiftCodeById,
-    activeEmployees,
     permissions,
-    periodDates,
-    currentPeriodShifts,
-    periodStats,
     sectionCoverage,
     openShifts,
     otAlerts,
-    currentHours,
-    shiftBreakdown,
+    periodStats,
     activityItems,
     shiftRequests,
     currentEmpId,
-    currentEmployee,
     draftNewCount,
     draftModifiedCount,
     draftDeletedCount,
-    absenceTypeById,
     isMobile,
-    isTablet,
-    prevPeriodLabel,
     onExpandPanel,
   } = props;
 
@@ -67,64 +46,22 @@ export default function AdminDashboard(props: DashboardContentProps) {
 
   return (
     <>
-      {/* Quick Actions */}
-      <QuickActionsBar
-        permissions={permissions}
+      {/* Zone 1: Status Bar */}
+      <DashboardStatusBar
+        coveragePct={periodStats.coverage?.pct ?? 100}
+        otAlertCount={showOT ? otAlerts.length : 0}
         pendingApprovalCount={shiftRequests.pendingApproval.length}
         draftCount={draftTotal}
-      />
-
-      {/* OT Alert Banner */}
-      {showOT && otAlerts.length > 0 && (
-        <AlertBanner
-          alerts={otAlerts}
-          onReview={() => (window.location.href = "/schedule")}
-        />
-      )}
-
-      {/* Action Queue */}
-      {actionItems.length > 0 && (
-        <ActionQueueCard items={actionItems} />
-      )}
-
-      {/* Draft Status + Approval Queue (2 columns) */}
-      {(draftTotal > 0 || shiftRequests.pendingApproval.length > 0) && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-            gap: 16,
-          }}
-        >
-          <DraftStatusCard
-            newCount={draftNewCount}
-            modifiedCount={draftModifiedCount}
-            deletedCount={draftDeletedCount}
-          />
-          {permissions.canApproveShiftRequests && (
-            <ShiftRequestsSummaryCard
-              isAdmin
-              openPickups={shiftRequests.openPickups}
-              myRequests={shiftRequests.myRequests}
-              pendingApproval={shiftRequests.pendingApproval}
-              currentEmpId={currentEmpId}
-              onResolve={shiftRequests.resolve}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Stat Cards */}
-      <StatCardsRow
-        stats={periodStats}
-        showOT={showOT}
-        isMobile={isMobile}
+        urgentGapCount={openShifts.filter((s) => s.urgency === "high").length}
         hasRequirements={coverageRequirements.length > 0}
-        prevPeriodLabel={prevPeriodLabel}
-        onExpand={() => onExpandPanel("stats")}
+        permissions={permissions}
+        onExpandStats={() => onExpandPanel("stats")}
       />
 
-      {/* Coverage + Open Shifts */}
+      {/* Zone 2: Action Queue (hero) */}
+      <ActionQueueCard items={actionItems} variant="hero" grouped />
+
+      {/* Zone 3: Context Cards */}
       <div
         style={{
           display: "grid",
@@ -147,55 +84,12 @@ export default function AdminDashboard(props: DashboardContentProps) {
         />
       </div>
 
-      {/* Bottom row: Staff Hours + Breakdown + Activity */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile
-            ? "1fr"
-            : isTablet
-              ? "1fr 1fr"
-              : "1fr 1fr 1fr",
-          gap: 16,
-        }}
-      >
-        {permissions.canViewStaff && (
-          <StaffHoursCard
-            employeeHours={currentHours}
-            employees={activeEmployees}
-            focusAreas={focusAreas}
-            onExpand={() => onExpandPanel("staffHours")}
-          />
-        )}
-        <ShiftBreakdownCard
-          breakdown={shiftBreakdown}
-          onExpand={() => onExpandPanel("breakdown")}
-        />
-        <ActivityFeed
-          items={activityItems}
-          onExpand={() => onExpandPanel("activity")}
-        />
-      </div>
-
-      {/* My Schedule (lower priority for admins) */}
-      <MyScheduleCard
-        currentEmpId={currentEmpId}
-        employee={currentEmployee}
-        periodDates={periodDates}
-        shifts={currentPeriodShifts}
-        shiftCodeById={shiftCodeById}
-        absenceTypeById={absenceTypeById}
+      {/* Activity Feed (collapsible) */}
+      <ActivityFeed
+        items={activityItems}
+        defaultCollapsed
+        onExpand={() => onExpandPanel("activity")}
       />
-
-      {/* Analytics Charts */}
-      {org.id && (
-        <div style={{ marginTop: 8 }}>
-          <h2 style={{ fontSize: "var(--dg-fs-title)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 16 }}>
-            Analytics
-          </h2>
-          <AnalyticsCharts orgId={org.id} />
-        </div>
-      )}
     </>
   );
 }

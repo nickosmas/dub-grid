@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { PresetColorPicker, TimeInput12h, labelStyle, inputStyle, normalizeTimeCompare } from "./shared";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Shift Code row ────────────────────────────────────────────────────────────
 function ShiftCodeRow({
@@ -1048,14 +1049,16 @@ function AbsenceTypesSettings({
           ))}
         </div>
       ) : (
-        <div style={{ border: "1px dashed var(--color-border)", borderRadius: 10, padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, margin: "12px 16px" }}>
-          <span>No off day types yet</span>
-          {canManageShiftCodes && (
+        <EmptyState
+          compact
+          title="No off day types yet"
+          action={canManageShiftCodes ? (
             <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
               + Add Off Day Type
             </button>
-          )}
-        </div>
+          ) : undefined}
+          style={{ margin: "12px 16px" }}
+        />
       )}
       {local.length > 0 && canManageShiftCodes && (
         <div style={{ padding: "8px 16px 12px" }}>
@@ -1196,19 +1199,16 @@ function ShiftCodesSettings({
                 {renderRows(areaCodes, true)}
               </div>
             ) : (
-              <div style={{
-                border: "1px dashed var(--color-border)", borderRadius: 10,
-                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                margin: "12px 16px",
-              }}>
-                <span>No shift codes yet</span>
-                {canManageShiftCodes && (
+              <EmptyState
+                compact
+                title="No shift codes yet"
+                action={canManageShiftCodes ? (
                   <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
                     + Add Shift Code
                   </button>
-                )}
-              </div>
+                ) : undefined}
+                style={{ margin: "12px 16px" }}
+              />
             )}
             {areaCodes.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>

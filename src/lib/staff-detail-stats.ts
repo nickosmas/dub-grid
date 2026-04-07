@@ -32,7 +32,6 @@ export function computeEmployeeHoursHistory(
   weekCount: number,
   otThreshold: number = 40,
   categoryById?: Map<number, ShiftCategory>,
-  focusAreaById?: Map<number, FocusArea>,
 ): WeeklyHoursSummary[] {
   const now = new Date();
   const results: WeeklyHoursSummary[] = [];
@@ -65,7 +64,6 @@ export function computeEmployeeHoursHistory(
         entry.customStartTime,
         entry.customEndTime,
         categoryById,
-        focusAreaById,
       );
       totalHours += hours;
       if (entry.shiftCodeIds.length > 0) {

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import Modal from "@/components/Modal";
-import { Employee, FocusArea, NamedItem } from "@/types";
+import { Employee, FocusArea, NamedItem, DirectoryPerson } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 
 type RowEntry = {
@@ -23,16 +23,23 @@ function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEnt
   };
 }
 
+export type NewEmployeeData = Omit<Employee, "id" | "seniority"> & {
+  /** Transient: if set, link this new employee to an existing app-only user after creation. */
+  _linkToUserId?: string;
+};
+
 interface AddEmployeeModalProps {
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   focusAreaLabel?: string;
   certificationLabel?: string;
-  onAdd: (employees: Omit<Employee, "id" | "seniority">[]) => void;
+  /** Directory data for matching existing app-only users by name. */
+  directory?: DirectoryPerson[];
+  onAdd: (employees: NewEmployeeData[]) => void;
   onClose: () => void;
 }
 
-export default function AddEmployeeModal({ focusAreas, certifications, focusAreaLabel = "Focus Areas", certificationLabel = "Certification", onAdd, onClose }: AddEmployeeModalProps) {
+export default function AddEmployeeModal({ focusAreas, certifications, focusAreaLabel = "Focus Areas", certificationLabel = "Certification", directory = [], onAdd, onClose }: AddEmployeeModalProps) {
   const defaultCertId: number | null = null;
   const defaultFocusAreaIds = useMemo(
     () => focusAreas.length > 0 ? [focusAreas[0].id] : [],
@@ -46,6 +53,26 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
   ]);
 
   const lastNameRef = useRef<HTMLInputElement | null>(null);
+
+  // Build a lookup of app-only users by normalized "first last" name for matching
+  const appOnlyByName = useMemo(() => {
+    const map = new Map<string, DirectoryPerson>();
+    for (const p of directory) {
+      if (p.source !== "user_only" || !p.userId) continue;
+      const key = `${p.firstName.trim()} ${p.lastName.trim()}`.toLowerCase();
+      if (key.length > 1) map.set(key, p);
+    }
+    return map;
+  }, [directory]);
+
+  // For each row, find a matching app-only user
+  const matchForRow = useCallback(
+    (row: RowEntry): DirectoryPerson | undefined => {
+      const key = `${row.firstName.trim()} ${row.lastName.trim()}`.toLowerCase();
+      return key.length > 1 ? appOnlyByName.get(key) : undefined;
+    },
+    [appOnlyByName],
+  );
 
   const validRows = rows.filter((r) => r.firstName.trim() && r.focusAreaIds.length > 0);
 
@@ -81,22 +108,27 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
   const handleSubmit = useCallback(() => {
     if (validRows.length === 0) return;
     onAdd(
-      validRows.map((r) => ({
-        firstName: r.firstName.trim(),
-        lastName: r.lastName.trim(),
-        certificationId: r.certificationId,
-        focusAreaIds: r.focusAreaIds,
-        roleIds: [],
-        phone: "",
-        email: "",
-        contactNotes: "",
-        status: "active" as const,
-        statusChangedAt: null,
-        statusNote: "",
-        userId: null,
-      })),
+      validRows.map((r) => {
+        const match = matchForRow(r);
+        return {
+          firstName: r.firstName.trim(),
+          lastName: r.lastName.trim(),
+          certificationId: r.certificationId,
+          focusAreaIds: r.focusAreaIds,
+          roleIds: [],
+          phone: "",
+          email: "",
+          contactNotes: "",
+          status: "active" as const,
+          statusChangedAt: null,
+          statusNote: "",
+          userId: null,
+          departmentIds: match?.departmentIds ?? [],
+          _linkToUserId: match?.userId ?? undefined,
+        };
+      }),
     );
-  }, [validRows, onAdd]);
+  }, [validRows, onAdd, matchForRow]);
 
   return (
     <Modal title="Add Staff Members" onClose={onClose} style={{ maxWidth: 960, width: "92vw" }}>
@@ -104,8 +136,8 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
 
         {/* Column headers */}
         <div className="grid grid-cols-[1fr_1fr_140px_1fr_28px] gap-2 pb-1.5 border-b border-[var(--color-border-light)] mb-1">
-          {["FIRST NAME", "LAST NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h) => (
-            <div key={h} className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-wider">{h}</div>
+          {["FIRST NAME", "LAST NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h, i) => (
+            <div key={`col-${i}`} className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-wider">{h}</div>
           ))}
         </div>
 
@@ -113,9 +145,10 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
         <div className="flex flex-col gap-1.5 max-h-[380px] overflow-y-auto pr-0.5">
           {rows.map((row, idx) => {
             const isLast = idx === rows.length - 1;
+            const match = matchForRow(row);
             return (
+              <div key={row._id}>
               <div
-                key={row._id}
                 className="grid grid-cols-[1fr_1fr_140px_1fr_28px] gap-2 items-center"
               >
                 {/* First Name */}
@@ -201,6 +234,13 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
+              </div>
+              {match && (
+                <div className="flex items-center gap-1.5 px-2 py-1 mt-0.5 mb-1 rounded-lg text-[11px] font-medium" style={{ background: "var(--color-brand-bg)", color: "var(--color-brand)" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  This person already has app access. They will be linked automatically.
+                </div>
+              )}
               </div>
             );
           })}

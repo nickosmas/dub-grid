@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
+import { EmptyState } from "@/components/EmptyState";
 
 interface ShiftRow {
   empId: string;
@@ -169,15 +170,10 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
           Loading schedule…
         </div>
       ) : shifts.length === 0 ? (
-        <div
-          style={{
-            padding: "48px 20px", textAlign: "center", background: "var(--color-surface)", borderRadius: 12,
-            border: "1px dashed var(--color-border)", color: "var(--color-text-muted)",
-          }}
-        >
-          <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 600, marginBottom: 4 }}>No shifts found</div>
-          <div style={{ fontSize: "var(--dg-fs-label)" }}>No schedule data for this date range.</div>
-        </div>
+        <EmptyState
+          title="No shifts found"
+          description="No schedule data for this date range."
+        />
       ) : (
         byDate.map(([date, rows]) => (
           <div key={date} style={{ ...sectionStyle, marginBottom: 12 }}>

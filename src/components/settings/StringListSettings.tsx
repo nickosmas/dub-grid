@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useMemo, useCallback } from "react";
-import { NamedItem } from "@/types";
+import { NamedItem, Department } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function StringListSettings({
   label,
@@ -11,6 +13,7 @@ export default function StringListSettings({
   placeholder,
   canEdit = true,
   hideAbbr = false,
+  departments,
 }: {
   label: string;
   items: NamedItem[];
@@ -18,6 +21,7 @@ export default function StringListSettings({
   placeholder: string;
   canEdit?: boolean;
   hideAbbr?: boolean;
+  departments?: Department[];
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [isEditing, setIsEditing] = useState(false);
@@ -73,11 +77,12 @@ export default function StringListSettings({
       sortOrder: i,
     }));
 
-    // Validate no duplicate names
-    const names = cleaned.map((it) => it.name.toLowerCase());
-    const dupes = names.filter((n, i) => n && names.indexOf(n) !== i);
+    // Validate no duplicate names (within the same department scope)
+    const keys = cleaned.map((it) => `${it.name.toLowerCase()}::${it.departmentId ?? ""}`);
+    const dupes = keys.filter((k, i) => k && keys.indexOf(k) !== i);
     if (dupes.length > 0) {
-      setError(`Duplicate name: "${dupes[0]}"`);
+      const dupeName = dupes[0].split("::")[0];
+      setError(`Duplicate name: "${dupeName}"`);
       return;
     }
 
@@ -103,7 +108,7 @@ export default function StringListSettings({
     const id = nextTmpId.current--;
     setLocal((prev) => [
       ...prev,
-      { id, orgId: "", name: "", abbr: "", sortOrder: prev.length },
+      { id, orgId: "", name: "", abbr: "", sortOrder: prev.length, departmentId: null },
     ]);
     // Focus new row's name input after render
     requestAnimationFrame(() => {
@@ -115,6 +120,16 @@ export default function StringListSettings({
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
   };
 
+  const activeDepts = useMemo(
+    () => (departments ?? []).filter((d) => !d.archivedAt && d.type === "scheduled"),
+    [departments],
+  );
+  const deptMap = useMemo(
+    () => new Map(activeDepts.map((d) => [d.id, d])),
+    [activeDepts],
+  );
+  const showDept = activeDepts.length > 0;
+
   const handleItemChange = (
     i: number,
     field: "name" | "abbr",
@@ -123,6 +138,15 @@ export default function StringListSettings({
     setLocal((prev) =>
       prev.map((item, idx) =>
         idx === i ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  const handleDeptChange = (i: number, value: string) => {
+    const departmentId = value === "" ? null : Number(value);
+    setLocal((prev) =>
+      prev.map((item, idx) =>
+        idx === i ? { ...item, departmentId } : item,
       ),
     );
   };
@@ -248,17 +272,18 @@ export default function StringListSettings({
     transition: "border-color 150ms ease, box-shadow 150ms ease",
   };
 
+  const deptCol = showDept ? (isMobile ? " 120px" : " 180px") : "";
   const gridCols = hideAbbr
     ? isEditing
-      ? "24px 32px 1fr 28px"
-      : "32px 1fr"
+      ? `24px 32px 1fr${deptCol} 28px`
+      : `32px 1fr${deptCol}`
     : isMobile
       ? isEditing
-        ? "24px 32px 1fr 100px 28px"
-        : "32px 1fr 100px"
+        ? `24px 32px 1fr 100px${deptCol} 28px`
+        : `32px 1fr 100px${deptCol}`
       : isEditing
-        ? "24px 32px 1fr 200px 28px"
-        : "32px 1fr 200px";
+        ? `24px 32px 1fr 200px${deptCol} 28px`
+        : `32px 1fr 200px${deptCol}`;
 
   return (
     <div style={{ padding: "16px" }}>
@@ -282,7 +307,7 @@ export default function StringListSettings({
           marginBottom: 12,
         }}
       >
-        {!isEditing && canEdit && (
+        {!isEditing && canEdit && displayList.length > 0 && (
           <button
             onClick={handleEnterEdit}
             className="dg-btn dg-btn-secondary"
@@ -347,34 +372,19 @@ export default function StringListSettings({
 
       {/* Table */}
       {displayList.length === 0 && !isEditing ? (
-        <div
-          style={{
-            border: "1px dashed var(--color-border)",
-            borderRadius: 12,
-            padding: "40px 20px",
-            textAlign: "center",
-            color: "var(--color-text-muted)",
-            fontSize: "var(--dg-fs-label)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <span>No items defined yet</span>
-          {canEdit && (
+        <EmptyState
+          compact
+          title="No items defined yet"
+          action={canEdit ? (
             <button
               onClick={handleEnterEdit}
               className="dg-btn dg-btn-secondary"
-              style={{
-                padding: "7px 16px",
-                fontSize: "var(--dg-fs-caption)",
-              }}
+              style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}
             >
               + Add New
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <div
           style={{
@@ -393,8 +403,12 @@ export default function StringListSettings({
             }}
           >
             {(isEditing
-              ? hideAbbr ? ["", "#", "Name", ""] : ["", "#", "Full Name", "Abbreviation", ""]
-              : hideAbbr ? ["#", "Name"] : ["#", "Full Name", "Abbreviation"]
+              ? hideAbbr
+                ? ["", "#", "Name", ...(showDept ? ["Department"] : []), ""]
+                : ["", "#", "Full Name", "Abbreviation", ...(showDept ? ["Department"] : []), ""]
+              : hideAbbr
+                ? ["#", "Name", ...(showDept ? ["Department"] : [])]
+                : ["#", "Full Name", "Abbreviation", ...(showDept ? ["Department"] : [])]
             ).map((h, i) => (
               <div
                 key={i}
@@ -547,6 +561,36 @@ export default function StringListSettings({
                     }}
                   >
                     {item.abbr}
+                  </div>
+                ))}
+
+                {showDept && (isEditing ? (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    draggable={false}
+                  >
+                    <CustomSelect
+                      value={item.departmentId != null ? String(item.departmentId) : ""}
+                      options={[
+                        { value: "", label: "Org-wide" },
+                        ...activeDepts.map((d) => ({ value: String(d.id), label: d.name })),
+                      ]}
+                      onChange={(val) => handleDeptChange(i, val)}
+                      fontSize="var(--dg-fs-label)"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 500,
+                      color: item.departmentId
+                        ? "var(--color-text-secondary)"
+                        : "var(--color-text-faint)",
+                    }}
+                  >
+                    {item.departmentId ? deptMap.get(item.departmentId)?.name ?? "—" : "Org-wide"}
                   </div>
                 ))}
 

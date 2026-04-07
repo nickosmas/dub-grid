@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { labelStyle, inputStyle, normalizeTimeCompare, TimeInput12h } from "./shared";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Shift Categories Settings ──────────────────────────────────────────────────
 function ShiftCategoriesSettings({
@@ -174,6 +175,7 @@ function ShiftCategoriesSettings({
     const orig = originalRef.current.get(cat.id);
     const isDirty = cat.isNew || !orig ||
       cat.name !== orig.name ||
+      (cat.color ?? null) !== (orig.color ?? null) ||
       (cat.startTime ?? null) !== (orig.startTime ?? null) ||
       (cat.endTime ?? null) !== (orig.endTime ?? null) ||
       (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null);
@@ -197,14 +199,14 @@ function ShiftCategoriesSettings({
             {(cat.startTime || cat.endTime) && (
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
                 {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
-                {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas) && (
+                {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
                   <span style={{ marginLeft: 8, fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                    ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas)})
+                    ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
                   </span>
                 )}
-                {resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas) > 0 && (
+                {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
                   <span style={{ marginLeft: 6, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
-                    incl. {resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas)}m break
+                    incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
                   </span>
                 )}
               </span>
@@ -291,30 +293,18 @@ function ShiftCategoriesSettings({
                 const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
                 handleChange(cat.id, "breakMinutes", val);
               }}
-              placeholder={(() => {
-                if (!cat.focusAreaId) return "No break";
-                const fa = focusAreas.find((f) => f.id === cat.focusAreaId);
-                return fa?.breakMinutes ? `Inherits ${fa.breakMinutes}m` : "No break";
-              })()}
+              placeholder="No break"
               style={{ ...inputStyle, width: 140 }}
               disabled={!canManageShiftCodes}
             />
-            {cat.breakMinutes == null && cat.focusAreaId != null && (() => {
-              const fa = focusAreas.find((f) => f.id === cat.focusAreaId);
-              return fa?.breakMinutes ? (
-                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                  Inherits {fa.breakMinutes}m from {fa.name}
-                </span>
-              ) : null;
-            })()}
           </div>
         </div>
         {calcTimeDuration(cat.startTime, cat.endTime) && (
           <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 10 }}>
             {(() => {
-              const effectiveBreak = resolveEffectiveBreak(cat.breakMinutes, cat.focusAreaId, focusAreas);
+              const effectiveBreak = resolveEffectiveBreak(cat.breakMinutes);
               const gross = calcTimeDuration(cat.startTime, cat.endTime);
-              const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes, cat.focusAreaId, focusAreas);
+              const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes);
               if (effectiveBreak > 0) {
                 return <>Gross: {gross} · Break: {effectiveBreak}m · Net: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{net}</span></>;
               }
@@ -388,6 +378,14 @@ function ShiftCategoriesSettings({
         Define the tally categories for each focus area (e.g. Day, Evening, Night).
       </p>
 
+      {focusAreas.length === 0 && (
+        <EmptyState
+          compact
+          title="No focus areas yet"
+          description="Create focus areas first, then add shift categories to each one."
+        />
+      )}
+
       {focusAreas.map((focusArea) => {
         const areaCats = local.filter((c) => c.focusAreaId === focusArea.id);
         return (
@@ -420,19 +418,16 @@ function ShiftCategoriesSettings({
                 {areaCats.map(renderCategoryRow)}
               </div>
             ) : (
-              <div style={{
-                border: "1px dashed var(--color-border)", borderRadius: 10,
-                padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                margin: "12px 16px",
-              }}>
-                <span>No categories yet</span>
-                {canManageShiftCodes && (
+              <EmptyState
+                compact
+                title="No categories yet"
+                action={canManageShiftCodes ? (
                   <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
                     + Add Category
                   </button>
-                )}
-              </div>
+                ) : undefined}
+                style={{ margin: "12px 16px" }}
+              />
             )}
             {areaCats.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>

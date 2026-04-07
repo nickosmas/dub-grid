@@ -57,8 +57,8 @@ const certifications: NamedItem[] = [
 ];
 
 const focusAreas: FocusArea[] = [
-  { id: 1, orgId: "org-1", name: "North", colorBg: "#EFF6FF", colorText: "#1E40AF", sortOrder: 0 },
-  { id: 2, orgId: "org-1", name: "South", colorBg: "#FEF3C7", colorText: "#92400E", sortOrder: 1 },
+  { id: 1, orgId: "org-1", name: "North", colorBg: "#EFF6FF", colorText: "#1E40AF", sortOrder: 0, departmentId: null },
+  { id: 2, orgId: "org-1", name: "South", colorBg: "#FEF3C7", colorText: "#92400E", sortOrder: 1, departmentId: null },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

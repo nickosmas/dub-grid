@@ -36,9 +36,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
   { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRecurringSchedule", "canApproveShiftRequests"] },
   { label: "Notes", keys: ["canEditNotes"] },
-  { label: "Recurring", keys: ["canManageRecurringShifts", "canManageShiftSeries"] },
-  { label: "Staff", keys: ["canManageEmployees"] },
-  { label: "Configuration", keys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgSettings", "canManageOrgLabels", "canManageCoverageRequirements"] },
+  { label: "Recurring", keys: ["canViewRecurringShifts", "canManageRecurringShifts", "canManageShiftSeries"] },
+  { label: "Staff", keys: ["canViewEmployeeDetails", "canManageEmployees"] },
+  { label: "Configuration", keys: ["canViewFocusAreas", "canManageFocusAreas", "canViewShiftCodes", "canManageShiftCodes", "canViewIndicatorTypes", "canManageIndicatorTypes", "canManageOrgSettings", "canViewOrgLabels", "canManageOrgLabels", "canViewCoverageRequirements", "canManageCoverageRequirements"] },
+  { label: "Dashboard", keys: ["canViewDashboardAnalytics"] },
 ];
 
 const PERM_LABELS: Record<keyof AdminPermissions, string> = {
@@ -47,20 +48,28 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canPublishSchedule: "Publish Schedule",
   canApplyRecurringSchedule: "Apply Recurring Schedule",
   canEditNotes: "Edit Notes / Indicators",
+  canViewRecurringShifts: "View Recurring Shifts",
   canManageRecurringShifts: "Manage Recurring Shifts",
   canManageShiftSeries: "Manage Shift Series",
   canViewStaff: "View Staff",
+  canViewEmployeeDetails: "View Employee Details",
   canManageEmployees: "Manage Employees",
-  canManageFocusAreas: "Manage Focus Areas",
+  canViewFocusAreas: "View Departments",
+  canManageFocusAreas: "Manage Departments",
+  canViewShiftCodes: "View Shift Codes",
   canManageShiftCodes: "Manage Shift Codes",
+  canViewIndicatorTypes: "View Indicator Types",
   canManageIndicatorTypes: "Manage Indicator Types",
   canManageOrgSettings: "Manage Organization Settings",
+  canViewOrgLabels: "View Custom Labels",
   canManageOrgLabels: "Manage Custom Labels",
+  canViewCoverageRequirements: "View Coverage Requirements",
   canManageCoverageRequirements: "Manage Coverage Requirements",
   canApproveShiftRequests: "Approve Shift Requests",
+  canViewDashboardAnalytics: "View Dashboard Analytics",
 };
 
-const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule"]);
+const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule", "canViewStaff"]);
 const SUPER_ADMIN_ONLY = new Set<keyof AdminPermissions>(["canManageOrgSettings"]);
 
 function emptyAdminPerms(): AdminPermissions {
@@ -70,17 +79,25 @@ function emptyAdminPerms(): AdminPermissions {
     canPublishSchedule: false,
     canApplyRecurringSchedule: false,
     canEditNotes: false,
+    canViewRecurringShifts: false,
     canManageRecurringShifts: false,
     canManageShiftSeries: false,
     canViewStaff: true,
+    canViewEmployeeDetails: false,
     canManageEmployees: false,
+    canViewFocusAreas: false,
     canManageFocusAreas: false,
+    canViewShiftCodes: false,
     canManageShiftCodes: false,
+    canViewIndicatorTypes: false,
     canManageIndicatorTypes: false,
     canManageOrgSettings: false,
+    canViewOrgLabels: false,
     canManageOrgLabels: false,
+    canViewCoverageRequirements: false,
     canManageCoverageRequirements: false,
     canApproveShiftRequests: false,
+    canViewDashboardAnalytics: false,
   };
 }
 
@@ -113,7 +130,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean }) {
+export default function UserManagementSettings({ orgId, isSuperAdmin, departments = [] }: { orgId: string; isSuperAdmin: boolean; departments?: import("@/types").Department[] }) {
   const { user: currentUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
   const myRole = isSuperAdmin ? "super_admin" : "user";
@@ -123,6 +140,13 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<import("@/types").Invitation[]>([]);
+
+  // Department name lookup for showing department badges on user-role members
+  const deptNameById = React.useMemo(() => {
+    const map = new Map<number, string>();
+    for (const d of departments) { if (d.type === "management") map.set(d.id, d.name); }
+    return map;
+  }, [departments]);
 
   // UI state
   const [activeTab, setActiveTab] = useState("active");
@@ -614,7 +638,14 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
                               )}
                             </div>
                           ) : (
-                            <RoleBadge role={user.orgRole} icon={isSuperAdminUser} />
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <RoleBadge role={user.orgRole} icon={isSuperAdminUser} />
+                              {user.orgRole === "user" && user.departmentIds.length > 0 && (
+                                <span className="text-[10px] text-[var(--color-text-faint)] italic">
+                                  via {user.departmentIds.map((id) => deptNameById.get(id)).filter(Boolean).join(", ") || "dept"}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </TableCell>
 

@@ -301,8 +301,9 @@ describe("middleware: route guards", () => {
     });
     const req = makeNextRequest("http://acme.localhost:3000/staff", { host: "acme.localhost:3000" });
     const res = await runMiddleware(req);
-    expect((res as { _type: string })._type).toBe("redirect");
-    expect((res as { _redirectUrl: string })._redirectUrl).toContain("/schedule");
+    // User role is allowed through — department permissions may grant access,
+    // and client-side guards enforce fine-grained authorization.
+    expect((res as { _type: string })._type).toBe("next");
   });
 
   it("allows admin role on /staff", async () => {
@@ -318,7 +319,7 @@ describe("middleware: route guards", () => {
     expect((res as { _type: string })._type).toBe("next");
   });
 
-  it("redirects user role from /settings to /schedule", async () => {
+  it("allows user role on /settings (department permissions may apply)", async () => {
     mockSessionWithClaims({
       platform_role: "none",
       org_role: "user",
@@ -328,8 +329,9 @@ describe("middleware: route guards", () => {
     });
     const req = makeNextRequest("http://acme.localhost:3000/settings", { host: "acme.localhost:3000" });
     const res = await runMiddleware(req);
-    expect((res as { _type: string })._type).toBe("redirect");
-    expect((res as { _redirectUrl: string })._redirectUrl).toContain("/schedule");
+    // User role is allowed through — department permissions may grant settings access,
+    // and client-side guards enforce per-section authorization.
+    expect((res as { _type: string })._type).toBe("next");
   });
 
   it("allows admin role on /settings", async () => {

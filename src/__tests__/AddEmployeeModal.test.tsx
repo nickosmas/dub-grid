@@ -19,6 +19,7 @@ const focusAreas: FocusArea[] = [
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
     sortOrder: 1,
+    departmentId: null,
   },
   {
     id: 2,
@@ -27,6 +28,7 @@ const focusAreas: FocusArea[] = [
     colorBg: "#F0FDF4",
     colorText: "#166534",
     sortOrder: 2,
+    departmentId: null,
   },
 ];
 
@@ -257,6 +259,7 @@ describe("AddEmployeeModal", () => {
               colorBg: "#EFF6FF",
               colorText: "#1D4ED8",
               sortOrder: i + 1,
+              departmentId: null,
             }));
 
             const onAdd = vi.fn();

@@ -53,6 +53,8 @@ interface ToolbarProps {
   hideTwoWeek?: boolean;
   /** Open the publish history panel. */
   onPublishHistory?: () => void;
+  /** When false, hides filters/search/tools (no data to operate on). */
+  hasData?: boolean;
 }
 
 /* ── Toggle Switch ── */
@@ -320,6 +322,7 @@ export default function Toolbar({
   onCoverageToggle,
   hideTwoWeek,
   onPublishHistory,
+  hasData = true,
 }: ToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -430,77 +433,81 @@ export default function Toolbar({
             onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
             fontSize="var(--dg-fs-caption)"
           />
-          <div style={{ position: "relative", flex: 1 }}>
-            <svg
-              width="13" height="13" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{
-                position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-                color: "var(--color-text-faint)", pointerEvents: "none",
-              }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Find staff…"
-              value={staffSearch}
-              onChange={(e) => onStaffSearchChange(e.target.value)}
-              className="dg-input"
-              style={{ paddingLeft: 30, width: "100%", borderRadius: 10 }}
-            />
-            {staffSearch && (
-              <button
-                onClick={() => onStaffSearchChange("")}
-                className="dg-btn-ghost"
+          {hasData && (
+            <div style={{ position: "relative", flex: 1 }}>
+              <svg
+                width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                 style={{
-                  position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                  padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 8,
+                  position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
+                  color: "var(--color-text-faint)", pointerEvents: "none",
                 }}
-                title="Clear search"
               >
-                ×
-              </button>
-            )}
-          </div>
-          <button
-            ref={toolsBtnRef}
-            onClick={toggleTools}
-            aria-expanded={toolsOpen}
-            aria-haspopup="menu"
-            className="dg-btn dg-btn-ghost"
-            style={{
-              border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
-              borderRadius: 10,
-              height: 44,
-              padding: "0 12px",
-              background: toolsOpen ? "rgba(46, 153, 48, 0.08)" : undefined,
-              color: toolsOpen ? "var(--color-primary)" : undefined,
-              flexShrink: 0,
-              position: "relative",
-            }}
-            title="Tools"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="4" y1="21" x2="4" y2="14" />
-              <line x1="4" y1="10" x2="4" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12" y2="3" />
-              <line x1="20" y1="21" x2="20" y2="16" />
-              <line x1="20" y1="12" x2="20" y2="3" />
-              <line x1="1" y1="14" x2="7" y2="14" />
-              <line x1="9" y1="8" x2="15" y2="8" />
-              <line x1="17" y1="16" x2="23" y2="16" />
-            </svg>
-            Tools
-            {requestsBadgeCount > 0 && (
-              <span className="dg-notification-badge dg-notification-badge--absolute">
-                {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
-              </span>
-            )}
-          </button>
-          {toolsOpen && (
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Find staff…"
+                value={staffSearch}
+                onChange={(e) => onStaffSearchChange(e.target.value)}
+                className="dg-input"
+                style={{ paddingLeft: 30, width: "100%", borderRadius: 10 }}
+              />
+              {staffSearch && (
+                <button
+                  onClick={() => onStaffSearchChange("")}
+                  className="dg-btn-ghost"
+                  style={{
+                    position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                    padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 8,
+                  }}
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+          {hasData && (
+            <button
+              ref={toolsBtnRef}
+              onClick={toggleTools}
+              aria-expanded={toolsOpen}
+              aria-haspopup="menu"
+              className="dg-btn dg-btn-ghost"
+              style={{
+                border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+                borderRadius: 10,
+                height: 44,
+                padding: "0 12px",
+                background: toolsOpen ? "rgba(46, 153, 48, 0.08)" : undefined,
+                color: toolsOpen ? "var(--color-primary)" : undefined,
+                flexShrink: 0,
+                position: "relative",
+              }}
+              title="Tools"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="1" y1="14" x2="7" y2="14" />
+                <line x1="9" y1="8" x2="15" y2="8" />
+                <line x1="17" y1="16" x2="23" y2="16" />
+              </svg>
+              Tools
+              {requestsBadgeCount > 0 && (
+                <span className="dg-notification-badge dg-notification-badge--absolute">
+                  {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
+                </span>
+              )}
+            </button>
+          )}
+          {hasData && toolsOpen && (
             <ToolsMenu
               triggerRef={toolsBtnRef}
               onClose={closeTools}
@@ -618,7 +625,7 @@ export default function Toolbar({
       </div>
 
       {/* ── FILTER ZONE: Focus areas + search (wraps to row 2 on tablet) ── */}
-      <div
+      {hasData && <div
         style={{
           display: "flex",
           alignItems: "center",
@@ -688,10 +695,10 @@ export default function Toolbar({
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── RIGHT ZONE: Presence + Coverage + Tools ── */}
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+      {hasData && <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         {presenceSlot}
 
         {/* Coverage button */}
@@ -765,6 +772,7 @@ export default function Toolbar({
             showAudit={showAudit}
             onAuditToggle={onAuditToggle}
             onPrintOpen={onPrintOpen}
+            onExportCSV={onExportCSV}
             canEditShifts={canEditShifts}
             onApplyRecurring={onApplyRecurring}
             isApplyingRecurring={isApplyingRecurring}
@@ -775,7 +783,7 @@ export default function Toolbar({
             onPublishHistory={onPublishHistory}
           />
         )}
-      </div>
+      </div>}
     </div>
   );
 }

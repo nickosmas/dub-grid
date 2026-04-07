@@ -182,7 +182,7 @@ export default function Header({ orgName }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOutLocal } = useLogout();
-  const { isGridmaster, role, canViewStaff, canManageOrg, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
+  const { isGridmaster, role, canViewStaff, canAccessSettings, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -198,7 +198,7 @@ export default function Header({ orgName }: HeaderProps) {
     if (item.id === "dashboard") return true;
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
-    if (item.id === "settings") return canManageOrg || isSuperAdmin || isGridmaster;
+    if (item.id === "settings") return canAccessSettings || isSuperAdmin || isGridmaster;
     return false;
   });
 

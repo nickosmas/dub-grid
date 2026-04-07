@@ -509,10 +509,14 @@ function OverviewTab({
               </div>
               <div>
                 <label style={labelStyle}>Shift Display</label>
-                <select className="dg-input" value={editShiftDisplayMode} onChange={(e) => setEditShiftDisplayMode(e.target.value as "code" | "name")}>
-                  <option value="code">Short Labels</option>
-                  <option value="name">Full Names</option>
-                </select>
+                <CustomSelect
+                  value={editShiftDisplayMode}
+                  options={[
+                    { value: "code", label: "Short Labels" },
+                    { value: "name", label: "Full Names" },
+                  ]}
+                  onChange={(val) => setEditShiftDisplayMode(val as "code" | "name")}
+                />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 22 }}>
                 <input

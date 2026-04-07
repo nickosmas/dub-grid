@@ -70,7 +70,7 @@ export function StaffTableRow({
   const hue = hashCode(emp.id) % 360;
 
   return (
-    <div key={emp.id}>
+    <div key={emp.id} className="dg-row-enter">
       <div
         className={`dg-table-row${isExpanded ? " expanded" : ""}`}
         draggable={isReordering}

@@ -80,6 +80,7 @@ const focusAreas: FocusArea[] = [
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
     sortOrder: 1,
+    departmentId: null,
   },
 ];
 
@@ -99,6 +100,7 @@ const employees: Employee[] = [
     email: "",
     contactNotes: "",
     userId: null,
+    departmentIds: [],
   },
   {
     id: "emp-2",
@@ -115,6 +117,7 @@ const employees: Employee[] = [
     email: "",
     contactNotes: "",
     userId: null,
+    departmentIds: [],
   },
 ];
 
@@ -131,6 +134,7 @@ const defaultProps = {
   onBench: vi.fn(),
   onActivate: vi.fn(),
   onAdd: vi.fn(),
+  canViewEmployeeDetails: true,
   canManageEmployees: true,
 };
 
@@ -222,6 +226,7 @@ describe("Property-based tests", () => {
         email: fc.string(),
         contactNotes: fc.string(),
         userId: fc.constant(null as string | null),
+        departmentIds: fc.constant([] as number[]),
       }),
       { minLength: 1, maxLength: 20 },
     )

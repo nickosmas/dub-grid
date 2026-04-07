@@ -12,6 +12,7 @@ const defaultFocusAreas: FocusArea[] = [
     colorBg: "#EFF6FF",
     colorText: "#1D4ED8",
     sortOrder: 1,
+    departmentId: null,
   },
   {
     id: 2,
@@ -20,6 +21,7 @@ const defaultFocusAreas: FocusArea[] = [
     colorBg: "#F0FDF4",
     colorText: "#166534",
     sortOrder: 2,
+    departmentId: null,
   },
 ];
 

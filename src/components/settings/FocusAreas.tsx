@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { PresetColorPicker, labelStyle } from "./shared";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Focus Area row ────────────────────────────────────────────────────────────
 function FocusAreaRow({
@@ -240,15 +241,22 @@ export default function FocusAreas({
   const nextTmpId = useRef(-1);
   const [saving, setSaving] = useState(false);
   const formEditsRef = useRef<Map<number, { name: string; colorBg: string; colorText: string }>>(new Map());
+  const [formEditCount, setFormEditCount] = useState(0);
 
   const isDirty = useMemo(() => {
     if (localFocusAreas.length !== focusAreas.length) return true;
+    if (formEditCount > 0) {
+      for (const [id, patch] of formEditsRef.current) {
+        const orig = focusAreas.find((fa) => fa.id === id);
+        if (orig && (patch.name !== orig.name || patch.colorBg !== orig.colorBg || patch.colorText !== orig.colorText)) return true;
+      }
+    }
     return localFocusAreas.some((fa, i) => {
       const orig = focusAreas[i];
       if (!orig) return true;
       return fa.id !== orig.id || fa.name !== orig.name || fa.colorBg !== orig.colorBg;
     });
-  }, [localFocusAreas, focusAreas]);
+  }, [localFocusAreas, focusAreas, formEditCount]);
 
   const displayList = useMemo((): (FocusArea & { isNew?: boolean })[] => {
     if (!isEditing || draggedIdx === null || dragOverIdx === null) return isEditing ? localFocusAreas : focusAreas;
@@ -260,12 +268,14 @@ export default function FocusAreas({
 
   const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string }) => {
     formEditsRef.current.set(id, patch);
+    setFormEditCount((c) => c + 1);
   }, []);
 
   const handleEnterEdit = () => {
     setLocalFocusAreas([...focusAreas]);
     setIsEditing(true);
     formEditsRef.current.clear();
+    setFormEditCount(0);
   };
 
   const handleCancel = () => {
@@ -274,12 +284,14 @@ export default function FocusAreas({
     setDraggedIdx(null);
     setDragOverIdx(null);
     formEditsRef.current.clear();
+    setFormEditCount(0);
   };
 
   const handleAdd = () => {
     const tmp: FocusArea & { isNew: boolean } = {
       id: nextTmpId.current--,
       orgId,
+      departmentId: null,
       name: "",
       colorBg: "#E0E7FF",
       colorText: "#3730A3",
@@ -318,6 +330,7 @@ export default function FocusAreas({
         const saved = await upsertFocusArea({
           id: item.isNew ? undefined : item.id,
           orgId,
+          departmentId: item.departmentId ?? null,
           name: item.name.trim(),
           colorBg: item.colorBg,
           colorText: item.colorText,
@@ -421,19 +434,15 @@ export default function FocusAreas({
 
       {/* List */}
       {displayList.length === 0 ? (
-        <div style={{
-          border: "1px dashed var(--color-border)", borderRadius: 12,
-          padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)",
-          fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-          margin: "0 16px 16px",
-        }}>
-          <span>No {label.toLowerCase()} defined yet</span>
-          {canManageFocusAreas && (
+        <EmptyState
+          compact
+          title={`No ${label.toLowerCase()} defined yet`}
+          action={canManageFocusAreas ? (
             <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}>
               + Add {label.replace(/s$/, "")}
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         displayList.map((fa, i) => (
           <FocusAreaRow

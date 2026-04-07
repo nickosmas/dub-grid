@@ -22,6 +22,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     email: "",
     contactNotes: "",
     userId: null,
+    departmentIds: [],
     ...overrides,
   };
 }

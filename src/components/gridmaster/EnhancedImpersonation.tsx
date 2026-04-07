@@ -8,6 +8,7 @@ import { setImpersonationCookie, clearImpersonationCookie } from "@/lib/imperson
 import { clearPermsCache } from "@/hooks/usePermissions";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
+import CustomSelect from "@/components/CustomSelect";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import * as Sentry from "@/lib/sentry";
 
@@ -311,17 +312,17 @@ export default function EnhancedImpersonation({
                   <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                     Role Override <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span>
                   </label>
-                  <select
-                    className="dg-input"
+                  <CustomSelect
                     value={roleOverride}
-                    onChange={(e) => setRoleOverride(e.target.value)}
+                    options={[
+                      { value: "", label: `Use actual role (${selectedUser.orgRole?.replace("_", " ") ?? "user"})` },
+                      { value: "user", label: "User (read-only)" },
+                      { value: "admin", label: "Admin" },
+                      { value: "super_admin", label: "Super Admin" },
+                    ]}
+                    onChange={setRoleOverride}
                     style={{ marginTop: 4, width: "100%" }}
-                  >
-                    <option value="">Use actual role ({selectedUser.orgRole?.replace("_", " ") ?? "user"})</option>
-                    <option value="user">User (read-only)</option>
-                    <option value="admin">Admin</option>
-                    <option value="super_admin">Super Admin</option>
-                  </select>
+                  />
                 </div>
                 <div style={{ marginTop: 12 }}>
                   <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
@@ -433,17 +434,17 @@ export default function EnhancedImpersonation({
                   <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                     Role Override <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span>
                   </label>
-                  <select
-                    className="dg-input"
+                  <CustomSelect
                     value={roleOverride}
-                    onChange={(e) => setRoleOverride(e.target.value)}
+                    options={[
+                      { value: "", label: `Use actual role (${selectedUser.orgRole?.replace("_", " ") ?? "user"})` },
+                      { value: "user", label: "User (read-only)" },
+                      { value: "admin", label: "Admin" },
+                      { value: "super_admin", label: "Super Admin" },
+                    ]}
+                    onChange={setRoleOverride}
                     style={{ marginTop: 4, width: "100%" }}
-                  >
-                    <option value="">Use actual role ({selectedUser.orgRole?.replace("_", " ") ?? "user"})</option>
-                    <option value="user">User (read-only)</option>
-                    <option value="admin">Admin</option>
-                    <option value="super_admin">Super Admin</option>
-                  </select>
+                  />
                 </div>
                 <div style={{ marginTop: 12 }}>
                   <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>

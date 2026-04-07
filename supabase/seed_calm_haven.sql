@@ -24,6 +24,10 @@ END $$;
 DO $$
 DECLARE
   org           uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
+  dept_nursing  bigint;
+  dept_visiting bigint;
+  dept_admin    bigint;
+  dept_hr       bigint;
   fa_snw    bigint;
   fa_sc     bigint;
   fa_ns     bigint;
@@ -36,16 +40,50 @@ DECLARE
   cat_vcsn_vn bigint;
 BEGIN
 
+  -- ── Departments (scheduled + management) ────────────────────────────────────
+  DELETE FROM public.departments WHERE org_id = org;
+
+  INSERT INTO public.departments (org_id, name, type, sort_order)
+  VALUES (org, 'Nursing', 'scheduled', 0)
+  RETURNING id INTO dept_nursing;
+
+  INSERT INTO public.departments (org_id, name, type, sort_order)
+  VALUES (org, 'Visiting', 'scheduled', 1)
+  RETURNING id INTO dept_visiting;
+
+  INSERT INTO public.departments (org_id, name, type, sort_order, permissions)
+  VALUES (org, 'Administration', 'management', 2, '{
+    "canViewSchedule": true, "canEditShifts": true, "canPublishSchedule": true,
+    "canApplyRecurringSchedule": true, "canEditNotes": true, "canManageRecurringShifts": true,
+    "canManageShiftSeries": true, "canViewStaff": true, "canManageEmployees": true,
+    "canManageFocusAreas": true, "canManageShiftCodes": true, "canManageIndicatorTypes": true,
+    "canManageOrgSettings": false, "canManageOrgLabels": true,
+    "canManageCoverageRequirements": true, "canApproveShiftRequests": true
+  }'::jsonb)
+  RETURNING id INTO dept_admin;
+
+  INSERT INTO public.departments (org_id, name, type, sort_order, permissions)
+  VALUES (org, 'Human Resources', 'management', 3, '{
+    "canViewSchedule": true, "canEditShifts": false, "canPublishSchedule": false,
+    "canApplyRecurringSchedule": false, "canEditNotes": false, "canManageRecurringShifts": false,
+    "canManageShiftSeries": false, "canViewStaff": true, "canManageEmployees": true,
+    "canManageFocusAreas": false, "canManageShiftCodes": false, "canManageIndicatorTypes": false,
+    "canManageOrgSettings": false, "canManageOrgLabels": false,
+    "canManageCoverageRequirements": false, "canApproveShiftRequests": false
+  }'::jsonb)
+  RETURNING id INTO dept_hr;
+
   -- ── Focus Areas ─────────────────────────────────────────────────────────────
 
-  INSERT INTO public.focus_areas (org_id, name, color_bg, color_text, sort_order)
+  INSERT INTO public.focus_areas (org_id, department_id, name, color_bg, color_text, sort_order)
   VALUES
-    (org, 'Skilled Nursing', '#FED7AA', '#9A3412', 0),
-    (org, 'Sheltered Care',       '#E9D5FF', '#6B21A8', 1),
-    (org, 'Night Shift',          '#FECDD3', '#9F1239', 2),
-    (org, 'Visiting CSNS',        '#FDE68A', '#92400E', 3)
+    (org, dept_nursing, 'Skilled Nursing', '#FED7AA', '#9A3412', 0),
+    (org, dept_nursing, 'Sheltered Care',       '#E9D5FF', '#6B21A8', 1),
+    (org, dept_nursing, 'Night Shift',          '#FECDD3', '#9F1239', 2),
+    (org, dept_visiting, 'Visiting CSNS',       '#FDE68A', '#92400E', 3)
   ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO UPDATE
-    SET color_bg   = EXCLUDED.color_bg,
+    SET department_id = EXCLUDED.department_id,
+        color_bg   = EXCLUDED.color_bg,
         color_text = EXCLUDED.color_text,
         sort_order = EXCLUDED.sort_order;
 
@@ -163,6 +201,9 @@ END $$;
 DO $$
 DECLARE
   org uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
+  -- Department IDs
+  dept_nursing  bigint;
+  dept_visiting bigint;
   -- Certification IDs
   cert_jlcsn  bigint;
   cert_staff  bigint;
@@ -186,17 +227,21 @@ DECLARE
   fa_vcsn bigint;
 BEGIN
 
+  -- ── Look up department IDs ──────────────────────────────────────────────────
+  SELECT id INTO dept_nursing  FROM public.departments WHERE org_id = org AND name = 'Nursing';
+  SELECT id INTO dept_visiting FROM public.departments WHERE org_id = org AND name = 'Visiting';
+
   -- ── Certifications ──────────────────────────────────────────────────────────
-  INSERT INTO public.certifications (org_id, name, abbr, sort_order)
+  INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
   VALUES
-    (org, 'Journal Listed Christian Science Nurse', 'JLCSN',  0),
-    (org, 'Staff Nurse',                          'STAFF',  1),
-    (org, 'Christian Science Nurse IV',            'CSN IV', 2),
-    (org, 'Christian Science Nurse III',           'CSN III',3),
-    (org, 'Christian Science Nurse II',            'CSN II', 4),
-    (org, 'Christian Science Nurse I',             'CSN I',  5),
-    (org, 'Other',                                 'Other',  6)
-  ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
+    (org, dept_nursing,  'Journal Listed Christian Science Nurse', 'JLCSN',  0),
+    (org, dept_nursing,  'Staff Nurse',                          'STAFF',  1),
+    (org, dept_nursing,  'Christian Science Nurse IV',            'CSN IV', 2),
+    (org, dept_nursing,  'Christian Science Nurse III',           'CSN III',3),
+    (org, dept_nursing,  'Christian Science Nurse II',            'CSN II', 4),
+    (org, dept_nursing,  'Christian Science Nurse I',             'CSN I',  5),
+    (org, NULL,          'Other',                                 'Other',  6)
+  ON CONFLICT (org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL DO NOTHING;
 
   SELECT id INTO cert_jlcsn FROM public.certifications WHERE org_id = org AND name = 'Journal Listed Christian Science Nurse';
   SELECT id INTO cert_csn4  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse IV';
@@ -206,19 +251,19 @@ BEGIN
   SELECT id INTO cert_other FROM public.certifications WHERE org_id = org AND name = 'Other';
 
   -- ── Organization Roles ────────────────────────────────────────────────────────
-  INSERT INTO public.organization_roles (org_id, name, abbr, sort_order)
+  INSERT INTO public.organization_roles (org_id, department_id, name, abbr, sort_order)
   VALUES
-    (org, 'Director of Christian Science Nursing',           'DCSN',       0),
-    (org, 'Director of Visiting Christian Science Nursing', 'DVCSN',      1),
-    (org, 'Director of Christian Science Nursing Training', 'DCSNT',      2),
-    (org, 'Assistant Director of Christian Science Nursing','ADCSN',      3),
-    (org, 'Supervisor',                                     'Supv',       4),
-    (org, 'Mentor',                                         'Mentor',     5),
-    (org, 'Christian Science Nurse',                        'CN',         6),
-    (org, 'Sheltered Care Manager',                         'SC Mgr',     7),
-    (org, 'Activity Coordinator',                           'Act Cor',    8),
-    (org, 'SC/Asst/Act/Cor',                                'SC/Act. Cor',9)
-  ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
+    (org, dept_nursing,  'Director of Christian Science Nursing',           'DCSN',       0),
+    (org, dept_visiting, 'Director of Visiting Christian Science Nursing', 'DVCSN',      1),
+    (org, dept_nursing,  'Director of Christian Science Nursing Training', 'DCSNT',      2),
+    (org, dept_nursing,  'Assistant Director of Christian Science Nursing','ADCSN',      3),
+    (org, NULL,          'Supervisor',                                     'Supv',       4),
+    (org, NULL,          'Mentor',                                         'Mentor',     5),
+    (org, NULL,          'Christian Science Nurse',                        'CN',         6),
+    (org, dept_nursing,  'Sheltered Care Manager',                         'SC Mgr',     7),
+    (org, dept_nursing,  'Activity Coordinator',                           'Act Cor',    8),
+    (org, dept_nursing,  'SC/Asst/Act/Cor',                                'SC/Act. Cor',9)
+  ON CONFLICT (org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL DO NOTHING;
 
   SELECT id INTO role_dcsn   FROM public.organization_roles WHERE org_id = org AND abbr = 'DCSN';
   SELECT id INTO role_dvcsn  FROM public.organization_roles WHERE org_id = org AND abbr = 'DVCSN';
@@ -274,6 +319,14 @@ BEGIN
     -- Visiting CSNS ───────────────────────────────────────────────────────────
     (org, 'Marilyn',        'Davenport',  cert_jlcsn, ARRAY[role_dvcsn],                    28, ARRAY[fa_vcsn])
   ON CONFLICT (org_id, first_name, last_name) WHERE archived_at IS NULL DO NOTHING;
+
+  -- ── Assign some employees to management departments ─────────────────────────
+  -- ~20% of employees get a management department assignment
+  UPDATE public.employees SET department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Administration')]
+  WHERE org_id = org AND last_name IN ('Sullivan', 'Crawford', 'Henderson', 'Patterson', 'Hartwell');
+
+  UPDATE public.employees SET department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Human Resources')]
+  WHERE org_id = org AND last_name IN ('Davenport');
 
   -- ── Update required certifications for shift codes ─────────────────────────
   -- Ds, Es (Skilled Nursing): require JLCSN, STAFF, CSN IV

@@ -16,6 +16,7 @@ CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly'
 CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
 CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap', 'calloff');
 CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired');
+CREATE TYPE public.department_type AS ENUM ('scheduled', 'management');
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -123,8 +124,9 @@ CREATE TABLE public.organization_memberships (
   schedule_last_viewed_at    TIMESTAMPTZ,
   archived_at                TIMESTAMPTZ,
   archived_by                UUID,
-  department_id              BIGINT,
+  department_ids             BIGINT[] NOT NULL DEFAULT '{}',
   phone                      TEXT,
+  onboarding_completed_at    TIMESTAMPTZ,
 
   UNIQUE (user_id, org_id)
 );
@@ -133,25 +135,26 @@ CREATE TABLE public.organization_memberships (
 -- ── organization_roles ────────────────────────────────────────────────────────
 
 CREATE TABLE public.organization_roles (
-  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  org_id      UUID NOT NULL,
-  name        TEXT NOT NULL,
-  abbr        TEXT NOT NULL,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  archived_at TIMESTAMPTZ
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id        UUID NOT NULL,
+  department_id BIGINT,
+  name          TEXT NOT NULL,
+  abbr          TEXT NOT NULL,
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  archived_at   TIMESTAMPTZ
 );
 
 
 -- ── focus_areas ───────────────────────────────────────────────────────────────
 
 CREATE TABLE public.focus_areas (
-  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  org_id      UUID NOT NULL,
-  name        TEXT NOT NULL,
-  color_bg    TEXT NOT NULL DEFAULT '#F1F5F9',
-  color_text  TEXT NOT NULL DEFAULT '#475569',
+  id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id         UUID NOT NULL,
+  department_id  BIGINT,
+  name           TEXT NOT NULL,
+  color_bg       TEXT NOT NULL DEFAULT '#F1F5F9',
+  color_text     TEXT NOT NULL DEFAULT '#475569',
   sort_order     INTEGER NOT NULL DEFAULT 0,
-  break_minutes  INTEGER DEFAULT NULL,
   archived_at    TIMESTAMPTZ,
   created_by     UUID,
   updated_by     UUID,
@@ -165,25 +168,36 @@ ALTER TABLE ONLY public.focus_areas REPLICA IDENTITY FULL;
 -- ── certifications ────────────────────────────────────────────────────────────
 
 CREATE TABLE public.certifications (
-  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  org_id      UUID NOT NULL,
-  name        TEXT NOT NULL,
-  abbr        TEXT NOT NULL,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  archived_at TIMESTAMPTZ
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id        UUID NOT NULL,
+  department_id BIGINT,
+  name          TEXT NOT NULL,
+  abbr          TEXT NOT NULL,
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  archived_at   TIMESTAMPTZ
 );
 
 
--- ── departments (for non-schedule org members: HR, finance, reception, etc.) ─
+-- ── departments ──────────────────────────────────────────────────────────────
+-- Two types: 'scheduled' (contain focus areas, appear on grid) and
+-- 'management' (standalone, for non-schedule staff like HR, Reception).
 
 CREATE TABLE public.departments (
   id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   org_id      UUID NOT NULL,
   name        TEXT NOT NULL,
   abbr        TEXT NOT NULL DEFAULT '',
+  type        public.department_type NOT NULL DEFAULT 'management',
   sort_order  INTEGER NOT NULL DEFAULT 0,
-  archived_at TIMESTAMPTZ
+  archived_at TIMESTAMPTZ,
+  permissions JSONB,
+  CONSTRAINT mgmt_permissions_only CHECK (type = 'management' OR permissions IS NULL)
 );
+
+COMMENT ON COLUMN public.departments.permissions IS
+  'AdminPermissions JSONB for management departments. Defines what members can do. NULL for scheduled departments.';
+
+ALTER TABLE ONLY public.departments REPLICA IDENTITY FULL;
 
 
 -- ── employees ─────────────────────────────────────────────────────────────────
@@ -209,7 +223,9 @@ CREATE TABLE public.employees (
   created_at        TIMESTAMPTZ DEFAULT now(),
   updated_at        TIMESTAMPTZ DEFAULT now(),
   /** Linked Supabase auth user. Set when invitation is accepted. */
-  user_id           UUID
+  user_id           UUID,
+  /** Management department IDs (for employees who also belong to management departments). */
+  department_ids    BIGINT[] NOT NULL DEFAULT '{}'
 );
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
@@ -440,7 +456,7 @@ CREATE TABLE public.invitations (
   first_name     TEXT,
   last_name      TEXT,
   phone          TEXT,
-  department_id  BIGINT
+  department_ids BIGINT[] NOT NULL DEFAULT '{}'
 );
 
 -- Only one pending (non-accepted, non-revoked) invitation per email per org.
@@ -733,13 +749,23 @@ ALTER TABLE public.certifications
 ALTER TABLE public.departments
   ADD CONSTRAINT departments_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
--- organization_memberships.department_id
-ALTER TABLE public.organization_memberships
-  ADD CONSTRAINT organization_memberships_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+-- focus_areas.department_id (parent scheduled department)
+-- ON DELETE SET NULL: if a department is deleted, its child focus areas become orphaned
+-- (department_id = NULL) and will not appear on the schedule grid. The app UI
+-- (DepartmentsSettings) deletes child FAs before deleting the department, so this is
+-- a safety net for direct DB operations.
+ALTER TABLE public.focus_areas
+  ADD CONSTRAINT focus_areas_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
 
--- invitations.department_id
-ALTER TABLE public.invitations
-  ADD CONSTRAINT invitations_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+ALTER TABLE public.organization_roles
+  ADD CONSTRAINT organization_roles_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
+ALTER TABLE public.certifications
+  ADD CONSTRAINT certifications_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
+-- NOTE: organization_memberships.department_ids, invitations.department_ids, and
+-- employees.department_ids are BIGINT[] arrays — no FK constraints (same pattern as
+-- employees.focus_area_ids and employees.role_ids). Integrity enforced at app layer.
 
 -- employees
 ALTER TABLE public.employees
@@ -898,8 +924,9 @@ CREATE INDEX idx_org_memberships_org_user ON public.organization_memberships(org
 
 -- organization_roles
 CREATE INDEX idx_organization_roles_org_id ON public.organization_roles(org_id);
-CREATE UNIQUE INDEX organization_roles_org_name_active_unique ON public.organization_roles(org_id, name) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX organization_roles_org_name_dept_active_unique ON public.organization_roles(org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL;
 CREATE INDEX idx_organization_roles_active ON public.organization_roles(org_id) WHERE archived_at IS NULL;
+CREATE INDEX idx_organization_roles_department_id ON public.organization_roles(department_id) WHERE department_id IS NOT NULL;
 
 -- focus_areas
 CREATE INDEX idx_focus_areas_org_id ON public.focus_areas(org_id);
@@ -908,8 +935,9 @@ CREATE INDEX idx_focus_areas_active ON public.focus_areas(org_id) WHERE archived
 
 -- certifications
 CREATE INDEX idx_certifications_org_id ON public.certifications(org_id);
-CREATE UNIQUE INDEX certifications_org_name_active_unique ON public.certifications(org_id, name) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX certifications_org_name_dept_active_unique ON public.certifications(org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL;
 CREATE INDEX idx_certifications_active ON public.certifications(org_id) WHERE archived_at IS NULL;
+CREATE INDEX idx_certifications_department_id ON public.certifications(department_id) WHERE department_id IS NOT NULL;
 
 -- departments
 CREATE INDEX idx_departments_org_id ON public.departments(org_id);
@@ -926,6 +954,8 @@ CREATE INDEX idx_employees_active ON public.employees(org_id) WHERE archived_at 
 CREATE INDEX idx_employees_status ON public.employees(org_id, status) WHERE archived_at IS NULL;
 CREATE UNIQUE INDEX idx_employees_user_id_per_org ON public.employees(org_id, user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_employees_user_id ON public.employees(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_employees_department_ids ON public.employees USING GIN (department_ids) WHERE department_ids != '{}';
+CREATE INDEX idx_focus_areas_department_id ON public.focus_areas(department_id) WHERE department_id IS NOT NULL;
 
 -- shift_categories
 CREATE UNIQUE INDEX shift_categories_global_name_unique ON public.shift_categories(org_id, name) WHERE focus_area_id IS NULL AND archived_at IS NULL;
@@ -1113,3 +1143,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.absence_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_requirements;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.organization_memberships;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.departments;

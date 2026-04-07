@@ -66,7 +66,7 @@ function SchedulerContent() {
     org, focusAreas, shiftCodes, allShiftCodes, shiftCategories,
     indicatorTypes, certifications, orgRoles, shiftCodeMap,
     absenceTypes, allAbsenceTypes, absenceTypeMap,
-    coverageRequirements,
+    coverageRequirements, departments,
     loading: orgLoading, loadError,
   } = useOrganizationData();
   // Use orgId from JWT (available immediately) so employee fetch starts
@@ -76,7 +76,15 @@ function SchedulerContent() {
     loading: empLoading,
   } = useEmployees(orgId ?? org?.id ?? null);
 
-  const today = useRef(new Date()).current;
+  const [today, setToday] = useState(() => new Date());
+
+  // Refresh `today` if the app stays open past midnight
+  useEffect(() => {
+    const now = new Date();
+    const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    const timer = setTimeout(() => setToday(new Date()), msUntilMidnight + 500);
+    return () => clearTimeout(timer);
+  }, [today]);
 
   // Date range for shift fetching: ±90 days from today.
   // Shifts outside this window are not loaded — keeps payload small for mature orgs.
@@ -2187,7 +2195,7 @@ function SchedulerContent() {
         color: "var(--color-text-primary)",
       }}
     >
-      {isLoading && (
+      {isLoading && employees.length > 0 && (
         <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)", zIndex: 50 }}>
           <AnimatedDubGridLogo size={160} />
         </div>
@@ -2313,6 +2321,7 @@ function SchedulerContent() {
                 onCoverageToggle={() => setShowCoveragePanel(prev => !prev)}
                 hideTwoWeek={isSmallDesktop}
                 onPublishHistory={() => setShowPublishHistory(true)}
+                hasData={employees.length > 0}
               />
             </div>
           </div>
@@ -2362,6 +2371,7 @@ function SchedulerContent() {
               today={today}
               highlightEmpIds={highlightEmpIds}
               focusAreas={focusAreas}
+              departments={departments}
               shiftCodes={shiftCodes}
               shiftCategories={shiftCategories}
               indicatorTypes={indicatorTypes}

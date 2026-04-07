@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import type { EmployeeTab, SortBy } from "./useStaffFilters";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
@@ -28,6 +29,7 @@ interface StaffToolbarProps {
   hasUnlinked: boolean;
   isReordering: boolean;
   canManageEmployees: boolean;
+  employeeCount: number;
   showAdd: boolean;
   onAdd: () => void;
   onImport?: () => void;
@@ -37,6 +39,8 @@ interface StaffToolbarProps {
   filterBtnRef?: React.RefObject<HTMLButtonElement | null>;
   /** Hide search/sort/filter/reorder controls (e.g. on the App Only tab). */
   hideControls?: boolean;
+  /** True when org settings data is not fully configured — disables add/import. */
+  setupIncomplete?: boolean;
 }
 
 const SORT_ICON = (
@@ -65,6 +69,7 @@ export function StaffToolbar({
   hasUnlinked,
   isReordering,
   canManageEmployees,
+  employeeCount,
   showAdd,
   onAdd,
   onImport,
@@ -73,10 +78,16 @@ export function StaffToolbar({
   filterOpen,
   filterBtnRef,
   hideControls = false,
+  setupIncomplete = false,
 }: StaffToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Hide search/sort/filter/export/import when the active tab has no items
+  const activeTabCount = tabs.find((t) => t.key === activeTab)?.count ?? 0;
+  const noData = activeTabCount === 0;
+  const effectiveHideControls = hideControls || noData;
   const [sortOpen, setSortOpen] = useState(false);
 
   // Keyboard shortcut: "/" focuses search
@@ -194,7 +205,7 @@ export function StaffToolbar({
           </div>
 
           {/* Controls row — invisible during reorder to preserve height */}
-            <div className={`flex items-center gap-2 px-3 py-2${(isReordering || hideControls) ? " invisible pointer-events-none" : ""}`}>
+            <div className={`flex items-center gap-2 px-3 py-2${(isReordering || effectiveHideControls) ? " invisible pointer-events-none" : ""}`}>
               {/* Search - full width on mobile */}
               <div className="relative flex-1">
                 <svg
@@ -253,7 +264,7 @@ export function StaffToolbar({
               </button>
 
               {/* Reorder button */}
-              {canManageEmployees && (
+              {canManageEmployees && employeeCount >= 2 && (
                 <button
                   onClick={onEnterReorder}
                   disabled={!canReorder}
@@ -274,8 +285,14 @@ export function StaffToolbar({
               {/* Add button (icon only on mobile) */}
               {showAdd && canManageEmployees && (
                 <button
-                  onClick={onAdd}
-                  className="flex items-center justify-center h-11 w-11 shrink-0 rounded-[10px] bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2"
+                  onClick={setupIncomplete ? undefined : onAdd}
+                  disabled={setupIncomplete}
+                  title={setupIncomplete ? "Complete organization settings setup first" : undefined}
+                  className={`flex items-center justify-center h-11 w-11 shrink-0 rounded-[10px] transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
+                    setupIncomplete
+                      ? "bg-[var(--color-border)] text-[var(--color-text-faint)] cursor-not-allowed opacity-60"
+                      : "bg-[var(--color-brand)] text-white hover:opacity-90"
+                  }`}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -294,7 +311,7 @@ export function StaffToolbar({
           <div className="flex-1" />
 
           {/* Right zone: search + sort + filter + add — invisible during reorder to preserve height */}
-            <div className={`flex items-center gap-2${(isReordering || hideControls) ? " invisible pointer-events-none" : ""}`}>
+            <div className={`flex items-center gap-2${(isReordering || effectiveHideControls) ? " invisible pointer-events-none" : ""}`}>
               {/* Search */}
               <div className="relative">
                 <svg
@@ -356,7 +373,7 @@ export function StaffToolbar({
               </button>
 
               {/* Reorder button */}
-              {canManageEmployees && (
+              {canManageEmployees && employeeCount >= 2 && (
                 <button
                   onClick={onEnterReorder}
                   disabled={!canReorder}
@@ -376,7 +393,7 @@ export function StaffToolbar({
               )}
 
               {/* Export button */}
-              {showAdd && onExport && (
+              {showAdd && !noData && onExport && (
                 <button
                   onClick={onExport}
                   className="dg-btn dg-btn-secondary"
@@ -391,12 +408,13 @@ export function StaffToolbar({
               )}
 
               {/* Import button */}
-              {showAdd && canManageEmployees && onImport && (
+              {showAdd && !noData && canManageEmployees && onImport && (
                 <button
-                  onClick={onImport}
-                  className="dg-btn dg-btn-secondary"
+                  onClick={setupIncomplete ? undefined : onImport}
+                  disabled={setupIncomplete}
+                  className={`dg-btn dg-btn-secondary${setupIncomplete ? " opacity-60 cursor-not-allowed" : ""}`}
                   style={{ fontSize: 13, height: "var(--dg-toolbar-h)", padding: "0 10px" }}
-                  title="Import CSV"
+                  title={setupIncomplete ? "Complete organization settings setup first" : "Import CSV"}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
@@ -408,8 +426,14 @@ export function StaffToolbar({
               {/* Add button */}
               {showAdd && canManageEmployees && (
                 <button
-                  onClick={onAdd}
-                  className="flex items-center gap-1.5 h-[var(--dg-toolbar-h)] px-3 rounded-[10px] bg-[var(--color-brand)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2"
+                  onClick={setupIncomplete ? undefined : onAdd}
+                  disabled={setupIncomplete}
+                  title={setupIncomplete ? "Complete organization settings setup first" : undefined}
+                  className={`flex items-center gap-1.5 h-[var(--dg-toolbar-h)] px-3 rounded-[10px] text-[13px] font-semibold transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
+                    setupIncomplete
+                      ? "bg-[var(--color-border)] text-[var(--color-text-faint)] cursor-not-allowed opacity-60"
+                      : "bg-[var(--color-brand)] text-white hover:opacity-90"
+                  }`}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -418,6 +442,18 @@ export function StaffToolbar({
                 </button>
               )}
             </div>
+        </div>
+      )}
+
+      {/* Setup incomplete banner */}
+      {setupIncomplete && canManageEmployees && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-warning-bg,rgba(245,158,11,0.08))]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning,#f59e0b)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p className="text-[12px] font-medium text-[var(--color-text-secondary)]">
+            Complete your <Link href="/settings" className="underline text-[var(--color-brand)] hover:opacity-80">organization settings</Link> (focus areas, shift codes, certifications, and roles) before managing people.
+          </p>
         </div>
       )}
     </div>

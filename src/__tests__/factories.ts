@@ -8,6 +8,8 @@ import type {
   FocusArea,
   ShiftCategory,
   CoverageRequirement,
+  Department,
+  AdminPermissions,
 } from "@/types";
 import type { ImpersonationData } from "@/lib/impersonation";
 
@@ -27,6 +29,7 @@ export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     email: "",
     contactNotes: "",
     userId: null,
+    departmentIds: [],
     ...overrides,
   };
 }
@@ -50,6 +53,7 @@ export function makeFocusArea(overrides: Partial<FocusArea> = {}): FocusArea {
   return {
     id: 1,
     orgId: "org1",
+    departmentId: null,
     name: "ICU",
     colorBg: "#e0f2fe",
     colorText: "#0369a1",
@@ -95,6 +99,47 @@ export function makeImpersonationData(overrides: Partial<ImpersonationData> = {}
     ...overrides,
   };
 }
+
+export function makeDepartment(overrides: Partial<Department> = {}): Department {
+  return {
+    id: 1,
+    orgId: "org-1",
+    name: "HR",
+    abbr: "",
+    type: "management",
+    sortOrder: 0,
+    archivedAt: null,
+    permissions: null,
+    ...overrides,
+  };
+}
+
+export const ALL_FALSE_PERMS: AdminPermissions = {
+  canViewSchedule: false,
+  canEditShifts: false,
+  canPublishSchedule: false,
+  canApplyRecurringSchedule: false,
+  canEditNotes: false,
+  canViewRecurringShifts: false,
+  canManageRecurringShifts: false,
+  canManageShiftSeries: false,
+  canViewStaff: false,
+  canViewEmployeeDetails: false,
+  canManageEmployees: false,
+  canViewFocusAreas: false,
+  canManageFocusAreas: false,
+  canViewShiftCodes: false,
+  canManageShiftCodes: false,
+  canViewIndicatorTypes: false,
+  canManageIndicatorTypes: false,
+  canManageOrgSettings: false,
+  canViewOrgLabels: false,
+  canManageOrgLabels: false,
+  canViewCoverageRequirements: false,
+  canManageCoverageRequirements: false,
+  canApproveShiftRequests: false,
+  canViewDashboardAnalytics: false,
+};
 
 export function makeJwtClaims(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

@@ -17,6 +17,7 @@ import {
   groupByDate,
 } from "@/lib/activity-log-utils";
 import type { DetailItem } from "@/lib/activity-log-utils";
+import { EmptyState } from "@/components/EmptyState";
 
 
 
@@ -318,6 +319,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
   const handleCategoryChange = (value: string) => {
     setCategoryFilter(value);
     setPage(0);
+    setLoading(true);
   };
 
   const handleSearchChange = (q: string) => {
@@ -366,33 +368,20 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
       {loading && entries.length === 0 ? (
         <SkeletonTable />
       ) : filteredEntries.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 48, color: "var(--color-text-muted)" }}>
-          {searchQuery || categoryFilter !== "all" ? (
-            <>
-              <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 600, marginBottom: 4 }}>
-                No matching activity
-              </div>
-              <div style={{ fontSize: "var(--dg-fs-body-sm)", marginBottom: 12 }}>
-                Try adjusting your search or filter.
-              </div>
-              <button
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-                onClick={() => { setSearchQuery(""); setCategoryFilter("all"); }}
-              >
-                Clear filters
-              </button>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 600, marginBottom: 4 }}>
-                No activity yet
-              </div>
-              <div style={{ fontSize: "var(--dg-fs-body-sm)" }}>
-                Actions taken in your organization will appear here.
-              </div>
-            </>
-          )}
-        </div>
+        <EmptyState
+          title={searchQuery || categoryFilter !== "all" ? "No matching activity" : "No activity yet"}
+          description={searchQuery || categoryFilter !== "all"
+            ? "Try adjusting your search or filter."
+            : "Actions taken in your organization will appear here."}
+          action={searchQuery || categoryFilter !== "all" ? (
+            <button
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              onClick={() => { setSearchQuery(""); setCategoryFilter("all"); }}
+            >
+              Clear filters
+            </button>
+          ) : undefined}
+        />
       ) : (
         <>
           <div style={{ overflowX: "auto" }}>
@@ -449,8 +438,8 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
           <Pagination
             page={page}
-            onPageChange={setPage}
-            entryCount={entries.length}
+            onPageChange={(p: number) => { setPage(p); setLoading(true); }}
+            entryCount={filteredEntries.length}
             pageSize={PAGE_SIZE}
           />
         </>
