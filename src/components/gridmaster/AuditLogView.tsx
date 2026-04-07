@@ -55,16 +55,16 @@ function ActionBadge({ action }: { action: string }) {
   const bg = isDestructive
     ? "var(--color-danger-bg)"
     : isCreate
-      ? "var(--color-success-bg, #e6f9e6)"
+      ? "var(--color-success-bg)"
       : isImpersonation
-        ? "var(--color-warning-bg, #fff8e6)"
+        ? "var(--color-warning-bg)"
         : "var(--color-bg-secondary)";
   const color = isDestructive
     ? "var(--color-danger)"
     : isCreate
-      ? "var(--color-success, #1a8a1a)"
+      ? "var(--color-success)"
       : isImpersonation
-        ? "var(--color-warning, #b08800)"
+        ? "var(--color-warning)"
         : "var(--color-text-secondary)";
 
   return (
@@ -189,8 +189,17 @@ export default function AuditLogView({
       )}
 
       {loading ? (
-        <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
-          Loading…
+        <div style={sectionStyle}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 16, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "18%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "14%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "20%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "14%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "22%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "12%" }} />
+            </div>
+          ))}
         </div>
       ) : (
         <>
@@ -254,23 +263,21 @@ export default function AuditLogView({
           )}
 
           {/* Pagination */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", alignItems: "center", marginTop: 16 }}>
             <button
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={page === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 12px" }}
             >
               Previous
             </button>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", display: "flex", alignItems: "center" }}>
-              Page {page + 1}
+            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace" }}>
+              {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + filteredEntries.length}
             </span>
             <button
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={entries.length < PAGE_SIZE}
               onClick={() => setPage((p) => p + 1)}
-              style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 12px" }}
             >
               Next
             </button>

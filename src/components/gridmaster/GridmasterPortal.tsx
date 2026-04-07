@@ -2,7 +2,22 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { usePermissions, useLogout, useMediaQuery, MOBILE } from "@/hooks";
+import { useAuth } from "@/components/AuthProvider";
+import { supabase } from "@/lib/supabase";
 import { DubGridLogo } from "@/components/Logo";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
@@ -27,85 +42,10 @@ type GridmasterView =
   | "impersonation-history"
   | "create-organization";
 
-// ── Sidebar link (same pattern as StaffView / SettingsPage) ──────────────────
+// ── Sidebar nav items ────────────────────────────────────────────────────────
 
-function SidebarLink({
-  label,
-  icon,
-  active,
-  onClick,
-  badge,
-  dimmed,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-  badge?: string | number;
-  dimmed?: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 9,
-        width: "100%",
-        padding: "7px 12px",
-        background: active
-          ? "var(--color-bg-secondary)"
-          : hovered
-            ? "var(--color-border-light)"
-            : "transparent",
-        border: "none",
-        borderRadius: 8,
-        cursor: "pointer",
-        fontSize: "var(--dg-fs-label)",
-        fontWeight: active ? 600 : 500,
-        color: active
-          ? "var(--color-text-primary)"
-          : hovered
-            ? "var(--color-text-primary)"
-            : "var(--color-text-muted)",
-        opacity: dimmed ? 0.5 : 1,
-        textAlign: "left",
-        fontFamily: "inherit",
-        transition: "background 150ms ease, color 150ms ease",
-        position: "relative",
-      }}
-    >
-      <span
-        style={{
-          color: active ? "var(--color-text-secondary)" : "var(--color-text-muted)",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        {icon}
-      </span>
-      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {label}
-      </span>
-      {badge !== undefined && (
-        <span
-          style={{
-            fontSize: "var(--dg-fs-footnote)",
-            fontWeight: 600,
-            color: "var(--color-text-subtle)",
-            flexShrink: 0,
-          }}
-        >
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
+const SIDEBAR_MENU_BTN_CLASS = "h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150";
+const SIDEBAR_GROUP_LABEL_CLASS = "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0";
 
 // ── Icons (inline SVGs) ──────────────────────────────────────────────────────
 
@@ -313,8 +253,38 @@ function OrgSearchCombobox({
 export default function GridmasterPortal() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
   const { signOutLocal } = useLogout();
+  const { user: authUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
   const [signingOut, setSigningOut] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  // Fetch user name for header identity
+  useEffect(() => {
+    if (!authUser) return;
+    const cached = sessionStorage.getItem("dg_user_name");
+    if (cached) { setUserName(cached); return; }
+    let cancelled = false;
+    void (async () => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", authUser.id)
+        .single();
+      if (cancelled) return;
+      const first = profile?.first_name?.trim() || "";
+      const last = profile?.last_name?.trim() || "";
+      const full = [first, last].filter(Boolean).join(" ");
+      const name = full || authUser.email?.split("@")[0] || null;
+      setUserName(name);
+      if (name) sessionStorage.setItem("dg_user_name", name);
+    })();
+    return () => { cancelled = true; };
+  }, [authUser]);
+
+  const displayName = userName || "Gridmaster";
+  const initials = userName
+    ? userName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    : "GM";
 
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
@@ -331,17 +301,18 @@ export default function GridmasterPortal() {
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
   const [impersonateOrgId, setImpersonateOrgId] = useState<string | undefined>();
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("dg-sidebar-collapsed-gridmaster") === "true";
-  });
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("dg-sidebar-collapsed-gridmaster", String(next));
-      return next;
-    });
-  }, []);
+  // User menu dropdown state
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   const loadData = useCallback(async () => {
     try {
@@ -364,6 +335,35 @@ export default function GridmasterPortal() {
     if (permLoading || !isGridmaster) return;
     loadData();
   }, [permLoading, isGridmaster, loadData]);
+
+  // ── Nav item config (must be before early returns to satisfy Rules of Hooks) ──
+
+  const navGroups = useMemo(() => [
+    {
+      id: "navigation",
+      label: "Navigation",
+      items: [
+        { key: "dashboard" as GridmasterView, label: "Dashboard", icon: DashboardIcon, onClick: () => { setView("dashboard"); setSelectedId(null); } },
+        { key: "all-users" as GridmasterView, label: "All Users", icon: UsersIcon, onClick: () => { setView("all-users"); setSelectedId(null); } },
+        { key: "audit-log" as GridmasterView, label: "Audit Log", icon: AuditIcon, onClick: () => { setView("audit-log"); setSelectedId(null); } },
+      ],
+    },
+    {
+      id: "actions",
+      label: "Actions",
+      items: [
+        { key: "create-organization" as GridmasterView, label: "New Organization", icon: PlusIcon, onClick: () => { setView("create-organization"); setSelectedId(null); } },
+      ],
+    },
+    {
+      id: "tools",
+      label: "Tools",
+      items: [
+        { key: "impersonation" as GridmasterView, label: "Impersonation", icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
+        { key: "impersonation-history" as GridmasterView, label: "History", icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); } },
+      ],
+    },
+  ], []);
 
   // ── Loading / denied states ──────────────────────────────────────────────
 
@@ -463,22 +463,98 @@ export default function GridmasterPortal() {
           />
         </div>
         {!isMobile && (
-          <button
-            onClick={handleSignOut}
-            className="dg-btn dg-btn-ghost"
-            style={{ fontSize: "var(--dg-fs-label)" }}
-          >
-            Sign out
-          </button>
+          <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: menuOpen ? "var(--color-bg-secondary)" : "transparent",
+                border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
+                borderRadius: 8,
+                padding: "4px 8px 4px 4px",
+                minHeight: 44,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "background 150ms ease, border-color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!menuOpen) {
+                  e.currentTarget.style.background = "var(--color-bg-secondary)";
+                  e.currentTarget.style.borderColor = "var(--color-border)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!menuOpen) {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }
+              }}
+            >
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "var(--color-brand)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-inverse)",
+                flexShrink: 0,
+              }}>
+                {initials}
+              </div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-primary)", lineHeight: 1.2, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {displayName}
+                </div>
+                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", lineHeight: 1.2 }}>
+                  Gridmaster
+                </div>
+              </div>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "transform 150ms ease", transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div className="dg-menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200 }}>
+                <button
+                  className="dg-menu-item"
+                  onClick={() => { setMenuOpen(false); window.location.href = "/profile"; }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  Profile
+                </button>
+                <div className="dg-menu-divider" />
+                <button
+                  className="dg-menu-item dg-menu-item--danger"
+                  onClick={() => { setMenuOpen(false); handleSignOut(); }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </header>
 
       {/* Mobile section chips */}
       {isMobile && (
-        <div className="dg-mobile-section-bar">
+        <nav className="dg-mobile-section-bar" aria-label="Gridmaster navigation">
           {([
             { key: "dashboard", label: "Dashboard" },
-
             { key: "all-users", label: "Users" },
             { key: "audit-log", label: "Audit" },
             { key: "create-organization", label: "New Org" },
@@ -493,131 +569,54 @@ export default function GridmasterPortal() {
               {item.label}
             </button>
           ))}
-        </div>
+        </nav>
       )}
 
       {/* Body: sidebar + content */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
-        {/* Expand button (shown when sidebar is collapsed) */}
-        {sidebarCollapsed && !isMobile && (
-          <button className="dg-sidebar-expand" onClick={toggleSidebar} title="Expand sidebar">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        )}
-
+      <SidebarProvider defaultOpen={true} style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar (desktop only) */}
         {!isMobile && (
-          <aside
-            className={`dg-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
-            style={{
-              width: 220,
-              flexShrink: 0,
-              background: "var(--color-surface)",
-              borderRight: "1px solid var(--color-border)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {/* Collapse toggle */}
-            <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 8px 0" }}>
-              <button className="dg-sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Navigation */}
-            <div style={{ padding: "4px 8px 4px" }}>
-              <div
-                style={{
-                  padding: "8px 12px 4px",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Navigation
-              </div>
-              <SidebarLink
-                label="Dashboard"
-                icon={DashboardIcon}
-                active={view === "dashboard"}
-                onClick={() => { setView("dashboard"); setSelectedId(null); }}
-              />
-
-              <SidebarLink
-                label="All Users"
-                icon={UsersIcon}
-                active={view === "all-users"}
-                onClick={() => { setView("all-users"); setSelectedId(null); }}
-              />
-              <SidebarLink
-                label="Audit Log"
-                icon={AuditIcon}
-                active={view === "audit-log"}
-                onClick={() => { setView("audit-log"); setSelectedId(null); }}
-              />
-            </div>
-
-            {/* Actions */}
-            <div style={{ padding: "4px 8px" }}>
-              <div
-                style={{
-                  padding: "8px 12px 4px",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Actions
-              </div>
-              <SidebarLink
-                label="New Organization"
-                icon={PlusIcon}
-                active={view === "create-organization"}
-                onClick={() => { setView("create-organization"); setSelectedId(null); }}
-              />
-            </div>
-
-            {/* Tools */}
-            <div style={{ borderTop: "1px solid var(--color-border)", padding: "8px 8px 12px", marginTop: "auto" }}>
-              <div
-                style={{
-                  padding: "8px 12px 4px",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Tools
-              </div>
-              <SidebarLink
-                label="Impersonation"
-                icon={ImpersonateIcon}
-                active={view === "impersonation"}
-                onClick={() => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); }}
-              />
-              <SidebarLink
-                label="Impersonation History"
-                icon={HistoryIcon}
-                active={view === "impersonation-history"}
-                onClick={() => { setView("impersonation-history"); setSelectedId(null); }}
-              />
-            </div>
-          </aside>
+          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
+            <SidebarContent className="pt-2 overscroll-contain">
+              {navGroups.map((group) => (
+                <SidebarGroup key={group.id}>
+                  <SidebarGroupLabel className={SIDEBAR_GROUP_LABEL_CLASS}>
+                    {group.label}
+                  </SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={item.key}>
+                          <SidebarMenuButton
+                            isActive={view === item.key}
+                            tooltip={item.label}
+                            onClick={item.onClick}
+                            className={SIDEBAR_MENU_BTN_CLASS}
+                          >
+                            <span className={view === item.key ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                              {item.icon}
+                            </span>
+                            <span className="font-semibold">{item.label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              ))}
+            </SidebarContent>
+            <SidebarFooter>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <GridmasterSidebarCollapseButton />
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarFooter>
+          </Sidebar>
         )}
 
         {/* Main content */}
-        <main style={{ flex: 1, overflow: "auto", padding: isMobile ? 16 : 24 }}>
+        <main aria-label="Gridmaster content" style={{ flex: 1, overflow: "auto", padding: isMobile ? 16 : 24 }}>
           {error && (
             <div
               style={{
@@ -644,7 +643,6 @@ export default function GridmasterPortal() {
               onCreateOrg={() => { setView("create-organization"); setSelectedId(null); }}
             />
           )}
-
 
           {view === "all-users" && (
             <AllUsersView
@@ -711,7 +709,42 @@ export default function GridmasterPortal() {
             <ImpersonationHistory />
           )}
         </main>
-      </div>
+      </SidebarProvider>
     </div>
+  );
+}
+
+// ── Sidebar collapse button (needs useSidebar context) ────────────────────
+
+function GridmasterSidebarCollapseButton() {
+  const { open, toggleSidebar } = useSidebar();
+
+  // Keyboard shortcut: 'b' to toggle sidebar (matches main app convention)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "b" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target as HTMLElement).isContentEditable) return;
+        toggleSidebar();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [toggleSidebar]);
+
+  return (
+    <SidebarMenuButton
+      onClick={toggleSidebar}
+      tooltip={open ? "Collapse Menu (b)" : "Expand Menu (b)"}
+      className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
+    >
+      <span className="flex shrink-0 items-center justify-center">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+          <polyline points="13 17 18 12 13 7" />
+          <polyline points="6 17 11 12 6 7" />
+        </svg>
+      </span>
+      <span className="font-semibold ml-2">Collapse Menu</span>
+    </SidebarMenuButton>
   );
 }

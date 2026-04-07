@@ -44,6 +44,7 @@ import TermsAcceptanceGate from "@/components/TermsAcceptanceGate";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
 
 import PostHogProvider from "@/components/PostHogProvider";
+import { Toaster } from "sonner";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -74,6 +75,14 @@ export default function RootLayout({
             </QueryProvider>
             </PostHogProvider>
           </AuthProvider>
+        <Toaster
+          position="bottom-center"
+          closeButton
+          duration={6000}
+          toastOptions={{
+            className: "text-[15px] font-semibold rounded-xl w-[min(calc(100vw-48px),720px)] max-w-full",
+          }}
+        />
         <CookieConsent />
         <ConsentGatedAnalytics />
       </body>

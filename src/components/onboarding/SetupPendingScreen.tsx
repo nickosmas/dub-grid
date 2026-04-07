@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { DubGridLogo } from "@/components/Logo";
 import { useLogout } from "@/hooks";
 import { Shield } from "lucide-react";
@@ -10,6 +11,14 @@ import { Shield } from "lucide-react";
  */
 export default function SetupPendingScreen() {
   const { signOutLocal } = useLogout();
+
+  // Auto-refresh every 30s to check if admin has completed setup
+  useEffect(() => {
+    const interval = setInterval(() => {
+      window.location.reload();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div
@@ -79,7 +88,7 @@ export default function SetupPendingScreen() {
         >
           Your administrator is still configuring the workspace.
           You&apos;ll be able to access the app once setup is complete.
-          Try refreshing in a few minutes.
+          This page refreshes automatically.
         </p>
 
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>

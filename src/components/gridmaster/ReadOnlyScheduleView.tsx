@@ -215,7 +215,7 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
                           <span style={{
                             display: "inline-block", padding: "1px 6px", borderRadius: 4,
                             fontSize: "var(--dg-fs-caption)", fontWeight: 700,
-                            background: "var(--color-warning-bg, #fff8e6)", color: "var(--color-warning, #b08800)",
+                            background: "var(--color-warning-bg)", color: "var(--color-warning)",
                           }}>
                             {r.absenceLabel}
                           </span>
@@ -228,9 +228,9 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
                       </td>
                       <td style={tdStyle}>
                         {r.isDraft ? (
-                          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-warning, #b08800)", background: "var(--color-warning-bg, #fff8e6)", padding: "1px 6px", borderRadius: 4 }}>Draft</span>
+                          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-warning)", background: "var(--color-warning-bg)", padding: "1px 6px", borderRadius: 4 }}>Draft</span>
                         ) : (
-                          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-success, green)", background: "var(--color-success-bg, #e6f9e6)", padding: "1px 6px", borderRadius: 4 }}>Published</span>
+                          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-success)", background: "var(--color-success-bg)", padding: "1px 6px", borderRadius: 4 }}>Published</span>
                         )}
                       </td>
                     </tr>

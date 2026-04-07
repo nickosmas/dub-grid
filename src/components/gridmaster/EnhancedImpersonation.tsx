@@ -80,8 +80,6 @@ export default function EnhancedImpersonation({
       const diff = new Date(expiresAt).getTime() - Date.now();
       if (diff <= 0) {
         setCountdown("Expired");
-        setSessionId(null);
-        setExpiresAt(null);
         clearInterval(interval);
         return;
       }
