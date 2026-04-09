@@ -90,7 +90,7 @@ export function buildNavGroups(
 
   if (perms.canAccessSettings) {
     const orgItems: NavItem[] = [];
-    if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "Organization Details", icon: iconBuilding });
+    if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "Organization Details", icon: iconBuilding, description: "Manage your organization's name and basic profile information." });
     if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels, description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
     if (orgItems.length > 0) groups.push({ id: "organization", label: "Organization", items: orgItems });
   }
