@@ -169,6 +169,12 @@ function ShiftCategoriesSettings({
   };
 
   const addBtnStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    width: "100%",
+    padding: "8px 16px",
     background: "none",
     border: "1px dashed var(--color-border)",
     borderRadius: 8,
