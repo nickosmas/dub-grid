@@ -1069,6 +1069,24 @@ export default function DepartmentsSettings({
         />
       ) : (
         <>
+          {/* Column header */}
+          <div
+            style={{
+              padding: "10px 16px",
+              borderBottom: "1px solid var(--color-border-light)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-subtle)",
+                letterSpacing: "0.06em",
+              }}
+            >
+              DEPARTMENT
+            </span>
+          </div>
           {schedDisplayList.map((dept, i) => (
             <ScheduledDepartmentRow
               key={dept.id}
@@ -1162,6 +1180,24 @@ export default function DepartmentsSettings({
         />
       ) : (
         <>
+          {/* Column header */}
+          <div
+            style={{
+              padding: "10px 16px",
+              borderBottom: "1px solid var(--color-border-light)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-subtle)",
+                letterSpacing: "0.06em",
+              }}
+            >
+              DEPARTMENT
+            </span>
+          </div>
           {mgmtDisplayList.map((dept, i) => (
             <ManagementDepartmentRow
               key={dept.id}

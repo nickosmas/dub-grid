@@ -581,16 +581,35 @@ export default function StringListSettings({
                     />
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-label)",
-                      fontWeight: 500,
-                      color: item.departmentId
-                        ? "var(--color-text-secondary)"
-                        : "var(--color-text-faint)",
-                    }}
-                  >
-                    {item.departmentId ? deptMap.get(item.departmentId)?.name ?? "—" : "Org-wide"}
+                  <div>
+                    {item.departmentId ? (
+                      <span
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 500,
+                          color: "var(--color-text-secondary)",
+                        }}
+                      >
+                        {deptMap.get(item.departmentId)?.name ?? "—"}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "1px 8px",
+                          borderRadius: 20,
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          background: "var(--color-bg-secondary)",
+                          border: "1px solid var(--color-border-light)",
+                          color: "var(--color-text-secondary)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Org-wide
+                      </span>
+                    )}
                   </div>
                 ))}
 

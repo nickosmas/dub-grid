@@ -634,8 +634,11 @@ function ShiftCodeRow({
           {certifications.length > 0 && (
             <div>
               <label style={labelStyle}>
-                REQUIRED {certificationLabel.toUpperCase()} (leave all unchecked = any qualification)
+                REQUIRED {certificationLabel.toUpperCase()}
               </label>
+              <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "0 0 6px", lineHeight: 1.4 }}>
+                Leave all unchecked to accept any qualification.
+              </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
                 {certifications.map((desig) => {
                   const checked = form.requiredCertificationIds.includes(desig.id);
