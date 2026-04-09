@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { ShiftCode, FocusArea, ShiftCategory, NamedItem, AbsenceType, ShiftDisplayMode } from "@/types";
-import { upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType } from "@/lib/db";
+import { upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, checkShiftCodeDependencies, checkAbsenceTypeDependencies } from "@/lib/db";
+import type { DependencyInfo } from "@/lib/db";
 import { fmt12h, calcTimeDuration } from "@/lib/utils";
 import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
 import { toast } from "sonner";
@@ -190,6 +191,7 @@ function ShiftCodeRow({
         defaultEndTime: saveEndTime,
         defaultDurationHours: form.defaultDurationHours,
         defaultDurationMinutes: form.defaultDurationMinutes,
+        version: 0,
       });
       onSaved(saved, st.id);
       setExpanded(false);
@@ -205,16 +207,21 @@ function ShiftCodeRow({
     }
   }, [form, st, orgId, onSaved, shiftCategories, isNameMode, existingLabels]);
 
+  const [depInfo, setDepInfo] = useState<DependencyInfo | null>(null);
+
+  const handleDeleteClick = useCallback(async () => {
+    if (st.isNew) { onDeleted(st.id); return; }
+    const deps = await checkShiftCodeDependencies(st.id, orgId);
+    setDepInfo(deps);
+    setShowDeleteConfirm(true);
+  }, [st, orgId, onDeleted]);
+
   const handleDelete = useCallback(async () => {
-    if (st.isNew) {
-      onDeleted(st.id);
-      return;
-    }
     setDeleting(true);
     try {
       await deleteShiftCode(st.id, orgId);
       onDeleted(st.id);
-      toast.success("Shift code deleted");
+      toast.success("Shift code archived");
     } catch (err) {
       toast.error("Failed to delete shift code");
       Sentry.captureException(err);
@@ -225,15 +232,18 @@ function ShiftCodeRow({
   }, [st, orgId, onDeleted]);
 
   return (
-    <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
       {/* Collapsed row */}
       <div
+        className="dg-hover-row"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "10px 0",
+          padding: "10px 8px",
+          borderRadius: 8,
           cursor: "pointer",
+          transition: "background 0.15s",
         }}
         onClick={() => setExpanded((e) => !e)}
       >
@@ -262,7 +272,7 @@ function ShiftCodeRow({
           style={{
             fontSize: "var(--dg-fs-label)",
             color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-            fontWeight: isNameMode ? 600 : 400,
+            fontWeight: isNameMode ? 700 : 500,
             flex: 1,
           }}
         >
@@ -322,9 +332,11 @@ function ShiftCodeRow({
       {expanded && (
         <div
           style={{
-            background: "var(--color-bg)",
-            borderTop: "1px solid var(--color-border-light)",
-            padding: 16,
+            background: "var(--color-bg-secondary)",
+            borderRadius: 10,
+            border: "1px solid var(--color-border-light)",
+            margin: "0 0 8px",
+            padding: "14px 16px",
             display: "flex",
             flexDirection: "column",
             gap: 12,
@@ -471,7 +483,7 @@ function ShiftCodeRow({
                   <button
                     type="button"
                     onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
-                    style={{ marginTop: 6, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                    style={{ marginTop: 6, background: "var(--color-surface)", border: "1px solid var(--color-brand)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
                     disabled={!canManageShiftCodes}
                   >
                     Set actual times instead
@@ -515,7 +527,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-secondary)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
                       >
                         Revert to category default
                       </button>
@@ -524,7 +536,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-secondary)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
                       >
                         Remove custom time
                       </button>
@@ -533,7 +545,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-brand)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
                       >
                         Use duration instead
                       </button>
@@ -552,10 +564,11 @@ function ShiftCodeRow({
                     <span style={{
                       fontSize: "var(--dg-fs-label)",
                       color: "var(--color-text-secondary)",
+                      fontWeight: 600,
                       padding: "4px 10px",
-                      background: "var(--color-bg-subtle)",
+                      background: "var(--color-surface)",
                       borderRadius: 6,
-                      border: "1px solid var(--color-border-light)",
+                      border: "1px solid var(--color-border)",
                     }}>
                       {fmt12h(categoryStart)} – {fmt12h(categoryEnd)}
                     </span>
@@ -586,8 +599,8 @@ function ShiftCodeRow({
                         }));
                       }}
                       style={{
-                        background: "var(--color-bg-subtle)",
-                        border: "1px solid var(--color-border)",
+                        background: "var(--color-surface)",
+                        border: "1px solid var(--color-brand)",
                         borderRadius: 6,
                         color: "var(--color-brand)",
                         padding: "5px 12px",
@@ -603,11 +616,13 @@ function ShiftCodeRow({
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
                         style={{
-                          background: "none",
-                          border: "none",
+                          background: "var(--color-surface)",
+                          border: "1px solid var(--color-brand)",
+                          borderRadius: 6,
                           color: "var(--color-brand)",
-                          padding: "5px 0",
+                          padding: "5px 12px",
                           fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
                           cursor: "pointer",
                         }}
                       >
@@ -653,7 +668,7 @@ function ShiftCodeRow({
                         border: `1.5px solid ${
                           checked ? "var(--color-brand)" : "var(--color-border)"
                         }`,
-                        background: checked ? "var(--color-brand-bg)" : "transparent",
+                        background: checked ? "var(--color-brand-bg)" : "var(--color-surface)",
                         transition: "border-color 150ms ease, background 150ms ease",
                       }}
                     >
@@ -704,15 +719,15 @@ function ShiftCodeRow({
               onClick={handleSave}
               disabled={saving || !canSave || !canManageShiftCodes}
               style={{
-                background: canSave && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border-light)",
+                background: canSave && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border)",
                 border: "none",
-                color: canSave && canManageShiftCodes ? "var(--color-text-inverse)" : "var(--color-text-muted)",
+                color: "var(--color-text-inverse)",
                 borderRadius: 8,
                 padding: "8px 18px",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 700,
-                cursor: canSave && canManageShiftCodes ? "pointer" : "default",
-                opacity: canSave && canManageShiftCodes ? 1 : 0.6,
+                cursor: canSave && canManageShiftCodes ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap",
               }}
             >
               {saving ? "Saving…" : "Save"}
@@ -746,13 +761,15 @@ function ShiftCodeRow({
                 }
               }}
               style={{
-                background: "var(--color-border-light)",
-                border: "none",
+                background: "none",
+                border: "1px solid var(--color-border)",
                 borderRadius: 8,
-                color: "var(--color-text-muted)",
+                color: "var(--color-text-primary)",
                 padding: "8px 14px",
                 fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
               Cancel
@@ -760,7 +777,7 @@ function ShiftCodeRow({
             <div style={{ flex: 1 }} />
             {canManageShiftCodes && !st.isNew && (
               <button
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={handleDeleteClick}
                 disabled={deleting}
                 style={{
                   background: "none",
@@ -780,15 +797,31 @@ function ShiftCodeRow({
         </div>
       )}
       {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Shift Code?"
-          message={<>Delete <strong>{form.label}</strong>? This code will be removed from future schedules.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
+        depInfo?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${form.label}"?`}
+            message={<>
+              <strong>{form.label}</strong> is currently {depInfo.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from dropdowns and new assignments.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${form.label}"?`}
+            message={<>This will archive <strong>{form.label}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        )
       )}
     </div>
   );
@@ -887,13 +920,21 @@ function AbsenceTypeRow({
     }
   }, [form, at, orgId, onSaved, isNameMode, allAbsenceTypes]);
 
-  const handleDelete = useCallback(async () => {
+  const [atDepInfo, setAtDepInfo] = useState<DependencyInfo | null>(null);
+
+  const handleDeleteClick = useCallback(async () => {
     if (at.isNew) { onDeleted(at.id); return; }
+    const deps = await checkAbsenceTypeDependencies(at.id, orgId);
+    setAtDepInfo(deps);
+    setShowDeleteConfirm(true);
+  }, [at, orgId, onDeleted]);
+
+  const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
       await deleteAbsenceType(at.id, orgId);
       onDeleted(at.id);
-      toast.success("Off day type deleted");
+      toast.success("Off day type archived");
     } catch (err) {
       toast.error("Failed to delete off day type");
       Sentry.captureException(err);
@@ -904,9 +945,10 @@ function AbsenceTypeRow({
   }, [at, orgId, onDeleted]);
 
   return (
-    <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
       <div
-        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}
+        className="dg-hover-row"
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: 8, cursor: "pointer", transition: "background 0.15s" }}
         onClick={() => setExpanded((e) => !e)}
       >
         {!isNameMode && (
@@ -917,14 +959,14 @@ function AbsenceTypeRow({
         {isNameMode && (
           <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: form.color, border: `1px solid ${borderColor(form.text)}`, flexShrink: 0 }} />
         )}
-        <span style={{ fontSize: "var(--dg-fs-label)", color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)", fontWeight: isNameMode ? 600 : 400, flex: 1 }}>
+        <span style={{ fontSize: "var(--dg-fs-label)", color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)", fontWeight: isNameMode ? 700 : 500, flex: 1 }}>
           {form.name || "—"}
         </span>
         <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>▾</span>
       </div>
 
       {expanded && (
-        <div style={{ background: "var(--color-bg)", borderTop: "1px solid var(--color-border-light)", padding: 16, display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ background: "var(--color-bg-secondary)", borderRadius: 10, border: "1px solid var(--color-border-light)", margin: "0 0 8px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
           <div style={{ display: "grid", gridTemplateColumns: isNameMode ? "1fr" : (isMobile ? "1fr" : "120px 1fr"), gap: 10 }}>
             {!isNameMode && (
               <div>
@@ -952,15 +994,15 @@ function AbsenceTypeRow({
             </p>
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} style={{ background: canSave && canEdit ? "var(--color-brand)" : "var(--color-border-light)", border: "none", color: canSave && canEdit ? "var(--color-text-inverse)" : "var(--color-text-muted)", borderRadius: 8, padding: "8px 18px", fontSize: "var(--dg-fs-label)", fontWeight: 700, cursor: canSave && canEdit ? "pointer" : "default", opacity: canSave && canEdit ? 1 : 0.6 }}>
+            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} style={{ background: canSave && canEdit ? "var(--color-brand)" : "var(--color-border)", border: "none", color: "var(--color-text-inverse)", borderRadius: 8, padding: "8px 18px", fontSize: "var(--dg-fs-label)", fontWeight: 700, cursor: canSave && canEdit ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} style={{ background: "var(--color-border-light)", border: "none", borderRadius: 8, color: "var(--color-text-muted)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", cursor: "pointer" }}>
+            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} style={{ background: "none", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-primary)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
               Cancel
             </button>
             <div style={{ flex: 1 }} />
             {canEdit && !at.isNew && (
-              <button onClick={() => setShowDeleteConfirm(true)} disabled={deleting} style={{ background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={handleDeleteClick} disabled={deleting} style={{ background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer" }}>
                 {deleting ? "…" : "Delete"}
               </button>
             )}
@@ -968,15 +1010,31 @@ function AbsenceTypeRow({
         </div>
       )}
       {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Off Day Type?"
-          message={<>Delete <strong>{form.label}</strong>? This type will be removed from future schedules.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
+        atDepInfo?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${form.label}"?`}
+            message={<>
+              <strong>{form.label}</strong> is currently {atDepInfo.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from dropdowns and new assignments.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${form.label}"?`}
+            message={<>This will archive <strong>{form.label}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        )
       )}
     </div>
   );
@@ -1036,7 +1094,7 @@ function AbsenceTypesSettings({
 
   return (
     <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-      <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
         Off Days
       </div>
       <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
@@ -1062,7 +1120,7 @@ function AbsenceTypesSettings({
       )}
       {local.length > 0 && canManageShiftCodes && (
         <div style={{ padding: "8px 16px 12px" }}>
-          <button onClick={handleAdd} style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", padding: "4px 10px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={handleAdd} style={{ background: "none", border: "1px dashed var(--color-border)", borderRadius: 8, color: "var(--color-text-muted)", padding: "7px 14px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.15s, color 0.15s" }}>
             + Add Off Day Type
           </button>
         </div>
@@ -1129,6 +1187,7 @@ function ShiftCodesSettings({
       text:"#3E433B",
       focusAreaId: focusAreaId,
       sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
+      version: 0,
       isNew: true,
     };
     setLocal((prev) => [...prev, tmp]);
@@ -1148,13 +1207,15 @@ function ShiftCodesSettings({
 
   const addBtnStyle: React.CSSProperties = {
     background: "none",
-    border: "none",
+    border: "1px dashed var(--color-border)",
+    borderRadius: 8,
     color: "var(--color-text-muted)",
-    padding: "6px 0",
+    padding: "7px 14px",
     fontSize: "var(--dg-fs-caption)",
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: "inherit",
+    transition: "border-color 0.15s, color 0.15s",
   };
 
   const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], hideAreaSelect = false) =>
@@ -1190,7 +1251,7 @@ function ShiftCodesSettings({
         );
         return (
           <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
               {focusArea.name}
             </div>
@@ -1228,7 +1289,7 @@ function ShiftCodesSettings({
         );
         return (
           <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
               General / Cross-Area
             </div>
             {generalCodes.length > 0 ? (

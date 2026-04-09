@@ -598,10 +598,10 @@ describe("canAccessSettings", () => {
 // Part H: buildPerms — user role with direct + department permissions
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("buildPerms — user role direct permissions", () => {
-  it("user with direct perms only (no department perms)", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, null);
+describe("buildPerms — user role per-user permissions", () => {
+  it("user with admin_permissions set", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canViewDashboardAnalytics).toBe(true);
     expect(result.canViewEmployeeDetails).toBe(true);
     expect(result.canEditShifts).toBe(false);
@@ -610,9 +610,9 @@ describe("buildPerms — user role direct permissions", () => {
     expect(result.canManageOrgSettings).toBe(false);
   });
 
-  it("user with department perms only (no direct perms) — no regression", () => {
-    const deptPerms = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
-    const result = buildPerms("user", "org-1", false, null, false, deptPerms);
+  it("user with edit perms configured per-user", () => {
+    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canEditShifts).toBe(true);
     expect(result.canEditNotes).toBe(true);
     expect(result.canViewSchedule).toBe(true);
@@ -620,33 +620,14 @@ describe("buildPerms — user role direct permissions", () => {
     expect(result.canManageOrgSettings).toBe(false);
   });
 
-  it("user with both direct + department perms — union (most permissive wins)", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewFocusAreas: true };
-    const deptPerms = { ...ALL_FALSE_PERMS, canEditShifts: true, canViewShiftCodes: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, deptPerms);
-    expect(result.canViewDashboardAnalytics).toBe(true);
-    expect(result.canViewFocusAreas).toBe(true);
-    expect(result.canEditShifts).toBe(true);
-    expect(result.canViewShiftCodes).toBe(true);
-    expect(result.canPublishSchedule).toBe(false);
-  });
-
-  it("user with both — conflicting values resolve to most permissive", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canEditShifts: false };
-    const deptPerms = { ...ALL_FALSE_PERMS, canEditShifts: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, deptPerms);
-    expect(result.canEditShifts).toBe(true);
-  });
-
-  it("user with both — canManageOrgSettings forced false even if set true", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
-    const deptPerms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, deptPerms);
+  it("user with canManageOrgSettings true — forced false", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canManageOrgSettings).toBe(false);
   });
 
-  it("user with no direct or department perms gets READ_ONLY_PERMS", () => {
-    const result = buildPerms("user", "org-1", false, null, false, null);
+  it("user with no permissions gets READ_ONLY_PERMS", () => {
+    const result = buildPerms("user", "org-1", false, null);
     expect(result.canViewSchedule).toBe(true);
     expect(result.canViewStaff).toBe(true);
     expect(result.canEditShifts).toBe(false);
@@ -654,9 +635,9 @@ describe("buildPerms — user role direct permissions", () => {
     expect(result.canAccessSettings).toBe(false);
   });
 
-  it("user with direct view perms gets canAccessSettings", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, null);
+  it("user with view perms gets canAccessSettings", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canAccessSettings).toBe(true);
     expect(result.canManageOrg).toBe(false);
   });

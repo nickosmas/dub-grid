@@ -9,6 +9,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode, DirectoryPerson, Department } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -227,7 +229,7 @@ function DepartmentsSection({
         </p>
 
         {canManageEmployees && onInviteToApp && !setupIncomplete && (
-          <button className="dg-btn dg-btn-primary dg-btn-sm shrink-0" onClick={onInviteToApp}>
+          <button data-tour="people-invite-btn" className="dg-btn dg-btn-primary dg-btn-sm shrink-0" onClick={onInviteToApp}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -238,7 +240,7 @@ function DepartmentsSection({
 
       {/* Department filter chips */}
       {departments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div data-tour="people-filters" className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setFilterDeptId(null)}
             className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
@@ -263,21 +265,23 @@ function DepartmentsSection({
             </button>
           ))}
           {noDeptCount > 0 && (
-            <button
-              onClick={() => setFilterDeptId(-1)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                filterDeptId === -1
-                  ? "bg-[var(--color-brand)] text-white"
-                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
-              }`}
-            >
-              No dept ({noDeptCount})
-            </button>
+            <Hint content={hint("Show only staff without a department assignment")} side="bottom">
+              <button
+                onClick={() => setFilterDeptId(-1)}
+                className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                  filterDeptId === -1
+                    ? "bg-[var(--color-brand)] text-white"
+                    : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
+                }`}
+              >
+                No dept ({noDeptCount})
+              </button>
+            </Hint>
           )}
         </div>
       )}
 
-    <div className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
+    <div data-tour="people-table" className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
       {/* Header row */}
       {!isMobile && (
         <div
@@ -541,6 +545,7 @@ function MembersSection({
   }
 
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
+    if (!orgId) return false;
     setRevokingId(invitationId);
     try {
       await revokeInvitation(invitationId, orgId);
@@ -719,7 +724,7 @@ function MembersSection({
         {/* ── Schedule staff tabs: employee table & empty states ── */}
         {activeTab !== "departments" && rawList.length > 0 ? (
           <>
-          <div data-testid="staff-table" className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
+          <div data-tour="staff-table" data-testid="staff-table" className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
             {/* Header row */}
             <div
               className={`grid border-b border-[var(--color-border-light)] bg-[var(--color-row-alt)] ${isMobile ? "px-3 py-2.5" : "px-6 py-3"}`}

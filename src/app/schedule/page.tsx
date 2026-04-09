@@ -4,12 +4,16 @@ import * as Sentry from "@/lib/sentry";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Toolbar from "@/components/Toolbar";
+import { TooltipTourRunner, completeTourAction } from "@/components/tooltip-tour";
+import { useActiveScheduleTour } from "@/components/tooltip-tour/useActiveScheduleTour";
 import ScheduleGrid from "@/components/ScheduleGrid";
 import MonthView from "@/components/MonthView";
 import PrintLegend from "@/components/PrintLegend";
 import type { PrintConfig } from "@/components/PrintOptionsModal";
 import DraftBanner from "@/components/DraftBanner";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 
 const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), { ssr: false });
 const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), { ssr: false });
@@ -173,6 +177,50 @@ function SchedulerContent() {
   );
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
+
+  // ── Tour selector ─────────────────────────────────────────────────────────
+  const hasShifts = useMemo(() => Object.keys(shifts).some(k => {
+    const s = shifts[k];
+    return s && s.label && s.label !== "OFF";
+  }), [shifts]);
+
+  const hasOwnPublishedShift = useMemo(() => {
+    if (!currentEmpId) return false;
+    return Object.entries(shifts).some(([key, s]) => {
+      if (!s || !s.label || s.label === "OFF" || s.isDraft) return false;
+      return key.startsWith(`${currentEmpId}_`);
+    });
+  }, [shifts, currentEmpId]);
+
+  const activeTour = useActiveScheduleTour({
+    hasShifts,
+    hasDrafts: hasUnpublishedChanges,
+    isEmployee: !canEditShifts,
+    hasOwnPublishedShift,
+  });
+
+
+
+  // Stamp data-tour attributes on the first empty/occupied grid cells after render
+  useEffect(() => {
+    if (!activeTour) return;
+    const stamp = () => {
+      // Clear previous stamps
+      document.querySelectorAll("[data-tour='grid-empty-cell'],[data-tour='grid-occupied-cell'],[data-tour='grid-shift-pill']").forEach(el => el.removeAttribute("data-tour"));
+      // First empty cell
+      const emptyCell = document.querySelector('.dg-grid-cell[data-empty="true"][data-interactive="true"]');
+      if (emptyCell) emptyCell.setAttribute("data-tour", "grid-empty-cell");
+      // First occupied cell
+      const occupiedCell = document.querySelector('.dg-grid-cell[data-empty="false"][data-interactive="true"]');
+      if (occupiedCell) occupiedCell.setAttribute("data-tour", "grid-occupied-cell");
+      // First shift pill inside an occupied cell
+      const pill = document.querySelector('.dg-grid-cell[data-empty="false"] .dg-shift-pill');
+      if (pill) pill.setAttribute("data-tour", "grid-shift-pill");
+    };
+    // Run after grid renders
+    const timer = setTimeout(stamp, 500);
+    return () => clearTimeout(timer);
+  }, [activeTour, shifts]);
 
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
 
@@ -532,7 +580,7 @@ function SchedulerContent() {
     [shifts, auditNames, publishChangesMap],
   );
 
-  const { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser, canEditShifts);
+  const { lockCell, unlockCell, getCellLock, getCurrentCell, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser, canEditShifts);
 
   // Refs for realtime callbacks — allows the channel effect to depend only on
   // [org] while still calling the latest versions of these functions.
@@ -542,6 +590,8 @@ function SchedulerContent() {
   handleLockBroadcastRef.current = handleLockBroadcast;
   const handleUnlockBroadcastRef = useRef(handleUnlockBroadcast);
   handleUnlockBroadcastRef.current = handleUnlockBroadcast;
+  const getCurrentCellRef = useRef(getCurrentCell);
+  getCurrentCellRef.current = getCurrentCell;
   const refetchScheduleDataRef = useRef(refetchScheduleData);
   refetchScheduleDataRef.current = refetchScheduleData;
   // Tracks when data was last fetched — used to throttle tab-visibility refetches
@@ -620,7 +670,8 @@ function SchedulerContent() {
           }
           const user = currentUserRef.current;
           if (user && canEditShiftsRef.current) {
-            await channel.track({ editingCell: null, userId: user.id, userName: user.name, canEdit: true });
+            const editingCell = getCurrentCellRef.current() ?? null;
+            await channel.track({ editingCell, userId: user.id, userName: user.name, canEdit: true });
           }
         } else if (status === 'CHANNEL_ERROR') {
           hadError = true;
@@ -644,8 +695,9 @@ function SchedulerContent() {
     if (!channel || !currentUser || !canEditShifts) return;
     if (channel.state !== 'joined') return;
 
+    const editingCell = getCurrentCellRef.current() ?? null;
     channel.track({
-      editingCell: null,
+      editingCell,
       userId: currentUser.id,
       userName: currentUser.name,
       canEdit: true,
@@ -662,12 +714,14 @@ function SchedulerContent() {
 
       const channel = realtimeChannelRef.current;
 
-      // Re-track presence if the channel is healthy
+      // Re-track presence if the channel is healthy — preserve the active
+      // cell lock so returning to the tab doesn't silently unlock it.
       if (channel && channel.state === 'joined') {
         const user = currentUserRef.current;
         if (user && canEditShiftsRef.current) {
+          const editingCell = getCurrentCellRef.current() ?? null;
           channel.track({
-            editingCell: null,
+            editingCell,
             userId: user.id,
             userName: user.name,
             canEdit: true,
@@ -1348,6 +1402,8 @@ function SchedulerContent() {
         empCertificationId: emp.certificationId,
         activeFocusAreaId: activeFaId,
       });
+      // Advance tour: grid-empty-cell or grid-occupied-cell step
+      completeTourAction();
     },
     [focusAreas, getCellLock, lockCell, canEditNotes],
   );
@@ -1373,7 +1429,7 @@ function SchedulerContent() {
 
         // Bulk-update all shifts in the series
         try {
-          await updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0]);
+          await updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0], org!.id);
           const prevShifts = shifts;
           const shiftData = await fetchShifts(org!.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
           setShifts(shiftData);
@@ -1393,6 +1449,8 @@ function SchedulerContent() {
         }
       } else {
         setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
+        // Advance tour: shift-picker step
+        completeTourAction();
       }
     },
     [editPanel, shifts, org, canEditShifts, setShift, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
@@ -1402,7 +1460,7 @@ function SchedulerContent() {
     if (!pendingSeriesDelete || !org) return;
     try {
       const prevShifts = shifts;
-      const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId);
+      const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
       const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
@@ -2253,18 +2311,20 @@ function SchedulerContent() {
                       </span>
                     ) : (
                       <>
-                        <button
-                          onClick={() => setShowPublishDiff(v => !v)}
-                          className="dg-btn dg-btn-secondary"
-                          style={{
-                            fontSize: "var(--dg-fs-caption)",
-                            padding: "5px 12px",
-                            background: showPublishDiff ? "var(--color-info-bg)" : undefined,
-                            color: showPublishDiff ? "var(--color-accent-text)" : undefined,
-                          }}
-                        >
-                          {showPublishDiff ? "Hide Changes" : "Show What Changed"}
-                        </button>
+                        <Hint content={hint("Highlight differences from the published schedule")} side="bottom">
+                          <button
+                            onClick={() => setShowPublishDiff(v => !v)}
+                            className="dg-btn dg-btn-secondary"
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              padding: "5px 12px",
+                              background: showPublishDiff ? "var(--color-info-bg)" : undefined,
+                              color: showPublishDiff ? "var(--color-accent-text)" : undefined,
+                            }}
+                          >
+                            {showPublishDiff ? "Hide Changes" : "Show What Changed"}
+                          </button>
+                        </Hint>
                         <button
                           onClick={() => setShowPublishHistory(true)}
                           className="dg-btn dg-btn-secondary"
@@ -2292,7 +2352,7 @@ function SchedulerContent() {
                 </div>
               );
             })()}
-            <div style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
+            <div data-tour="schedule-toolbar" style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
               <Toolbar
                 weekStart={weekStart}
                 spanWeeks={spanWeeks}
@@ -2357,6 +2417,7 @@ function SchedulerContent() {
 
             {/* Desktop/Tablet Grid */}
             {spanWeeks !== "month" && !isMobile && (
+          <div data-tour="schedule-grid">
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <ScheduleGrid
               filteredEmployees={filteredEmployees}
@@ -2451,6 +2512,7 @@ function SchedulerContent() {
               )}
             </DragOverlay>
           </DndContext>
+          </div>
         )}
 
         {/* Context menu for copy/paste/requests */}
@@ -2668,7 +2730,7 @@ function SchedulerContent() {
             try {
               // Wait for any pending write on this key to complete before writing
               await (pendingShiftWrites.current.get(key) ?? Promise.resolve());
-              await upsertShift(editPanel.empId, dateKey, [], org?.id ?? null, null, null, version, absenceType.id);
+              await upsertShift(editPanel.empId, dateKey, [], org!.id, null, null, version, absenceType.id);
               const absenceDisplayLabel = absenceTypeMap.get(absenceType.id) ?? absenceType.label;
               setShifts((prev) => {
                 const cur = prev[key];
@@ -2912,6 +2974,8 @@ function SchedulerContent() {
         )}
         </>
       )}
+
+      {activeTour && <TooltipTourRunner config={activeTour} />}
     </div>
   );
 }

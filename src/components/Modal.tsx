@@ -44,6 +44,13 @@ export default function Modal({ title, onClose, children, style, "aria-described
     else dialog.focus();
   }, []);
 
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   // Clear timeout on unmount to prevent stale onClose calls
   useEffect(() => {
     return () => {

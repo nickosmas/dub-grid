@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import type { Permissions } from "@/hooks";
 
 interface DashboardStatusBarProps {
@@ -130,19 +132,27 @@ export default function DashboardStatusBar({
         )}
 
         {showOT && (
-          <MetricChip
-            label="OT"
-            value={String(otAlertCount)}
-            color={chipColor(otAlertCount, { green: 0, amber: 2 }, true)}
-          />
+          <Hint content={hint("Staff projected to exceed 40 hours this period")} side="bottom">
+            <div>
+              <MetricChip
+                label="OT"
+                value={String(otAlertCount)}
+                color={chipColor(otAlertCount, { green: 0, amber: 2 }, true)}
+              />
+            </div>
+          </Hint>
         )}
 
         {permissions.canApproveShiftRequests && pendingApprovalCount > 0 && (
-          <MetricChip
-            label="Pending"
-            value={String(pendingApprovalCount)}
-            color="var(--color-warning)"
-          />
+          <Hint content={hint("Shift requests waiting for your approval")} side="bottom">
+            <div>
+              <MetricChip
+                label="Pending"
+                value={String(pendingApprovalCount)}
+                color="var(--color-warning)"
+              />
+            </div>
+          </Hint>
         )}
 
         {draftCount > 0 && (

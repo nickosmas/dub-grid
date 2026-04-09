@@ -285,47 +285,57 @@ BEGIN
   DELETE FROM public.employees WHERE org_id = org;
 
   INSERT INTO public.employees
-    (org_id, first_name, last_name, certification_id, role_ids, seniority, focus_area_ids)
+    (org_id, first_name, last_name, certification_id, role_ids, seniority, focus_area_ids, status)
   VALUES
     -- Skilled Nursing ────────────────────────────────────────────────────
-    (org, 'Margaret',       'Sullivan',   cert_jlcsn, ARRAY[role_dcsn],                      1, ARRAY[fa_snw]),
-    (org, 'Thomas',         'Crawford',   cert_jlcsn, ARRAY[role_mentor],                    2, ARRAY[fa_snw, fa_sc]),
-    (org, 'Carol',          'Henderson',  cert_jlcsn, ARRAY[role_supv],                      3, ARRAY[fa_snw, fa_sc]),
-    (org, 'Diane',          'Patterson',  cert_jlcsn, ARRAY[role_supv],                      4, ARRAY[fa_snw, fa_sc]),
-    (org, 'Laura',          'Marshall',   cert_jlcsn, ARRAY[role_mentor, role_supv],          5, ARRAY[fa_snw, fa_sc]),
-    (org, 'Richard',        'Bennett',    cert_jlcsn, ARRAY[role_supv],                      6, ARRAY[fa_snw, fa_sc]),
-    (org, 'Susan',          'Fletcher',   cert_jlcsn, ARRAY[role_supv, role_cn],              7, ARRAY[fa_snw, fa_vcsn, fa_sc]),
-    (org, 'William',        'Harper',     cert_jlcsn, ARRAY[role_supv],                      8, ARRAY[fa_snw]),
-    (org, 'Kenneth',        'Crawford',   cert_jlcsn, ARRAY[role_supv],                      9, ARRAY[fa_snw, fa_ns]),
-    (org, 'Nancy',          'Thornton',   cert_jlcsn, ARRAY[]::bigint[],                    10, ARRAY[fa_snw]),
-    (org, 'Kevin',          'Donovan',    cert_staff, ARRAY[]::bigint[],                    11, ARRAY[fa_snw]),
-    (org, 'Brian',          'Shepherd',   cert_staff, ARRAY[]::bigint[],                    12, ARRAY[fa_snw, fa_sc]),
-    (org, 'Timothy',        'Walsh',      cert_staff, ARRAY[]::bigint[],                    13, ARRAY[fa_snw, fa_sc]),
-    (org, 'Nathan "Nate"',  'Callahan',   cert_staff, ARRAY[]::bigint[],                    14, ARRAY[fa_snw, fa_sc]),
-    (org, 'Janet',          'Morrison',   cert_staff, ARRAY[]::bigint[],                    15, ARRAY[fa_snw, fa_sc]),
-    (org, 'Barbara',        'Trent',      cert_staff, ARRAY[]::bigint[],                    16, ARRAY[fa_snw]),
-    (org, 'David Michael',  'Spencer',    cert_csn3,  ARRAY[]::bigint[],                    17, ARRAY[fa_snw, fa_vcsn, fa_sc]),
-    (org, 'Robert',         'Garrison',   cert_csn3,  ARRAY[]::bigint[],                    18, ARRAY[fa_snw, fa_sc]),
-    (org, 'Steven',         'Whitfield',  cert_csn3,  ARRAY[]::bigint[],                    19, ARRAY[fa_snw, fa_sc]),
-    (org, 'Raymond',        'Caldwell',   cert_csn2,  ARRAY[]::bigint[],                    20, ARRAY[fa_snw, fa_sc]),
-    (org, 'Patricia',       'Langford',   cert_csn2,  ARRAY[]::bigint[],                    21, ARRAY[fa_snw, fa_sc]),
-    (org, 'Christine',      'Prescott',   cert_csn2,  ARRAY[]::bigint[],                    22, ARRAY[fa_snw, fa_sc]),
-    (org, 'Evelyn',         'Hartwell',   cert_jlcsn, ARRAY[role_scmgr],                    23, ARRAY[fa_snw, fa_sc]),
-    (org, 'Gloria',         'Jennings',   cert_other, ARRAY[role_actcor],                   24, ARRAY[fa_snw, fa_sc]),
-    (org, 'Donna',          'Fowler',     cert_other, ARRAY[role_scasst],                   25, ARRAY[fa_snw, fa_sc]),
+    (org, 'Margaret',       'Sullivan',   cert_jlcsn, ARRAY[role_dcsn],                      1, ARRAY[fa_snw],                  'active'),
+    (org, 'Thomas',         'Crawford',   cert_jlcsn, ARRAY[role_mentor],                    2, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Carol',          'Henderson',  cert_jlcsn, ARRAY[role_supv],                      3, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Diane',          'Patterson',  cert_jlcsn, ARRAY[role_supv],                      4, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Laura',          'Marshall',   cert_jlcsn, ARRAY[role_mentor, role_supv],          5, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Richard',        'Bennett',    cert_jlcsn, ARRAY[role_supv],                      6, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Susan',          'Fletcher',   cert_jlcsn, ARRAY[role_supv, role_cn],              7, ARRAY[fa_snw, fa_vcsn, fa_sc],  'active'),
+    (org, 'William',        'Harper',     cert_jlcsn, ARRAY[role_supv],                      8, ARRAY[fa_snw],                  'active'),
+    (org, 'Kenneth',        'Crawford',   cert_jlcsn, ARRAY[role_supv],                      9, ARRAY[fa_snw, fa_ns],           'active'),
+    (org, 'Nancy',          'Thornton',   cert_jlcsn, ARRAY[]::bigint[],                    10, ARRAY[fa_snw],                  'active'),
+    (org, 'Kevin',          'Donovan',    cert_staff, ARRAY[]::bigint[],                    11, ARRAY[fa_snw],                  'active'),
+    (org, 'Brian',          'Shepherd',   cert_staff, ARRAY[]::bigint[],                    12, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Timothy',        'Walsh',      cert_staff, ARRAY[]::bigint[],                    13, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Nathan "Nate"',  'Callahan',   cert_staff, ARRAY[]::bigint[],                    14, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Janet',          'Morrison',   cert_staff, ARRAY[]::bigint[],                    15, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Barbara',        'Trent',      cert_staff, ARRAY[]::bigint[],                    16, ARRAY[fa_snw],                  'active'),
+    (org, 'David Michael',  'Spencer',    cert_csn3,  ARRAY[]::bigint[],                    17, ARRAY[fa_snw, fa_vcsn, fa_sc],  'active'),
+    (org, 'Robert',         'Garrison',   cert_csn3,  ARRAY[]::bigint[],                    18, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Steven',         'Whitfield',  cert_csn3,  ARRAY[]::bigint[],                    19, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Raymond',        'Caldwell',   cert_csn2,  ARRAY[]::bigint[],                    20, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Patricia',       'Langford',   cert_csn2,  ARRAY[]::bigint[],                    21, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Christine',      'Prescott',   cert_csn2,  ARRAY[]::bigint[],                    22, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Evelyn',         'Hartwell',   cert_jlcsn, ARRAY[role_scmgr],                    23, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Gloria',         'Jennings',   cert_other, ARRAY[role_actcor],                   24, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Donna',          'Fowler',     cert_other, ARRAY[role_scasst],                   25, ARRAY[fa_snw, fa_sc],           'active'),
     -- Night Shift ─────────────────────────────────────────────────────────────
-    (org, 'Hannah',         'Stratton',   cert_jlcsn, ARRAY[role_supv],                     26, ARRAY[fa_ns]),
-    (org, 'Vincent',        'Gallagher',  cert_jlcsn, ARRAY[role_supv],                     27, ARRAY[fa_ns]),
+    (org, 'Hannah',         'Stratton',   cert_jlcsn, ARRAY[role_supv],                     26, ARRAY[fa_ns],                   'active'),
+    (org, 'Vincent',        'Gallagher',  cert_jlcsn, ARRAY[role_supv],                     27, ARRAY[fa_ns],                   'active'),
     -- Visiting CSNS ───────────────────────────────────────────────────────────
-    (org, 'Marilyn',        'Davenport',  cert_jlcsn, ARRAY[role_dvcsn],                    28, ARRAY[fa_vcsn])
+    (org, 'Marilyn',        'Davenport',  cert_jlcsn, ARRAY[role_dvcsn],                    28, ARRAY[fa_vcsn],                 'active')
   ON CONFLICT (org_id, first_name, last_name) WHERE archived_at IS NULL DO NOTHING;
 
   -- ── Assign some employees to management departments ─────────────────────────
   -- ~20% of employees get a management department assignment
-  UPDATE public.employees SET department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Administration')]
-  WHERE org_id = org AND last_name IN ('Sullivan', 'Crawford', 'Henderson', 'Patterson', 'Hartwell');
+  -- Sullivan & Crawford are admins (get dept permission template), others are users
+  UPDATE public.employees SET
+    department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Administration')],
+    dept_admin_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Administration')]
+  WHERE org_id = org AND last_name IN ('Sullivan', 'Crawford');
 
-  UPDATE public.employees SET department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Human Resources')]
+  UPDATE public.employees SET
+    department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Administration')]
+  WHERE org_id = org AND last_name IN ('Henderson', 'Patterson', 'Hartwell');
+
+  -- Davenport is an admin in HR
+  UPDATE public.employees SET
+    department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Human Resources')],
+    dept_admin_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Human Resources')]
   WHERE org_id = org AND last_name IN ('Davenport');
 
   -- ── Update required certifications for shift codes ─────────────────────────

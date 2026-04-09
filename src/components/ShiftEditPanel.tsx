@@ -7,6 +7,9 @@ import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm from "./RepeatForm";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
+import { completeTourAction } from "@/components/tooltip-tour";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
@@ -396,22 +399,25 @@ function PillTimeEditor({
   // State 1: No custom time set — show "Custom time" button to add one
   if (!hasCustomTime && !editing) {
     return (
-      <button
-        onClick={() => startEditing()}
-        style={{
-          display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-subtle)", background: "none",
-          border: "1px dashed var(--color-border)", borderRadius: 8,
-          padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
-          width: "100%", justifyContent: "center", marginTop: 8,
-        }}
-      >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        Custom time
-        {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}{calcTimeDuration(defaultStart, defaultEnd) ? ` (${calcTimeDuration(defaultStart, defaultEnd)})` : ""}</span>}
-      </button>
+      <Hint content={hint("Override this shift's start and end times")} side="left">
+        <button
+          data-tour="edit-panel-custom-time"
+          onClick={() => startEditing()}
+          style={{
+            display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-subtle)", background: "none",
+            border: "1px dashed var(--color-border)", borderRadius: 8,
+            padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
+            width: "100%", justifyContent: "center", marginTop: 8,
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Custom time
+          {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}{calcTimeDuration(defaultStart, defaultEnd) ? ` (${calcTimeDuration(defaultStart, defaultEnd)})` : ""}</span>}
+        </button>
+      </Hint>
     );
   }
 
@@ -1624,36 +1630,39 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && !seriesId && onRepeatConfirm && currentLabels.length <= 1 && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={sectionLabel}>Repeating</div>
-                  <button
-                    onClick={() => setShowRepeatForm(true)}
-                    className="dg-btn dg-btn-secondary"
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      fontSize: "var(--dg-fs-caption)",
-                      padding: "9px 12px",
-                    }}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  <Hint content={hint("Create a recurring pattern (daily, weekly, biweekly)")} side="top">
+                    <button
+                      data-tour="edit-panel-repeat-btn"
+                      onClick={() => { setShowRepeatForm(true); completeTourAction(); }}
+                      className="dg-btn dg-btn-secondary"
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                      }}
                     >
-                      <polyline points="17 1 21 5 17 9" />
-                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                      <polyline points="7 23 3 19 7 15" />
-                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                    </svg>
-                    {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
-                  </button>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="17 1 21 5 17 9" />
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                        <polyline points="7 23 3 19 7 15" />
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                      </svg>
+                      {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
+                    </button>
+                  </Hint>
                 </div>
               )}
 
@@ -1795,81 +1804,90 @@ export default function ShiftEditPanel({
                     Shift requests
                   </div>
                   {onMakeAvailable && (
-                    <button
-                      onClick={onMakeAvailable}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px solid var(--color-info-border)",
-                        borderRadius: 8,
-                        color: "var(--color-link)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="8.5" cy="7" r="4" />
-                        <line x1="20" y1="8" x2="20" y2="14" />
-                        <line x1="23" y1="11" x2="17" y2="11" />
-                      </svg>
-                      Make available for pickup
-                    </button>
+                    <Hint content={hint("Post this shift for other staff to pick up")} side="top">
+                      <button
+                        data-tour="edit-panel-pickup-btn"
+                        onClick={onMakeAvailable}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                          border: "1px solid var(--color-info-border)",
+                          borderRadius: 8,
+                          color: "var(--color-link)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="8.5" cy="7" r="4" />
+                          <line x1="20" y1="8" x2="20" y2="14" />
+                          <line x1="23" y1="11" x2="17" y2="11" />
+                        </svg>
+                        Make available for pickup
+                      </button>
+                    </Hint>
                   )}
                   {onProposeSwap && (
-                    <button
-                      onClick={onProposeSwap}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px solid var(--color-info-border)",
-                        borderRadius: 8,
-                        color: "var(--color-accent-text)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="17 1 21 5 17 9" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                        <polyline points="7 23 3 19 7 15" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                      </svg>
-                      Propose a swap
-                    </button>
+                    <Hint content={hint("Request a shift exchange with another employee")} side="top">
+                      <button
+                        data-tour="edit-panel-swap-btn"
+                        onClick={onProposeSwap}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                          border: "1px solid var(--color-info-border)",
+                          borderRadius: 8,
+                          color: "var(--color-accent-text)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="17 1 21 5 17 9" />
+                          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                          <polyline points="7 23 3 19 7 15" />
+                          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                        </svg>
+                        Propose a swap
+                      </button>
+                    </Hint>
                   )}
                   {onCallOff && !showCallOffPicker && (
-                    <button
-                      onClick={() => setShowCallOffPicker(true)}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px solid var(--color-danger-border)",
-                        borderRadius: 8,
-                        color: "var(--color-danger-text)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="15" y1="9" x2="9" y2="15" />
-                        <line x1="9" y1="9" x2="15" y2="15" />
-                      </svg>
-                      Call off
-                    </button>
+                    <Hint content={hint("Submit an absence request for this shift")} side="top">
+                      <button
+                        data-tour="edit-panel-calloff-btn"
+                        onClick={() => setShowCallOffPicker(true)}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                          border: "1px solid var(--color-danger-border)",
+                          borderRadius: 8,
+                          color: "var(--color-danger-text)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
+                        </svg>
+                        Call off
+                      </button>
+                    </Hint>
                   )}
                   {onCallOff && showCallOffPicker && (
                     <div style={{ marginTop: 4 }}>
@@ -2035,6 +2053,7 @@ export default function ShiftEditPanel({
                   No shifts start at or after {fmt12h(firstShiftEndTime)}.
                 </div>
               ) : (
+                <div data-tour="shift-picker">
                 <ShiftPicker
                   shiftCodes={pickerShiftCodes}
                   absenceTypes={pickerAbsenceTypes}
@@ -2066,6 +2085,7 @@ export default function ShiftEditPanel({
                   closeOnSelect={false}
                   shiftDisplayMode={shiftDisplayMode}
                 />
+                </div>
               )}
             </>
           )}

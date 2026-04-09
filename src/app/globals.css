@@ -216,6 +216,17 @@
   --shadow-drag: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
 
   /* ----------------------------------------------------------
+     Tooltip & Tour tokens
+  ---------------------------------------------------------- */
+  --tooltip-font-size: var(--dg-fs-label);
+  --tooltip-border-radius: var(--dg-radius-sm);
+  --tooltip-shadow: var(--shadow-float);
+  --tour-popover-border-radius: var(--dg-radius-xl);
+  --tour-popover-shadow: var(--shadow-modal);
+  --tour-popover-width: 320px;
+  --tour-arrow-size: 8px;
+
+  /* ----------------------------------------------------------
      Animation durations
   ---------------------------------------------------------- */
   --dg-duration-fast: 150ms;
@@ -400,6 +411,11 @@ textarea {
 .dg-btn-sm {
   font-size: var(--dg-fs-caption);
   padding: 6px 14px;
+}
+
+/* Hover row (settings list items) */
+.dg-hover-row:hover {
+  background: var(--color-bg-secondary);
 }
 
 /* ── Input System ───────────────────────────────────────── */
@@ -721,12 +737,12 @@ textarea {
 /* ── Slide-over Panel ───────────────────────────────────── */
 .dg-panel {
   position: fixed;
-  top: 12px;
+  top: calc(var(--header-height) + 12px);
   right: 12px;
   bottom: 12px;
   width: min(480px, calc(100vw - 24px));
   background: var(--color-surface);
-  z-index: 201;
+  z-index: 10001;
   box-shadow: var(--shadow-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--dg-radius-lg);
@@ -740,7 +756,7 @@ textarea {
   position: fixed;
   inset: 0;
   background: var(--dg-overlay-light);
-  z-index: 200;
+  z-index: 10000;
   animation: fade-in var(--dg-duration-standard) ease;
 }
 
@@ -1128,13 +1144,13 @@ textarea {
   background: var(--dg-overlay-light);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
-  z-index: 200;
+  z-index: 10000;
   animation: fade-in var(--dg-duration-standard) ease;
 }
 
 .staff-detail-pane {
   position: fixed;
-  top: 12px;
+  top: calc(var(--header-height) + 12px);
   right: 12px;
   bottom: 12px;
   width: min(480px, calc(100vw - 24px));
@@ -1145,7 +1161,7 @@ textarea {
   border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08);
-  z-index: 201;
+  z-index: 10001;
   animation: staff-detail-in var(--dg-duration-standard) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2350,6 +2366,209 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   }
 }
 
+
+/* ── Tooltip & Tour ────────────────────────────────────────────────────────
+ * Styles for <HelpHint /> trigger and <TourPopover /> arrow/caret.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+.help-hint-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  border: none;
+  padding: 0;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.tour-popover {
+  position: fixed;
+  z-index: 9998;
+  width: var(--tour-popover-width);
+  background: var(--color-surface, white);
+  border-radius: var(--tour-popover-border-radius);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--tour-popover-shadow);
+  padding: 18px 20px 16px;
+  font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
+  transition: top 300ms ease, left 300ms ease, opacity 200ms ease;
+}
+
+.tour-popover-arrow {
+  position: absolute;
+  width: var(--tour-arrow-size);
+  height: var(--tour-arrow-size);
+  background: var(--color-surface, white);
+  border: 1px solid var(--color-border);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* Clip the border on the popover-facing side */
+.tour-popover-arrow[data-side="bottom"] {
+  border-bottom: none;
+  border-right: none;
+}
+.tour-popover-arrow[data-side="top"] {
+  border-top: none;
+  border-left: none;
+}
+.tour-popover-arrow[data-side="left"] {
+  border-left: none;
+  border-bottom: none;
+}
+.tour-popover-arrow[data-side="right"] {
+  border-right: none;
+  border-top: none;
+}
+
+.tour-popover-title {
+  font-size: var(--dg-fs-body-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+}
+
+.tour-popover-body {
+  font-size: var(--dg-fs-label);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.tour-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tour-popover-progress {
+  font-size: var(--dg-fs-caption);
+  color: var(--color-text-faint);
+  font-weight: 500;
+}
+
+.tour-popover-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tour-popover-skip {
+  background: none;
+  border: none;
+  font-size: var(--dg-fs-caption);
+  font-weight: 500;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+
+.tour-popover-back {
+  background: none;
+  border: none;
+  font-size: var(--dg-fs-caption);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.tour-popover-next {
+  padding: 6px 16px;
+  border-radius: var(--dg-radius-sm);
+  border: none;
+  background: var(--color-brand);
+  color: var(--color-text-inverse);
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 100ms ease;
+}
+
+.tour-popover-next:hover {
+  opacity: 0.9;
+}
+
+.tour-entry-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9996;
+  background: var(--dg-overlay-heavy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tour-entry-card {
+  background: var(--color-surface);
+  border-radius: var(--tour-popover-border-radius);
+  box-shadow: var(--tour-popover-shadow);
+  padding: 28px 32px 24px;
+  max-width: 400px;
+  width: calc(100vw - 32px);
+  text-align: center;
+}
+
+.tour-entry-headline {
+  font-size: var(--dg-fs-heading);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.tour-entry-meta {
+  font-size: var(--dg-fs-label);
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+}
+
+.tour-entry-start {
+  width: 100%;
+  padding: 10px 20px;
+  border-radius: var(--dg-radius-md);
+  border: none;
+  background: var(--color-brand);
+  color: var(--color-text-inverse);
+  font-size: var(--dg-fs-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.tour-entry-start:hover {
+  opacity: 0.9;
+}
+
+.tour-entry-dismiss {
+  background: none;
+  border: none;
+  font-size: var(--dg-fs-label);
+  color: var(--color-text-faint);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tour-entry-specialist {
+  display: block;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  font-size: var(--dg-fs-caption);
+  color: var(--color-link);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* ── Reduced motion ────────────────────────────────────────────────────────
  * Disables non-essential animations and transitions for users who have

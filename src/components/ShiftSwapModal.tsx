@@ -3,6 +3,8 @@
 import { useState, useMemo, useCallback } from "react";
 import type { Employee } from "@/types";
 import Modal from "@/components/Modal";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
@@ -212,45 +214,51 @@ export default function ShiftSwapModal({
               marginBottom: 12,
             }}
           >
-            <button
-              type="button"
-              onClick={() => goDay(-1)}
-              disabled={!canGoPrev}
-              title="Previous day"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: canGoPrev ? "pointer" : "not-allowed",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-title)",
-                color: canGoPrev ? "var(--color-text-secondary)" : "var(--color-text-faint)",
-                borderRadius: 8,
-                fontFamily: "inherit",
-                opacity: canGoPrev ? 1 : 0.5,
-              }}
-            >
-              ‹
-            </button>
+            <Hint content={hint("Go to previous day")} side="bottom">
+              <span style={{ display: "inline-flex" }}>
+                <button
+                  type="button"
+                  onClick={() => goDay(-1)}
+                  disabled={!canGoPrev}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: canGoPrev ? "pointer" : "not-allowed",
+                    padding: "4px 8px",
+                    fontSize: "var(--dg-fs-title)",
+                    color: canGoPrev ? "var(--color-text-secondary)" : "var(--color-text-faint)",
+                    borderRadius: 8,
+                    fontFamily: "inherit",
+                    opacity: canGoPrev ? 1 : 0.5,
+                  }}
+                  aria-label="Go to previous day"
+                >
+                  ‹
+                </button>
+              </span>
+            </Hint>
             <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>
               {formatDisplayDate(viewDate)}
             </span>
-            <button
-              type="button"
-              onClick={() => goDay(1)}
-              title="Next day"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-title)",
-                color: "var(--color-text-secondary)",
-                borderRadius: 8,
-                fontFamily: "inherit",
-              }}
-            >
-              ›
-            </button>
+            <Hint content={hint("Go to next day")} side="bottom">
+              <button
+                type="button"
+                onClick={() => goDay(1)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  fontSize: "var(--dg-fs-title)",
+                  color: "var(--color-text-secondary)",
+                  borderRadius: 8,
+                  fontFamily: "inherit",
+                }}
+                aria-label="Go to next day"
+              >
+                ›
+              </button>
+            </Hint>
           </div>
 
           {/* Eligible employee list */}

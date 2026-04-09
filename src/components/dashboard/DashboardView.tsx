@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
+import { TooltipTourRunner } from "@/components/tooltip-tour";
+import { dashboardTour } from "@/components/tooltip-tour/tours/dashboard";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 
 import type { Permissions } from "@/hooks";
@@ -423,7 +425,7 @@ export default function DashboardView({
       </div>
 
       {/* Content */}
-      <div style={contentStyle}>
+      <div data-tour="dashboard-cards" style={contentStyle}>
 
       {/* Onboarding checklist — shown until all setup steps are complete */}
       {hasAdminCapability && (() => {
@@ -562,6 +564,8 @@ export default function DashboardView({
       )}
 
       </div>
+
+      <TooltipTourRunner config={dashboardTour} />
     </div>
   );
 }

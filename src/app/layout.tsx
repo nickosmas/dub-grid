@@ -39,6 +39,7 @@ import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
 import ConsentGatedAnalytics from "@/components/ConsentGatedAnalytics";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { TOOLTIP_DELAY_MS } from "@/lib/constants";
 import CookieConsent from "@/components/CookieConsent";
 import TermsAcceptanceGate from "@/components/TermsAcceptanceGate";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
@@ -66,7 +67,7 @@ export default function RootLayout({
               <TermsAcceptanceGate>
                 <OnboardingGate>
                   <MobileSubNavProvider>
-                    <TooltipProvider>
+                    <TooltipProvider delay={TOOLTIP_DELAY_MS}>
                       <AppShell>{children}</AppShell>
                     </TooltipProvider>
                   </MobileSubNavProvider>

@@ -125,8 +125,11 @@ CREATE TABLE public.organization_memberships (
   archived_at                TIMESTAMPTZ,
   archived_by                UUID,
   department_ids             BIGINT[] NOT NULL DEFAULT '{}',
+  /** Subset of department_ids where this user is a dept admin (gets dept permission template). */
+  dept_admin_ids             BIGINT[] NOT NULL DEFAULT '{}',
   phone                      TEXT,
   onboarding_completed_at    TIMESTAMPTZ,
+  tooltip_tours_completed    JSONB NOT NULL DEFAULT '{}'::jsonb,
 
   UNIQUE (user_id, org_id)
 );
@@ -225,7 +228,11 @@ CREATE TABLE public.employees (
   /** Linked Supabase auth user. Set when invitation is accepted. */
   user_id           UUID,
   /** Management department IDs (for employees who also belong to management departments). */
-  department_ids    BIGINT[] NOT NULL DEFAULT '{}'
+  department_ids    BIGINT[] NOT NULL DEFAULT '{}',
+  /** Subset of department_ids where this employee is a dept admin (gets dept permission template). */
+  dept_admin_ids    BIGINT[] NOT NULL DEFAULT '{}',
+  /** Optimistic concurrency control version counter. */
+  version           INTEGER NOT NULL DEFAULT 0
 );
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
@@ -456,7 +463,9 @@ CREATE TABLE public.invitations (
   first_name     TEXT,
   last_name      TEXT,
   phone          TEXT,
-  department_ids BIGINT[] NOT NULL DEFAULT '{}'
+  department_ids BIGINT[] NOT NULL DEFAULT '{}',
+  /** Subset of department_ids where this invitee will be a dept admin. */
+  dept_admin_ids BIGINT[] NOT NULL DEFAULT '{}'
 );
 
 -- Only one pending (non-accepted, non-revoked) invitation per email per org.
@@ -955,6 +964,7 @@ CREATE INDEX idx_employees_status ON public.employees(org_id, status) WHERE arch
 CREATE UNIQUE INDEX idx_employees_user_id_per_org ON public.employees(org_id, user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_employees_user_id ON public.employees(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_employees_department_ids ON public.employees USING GIN (department_ids) WHERE department_ids != '{}';
+CREATE INDEX idx_employees_dept_admin_ids ON public.employees USING GIN (dept_admin_ids) WHERE dept_admin_ids != '{}';
 CREATE INDEX idx_focus_areas_department_id ON public.focus_areas(department_id) WHERE department_id IS NOT NULL;
 
 -- shift_categories

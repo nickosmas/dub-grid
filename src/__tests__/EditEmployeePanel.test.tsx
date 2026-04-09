@@ -63,6 +63,8 @@ const employee: Employee = {
   contactNotes: "",
   userId: null,
   departmentIds: [],
+  deptAdminIds: [],
+  version: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -293,6 +295,8 @@ describe("EditEmployeePanel", () => {
         contactNotes: fc.string({ maxLength: 50 }),
         userId: fc.constant(null as string | null),
         departmentIds: fc.constant([] as number[]),
+        deptAdminIds: fc.constant([] as number[]),
+        version: fc.constant(0),
       });
 
       fc.assert(

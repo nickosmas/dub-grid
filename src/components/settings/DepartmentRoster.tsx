@@ -2,11 +2,15 @@
 
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { useDirectory } from "@/hooks/useDirectory";
-import { updateAppOnlyUser, updateEmployeeDepartments, updatePendingInvitation, invalidateOrgDirectory } from "@/lib/db";
+import { updateAppOnlyUser, updateEmployeeDepartments, updatePendingInvitation, updateAdminPermissions, invalidateOrgDirectory } from "@/lib/db";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
-import type { Department, DirectoryPerson } from "@/types";
+import { supabase } from "@/lib/supabase";
+import type { Department, DirectoryPerson, AdminPermissions } from "@/types";
+import PermissionsEditor from "@/components/PermissionsEditor";
 
 interface DepartmentRosterProps {
   department: Department;
@@ -20,6 +24,10 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
   const [showAddPicker, setShowAddPicker] = useState(false);
   const [search, setSearch] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [editingPerms, setEditingPerms] = useState<{
+    person: DirectoryPerson;
+    currentPermissions: AdminPermissions | null;
+  } | null>(null);
 
   const members = useMemo(
     () => directory.filter((p) => p.departmentIds.includes(department.id)),
@@ -44,24 +52,42 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
     queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
   }
 
-  async function updatePersonDepts(person: DirectoryPerson, newDeptIds: number[]) {
+  async function updatePersonDepts(person: DirectoryPerson, newDeptIds: number[], newAdminIds?: number[]) {
     if (person.source === "employee" && person.employeeId) {
-      await updateEmployeeDepartments(person.employeeId, newDeptIds, orgId);
+      await updateEmployeeDepartments(person.employeeId, newDeptIds, orgId, newAdminIds);
     } else if (person.source === "pending_invite") {
-      // personId is 'inv:<uuid>' — extract the invitation ID
       const invId = person.personId.replace(/^inv:/, "");
-      await updatePendingInvitation(invId, orgId, { departmentIds: newDeptIds });
+      const data: { departmentIds: number[]; deptAdminIds?: number[] } = { departmentIds: newDeptIds };
+      if (newAdminIds !== undefined) data.deptAdminIds = newAdminIds;
+      await updatePendingInvitation(invId, orgId, data);
     } else if (person.userId) {
-      await updateAppOnlyUser(person.userId, orgId, { departmentIds: newDeptIds });
+      const data: { departmentIds: number[]; deptAdminIds?: number[] } = { departmentIds: newDeptIds };
+      if (newAdminIds !== undefined) data.deptAdminIds = newAdminIds;
+      await updateAppOnlyUser(person.userId, orgId, data);
     }
   }
 
-  async function addMember(person: DirectoryPerson) {
+  async function addMember(person: DirectoryPerson, asAdmin: boolean) {
     setUpdating(person.personId);
     try {
-      await updatePersonDepts(person, [...person.departmentIds, department.id]);
+      const newDeptIds = [...person.departmentIds, department.id];
+      const newAdminIds = asAdmin ? [...person.deptAdminIds, department.id] : undefined;
+      await updatePersonDepts(person, newDeptIds, newAdminIds);
       await invalidate();
-      toast.success(`Added ${person.firstName} ${person.lastName}`);
+      toast.success(`Added ${person.firstName} ${person.lastName} as ${asAdmin ? "admin" : "user"}`);
+      // If added as admin with app access, open permissions editor immediately
+      if (asAdmin && person.userId) {
+        const { data } = await supabase
+          .from("organization_memberships")
+          .select("admin_permissions")
+          .eq("user_id", person.userId)
+          .eq("org_id", orgId)
+          .single();
+        setEditingPerms({
+          person,
+          currentPermissions: (data?.admin_permissions ?? null) as AdminPermissions | null,
+        });
+      }
     } catch (err: unknown) {
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to add member");
     } finally {
@@ -72,7 +98,11 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
   async function removeMember(person: DirectoryPerson) {
     setUpdating(person.personId);
     try {
-      await updatePersonDepts(person, person.departmentIds.filter((id) => id !== department.id));
+      await updatePersonDepts(
+        person,
+        person.departmentIds.filter((id) => id !== department.id),
+        person.deptAdminIds.filter((id) => id !== department.id),
+      );
       await invalidate();
       toast.success(`Removed ${person.firstName} ${person.lastName}`);
     } catch (err: unknown) {
@@ -82,13 +112,106 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
     }
   }
 
+  async function toggleMemberRole(person: DirectoryPerson) {
+    setUpdating(person.personId);
+    const isAdmin = person.deptAdminIds.includes(department.id);
+    try {
+      const newAdminIds = isAdmin
+        ? person.deptAdminIds.filter((id) => id !== department.id)
+        : [...person.deptAdminIds, department.id];
+      await updatePersonDepts(person, person.departmentIds, newAdminIds);
+      await invalidate();
+      const nowAdmin = !isAdmin;
+      toast.success(`${person.firstName} ${person.lastName} is now ${nowAdmin ? "an admin" : "a user"}`);
+      // If promoted to admin with app access, open permissions editor
+      if (nowAdmin && person.userId) {
+        const { data } = await supabase
+          .from("organization_memberships")
+          .select("admin_permissions")
+          .eq("user_id", person.userId)
+          .eq("org_id", orgId)
+          .single();
+        setEditingPerms({
+          person,
+          currentPermissions: (data?.admin_permissions ?? null) as AdminPermissions | null,
+        });
+      }
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : null) ?? "Failed to update role");
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  async function openPermsEditor(person: DirectoryPerson) {
+    if (!person.userId) return;
+    const { data } = await supabase
+      .from("organization_memberships")
+      .select("admin_permissions")
+      .eq("user_id", person.userId)
+      .eq("org_id", orgId)
+      .single();
+    setEditingPerms({
+      person,
+      currentPermissions: (data?.admin_permissions ?? null) as AdminPermissions | null,
+    });
+  }
+
   const sourceBadge = (source: DirectoryPerson["source"]) => {
-    const label = source === "employee" ? "Staff" : source === "user_only" ? "App Only" : "Invited";
-    const bg = source === "employee" ? "var(--color-brand-light, #E0E7FF)" : "var(--color-surface-subtle, #F3F4F6)";
+    const config =
+      source === "employee"
+        ? { label: "Employee", bg: "var(--color-success-bg)", color: "var(--color-success-text)" }
+        : source === "user_only"
+          ? { label: "App Only", bg: "var(--color-bg-secondary)", color: "var(--color-text-muted)" }
+          : { label: "Invited", bg: "var(--color-warning-bg)", color: "var(--color-warning-text)" };
     return (
-      <span style={{ fontSize: "var(--dg-fs-caption)", padding: "1px 6px", borderRadius: 4, background: bg, color: "var(--color-text-subtle)", whiteSpace: "nowrap" }}>
-        {label}
+      <span
+        style={{
+          fontSize: "var(--dg-fs-badge)",
+          fontWeight: 600,
+          padding: "2px 8px",
+          borderRadius: 10,
+          background: config.bg,
+          color: config.color,
+          whiteSpace: "nowrap",
+          lineHeight: 1.4,
+          letterSpacing: "0.02em",
+        }}
+      >
+        {config.label}
       </span>
+    );
+  };
+
+  const roleBadge = (person: DirectoryPerson) => {
+    const isAdmin = person.deptAdminIds.includes(department.id);
+    const badge = (
+      <button
+        onClick={(e) => { e.preventDefault(); toggleMemberRole(person); }}
+        disabled={!canEdit || updating === person.personId}
+        style={{
+          fontSize: "var(--dg-fs-badge)",
+          fontWeight: 600,
+          padding: "2px 8px",
+          borderRadius: 10,
+          background: isAdmin ? "var(--color-primary-bg, #EBF5FF)" : "var(--color-bg-secondary)",
+          color: isAdmin ? "var(--color-primary, #2563EB)" : "var(--color-text-muted)",
+          border: "none",
+          cursor: canEdit ? "pointer" : "default",
+          whiteSpace: "nowrap",
+          lineHeight: 1.4,
+          letterSpacing: "0.02em",
+          transition: "background 0.15s, color 0.15s",
+        }}
+      >
+        {isAdmin ? "Admin" : "User"}
+      </button>
+    );
+    if (!canEdit) return badge;
+    return (
+      <Hint content={hint(`Switch to ${isAdmin ? "user" : "admin"}`)} side="left">
+        {badge}
+      </Hint>
     );
   };
 
@@ -98,7 +221,7 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "4px 0" }}>
         <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           Members ({members.length})
         </span>
@@ -115,7 +238,7 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
 
       {/* ── Add member picker ─────────────────────────────────────────── */}
       {showAddPicker && (
-        <div style={{ marginBottom: 12, border: "1px solid var(--color-border-light)", borderRadius: 8, padding: 8, background: "var(--color-surface-subtle, #FAFAFA)" }}>
+        <div className="dg-card-enter" style={{ marginBottom: 12, border: "1px solid var(--color-border-light)", borderRadius: 8, padding: 8, background: "var(--color-surface-subtle, #FAFAFA)" }}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -133,20 +256,29 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
               {nonMembers.map((p) => (
                 <div
                   key={p.personId}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", borderBottom: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-label)" }}
+                  className="dg-hover-row"
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 8px", borderBottom: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-label)" }}
                 >
-                  <span style={{ flex: 1 }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {p.firstName} {p.lastName}
                     {p.email && <span style={{ color: "var(--color-text-faint)", marginLeft: 6, fontSize: "var(--dg-fs-caption)" }}>{p.email}</span>}
                   </span>
                   {sourceBadge(p.source)}
                   <button
                     className="dg-btn dg-btn-ghost"
-                    onClick={() => addMember(p)}
+                    onClick={() => addMember(p, false)}
                     disabled={updating === p.personId}
                     style={{ fontSize: "var(--dg-fs-caption)", padding: "2px 8px" }}
                   >
-                    {updating === p.personId ? "..." : "Add"}
+                    {updating === p.personId ? "..." : "as User"}
+                  </button>
+                  <button
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() => addMember(p, true)}
+                    disabled={updating === p.personId}
+                    style={{ fontSize: "var(--dg-fs-caption)", padding: "2px 8px", color: "var(--color-primary, #2563EB)" }}
+                  >
+                    {updating === p.personId ? "..." : "as Admin"}
                   </button>
                 </div>
               ))}
@@ -162,29 +294,67 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
         </div>
       ) : (
         <div>
-          {members.map((p) => (
-            <div
-              key={p.personId}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-label)" }}
-            >
-              <span style={{ flex: 1, fontWeight: 500 }}>
-                {p.firstName} {p.lastName}
-              </span>
-              {p.email && <span style={{ color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)" }}>{p.email}</span>}
-              {sourceBadge(p.source)}
-              {canEdit && (
-                <button
-                  className="dg-btn dg-btn-ghost"
-                  onClick={() => removeMember(p)}
-                  disabled={updating === p.personId}
-                  style={{ fontSize: "var(--dg-fs-caption)", padding: "2px 8px", color: "var(--color-danger, #EF4444)" }}
-                >
-                  {updating === p.personId ? "..." : "Remove"}
-                </button>
-              )}
-            </div>
-          ))}
+          {members.map((p) => {
+            const isAdmin = p.deptAdminIds.includes(department.id);
+            const hasAppAccess = !!p.userId;
+            return (
+              <div
+                key={p.personId}
+                className="dg-hover-row"
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", borderBottom: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-label)" }}
+              >
+                <span style={{ flex: 1, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.firstName} {p.lastName}
+                </span>
+                {roleBadge(p)}
+                {/* Per-admin configure — only for members with app access */}
+                {isAdmin && hasAppAccess && canEdit && (
+                  <button
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() => openPermsEditor(p)}
+                    style={{ fontSize: "var(--dg-fs-caption)", padding: "2px 8px", flexShrink: 0 }}
+                  >
+                    Configure
+                  </button>
+                )}
+                {isAdmin && !hasAppAccess && (
+                  <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)", fontStyle: "italic", flexShrink: 0 }}>
+                    No account
+                  </span>
+                )}
+                {canEdit && (
+                  <button
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() => removeMember(p)}
+                    disabled={updating === p.personId}
+                    style={{ fontSize: "var(--dg-fs-caption)", padding: "2px 8px", color: "var(--color-text-faint)", flexShrink: 0 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-danger)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-faint)")}
+                  >
+                    {updating === p.personId ? "..." : "Remove"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {/* ── Per-user permissions editor ───────────────────────────────── */}
+      {editingPerms && (
+        <PermissionsEditor
+          title={`Permissions \u2014 ${editingPerms.person.firstName} ${editingPerms.person.lastName}`}
+          subtitle={<>Configure what <strong>{editingPerms.person.firstName} {editingPerms.person.lastName}</strong> can do. <em>View Schedule</em> and <em>View Staff</em> are always enabled.</>}
+          initialPermissions={editingPerms.currentPermissions}
+          showPermissionCounter
+          lockedFalse={["canManageOrgSettings"]}
+          onSave={async (perms) => {
+            await updateAdminPermissions(editingPerms.person.userId!, perms, orgId, editingPerms.person.email || undefined);
+            toast.success("Permissions updated");
+            await invalidate();
+          }}
+          onClose={() => setEditingPerms(null)}
+        />
       )}
     </div>
   );

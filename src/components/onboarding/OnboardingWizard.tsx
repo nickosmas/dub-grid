@@ -19,6 +19,7 @@ import ShiftCodesStep from "./steps/ShiftCodesStep";
 import DisplayModeStep from "./steps/DisplayModeStep";
 import ShiftCodesDetailStep from "./steps/ShiftCodesDetailStep";
 import AdminOrientationStep from "./steps/AdminOrientationStep";
+import SuperAdminOrientationStep from "./steps/SuperAdminOrientationStep";
 import CustomLabelsStep from "./steps/CustomLabelsStep";
 import CompletionStep from "./steps/CompletionStep";
 
@@ -28,6 +29,7 @@ interface OnboardingWizardProps {
   role: string;
   orgId: string;
   userId: string;
+  isOrgSetup: boolean;
 }
 
 function buildSuperAdminSteps(displayMode: ShiftDisplayMode): StepConfig[] {
@@ -52,6 +54,12 @@ const ADMIN_STEPS: StepConfig[] = [
   { id: "completion", label: "Done" },
 ];
 
+const SA_ORIENTATION_STEPS: StepConfig[] = [
+  { id: "welcome", label: "Welcome" },
+  { id: "sa-orientation", label: "Overview" },
+  { id: "completion", label: "Done" },
+];
+
 const USER_STEPS: StepConfig[] = [
   { id: "welcome", label: "Welcome" },
   { id: "completion", label: "Done" },
@@ -61,15 +69,18 @@ export default function OnboardingWizard({
   role,
   orgId,
   userId,
+  isOrgSetup,
 }: OnboardingWizardProps) {
   const { org } = useOrganizationData();
   const displayMode = org?.shiftDisplayMode ?? "code";
 
   const steps = useMemo(() => {
-    if (role === "super_admin") return buildSuperAdminSteps(displayMode);
+    if (role === "super_admin") {
+      return isOrgSetup ? SA_ORIENTATION_STEPS : buildSuperAdminSteps(displayMode);
+    }
     if (role === "admin") return ADMIN_STEPS;
     return USER_STEPS;
-  }, [role, displayMode]);
+  }, [role, displayMode, isOrgSetup]);
   const {
     currentStepIndex,
     currentStep,
@@ -100,7 +111,7 @@ export default function OnboardingWizard({
 
     switch (id) {
       case "welcome":
-        return <WelcomeStep role={role} onNext={goNext} />;
+        return <WelcomeStep role={role} onNext={goNext} isOrgSetup={isOrgSetup} />;
       case "org-details":
         return <OrgDetailsStep onNext={goNext} onBack={goBack} />;
       case "custom-labels":
@@ -119,9 +130,11 @@ export default function OnboardingWizard({
         return <ShiftCodesDetailStep onNext={goNext} onBack={goBack} />;
       case "orientation":
         return <AdminOrientationStep onNext={goNext} onBack={goBack} />;
+      case "sa-orientation":
+        return <SuperAdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "completion":
         return (
-          <CompletionStep role={role} onComplete={completeOnboarding} />
+          <CompletionStep role={role} onComplete={completeOnboarding} isOrgSetup={isOrgSetup} />
         );
       default:
         return null;
@@ -240,8 +253,8 @@ export default function OnboardingWizard({
       {/* Fade-in animation */}
       <style>{`
         @keyframes onboarding-fade-in {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
 

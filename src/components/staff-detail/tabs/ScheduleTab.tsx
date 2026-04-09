@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, Fragment } from "react";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import type {
   Employee,
   ShiftMap,
@@ -259,7 +261,7 @@ export function ScheduleTab({
                                     )
                                   )}
                                   {entry.fromRecurring && (
-                                    <span className="text-muted-foreground text-[11px]" title="From recurring schedule">↻</span>
+                                    <Hint content={hint("From recurring schedule")} side="top"><span className="text-muted-foreground text-[11px]">↻</span></Hint>
                                   )}
                                 </div>
                               </TableCell>

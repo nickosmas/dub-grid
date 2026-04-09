@@ -23,6 +23,8 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
     ...overrides,
   };
 }
@@ -38,6 +40,7 @@ function makeShiftCode(overrides: Partial<ShiftCode> = {}): ShiftCode {
     text: "#000",
     sortOrder: 1,
     categoryId: null,
+    version: 0,
     ...overrides,
   };
 }

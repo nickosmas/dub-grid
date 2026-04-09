@@ -124,6 +124,8 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
           statusNote: "",
           userId: null,
           departmentIds: match?.departmentIds ?? [],
+          deptAdminIds: match?.deptAdminIds ?? [],
+          version: 0,
           _linkToUserId: match?.userId ?? undefined,
         };
       }),

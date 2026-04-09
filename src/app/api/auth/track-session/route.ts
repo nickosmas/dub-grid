@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
       );
 
     if (error) {
+      // FK violation (23503) means auth.users row doesn't exist yet — race condition
+      // during sign-up. Return 409 so the client can retry silently.
+      if (error.code === "23503") {
+        return NextResponse.json({ error: "User not ready" }, { status: 409 });
+      }
       console.error("track-session upsert error:", error);
       return NextResponse.json({ error: "Failed to track session" }, { status: 500 });
     }

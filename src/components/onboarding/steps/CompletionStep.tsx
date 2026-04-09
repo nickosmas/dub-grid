@@ -10,32 +10,40 @@ import * as Sentry from "@/lib/sentry";
 interface CompletionStepProps {
   role: string;
   onComplete: () => Promise<void>;
+  isOrgSetup?: boolean;
 }
 
-export default function CompletionStep({ role, onComplete }: CompletionStepProps) {
+export default function CompletionStep({ role, onComplete, isOrgSetup }: CompletionStepProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const isSuperAdmin = role === "super_admin";
+  const isSaOrientation = isSuperAdmin && (isOrgSetup ?? false);
   const isUser = role === "user";
 
-  const heading = isSuperAdmin
+  const heading = isSuperAdmin && !isSaOrientation
     ? "Your Workspace is Ready!"
     : "You\u2019re All Set!";
 
-  const subtext = isSuperAdmin
-    ? "Everything is configured and ready to go. Next, head to the People page to add your employees and start building schedules."
-    : isUser
-      ? "You\u2019re all set up. Head to the schedule to see your upcoming shifts."
-      : "Your account is set up and ready. Head to the dashboard to get started.";
+  const subtext = isSaOrientation
+    ? "You have full super admin access. Head to the dashboard to see how things are running."
+    : isSuperAdmin
+      ? "Everything is configured and ready to go. Next, head to the People page to add your employees and start building schedules."
+      : isUser
+        ? "You\u2019re all set up. Head to the schedule to see your upcoming shifts."
+        : "Your account is set up and ready. Head to the dashboard to get started.";
 
-  const ctaLabel = isSuperAdmin
-    ? "Go to People"
-    : isUser
-      ? "View My Schedule"
-      : "Go to Dashboard";
+  const ctaLabel = isSaOrientation
+    ? "Go to Dashboard"
+    : isSuperAdmin
+      ? "Go to People"
+      : isUser
+        ? "View My Schedule"
+        : "Go to Dashboard";
 
-  const destination = isUser ? "/schedule" : isSuperAdmin ? "/people" : "/dashboard";
+  const destination = isSaOrientation
+    ? "/dashboard"
+    : isUser ? "/schedule" : isSuperAdmin ? "/people" : "/dashboard";
 
   async function handleComplete() {
     setLoading(true);

@@ -702,15 +702,18 @@ async function main() {
     }
 
     // 9b. Assign ~20% of employees to management departments
+    // Every 5th employee gets a mgmt dept. First of each pair is a dept admin, rest are users.
     const mgmtDeptIds = deptIds.filter((_, idx) => tenant.departments?.[idx]?.type === 'management');
     if (mgmtDeptIds.length > 0) {
+      let adminToggle = true; // alternate admin/user within each dept
       for (let i = 0; i < employees.length; i++) {
         if (i % 5 === 0) {
           const mgmtId = mgmtDeptIds[i % mgmtDeptIds.length];
           await db.query(
-            `UPDATE public.employees SET department_ids = $1 WHERE id = $2`,
-            [[mgmtId], employees[i].id]
+            `UPDATE public.employees SET department_ids = $1, dept_admin_ids = $2 WHERE id = $3`,
+            [[mgmtId], adminToggle ? [mgmtId] : [], employees[i].id]
           );
+          adminToggle = !adminToggle;
         }
       }
     }

@@ -1207,7 +1207,8 @@ CREATE OR REPLACE FUNCTION public.send_invitation(
   p_first_name     TEXT DEFAULT NULL,
   p_last_name      TEXT DEFAULT NULL,
   p_phone          TEXT DEFAULT NULL,
-  p_department_ids BIGINT[] DEFAULT '{}'
+  p_department_ids   BIGINT[] DEFAULT '{}',
+  p_dept_admin_ids   BIGINT[] DEFAULT '{}'
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -1270,8 +1271,8 @@ BEGIN
     RAISE EXCEPTION 'An active invitation already exists for this email';
   END IF;
 
-  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id, first_name, last_name, phone, department_ids)
-    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id, p_first_name, p_last_name, p_phone, p_department_ids)
+  INSERT INTO public.invitations (org_id, invited_by, email, role_to_assign, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids)
+    VALUES (p_org_id, auth.uid(), lower(p_email), p_role::public.org_role, p_employee_id, p_first_name, p_last_name, p_phone, p_department_ids, p_dept_admin_ids)
   RETURNING * INTO v_invite;
 
   RETURN jsonb_build_object(
@@ -1282,7 +1283,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID, TEXT, TEXT, TEXT, BIGINT[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID, TEXT, TEXT, TEXT, BIGINT[], BIGINT[]) TO authenticated;
 
 
 -- ── accept_invitation ─────────────────────────────────────────────────────────
@@ -1353,11 +1354,12 @@ BEGIN
   -- Bypass guard_org_role_change trigger — this is an authorised role path.
   PERFORM set_config('app.allow_role_change', 'true', true);
 
-  INSERT INTO public.organization_memberships (user_id, org_id, org_role, department_ids, phone)
-  VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign, v_invite.department_ids, v_invite.phone)
+  INSERT INTO public.organization_memberships (user_id, org_id, org_role, department_ids, dept_admin_ids, phone)
+  VALUES (v_uid, v_invite.org_id, v_invite.role_to_assign, v_invite.department_ids, v_invite.dept_admin_ids, v_invite.phone)
   ON CONFLICT (user_id, org_id) DO UPDATE
     SET org_role = EXCLUDED.org_role,
-        department_ids = CASE WHEN EXCLUDED.department_ids != '{}' THEN EXCLUDED.department_ids ELSE organization_memberships.department_ids END;
+        department_ids = CASE WHEN EXCLUDED.department_ids != '{}' THEN EXCLUDED.department_ids ELSE organization_memberships.department_ids END,
+        dept_admin_ids = CASE WHEN EXCLUDED.dept_admin_ids != '{}' THEN EXCLUDED.dept_admin_ids ELSE organization_memberships.dept_admin_ids END;
 
   UPDATE public.profiles
   SET org_id = v_invite.org_id, updated_at = NOW()
@@ -1433,6 +1435,30 @@ CREATE OR REPLACE TRIGGER trg_revoke_invitation_on_employee_archive
   EXECUTE FUNCTION public.revoke_invitation_on_employee_archive();
 
 
+-- Auto-expire pending shift requests when an employee is archived (soft-deleted).
+-- Mirrors the invitation revocation trigger above.
+CREATE OR REPLACE FUNCTION public.expire_shift_requests_on_employee_archive()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF OLD.archived_at IS NULL AND NEW.archived_at IS NOT NULL THEN
+    UPDATE public.shift_requests
+    SET status = 'expired', resolved_at = NOW(), updated_at = NOW()
+    WHERE (requester_emp_id = OLD.id OR target_emp_id = OLD.id)
+      AND status IN ('open', 'pending_approval');
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_expire_shift_requests_on_employee_archive
+  BEFORE UPDATE ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.expire_shift_requests_on_employee_archive();
+
+
 -- ── link_employee_to_user ────────────────────────────────────────────────────
 -- Directly link an existing org user to an employee record (no invitation needed).
 -- Use case: user already has an account and is already a member of this org.
@@ -1501,6 +1527,11 @@ BEGIN
         WHERE cm.user_id = p_user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
         LIMIT 1
       ), '{}') ELSE department_ids END,
+      dept_admin_ids = CASE WHEN dept_admin_ids = '{}' THEN COALESCE((
+        SELECT cm.dept_admin_ids FROM public.organization_memberships cm
+        WHERE cm.user_id = p_user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
+        LIMIT 1
+      ), '{}') ELSE dept_admin_ids END,
       updated_at = NOW()
   WHERE id = p_employee_id AND org_id = p_org_id;
 
@@ -1909,7 +1940,8 @@ RETURNS TABLE (
   admin_permissions JSONB,
   created_at        TIMESTAMPTZ,
   last_sign_in_at   TIMESTAMPTZ,
-  department_ids    BIGINT[]
+  department_ids    BIGINT[],
+  dept_admin_ids    BIGINT[]
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
@@ -1928,7 +1960,7 @@ BEGIN
   RETURN QUERY
   SELECT p.id, u.email::TEXT, p.first_name, p.last_name, p.platform_role,
     cm.org_role, cm.admin_permissions, p.created_at,
-    u.last_sign_in_at, cm.department_ids
+    u.last_sign_in_at, cm.department_ids, cm.dept_admin_ids
   FROM public.organization_memberships cm
   JOIN public.profiles p ON p.id = cm.user_id
   JOIN auth.users u ON u.id = cm.user_id
@@ -3284,7 +3316,7 @@ CREATE TRIGGER trg_check_shift_code_overlap
 -- Purges archived data older than the organization's retention period.
 -- Designed to be called by a cron job (e.g. pg_cron or Supabase Edge Function).
 CREATE OR REPLACE FUNCTION public.purge_expired_data()
-RETURNS TABLE(org_id UUID, employees_purged BIGINT, shifts_purged BIGINT, audit_purged BIGINT, invitations_purged BIGINT)
+RETURNS TABLE(org_id UUID, employees_purged BIGINT, shifts_purged BIGINT, audit_purged BIGINT, invitations_purged BIGINT, requests_purged BIGINT)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -3295,6 +3327,7 @@ DECLARE
   s_count BIGINT;
   a_count BIGINT;
   i_count BIGINT;
+  r_count BIGINT;
 BEGIN
   -- Auth check: only service-role (cron) or gridmasters may call this.
   IF auth.uid() IS NOT NULL AND NOT public.is_gridmaster() THEN
@@ -3344,13 +3377,24 @@ BEGIN
     )
     SELECT count(*) INTO i_count FROM deleted;
 
+    -- Purge resolved shift requests past retention
+    WITH deleted AS (
+      DELETE FROM shift_requests sr
+      WHERE sr.org_id = org.id
+        AND sr.status NOT IN ('open', 'pending_approval')
+        AND sr.updated_at < now() - (org.data_retention_days || ' days')::INTERVAL
+      RETURNING 1
+    )
+    SELECT count(*) INTO r_count FROM deleted;
+
     org_id := org.id;
     employees_purged := e_count;
     shifts_purged := s_count;
     audit_purged := a_count;
     invitations_purged := i_count;
+    requests_purged := r_count;
 
-    IF e_count > 0 OR s_count > 0 OR a_count > 0 OR i_count > 0 THEN
+    IF e_count > 0 OR s_count > 0 OR a_count > 0 OR i_count > 0 OR r_count > 0 THEN
       RETURN NEXT;
     END IF;
   END LOOP;
@@ -3656,7 +3700,8 @@ RETURNS TABLE (
   seniority         INTEGER,
   last_sign_in_at   TIMESTAMPTZ,
   invitation_status TEXT,
-  department_ids    BIGINT[]
+  department_ids    BIGINT[],
+  dept_admin_ids    BIGINT[]
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
@@ -3708,7 +3753,8 @@ BEGIN
       ORDER BY inv.created_at DESC
       LIMIT 1
     )                                       AS invitation_status,
-    CASE WHEN e.department_ids != '{}' THEN e.department_ids ELSE COALESCE(cm.department_ids, '{}') END AS department_ids
+    CASE WHEN e.department_ids != '{}' THEN e.department_ids ELSE COALESCE(cm.department_ids, '{}') END AS department_ids,
+    CASE WHEN e.dept_admin_ids != '{}' THEN e.dept_admin_ids ELSE COALESCE(cm.dept_admin_ids, '{}') END AS dept_admin_ids
   FROM public.employees e
   LEFT JOIN public.organization_memberships cm
     ON cm.user_id = e.user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
@@ -3737,7 +3783,8 @@ BEGIN
     NULL::INTEGER                          AS seniority,
     au2.last_sign_in_at,
     NULL::TEXT                             AS invitation_status,
-    cm2.department_ids
+    cm2.department_ids,
+    cm2.dept_admin_ids
   FROM public.organization_memberships cm2
   JOIN public.profiles p ON p.id = cm2.user_id
   JOIN auth.users au2 ON au2.id = cm2.user_id
@@ -3770,7 +3817,8 @@ BEGIN
     NULL::INTEGER                          AS seniority,
     NULL::TIMESTAMPTZ                      AS last_sign_in_at,
     CASE WHEN inv3.expires_at < NOW() THEN 'expired' ELSE 'pending' END AS invitation_status,
-    inv3.department_ids
+    inv3.department_ids,
+    inv3.dept_admin_ids
   FROM public.invitations inv3
   WHERE inv3.org_id = p_org_id
     AND inv3.employee_id IS NULL
@@ -3805,20 +3853,29 @@ BEGIN
       RAISE EXCEPTION 'Invalid department_ids: one or more department IDs do not exist or are archived';
     END IF;
   END IF;
+  -- Validate dept_admin_ids is a subset of department_ids
+  IF NEW.dept_admin_ids != '{}' THEN
+    IF EXISTS (
+      SELECT 1 FROM unnest(NEW.dept_admin_ids) AS aid
+      WHERE aid NOT IN (SELECT unnest(NEW.department_ids))
+    ) THEN
+      RAISE EXCEPTION 'Invalid dept_admin_ids: must be a subset of department_ids';
+    END IF;
+  END IF;
   RETURN NEW;
 END;
 $$;
 
 CREATE TRIGGER trg_employees_validate_dept_ids
-  BEFORE INSERT OR UPDATE OF department_ids ON public.employees
+  BEFORE INSERT OR UPDATE OF department_ids, dept_admin_ids ON public.employees
   FOR EACH ROW EXECUTE FUNCTION public.validate_department_ids();
 
 CREATE TRIGGER trg_memberships_validate_dept_ids
-  BEFORE INSERT OR UPDATE OF department_ids ON public.organization_memberships
+  BEFORE INSERT OR UPDATE OF department_ids, dept_admin_ids ON public.organization_memberships
   FOR EACH ROW EXECUTE FUNCTION public.validate_department_ids();
 
 CREATE TRIGGER trg_invitations_validate_dept_ids
-  BEFORE INSERT OR UPDATE OF department_ids ON public.invitations
+  BEFORE INSERT OR UPDATE OF department_ids, dept_admin_ids ON public.invitations
   FOR EACH ROW EXECUTE FUNCTION public.validate_department_ids();
 
 
@@ -3868,5 +3925,21 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'No pending onboarding found for this user/org';
   END IF;
+END;
+$$;
+
+-- Mark a tooltip tour as completed for the current user in the given org.
+-- SECURITY DEFINER so it bypasses RLS (same pattern as complete_onboarding).
+CREATE OR REPLACE FUNCTION public.complete_tooltip_tour(p_org_id UUID, p_page_key TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.organization_memberships
+  SET tooltip_tours_completed = tooltip_tours_completed || jsonb_build_object(p_page_key, now())
+  WHERE user_id = auth.uid()
+    AND org_id = p_org_id;
 END;
 $$;

@@ -101,6 +101,8 @@ const employees: Employee[] = [
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
   },
   {
     id: "emp-2",
@@ -118,6 +120,8 @@ const employees: Employee[] = [
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
   },
 ];
 
@@ -227,6 +231,8 @@ describe("Property-based tests", () => {
         contactNotes: fc.string(),
         userId: fc.constant(null as string | null),
         departmentIds: fc.constant([] as number[]),
+        deptAdminIds: fc.constant([] as number[]),
+        version: fc.constant(0),
       }),
       { minLength: 1, maxLength: 20 },
     )

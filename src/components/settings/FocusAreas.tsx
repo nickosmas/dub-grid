@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { FocusArea } from "@/types";
-import { deleteFocusArea, upsertFocusArea } from "@/lib/db";
+import { deleteFocusArea, upsertFocusArea, checkFocusAreaDependencies } from "@/lib/db";
+import type { DependencyInfo } from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -50,16 +51,21 @@ function FocusAreaRow({
     }
   }, [form, isReordering, focusArea.id, onFormChange]);
 
+  const [faDepInfo, setFaDepInfo] = useState<DependencyInfo | null>(null);
+
+  const handleDeleteClick = useCallback(async () => {
+    if (focusArea.isNew) { onDeleted(focusArea.id); return; }
+    const deps = await checkFocusAreaDependencies(focusArea.id, orgId);
+    setFaDepInfo(deps);
+    setShowDeleteConfirm(true);
+  }, [focusArea, orgId, onDeleted]);
+
   const handleDelete = useCallback(async () => {
-    if (focusArea.isNew) {
-      onDeleted(focusArea.id);
-      return;
-    }
     setDeleting(true);
     try {
       await deleteFocusArea(focusArea.id, orgId);
       onDeleted(focusArea.id);
-      toast.success("Focus area deleted");
+      toast.success("Focus area archived");
     } catch (err) {
       toast.error("Failed to delete focus area");
       Sentry.captureException(err);
@@ -160,7 +166,7 @@ function FocusAreaRow({
         {!focusArea.isNew && (
           <button
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+            onClick={(e) => { e.stopPropagation(); handleDeleteClick(); }}
             disabled={deleting}
             style={{
               background: "none",
@@ -204,15 +210,31 @@ function FocusAreaRow({
       </div>
 
       {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Focus Area?"
-          message={<>Delete <strong>{form.name || "this area"}</strong>? Employees assigned to this area will need to be reassigned.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
+        faDepInfo?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${form.name}"?`}
+            message={<>
+              <strong>{form.name}</strong> is currently {faDepInfo.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from active use.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${form.name}"?`}
+            message={<>This will archive <strong>{form.name || "this area"}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        )
       )}
     </div>
   );
@@ -226,16 +248,19 @@ export default function FocusAreas({
   label,
   onChange,
   canManageFocusAreas,
+  initialEditing,
 }: {
   focusAreas: FocusArea[];
   orgId: string;
   label: string;
   onChange: (focusAreas: FocusArea[]) => void;
   canManageFocusAreas: boolean;
+  /** Start in edit mode immediately (e.g. during onboarding). */
+  initialEditing?: boolean;
 }) {
   const [localFocusAreas, setLocalFocusAreas] =
     useState<(FocusArea & { isNew?: boolean })[]>(focusAreas);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditing ?? false);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const nextTmpId = useRef(-1);
@@ -296,6 +321,7 @@ export default function FocusAreas({
       colorBg: "#E0E7FF",
       colorText: "#3730A3",
       sortOrder: localFocusAreas.length,
+      version: 0,
       isNew: true,
     };
     setLocalFocusAreas((prev) => [...prev, tmp]);
@@ -335,6 +361,7 @@ export default function FocusAreas({
           colorBg: item.colorBg,
           colorText: item.colorText,
           sortOrder: item.sortOrder,
+          version: 0,
         });
         results.push(saved);
       }

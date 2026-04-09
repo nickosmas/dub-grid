@@ -26,6 +26,7 @@ interface UseCellLocksReturn {
   lockCell: (cellKey: string) => void;
   unlockCell: () => void;
   getCellLock: (cellKey: string) => CellLock | null;
+  getCurrentCell: () => string | null;
   lockedCells: Map<string, CellLock>;
   onlineUsers: OnlineUser[];
   syncPresence: () => void;
@@ -44,6 +45,7 @@ export function useCellLocks(
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const currentUserRef = useRef(currentUser);
   const canEditRef = useRef(canEdit);
+  const currentCellRef = useRef<string | null>(null);
   useEffect(() => {
     currentUserRef.current = currentUser;
     canEditRef.current = canEdit;
@@ -108,6 +110,19 @@ export function useCellLocks(
 
       if (channel.state !== 'joined') return;
 
+      // If switching cells, broadcast unlock for the previous cell so other
+      // clients drop it immediately (don't wait for the slower presence sync).
+      const prev = currentCellRef.current;
+      if (prev && prev !== cellKey) {
+        channel.send({
+          type: 'broadcast',
+          event: 'cell_unlocked',
+          payload: { userId: user.id },
+        });
+      }
+
+      currentCellRef.current = cellKey;
+
       // Presence for consistency (slower, server round-trip)
       channel.track({
         editingCell: cellKey,
@@ -129,6 +144,8 @@ export function useCellLocks(
     const channel = channelRef.current;
     const user = currentUserRef.current;
     if (!channel || !user) return;
+
+    currentCellRef.current = null;
 
     if (channel.state !== 'joined') return;
 
@@ -185,5 +202,9 @@ export function useCellLocks(
     [lockedCells],
   );
 
-  return { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast };
+  const getCurrentCell = useCallback((): string | null => {
+    return currentCellRef.current;
+  }, []);
+
+  return { lockCell, unlockCell, getCellLock, getCurrentCell, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast };
 }

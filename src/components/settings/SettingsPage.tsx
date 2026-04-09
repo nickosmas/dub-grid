@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType } from "@/types";
-import { saveCertifications, saveOrganizationRoles } from "@/lib/db";
-import { helpText } from "@/lib/help-content";
+import { saveCertifications, saveOrganizationRoles, checkCertificationDependencies, checkRoleDependencies } from "@/lib/db";
+import { TooltipTourRunner } from "@/components/tooltip-tour";
+import { settingsTour } from "@/components/tooltip-tour/tours/settings";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
-import { Section } from "./shared";
+import { SectionCard } from "./shared";
 import OrganizationGeneral from "./OrganizationGeneral";
 import OrganizationLabels from "./OrganizationLabels";
 import DisplayMode from "./DisplayMode";
@@ -191,7 +192,7 @@ export default function SettingsPage({
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - var(--app-shell-header-h, 56px))", width: "100%", overflow: "hidden", position: "relative" }}>
         {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
         {!isMobile && (
-          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }}>
+          <Sidebar data-tour="settings-sidebar" collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }}>
             <SidebarContent className="pt-2 overscroll-contain">
               {navGroups.map((group) => (
                 <SidebarGroup key={group.id}>
@@ -245,12 +246,19 @@ export default function SettingsPage({
         )}
 
         {/* Content */}
-        <div style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
+        <div data-tour="settings-content" style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
         {activeItem && (
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 20px", width: "100%", maxWidth }}>
-            {activeItem.label}
-          </h1>
+          <div style={{ width: "100%", maxWidth, marginBottom: 20 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+              {activeItem.label}
+            </h1>
+            {activeItem.description && (
+              <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+                {activeItem.description}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Permission info for users with limited access */}
@@ -274,36 +282,36 @@ export default function SettingsPage({
 
         {activeSection === "org-general" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title="Organization Details">
+            <SectionCard>
               <OrganizationGeneral
                 organization={organization}
                 onSave={onOrganizationSave}
               />
-            </Section>
+            </SectionCard>
           </div>
         )}
 
         {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title="Custom Labels" helpText={helpText.settings.orgLabels}>
+            <SectionCard>
               <OrganizationLabels
                 organization={organization}
                 onSave={onOrganizationSave}
                 readOnly={!isSuperAdmin && !canManageOrgLabels}
               />
-            </Section>
+            </SectionCard>
           </div>
         )}
 
         {activeSection === "org-display" && canManageOrgSettings && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title="Shift Display Mode">
+            <SectionCard>
               <DisplayMode
                 organization={organization}
                 shiftCodes={shiftCodes}
                 onSave={onOrganizationSave}
               />
-            </Section>
+            </SectionCard>
           </div>
         )}
 
@@ -311,12 +319,12 @@ export default function SettingsPage({
 
         {activeSection === "schedule-rules" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title="Schedule Rules">
+            <SectionCard>
               <ScheduleRules
                 organization={organization}
                 onOrganizationSave={onOrganizationSave}
               />
-            </Section>
+            </SectionCard>
           </div>
         )}
 
@@ -374,49 +382,49 @@ export default function SettingsPage({
 
         {activeSection === "staff-certifications" && (canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title={certificationLabel} noPadding helpText={helpText.staff.certification}>
-              <StringListSettings
-                label={`Define the ${certificationLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
-                items={certifications}
-                placeholder="e.g. RN"
-                onSave={async (updated) => {
-                  try {
-                    const saved = await saveCertifications(organization.id, updated, certifications);
-                    onCertificationsChange(saved);
-                    toast.success("Certifications saved");
-                  } catch (err) {
-                    toast.error("Failed to save certifications");
-                    throw err;
-                  }
-                }}
-                canEdit={canManageOrgLabels}
-                departments={departments}
-              />
-            </Section>
+            <StringListSettings
+              label={certificationLabel}
+              sectionTitle={certificationLabel}
+              items={certifications}
+              placeholder="e.g. RN"
+              onSave={async (updated) => {
+                try {
+                  const saved = await saveCertifications(organization.id, updated, certifications);
+                  onCertificationsChange(saved);
+                  toast.success("Certifications saved");
+                } catch (err) {
+                  toast.error("Failed to save certifications");
+                  throw err;
+                }
+              }}
+              canEdit={canManageOrgLabels}
+              departments={departments}
+              onCheckDependencies={(id) => checkCertificationDependencies(id, organization.id)}
+            />
           </div>
         )}
 
         {activeSection === "staff-roles" && (canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title={roleLabel} noPadding helpText={helpText.staff.roles}>
-              <StringListSettings
-                label={`Define the ${roleLabel.toLowerCase()} available when adding or editing staff. These also determine the order in which they appear in dropdowns.`}
-                items={orgRoles}
-                placeholder="e.g. Charge Nurse"
-                onSave={async (updated) => {
-                  try {
-                    const saved = await saveOrganizationRoles(organization.id, updated, orgRoles);
-                    onOrgRolesChange(saved);
-                    toast.success("Roles saved");
-                  } catch (err) {
-                    toast.error("Failed to save roles");
-                    throw err;
-                  }
-                }}
-                canEdit={canManageOrgLabels}
-                departments={departments}
-              />
-            </Section>
+            <StringListSettings
+              label={roleLabel}
+              sectionTitle={roleLabel}
+              items={orgRoles}
+              placeholder="e.g. Charge Nurse"
+              onSave={async (updated) => {
+                try {
+                  const saved = await saveOrganizationRoles(organization.id, updated, orgRoles);
+                  onOrgRolesChange(saved);
+                  toast.success("Roles saved");
+                } catch (err) {
+                  toast.error("Failed to save roles");
+                  throw err;
+                }
+              }}
+              canEdit={canManageOrgLabels}
+              departments={departments}
+              onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
+            />
           </div>
         )}
 
@@ -438,14 +446,14 @@ export default function SettingsPage({
 
         {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
           <div style={{ width: "100%", maxWidth }}>
-            <Section title="Indicators">
+            <SectionCard>
               <Indicators
                 indicatorTypes={indicatorTypes}
                 orgId={organization.id}
                 onChange={onIndicatorTypesChange}
                 canManageIndicatorTypes={canManageIndicatorTypes}
               />
-            </Section>
+            </SectionCard>
           </div>
         )}
 
@@ -468,6 +476,7 @@ export default function SettingsPage({
         )}
       </div>
     </div>
+    <TooltipTourRunner config={settingsTour} />
     </SidebarProvider>
   );
 }

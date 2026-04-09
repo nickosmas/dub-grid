@@ -30,6 +30,8 @@ export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
     ...overrides,
   };
 }

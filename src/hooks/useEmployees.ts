@@ -124,7 +124,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
     });
     try {
-      await deleteEmployee(empId, orgId ?? undefined);
+      await deleteEmployee(empId, orgId!);
       toast.success("Employee terminated");
       invalidateEmployees();
     } catch (err) {
@@ -145,7 +145,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
     });
     try {
-      await benchEmployee(empId, note, orgId ?? undefined);
+      await benchEmployee(empId, note, orgId!);
       toast.success("Employee benched");
       invalidateEmployees();
     } catch (err) {
@@ -167,7 +167,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
     });
     try {
-      await activateEmployee(empId, orgId ?? undefined);
+      await activateEmployee(empId, orgId!);
       toast.success("Employee activated");
       invalidateEmployees();
     } catch (err) {

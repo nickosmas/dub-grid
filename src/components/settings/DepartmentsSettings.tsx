@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { PresetColorPicker, labelStyle } from "./shared";
-import DepartmentPermissionsEditor, { countEnabledPermissions } from "./DepartmentPermissionsEditor";
 import DepartmentRoster from "./DepartmentRoster";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -23,6 +22,8 @@ interface DepartmentsSettingsProps {
   canManageOrgLabels: boolean;
   onDepartmentsChange: (departments: Department[]) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
+  /** Hide the member roster in management departments (e.g. during onboarding). */
+  hideRoster?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -51,14 +52,15 @@ const sectionTitleStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-body-sm)",
   fontWeight: 700,
   color: "var(--color-text-secondary)",
-  padding: "14px 16px 10px",
+  padding: "16px 16px 4px",
   margin: 0,
 };
 
-const dividerStyle: React.CSSProperties = {
-  height: 1,
-  background: "var(--color-border)",
-  margin: "8px 0",
+const sectionBoxStyle: React.CSSProperties = {
+  background: "var(--color-bg-card, white)",
+  borderRadius: 12,
+  border: "1px solid var(--color-border)",
+  overflow: "hidden",
 };
 
 // ── Focus Area Row (within a scheduled department) ──────────────────────────
@@ -75,6 +77,7 @@ function FocusAreaRow({
   onDragOver,
   onDrop,
   onDragEnd,
+  isOnboarding,
 }: {
   fa: FocusArea;
   orgId: string;
@@ -87,6 +90,7 @@ function FocusAreaRow({
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  isOnboarding?: boolean;
 }) {
   const [editName, setEditName] = useState(fa.name);
   const [editColorBg, setEditColorBg] = useState(fa.colorBg);
@@ -110,6 +114,7 @@ function FocusAreaRow({
         colorBg: editColorBg,
         colorText: editColorText,
         sortOrder: fa.sortOrder,
+        version: 0,
       });
       onUpdate(saved);
       setIsInlineEdit(false);
@@ -131,7 +136,7 @@ function FocusAreaRow({
     try {
       await deleteFocusArea(fa.id, orgId);
       onDelete(fa.id);
-      toast.success("Focus area deleted");
+      toast.success(isOnboarding ? "Focus area removed" : "Focus area archived");
     } catch (err) {
       toast.error("Failed to delete focus area");
       Sentry.captureException(err);
@@ -157,17 +162,17 @@ function FocusAreaRow({
   if (!isEditing && !isInlineEdit) {
     return (
       <div
+        className="dg-hover-row"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "8px 12px 8px 40px",
+          padding: "8px 12px 8px 16px",
+          marginLeft: 24,
+          borderLeft: "2px solid var(--color-border-light)",
           borderBottom: "1px solid var(--color-border-light)",
         }}
       >
-        <span style={{ color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)", marginRight: 2 }}>
-          &#x251C;&#x2500;
-        </span>
         <ColorBadge color={fa.colorBg} />
         <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
           {fa.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
@@ -181,24 +186,18 @@ function FocusAreaRow({
         </button>
         <button
           onClick={() => setShowDeleteConfirm(true)}
-          style={{
-            background: "none",
-            border: "1px solid var(--color-danger-border)",
-            borderRadius: 8,
-            color: "var(--color-danger)",
-            padding: "4px 10px",
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
+          className="dg-btn dg-btn-danger"
+          style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
         >
           Delete
         </button>
         {showDeleteConfirm && (
           <ConfirmDialog
-            title="Delete Focus Area?"
-            message={<>Delete <strong>{fa.name || "this area"}</strong>? Employees assigned to it will need reassignment.</>}
-            confirmLabel="Delete"
+            title={isOnboarding ? "Remove Focus Area?" : "Archive Focus Area?"}
+            message={isOnboarding
+              ? <>Remove <strong>{fa.name || "this area"}</strong>?</>
+              : <>Archive <strong>{fa.name || "this area"}</strong>? Employees assigned to it will need reassignment.</>}
+            confirmLabel={isOnboarding ? "Remove" : "Archive"}
             variant="danger"
             isLoading={deleting}
             onConfirm={handleDelete}
@@ -218,7 +217,9 @@ function FocusAreaRow({
       onDrop={isEditing ? onDrop : undefined}
       onDragEnd={isEditing ? onDragEnd : undefined}
       style={{
-        padding: "10px 12px 10px 28px",
+        padding: "10px 12px 10px 16px",
+        marginLeft: 24,
+        borderLeft: "2px solid var(--color-border-light)",
         borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
         borderBottom: "1px solid var(--color-border-light)",
         opacity: isDragging ? 0.5 : 1,
@@ -271,9 +272,11 @@ function FocusAreaRow({
 
       {showDeleteConfirm && (
         <ConfirmDialog
-          title="Delete Focus Area?"
-          message={<>Delete <strong>{editName || "this area"}</strong>? Employees assigned to it will need reassignment.</>}
-          confirmLabel="Delete"
+          title={isOnboarding ? "Remove Focus Area?" : "Archive Focus Area?"}
+          message={isOnboarding
+            ? <>Remove <strong>{editName || "this area"}</strong>?</>
+            : <>Archive <strong>{editName || "this area"}</strong>? Employees assigned to it will need reassignment.</>}
+          confirmLabel={isOnboarding ? "Remove" : "Archive"}
           variant="danger"
           isLoading={deleting}
           onConfirm={handleDelete}
@@ -303,6 +306,7 @@ function ScheduledDepartmentRow({
   onDragOver,
   onDrop,
   onDragEnd,
+  hideRoster,
 }: {
   dept: Department;
   childFocusAreas: FocusArea[];
@@ -319,6 +323,7 @@ function ScheduledDepartmentRow({
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  hideRoster?: boolean;
 }) {
   const [expanded, setExpanded] = useState(childFocusAreas.length > 1);
   const [editingName, setEditingName] = useState(!dept.name);
@@ -380,6 +385,7 @@ function ScheduledDepartmentRow({
       colorBg: DEFAULT_COLOR_BG,
       colorText: DEFAULT_COLOR_TEXT,
       sortOrder: childFocusAreas.length,
+      version: 0,
     };
     onFocusAreasChange([...childFocusAreas, newFA]);
     setExpanded(true);
@@ -435,6 +441,7 @@ function ScheduledDepartmentRow({
     >
       {/* Department header row */}
       <div
+        className={!isEditing ? "dg-hover-row" : undefined}
         style={{
           display: "flex",
           alignItems: "center",
@@ -459,7 +466,7 @@ function ScheduledDepartmentRow({
 
         {/* Dept name (inline edit or display) */}
         {editingName ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, background: "var(--color-bg-secondary)", padding: "4px 8px", borderRadius: "var(--dg-radius-sm)" }} onClick={(e) => e.stopPropagation()}>
             <input
               value={nameValue}
               onChange={(e) => setNameValue(e.target.value)}
@@ -520,10 +527,8 @@ function ScheduledDepartmentRow({
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              style={{
-                background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8,
-                color: "var(--color-danger)", padding: "4px 10px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer",
-              }}
+              className="dg-btn dg-btn-danger"
+              style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
             >
               Delete
             </button>
@@ -533,8 +538,8 @@ function ScheduledDepartmentRow({
 
       {/* Single focus area — name synced from department, show split option */}
       {isSingleFA && firstFA && (
-        <div style={{ padding: "4px 16px 12px 40px" }}>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 6 }}>
+        <div style={{ padding: "8px 16px 14px 40px" }}>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 8 }}>
             Appears as &ldquo;{firstFA.name}&rdquo; on the schedule. Renaming the department updates this automatically. Only split if staff work in distinct sections.
           </div>
             {canEdit && (
@@ -579,6 +584,7 @@ function ScheduledDepartmentRow({
               onDragOver={(e) => handleFADragOver(e, i)}
               onDrop={handleFADrop}
               onDragEnd={handleFADragEnd}
+              isOnboarding={hideRoster}
             />
           ))}
 
@@ -588,7 +594,7 @@ function ScheduledDepartmentRow({
               onClick={(e) => { e.stopPropagation(); handleAddFocusArea(); }}
               style={{
                 display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "8px 12px 8px 40px",
-                background: "none", border: "none", borderBottom: "1px solid var(--color-border-light)",
+                background: "none", border: "none",
                 cursor: "pointer", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
                 transition: "background 120ms ease",
               }}
@@ -627,6 +633,7 @@ function ManagementDepartmentRow({
   dept,
   orgId,
   canEdit,
+  hideRoster,
   onUpdate,
   onDelete,
   isDragging,
@@ -640,6 +647,7 @@ function ManagementDepartmentRow({
   dept: Department;
   orgId: string;
   canEdit: boolean;
+  hideRoster?: boolean;
   onUpdate: (updated: Department) => void;
   onDelete: (id: number) => void;
   isDragging: boolean;
@@ -652,13 +660,11 @@ function ManagementDepartmentRow({
 }) {
   const [editingName, setEditingName] = useState(!dept.name);
   const [nameValue, setNameValue] = useState(dept.name);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ deps: { hasDependencies: boolean; summary: string } | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [showPermsEditor, setShowPermsEditor] = useState(false);
   const isNameModified = nameValue.trim() !== dept.name;
 
-  const { enabled: permCount, total: permTotal } = countEnabledPermissions(dept.permissions);
 
   const handleSave = () => {
     if (!nameValue.trim()) return;
@@ -666,11 +672,18 @@ function ManagementDepartmentRow({
     setEditingName(false);
   };
 
+  const handleDeleteClick = async () => {
+    if (dept.id <= 0) { onDelete(dept.id); return; }
+    const { checkDepartmentDependencies } = await import("@/lib/db");
+    const deps = await checkDepartmentDependencies(dept.id, orgId);
+    setDeleteConfirm({ deps });
+  };
+
   const handleDelete = () => {
     setDeleting(true);
     onDelete(dept.id);
     setDeleting(false);
-    setShowDeleteConfirm(false);
+    setDeleteConfirm(null);
   };
 
   return (
@@ -689,24 +702,23 @@ function ManagementDepartmentRow({
     >
       {/* ── Header row ────────────────────────────────────────────── */}
       <div
-        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: dept.name ? "pointer" : undefined }}
-        onClick={() => { if (dept.name && !editingName) setExpanded(!expanded); }}
+        className={!isEditing ? "dg-hover-row" : undefined}
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: dept.name && !hideRoster ? "pointer" : undefined }}
+        onClick={() => { if (dept.name && !editingName && !hideRoster) setExpanded(!expanded); }}
       >
         {isEditing && <DragHandle />}
 
-        {dept.name && (
-          <span style={{ color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)", transition: "transform 150ms", transform: expanded ? "rotate(90deg)" : "none" }}>
-            &#x25B6;
-          </span>
-        )}
-        {!dept.name && (
-          <span style={{ color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)" }}>
-            &#x251C;&#x2500;
-          </span>
+        {dept.name && !hideRoster && (
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms ease", flexShrink: 0, color: "var(--color-text-muted)" }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
         )}
 
         {editingName ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, background: "var(--color-bg-secondary)", padding: "4px 8px", borderRadius: "var(--dg-radius-sm)" }} onClick={(e) => e.stopPropagation()}>
             <input
               value={nameValue}
               onChange={(e) => setNameValue(e.target.value)}
@@ -731,11 +743,6 @@ function ManagementDepartmentRow({
         ) : (
           <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
             {dept.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
-            {dept.name && (
-              <span style={{ marginLeft: 8, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
-                {permCount}/{permTotal} permissions
-              </span>
-            )}
           </span>
         )}
 
@@ -749,11 +756,9 @@ function ManagementDepartmentRow({
               Rename
             </button>
             <button
-              onClick={() => setShowDeleteConfirm(true)}
-              style={{
-                background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8,
-                color: "var(--color-danger)", padding: "4px 10px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer",
-              }}
+              onClick={handleDeleteClick}
+              className="dg-btn dg-btn-danger"
+              style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
             >
               Delete
             </button>
@@ -761,52 +766,41 @@ function ManagementDepartmentRow({
         )}
       </div>
 
-      {/* ── Expanded body: Permissions + Roster ────────────────── */}
-      {expanded && dept.name && (
-        <div style={{ padding: "0 12px 12px 36px" }}>
-          {/* Permissions summary + edit button */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Permissions
-            </span>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
-              {permCount} of {permTotal} enabled
-            </span>
-            {canEdit && (
-              <button
-                className="dg-btn dg-btn-ghost"
-                onClick={() => setShowPermsEditor(true)}
-                style={{ fontSize: "var(--dg-fs-caption)", padding: "2px 8px", marginLeft: "auto" }}
-              >
-                Configure
-              </button>
-            )}
-          </div>
-
-          {/* Roster */}
+      {/* ── Expanded body: Roster ─────────────────────────────── */}
+      {expanded && dept.name && !hideRoster && (
+        <div style={{ padding: "4px 12px 16px 36px" }}>
           <DepartmentRoster department={dept} orgId={orgId} canEdit={canEdit} />
         </div>
       )}
 
-      {showPermsEditor && (
-        <DepartmentPermissionsEditor
-          department={dept}
-          orgId={orgId}
-          onClose={() => setShowPermsEditor(false)}
-          onSaved={(perms) => onUpdate({ ...dept, permissions: perms })}
-        />
-      )}
-
-      {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Department?"
-          message={<>Delete <strong>{dept.name || "this department"}</strong>? Employees assigned to it will need reassignment.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
+      {deleteConfirm && (
+        deleteConfirm.deps?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${dept.name}"?`}
+            message={<>
+              <strong>{dept.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from active use. Consider renaming instead if this department is still needed.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setDeleteConfirm(null)}
+            secondaryConfirmLabel="Rename Instead"
+            onSecondaryConfirm={() => { setDeleteConfirm(null); setEditingName(true); }}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${dept.name}"?`}
+            message={<>This will archive <strong>{dept.name || "this department"}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setDeleteConfirm(null)}
+          />
+        )
       )}
     </div>
   );
@@ -825,6 +819,7 @@ export default function DepartmentsSettings({
   canManageOrgLabels,
   onDepartmentsChange,
   onFocusAreasChange,
+  hideRoster,
 }: DepartmentsSettingsProps) {
   const canEdit = canManageFocusAreas || canManageOrgLabels;
   const [saving, setSaving] = useState(false);
@@ -900,6 +895,7 @@ export default function DepartmentsSettings({
           colorBg: DEFAULT_COLOR_BG,
           colorText: DEFAULT_COLOR_TEXT,
           sortOrder: 0,
+          version: 0,
         });
         onFocusAreasChange([...focusAreas, newFA]);
       }
@@ -1023,10 +1019,11 @@ export default function DepartmentsSettings({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* ── Section 1: Scheduled Departments ──────────────────────────────── */}
+      <div className="dg-page-enter" style={sectionBoxStyle}>
       <h3 style={sectionTitleStyle}>Scheduled {departmentLabel}</h3>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", padding: "0 16px 8px", margin: 0 }}>
+      <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", padding: "0 16px 14px", margin: 0 }}>
         Scheduled departments appear on the grid. Each department has one or more focus areas that define how staff are grouped on the schedule.
       </p>
 
@@ -1056,6 +1053,7 @@ export default function DepartmentsSettings({
         <EmptyState
           compact
           title={`No scheduled ${departmentLabel.toLowerCase()} defined yet`}
+          style={{ border: "none", borderRadius: 0 }}
           action={canEdit ? (
             <button
               onClick={handleAddScheduledDept}
@@ -1087,6 +1085,7 @@ export default function DepartmentsSettings({
               onDragOver={(e) => handleSchedDragOver(e, i)}
               onDrop={handleSchedDrop}
               onDragEnd={handleSchedDragEnd}
+              hideRoster={hideRoster}
             />
           ))}
 
@@ -1097,7 +1096,7 @@ export default function DepartmentsSettings({
               disabled={saving}
               style={{
                 display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 16px",
-                background: "none", border: "none", borderBottom: "1px solid var(--color-border-light)",
+                background: "none", border: "none", borderRadius: "0 0 12px 12px",
                 cursor: saving ? "wait" : "pointer", color: "var(--color-brand)", fontSize: "var(--dg-fs-label)", fontWeight: 600,
                 transition: "background 120ms ease",
               }}
@@ -1114,12 +1113,12 @@ export default function DepartmentsSettings({
         </>
       )}
 
-      {/* ── Divider ───────────────────────────────────────────────────────── */}
-      <div style={dividerStyle} />
+      </div>
 
       {/* ── Section 2: Management Departments ─────────────────────────────── */}
+      <div className="dg-page-enter" style={sectionBoxStyle}>
       <h3 style={sectionTitleStyle}>Management {departmentLabel}</h3>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", padding: "0 16px 8px", margin: 0 }}>
+      <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", padding: "0 16px 14px", margin: 0 }}>
         For people who use the app but don&rsquo;t appear on the schedule (e.g. HR, Reception, Finance).
       </p>
 
@@ -1149,6 +1148,7 @@ export default function DepartmentsSettings({
         <EmptyState
           compact
           title={`No management ${departmentLabel.toLowerCase()} defined yet`}
+          style={{ border: "none", borderRadius: 0 }}
           action={canEdit ? (
             <button
               onClick={handleAddManagementDept}
@@ -1168,6 +1168,7 @@ export default function DepartmentsSettings({
               dept={dept}
               orgId={orgId}
               canEdit={canEdit}
+              hideRoster={hideRoster}
               onUpdate={handleManagementDeptUpdate}
               onDelete={handleManagementDeptDelete}
               isDragging={mgmtDragIdx !== null && managementDepts[mgmtDragIdx]?.id === dept.id}
@@ -1187,7 +1188,7 @@ export default function DepartmentsSettings({
               disabled={saving}
               style={{
                 display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 16px",
-                background: "none", border: "none", borderBottom: "1px solid var(--color-border-light)",
+                background: "none", border: "none", borderRadius: "0 0 12px 12px",
                 cursor: saving ? "wait" : "pointer", color: "var(--color-brand)", fontSize: "var(--dg-fs-label)", fontWeight: 600,
                 transition: "background 120ms ease",
               }}
@@ -1203,6 +1204,7 @@ export default function DepartmentsSettings({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

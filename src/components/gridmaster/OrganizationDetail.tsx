@@ -4,7 +4,7 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail } from "@/lib/db";
+import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail, updateAdminPermissions } from "@/lib/db";
 import { queueNotification } from "@/lib/notify";
 import type { TenantStats } from "@/lib/db";
 import type {
@@ -31,7 +31,7 @@ interface InvitationRow {
   revoked_at: string | null;
 }
 import ConfirmDialog from "@/components/ConfirmDialog";
-import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
+import PermissionsEditor from "@/components/PermissionsEditor";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import ReadOnlyScheduleView from "@/components/gridmaster/ReadOnlyScheduleView";
@@ -1041,14 +1041,16 @@ function UsersTab({
 
       {/* Permissions editor modal */}
       {editingPerms && (
-        <AdminPermissionsEditor
-          userId={editingPerms.id}
-          orgId={orgId}
-          userName={[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}
-          userEmail={editingPerms.email ?? undefined}
-          currentPermissions={editingPerms.adminPermissions}
+        <PermissionsEditor
+          title={`Admin Permissions \u2014 ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
+          subtitle={<>Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.</>}
+          initialPermissions={editingPerms.adminPermissions}
+          onSave={async (perms) => {
+            await updateAdminPermissions(editingPerms.id, perms, orgId, editingPerms.email ?? undefined);
+            toast.success("Permissions updated");
+            onUsersChanged();
+          }}
           onClose={() => setEditingPerms(null)}
-          onSaved={() => onUsersChanged()}
         />
       )}
 

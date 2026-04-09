@@ -284,6 +284,8 @@ export default function OrganizationSetupWizard({
             statusNote: "",
             userId: null,
             departmentIds: [],
+            deptAdminIds: [],
+            version: 0,
           }, org.id);
           employeeId = emp.id;
         } catch (empErr: unknown) {
@@ -368,6 +370,7 @@ export default function OrganizationSetupWizard({
           colorBg: fa.colorBg,
           colorText: "#FFFFFF",
           sortOrder: i,
+          version: 0,
         });
       }
       savedCount += validFocusAreas.length;
@@ -443,6 +446,7 @@ export default function OrganizationSetupWizard({
           defaultEndTime: null,
           defaultDurationHours: null,
           defaultDurationMinutes: null,
+          version: 0,
         });
       }
       savedCount += validCodes.length;
@@ -482,6 +486,8 @@ export default function OrganizationSetupWizard({
             statusNote: "",
             userId: null,
             departmentIds: [],
+            deptAdminIds: [],
+            version: 0,
           },
           createdOrg.id,
         );

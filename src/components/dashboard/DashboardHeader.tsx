@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 import type { ViewMode } from "./DashboardView";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -77,25 +79,27 @@ export default function DashboardHeader({
       <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}>
         {/* Row 1: Period navigation */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button
-            onClick={onPrev}
-            className="dg-btn dg-btn-secondary"
-            style={{
-              width: 44,
-              height: 44,
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 10,
-              flexShrink: 0,
-            }}
-            title="Previous period"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+          <Hint content={hint("Go to previous period")}>
+            <button
+              onClick={onPrev}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                width: 44,
+                height: 44,
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 10,
+                flexShrink: 0,
+              }}
+              aria-label="Go to previous period"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          </Hint>
           <div style={{ flex: 1, textAlign: "center", userSelect: "none" }}>
             <span
               style={{
@@ -111,25 +115,27 @@ export default function DashboardHeader({
               {orgName}
             </div>
           </div>
-          <button
-            onClick={onNext}
-            className="dg-btn dg-btn-secondary"
-            style={{
-              width: 44,
-              height: 44,
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 10,
-              flexShrink: 0,
-            }}
-            title="Next period"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
+          <Hint content={hint("Go to next period")}>
+            <button
+              onClick={onNext}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                width: 44,
+                height: 44,
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 10,
+                flexShrink: 0,
+              }}
+              aria-label="Go to next period"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </Hint>
           <button
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
@@ -184,27 +190,29 @@ export default function DashboardHeader({
       }}
     >
       {/* NAV ZONE: Chevrons + date label + Today */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div data-tour="dashboard-period-nav" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button
-            onClick={onPrev}
-            className="dg-btn dg-btn-secondary"
-            style={{
-              width: "var(--dg-toolbar-h)",
-              height: "var(--dg-toolbar-h)",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 10,
-              flexShrink: 0,
-            }}
-            title="Previous period"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+          <Hint content={hint("Go to previous period")}>
+            <button
+              onClick={onPrev}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                width: "var(--dg-toolbar-h)",
+                height: "var(--dg-toolbar-h)",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 10,
+                flexShrink: 0,
+              }}
+              aria-label="Go to previous period"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          </Hint>
           <div style={{ textAlign: "center", userSelect: "none", minWidth: 140 }}>
             <span
               style={{
@@ -217,25 +225,27 @@ export default function DashboardHeader({
               {dateLabel}
             </span>
           </div>
-          <button
-            onClick={onNext}
-            className="dg-btn dg-btn-secondary"
-            style={{
-              width: "var(--dg-toolbar-h)",
-              height: "var(--dg-toolbar-h)",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 10,
-              flexShrink: 0,
-            }}
-            title="Next period"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
+          <Hint content={hint("Go to next period")}>
+            <button
+              onClick={onNext}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                width: "var(--dg-toolbar-h)",
+                height: "var(--dg-toolbar-h)",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 10,
+                flexShrink: 0,
+              }}
+              aria-label="Go to next period"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </Hint>
         </div>
 
         {/* Today button */}
@@ -254,7 +264,7 @@ export default function DashboardHeader({
         </button>
 
         {/* View mode selector */}
-        <div className="dg-span-tabs dg-span-tabs--light">
+        <div data-tour="dashboard-view-mode" className="dg-span-tabs dg-span-tabs--light">
           {VIEW_MODES.map((m, i) => {
             const isActive = viewMode === m.value;
             const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;

@@ -2,14 +2,26 @@
 
 import React from "react";
 import { PREDEFINED_COLORS, getPresetByBg, PredefinedColor } from "@/lib/colors";
-import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
+import { sectionStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import { parseTo12h, to24h } from "@/lib/utils";
-import HelpTooltip from "@/components/HelpTooltip";
 import CustomSelect from "@/components/CustomSelect";
 
 // ── Re-exports for convenience ───────────────────────────────────────────────
 export const labelStyle = sharedLabelStyle;
-export const inputStyle: React.CSSProperties = {};
+export const inputStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box" as const,
+  height: 36,
+  padding: "0 10px",
+  border: "1px solid var(--color-border)",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  color: "var(--color-text-secondary)",
+  background: "var(--color-surface)",
+  outline: "none",
+};
 
 // ── Common IANA timezones ─────────────────────────────────────────────────────
 export const TIMEZONES = [
@@ -38,19 +50,15 @@ export function normalizeTimeCompare(t: string | null | undefined): string | nul
   return t.slice(0, 5);
 }
 
-// ── Section wrapper ────────────────────────────────────────────────────────────
-export function Section({
-  title,
+// ── Section card (headerless container) ─────────────────────────────────────────
+export function SectionCard({
   children,
   maxWidth = 860,
   noPadding = false,
-  helpText,
 }: {
-  title: string;
   children: React.ReactNode;
   maxWidth?: number;
   noPadding?: boolean;
-  helpText?: string;
 }) {
   return (
     <div
@@ -62,12 +70,6 @@ export function Section({
         flexShrink: 0,
       }}
     >
-      <div
-        style={{ ...sectionHeaderStyle, display: "flex", alignItems: "center", gap: 8 }}
-      >
-        {title}
-        {helpText && <HelpTooltip text={helpText} side="right" />}
-      </div>
       {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}
     </div>
   );

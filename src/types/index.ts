@@ -219,6 +219,10 @@ export interface Employee {
   userId: string | null;
   /** Management department IDs (explicit assignment for non-schedule departments). */
   departmentIds: number[];
+  /** Subset of departmentIds where this employee is a dept admin (gets dept permission template). */
+  deptAdminIds: number[];
+  /** Optimistic concurrency control version counter. */
+  version: number;
 }
 
 export type DraftKind = 'new' | 'modified' | 'deleted' | null;
@@ -316,7 +320,9 @@ export interface ShiftSeries {
   id: string;
   empId: string;
   orgId: string;
-  shiftCodeId: number;
+  shiftCodeId: number | null;
+  /** FK to absence_types. Null when this is a shift-code series. */
+  absenceTypeId: number | null;
   shiftLabel: string;
   frequency: SeriesFrequency;
   /** Day-of-week numbers for weekly/biweekly. Null means every day. */
@@ -484,6 +490,7 @@ export interface OrganizationUser {
   createdAt: string;
   lastSignInAt: string | null;
   departmentIds: number[];
+  deptAdminIds: number[];
 }
 
 /** A unified person record for the People Directory (union of employees + app-only users + pending invites). */
@@ -506,6 +513,7 @@ export interface DirectoryPerson {
   lastSignInAt: string | null;
   invitationStatus: 'pending' | 'expired' | null;
   departmentIds: number[];
+  deptAdminIds: number[];
 }
 
 export interface UserSession {
@@ -698,6 +706,7 @@ export interface OrganizationMembership {
   adminPermissions: AdminPermissions | null;
   joinedAt: string;
   onboardingCompletedAt: string | null;
+  tooltipToursCompleted: Record<string, string>;
   email: string | null;
   firstName: string | null;
   lastName: string | null;

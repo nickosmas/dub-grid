@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, OrganizationUser, OrganizationRole, AdminPermissions, NamedItem, CoverageRequirement, AbsenceType, ShiftDisplayMode } from "@/types";
-import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles, fetchFullAuditLog, fetchInvitations, revokeInvitation, resendInvitation } from "@/lib/db";
+import { updateOrganization, deleteFocusArea, upsertFocusArea, upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, upsertIndicatorType, deleteIndicatorType, upsertShiftCategory, deleteShiftCategory, saveCoverageRequirements, fetchOrganizationUsers, changeOrganizationUserRole, updateAdminPermissions, saveCertifications, saveOrganizationRoles, fetchFullAuditLog, fetchInvitations, revokeInvitation, resendInvitation, checkCertificationDependencies, checkRoleDependencies } from "@/lib/db";
 import { parseTo12h, to24h, fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { PREDEFINED_COLORS, getPresetByBg, TRANSPARENT_BORDER, PredefinedColor, borderColor } from "@/lib/colors";
 import { sectionStyle, sectionHeaderStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
-import HelpTooltip from "@/components/HelpTooltip";
+import { Hint, HelpHint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { helpText } from "@/lib/help-content";
 import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { useAuth } from "@/components/AuthProvider";
+import ArchivedItems from "@/components/settings/ArchivedItems";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import {
@@ -129,7 +131,7 @@ function Section({
         style={{ ...sectionHeaderStyle, display: "flex", alignItems: "center", gap: 8 }}
       >
         {title}
-        {helpText && <HelpTooltip text={helpText} side="right" />}
+        {helpText && <HelpHint content={hint(helpText)} />}
       </div>
       {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}
     </div>
@@ -758,6 +760,7 @@ function FocusAreasSettings({
             colorBg: fa.colorBg,
             colorText: fa.colorText,
             sortOrder: fa.sortOrder,
+            version: 0,
           }),
         ),
       );
@@ -781,6 +784,7 @@ function FocusAreasSettings({
       colorBg: PREDEFINED_COLORS[0].bg,
       colorText: PREDEFINED_COLORS[0].text,
       sortOrder: localFocusAreas.length,
+      version: 0,
       isNew: true,
     };
     setLocalFocusAreas((prev) => [...prev, tmp]);
@@ -1095,6 +1099,7 @@ function ShiftCodeRow({
         defaultEndTime: saveEndTime,
         defaultDurationHours: form.defaultDurationHours,
         defaultDurationMinutes: form.defaultDurationMinutes,
+        version: 0,
       });
       onSaved(saved, st.id);
       setExpanded(false);
@@ -1299,7 +1304,9 @@ function ShiftCodeRow({
 
           {/* Shift Category */}
           <div>
+              <Hint content={hint("Categories group shifts with shared time and break rules")} side="left">
               <label style={labelStyle}>SHIFT CATEGORY</label>
+              </Hint>
               <CustomSelect
                 value={form.categoryId != null ? String(form.categoryId) : ""}
                 options={[
@@ -1373,6 +1380,7 @@ function ShiftCodeRow({
                     />
                     <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>m</span>
                   </div>
+                  <Hint content={hint("Use duration for variable starts, times for fixed shifts")} side="left">
                   <button
                     type="button"
                     onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
@@ -1381,6 +1389,7 @@ function ShiftCodeRow({
                   >
                     Set actual times instead
                   </button>
+                  </Hint>
                 </div>
               );
             }
@@ -1417,6 +1426,7 @@ function ShiftCodeRow({
                   )}
                   <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
                     {hasCategoryTime && canManageShiftCodes && (
+                      <Hint content={hint("Remove custom times and inherit from the category")} side="left">
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
@@ -1424,6 +1434,7 @@ function ShiftCodeRow({
                       >
                         Revert to category default
                       </button>
+                      </Hint>
                     )}
                     {!hasCategoryTime && canManageShiftCodes && (
                       <button
@@ -1480,6 +1491,7 @@ function ShiftCodeRow({
                 )}
                 {canManageShiftCodes && (
                   <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                    <Hint content={hint("Override the category default start and end times")} side="left">
                     <button
                       type="button"
                       onClick={() => {
@@ -1503,7 +1515,9 @@ function ShiftCodeRow({
                     >
                       Customize Time
                     </button>
+                    </Hint>
                     {isGeneral && (
+                      <Hint content={hint("Use duration for variable starts, times for fixed shifts")} side="left">
                       <button
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
@@ -1518,6 +1532,7 @@ function ShiftCodeRow({
                       >
                         Set duration instead
                       </button>
+                      </Hint>
                     )}
                   </div>
                 )}
@@ -1538,9 +1553,11 @@ function ShiftCodeRow({
           {/* Required Certifications — only for recurring shifts */}
           {certifications.length > 0 && (
             <div>
+              <Hint content={hint("Only qualified staff can be assigned this shift")} side="left">
               <label style={labelStyle}>
                 REQUIRED {certificationLabel.toUpperCase()} (leave all unchecked = any qualification)
               </label>
+              </Hint>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
                 {certifications.map((desig) => {
                   const checked = form.requiredCertificationIds.includes(desig.id);
@@ -2032,6 +2049,7 @@ function ShiftCodesSettings({
       text:"#3E433B",
       focusAreaId: focusAreaId,
       sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
+      version: 0,
       isNew: true,
     };
     setLocal((prev) => [...prev, tmp]);
@@ -2187,12 +2205,14 @@ function StringListSettings({
   onSave,
   placeholder,
   canEdit = true,
+  onCheckDependencies,
 }: {
   label: string;
   items: NamedItem[];
   onSave: (items: NamedItem[]) => Promise<void>;
   placeholder: string;
   canEdit?: boolean;
+  onCheckDependencies?: (itemId: number) => Promise<{ hasDependencies: boolean; summary: string }>;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [isEditing, setIsEditing] = useState(false);
@@ -2271,6 +2291,19 @@ function StringListSettings({
 
   const handleRemove = (i: number) => {
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; name: string; deps: { hasDependencies: boolean; summary: string } | null } | null>(null);
+
+  const handleDeleteClick = async (i: number) => {
+    const item = local[i];
+    if (item.id <= 0) { handleRemove(i); return; }
+    if (onCheckDependencies) {
+      const deps = await onCheckDependencies(item.id);
+      setDeleteConfirm({ idx: i, name: item.name, deps });
+    } else {
+      handleRemove(i);
+    }
   };
 
   const handleItemChange = (i: number, field: "name" | "abbr", value: string) => {
@@ -2477,19 +2510,23 @@ function StringListSettings({
               {isEditing && (
                 <button
                   onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+                  onClick={(e) => { e.stopPropagation(); handleDeleteClick(i); }}
                   style={{
                     background: "none",
-                    border: "none",
+                    border: "1px solid var(--color-danger-border, #FECACA)",
+                    borderRadius: 8,
                     cursor: "pointer",
-                    color: "var(--color-text-muted)",
-                    fontSize: "var(--dg-fs-body)",
-                    lineHeight: 1,
-                    padding: "0 2px",
+                    color: "var(--color-danger)",
+                    padding: "4px 10px",
+                    fontSize: "var(--dg-fs-caption)",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap" as const,
+                    transition: "background 150ms",
                   }}
-                  title="Remove"
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
                 >
-                  ×
+                  Delete
                 </button>
               )}
             </div>
@@ -2563,6 +2600,33 @@ function StringListSettings({
         >
           <strong>Save Error:</strong> {error}
         </div>
+      )}
+
+      {deleteConfirm && (
+        deleteConfirm.deps?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${deleteConfirm.name}"?`}
+            message={<>
+              <strong>{deleteConfirm.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from dropdowns and new assignments.
+              Consider renaming instead if this item is still needed under a different name.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
+            onCancel={() => setDeleteConfirm(null)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${deleteConfirm.name}"?`}
+            message={<>This will archive <strong>{deleteConfirm.name}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
+            onCancel={() => setDeleteConfirm(null)}
+          />
+        )
       )}
     </div>
   );
@@ -3280,6 +3344,12 @@ const PERM_LABELS: Record<keyof AdminPermissions, string> = {
   canViewDashboardAnalytics: "View Dashboard Analytics",
 };
 
+const PERM_DESCRIPTIONS: Partial<Record<keyof AdminPermissions, string>> = {
+  canManageShiftSeries: "Create and edit recurring shift patterns",
+  canApplyRecurringSchedule: "Deploy recurring shift templates to the schedule",
+  canApproveShiftRequests: "Review and approve time-off and swap requests",
+};
+
 /** Permissions that are always on and cannot be toggled off. */
 const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule"]);
 
@@ -3626,6 +3696,7 @@ function CoverageRequirementsSettings({
                 {isExpanded && (
                   <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
                     {/* Every day toggle */}
+                    <Hint content={hint("Apply one minimum to all days, or customize per day")} side="left">
                     <div
                       style={{
                         display: "flex",
@@ -3664,6 +3735,7 @@ function CoverageRequirementsSettings({
                         />
                       </button>
                     </div>
+                    </Hint>
 
                     {/* Per-code vertical list */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -3688,7 +3760,9 @@ function CoverageRequirementsSettings({
                           {/* Inputs */}
                           {draft.everyDay ? (
                             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
+                              <Hint content={hint("Minimum staff needed to identify coverage gaps")} side="left">
                               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", width: 60 }}>Min staff</span>
+                              </Hint>
                               <input
                                 type="number"
                                 min={0}
@@ -4225,9 +4299,17 @@ function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSupe
                                             onMouseEnter={(e) => { if (!toggleDisabled) e.currentTarget.style.background = "var(--color-border-light)"; }}
                                             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                                           >
-                                            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
-                                              {PERM_LABELS[key]}
-                                            </span>
+                                            {PERM_DESCRIPTIONS[key] ? (
+                                              <Hint content={hint(PERM_DESCRIPTIONS[key]!)} side="left">
+                                                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
+                                                  {PERM_LABELS[key]}
+                                                </span>
+                                              </Hint>
+                                            ) : (
+                                              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", lineHeight: 1.3 }}>
+                                                {PERM_LABELS[key]}
+                                              </span>
+                                            )}
                                             <div style={{
                                               position: "relative", width: 34, height: 20, borderRadius: 10, flexShrink: 0,
                                               background: isOn ? "var(--color-brand)" : "var(--color-border)",
@@ -4690,7 +4772,7 @@ export default function SettingsPage({
   onAbsenceTypesChange,
 }: SettingsPageProps) {
   const searchParams = useSearchParams();
-  const VALID_SECTIONS = ["organization", "display-mode", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "activity", "impersonation"];
+  const VALID_SECTIONS = ["organization", "display-mode", "shift-categories", "shift-codes", "coverage", "indicators", "staff-config", "users", "activity", "archived", "impersonation"];
   const sectionFromPath = searchParams.get("section");
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -4732,6 +4814,7 @@ export default function SettingsPage({
     { id: "staff-config", label: "Designations", icon: iconDesignations },
     ...(isSuperAdmin ? [{ id: "users", label: "User Management", icon: iconUsers }] : []),
     ...(isSuperAdmin ? [{ id: "activity", label: "Activity Log", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg> }] : []),
+    { id: "archived", label: "Archived Items", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> },
   ] : [];
 
   const gridmasterLinks = isGridmaster ? [
@@ -4985,6 +5068,7 @@ export default function SettingsPage({
                   }
                 }}
                 canEdit={canManageOrgLabels}
+                onCheckDependencies={(id: number) => checkCertificationDependencies(id, organization.id)}
               />
             </Section>
             <Section title={roleLabel} noPadding helpText={helpText.staff.roles}>
@@ -5003,6 +5087,7 @@ export default function SettingsPage({
                   }
                 }}
                 canEdit={canManageOrgLabels}
+                onCheckDependencies={(id: number) => checkRoleDependencies(id, organization.id)}
               />
             </Section>
           </div>
@@ -5017,6 +5102,12 @@ export default function SettingsPage({
         {activeSection === "activity" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth: 1100 }}>
             <OrgActivityLog orgId={organization.id} />
+          </div>
+        )}
+
+        {activeSection === "archived" && canManageOrg && (
+          <div style={{ width: "100%", maxWidth: 860 }}>
+            <ArchivedItems orgId={organization.id} />
           </div>
         )}
 

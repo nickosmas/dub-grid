@@ -60,8 +60,14 @@ export type AuditAction =
   | "indicator_type.archived"
   | "indicator_type.restored"
   | "certifications.saved"
+  | "certification.restored"
   | "org_roles.saved"
+  | "org_role.restored"
   | "coverage_requirements.saved"
+  // Departments
+  | "departments.saved"
+  | "department.restored"
+  | "department_permissions.updated"
   // Recurring shifts
   | "recurring_shift.upserted"
   | "recurring_shift.deleted"
@@ -99,6 +105,7 @@ export type AuditResourceType =
   | "certification"
   | "org_role"
   | "coverage_requirement"
+  | "department"
   | "recurring_shift"
   | "shift_series"
   | "impersonation_session"

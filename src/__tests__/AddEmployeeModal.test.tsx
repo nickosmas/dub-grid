@@ -260,6 +260,7 @@ describe("AddEmployeeModal", () => {
               colorText: "#1D4ED8",
               sortOrder: i + 1,
               departmentId: null,
+              version: 0,
             }));
 
             const onAdd = vi.fn();

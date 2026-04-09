@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { EmployeeTab, SortBy } from "./useStaffFilters";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 
 interface TabItem {
   key: EmployeeTab;
@@ -165,7 +167,7 @@ export function StaffToolbar({
   );
 
   const tabButtons = (
-    <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+    <div data-tour="staff-tabs" className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
       {tabs.map((tab, i) => {
         const active = activeTab === tab.key;
         const prevActive = i > 0 && activeTab === tabs[i - 1].key;
@@ -284,20 +286,23 @@ export function StaffToolbar({
 
               {/* Add button (icon only on mobile) */}
               {showAdd && canManageEmployees && (
-                <button
-                  onClick={setupIncomplete ? undefined : onAdd}
-                  disabled={setupIncomplete}
-                  title={setupIncomplete ? "Complete organization settings setup first" : undefined}
-                  className={`flex items-center justify-center h-11 w-11 shrink-0 rounded-[10px] transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
-                    setupIncomplete
-                      ? "bg-[var(--color-border)] text-[var(--color-text-faint)] cursor-not-allowed opacity-60"
-                      : "bg-[var(--color-brand)] text-white hover:opacity-90"
-                  }`}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
+                <Hint content={hint(setupIncomplete ? "Complete organization settings setup first" : "Add employee")} side="bottom">
+                  <span data-tour="staff-add-btn" style={{ display: "inline-flex" }}>
+                    <button
+                      onClick={setupIncomplete ? undefined : onAdd}
+                      disabled={setupIncomplete}
+                      className={`flex items-center justify-center h-11 w-11 shrink-0 rounded-[10px] transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
+                        setupIncomplete
+                          ? "bg-[var(--color-border)] text-[var(--color-text-faint)] cursor-not-allowed opacity-60"
+                          : "bg-[var(--color-brand)] text-white hover:opacity-90"
+                      }`}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                    </button>
+                  </span>
+                </Hint>
               )}
             </div>
         </div>
@@ -394,52 +399,59 @@ export function StaffToolbar({
 
               {/* Export button */}
               {showAdd && !noData && onExport && (
-                <button
-                  onClick={onExport}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ fontSize: 13, height: "var(--dg-toolbar-h)", padding: "0 10px" }}
-                  title="Export CSV"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  {isTablet ? "" : " Export"}
-                </button>
+                <Hint content={hint("Export staff as CSV")} side="bottom">
+                  <button
+                    onClick={onExport}
+                    className="dg-btn dg-btn-secondary"
+                    style={{ fontSize: 13, height: "var(--dg-toolbar-h)", padding: "0 10px" }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    {isTablet ? "" : " Export"}
+                  </button>
+                </Hint>
               )}
 
               {/* Import button */}
               {showAdd && !noData && canManageEmployees && onImport && (
-                <button
-                  onClick={setupIncomplete ? undefined : onImport}
-                  disabled={setupIncomplete}
-                  className={`dg-btn dg-btn-secondary${setupIncomplete ? " opacity-60 cursor-not-allowed" : ""}`}
-                  style={{ fontSize: 13, height: "var(--dg-toolbar-h)", padding: "0 10px" }}
-                  title={setupIncomplete ? "Complete organization settings setup first" : "Import CSV"}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  {isTablet ? "" : " Import"}
-                </button>
+                <Hint content={hint(setupIncomplete ? "Complete organization settings setup first" : "Import staff from CSV")} side="bottom">
+                  <span style={{ display: "inline-flex" }}>
+                    <button
+                      onClick={setupIncomplete ? undefined : onImport}
+                      disabled={setupIncomplete}
+                      className={`dg-btn dg-btn-secondary${setupIncomplete ? " opacity-60 cursor-not-allowed" : ""}`}
+                      style={{ fontSize: 13, height: "var(--dg-toolbar-h)", padding: "0 10px" }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      {isTablet ? "" : " Import"}
+                    </button>
+                  </span>
+                </Hint>
               )}
 
               {/* Add button */}
               {showAdd && canManageEmployees && (
-                <button
-                  onClick={setupIncomplete ? undefined : onAdd}
-                  disabled={setupIncomplete}
-                  title={setupIncomplete ? "Complete organization settings setup first" : undefined}
-                  className={`flex items-center gap-1.5 h-[var(--dg-toolbar-h)] px-3 rounded-[10px] text-[13px] font-semibold transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
-                    setupIncomplete
-                      ? "bg-[var(--color-border)] text-[var(--color-text-faint)] cursor-not-allowed opacity-60"
-                      : "bg-[var(--color-brand)] text-white hover:opacity-90"
-                  }`}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  {isTablet ? "" : "Add"}
-                </button>
+                <Hint content={hint(setupIncomplete ? "Complete organization settings setup first" : "Add employee")} side="bottom">
+                  <span data-tour="staff-add-btn" style={{ display: "inline-flex" }}>
+                    <button
+                      onClick={setupIncomplete ? undefined : onAdd}
+                      disabled={setupIncomplete}
+                      className={`flex items-center gap-1.5 h-[var(--dg-toolbar-h)] px-3 rounded-[10px] text-[13px] font-semibold transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
+                        setupIncomplete
+                          ? "bg-[var(--color-border)] text-[var(--color-text-faint)] cursor-not-allowed opacity-60"
+                          : "bg-[var(--color-brand)] text-white hover:opacity-90"
+                      }`}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      {isTablet ? "" : "Add"}
+                    </button>
+                  </span>
+                </Hint>
               )}
             </div>
         </div>
