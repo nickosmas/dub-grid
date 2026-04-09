@@ -211,18 +211,18 @@ export default function DisplayMode({
           onClick={handleSave}
           disabled={!isModified || saving}
           style={{
-            padding: "10px 24px",
+            padding: "9px 20px",
             borderRadius: 8,
             border: "none",
-            background: isModified ? "var(--color-brand)" : "var(--color-bg-secondary)",
-            color: isModified ? "#fff" : "var(--color-text-faint)",
-            fontWeight: 600,
-            fontSize: 14,
+            background: isModified ? "var(--color-brand)" : "var(--color-border-light)",
+            color: isModified ? "var(--color-text-inverse)" : "var(--color-text-muted)",
+            fontWeight: 700,
+            fontSize: "var(--dg-fs-label)",
             cursor: isModified ? "pointer" : "not-allowed",
-            opacity: saving ? 0.6 : 1,
+            opacity: isModified ? 1 : 0.6,
           }}
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? "Saving…" : "Save"}
         </button>
       </div>
     </div>

@@ -584,23 +584,20 @@ function ScheduledDepartmentRow({
 
           {/* Add focus area button */}
           {canEdit && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleAddFocusArea(); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "8px 12px 8px 40px",
-                background: "none", border: "none", borderBottom: "1px solid var(--color-border-light)",
-                cursor: "pointer", color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
-                transition: "background 120ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-brand-bg)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add {focusAreaLabel.replace(/s$/i, "")}
-            </button>
+            <div style={{ padding: "8px 16px" }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleAddFocusArea(); }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  width: "100%", padding: "8px 16px",
+                  background: "none", border: "1px dashed var(--color-border)", borderRadius: 8,
+                  cursor: "pointer", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
+                  fontFamily: "inherit",
+                }}
+              >
+                + Add {focusAreaLabel.replace(/s$/i, "")}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1092,24 +1089,21 @@ export default function DepartmentsSettings({
 
           {/* Add scheduled dept button */}
           {canEdit && (
-            <button
-              onClick={handleAddScheduledDept}
-              disabled={saving}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 16px",
-                background: "none", border: "none", borderBottom: "1px solid var(--color-border-light)",
-                cursor: saving ? "wait" : "pointer", color: "var(--color-brand)", fontSize: "var(--dg-fs-label)", fontWeight: 600,
-                transition: "background 120ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-brand-bg)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              {saving ? "Adding\u2026" : `Add Scheduled ${departmentLabel.replace(/s$/i, "")}`}
-            </button>
+            <div style={{ padding: "8px 16px" }}>
+              <button
+                onClick={handleAddScheduledDept}
+                disabled={saving}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  width: "100%", padding: "8px 16px",
+                  background: "none", border: "1px dashed var(--color-border)", borderRadius: 8,
+                  cursor: saving ? "wait" : "pointer", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
+                  fontFamily: "inherit",
+                }}
+              >
+                {saving ? "Adding…" : `+ Add Scheduled ${departmentLabel.replace(/s$/i, "")}`}
+              </button>
+            </div>
           )}
         </>
       )}
@@ -1182,24 +1176,21 @@ export default function DepartmentsSettings({
 
           {/* Add management dept button */}
           {canEdit && (
-            <button
-              onClick={handleAddManagementDept}
-              disabled={saving}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 16px",
-                background: "none", border: "none", borderBottom: "1px solid var(--color-border-light)",
-                cursor: saving ? "wait" : "pointer", color: "var(--color-brand)", fontSize: "var(--dg-fs-label)", fontWeight: 600,
-                transition: "background 120ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-brand-bg)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              {saving ? "Adding\u2026" : `Add Management ${departmentLabel.replace(/s$/i, "")}`}
-            </button>
+            <div style={{ padding: "8px 16px" }}>
+              <button
+                onClick={handleAddManagementDept}
+                disabled={saving}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  width: "100%", padding: "8px 16px",
+                  background: "none", border: "1px dashed var(--color-border)", borderRadius: 8,
+                  cursor: saving ? "wait" : "pointer", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
+                  fontFamily: "inherit",
+                }}
+              >
+                {saving ? "Adding…" : `+ Add Management ${departmentLabel.replace(/s$/i, "")}`}
+              </button>
+            </div>
           )}
         </>
       )}

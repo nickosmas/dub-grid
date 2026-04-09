@@ -92,9 +92,6 @@ export default function Indicators({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "0 0 14px" }}>
-        Indicators appear as colored dots on shift cells. Add, rename, or recolor them here.
-      </p>
       {local.length === 0 && (
         <EmptyState
           compact
@@ -102,8 +99,18 @@ export default function Indicators({
           action={canManageIndicatorTypes ? (
             <button
               onClick={handleAdd}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "8px 20px",
+                background: "none",
+                border: "1px dashed var(--color-border)",
+                borderRadius: 8,
+                cursor: "pointer",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                fontFamily: "inherit",
+              }}
             >
               + Add Indicator
             </button>
@@ -194,13 +201,19 @@ export default function Indicators({
           onClick={handleAdd}
           style={{
             marginTop: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            width: "100%",
+            padding: "8px 16px",
             background: "none",
-            border: "none",
-            color: "var(--color-text-muted)",
-            padding: "6px 0",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
+            border: "1px dashed var(--color-border)",
+            borderRadius: 8,
             cursor: "pointer",
+            color: "var(--color-text-muted)",
+            fontSize: "var(--dg-fs-caption)",
+            fontWeight: 600,
             fontFamily: "inherit",
           }}
         >

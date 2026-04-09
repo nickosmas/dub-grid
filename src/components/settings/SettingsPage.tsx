@@ -186,6 +186,15 @@ export default function SettingsPage({
   const activeItem = allItems.find(i => i.id === activeSection);
   const maxWidth = getMaxWidth(activeSection);
 
+  const sectionSubtitles: Partial<Record<SectionId, string>> = {
+    "org-general": "Manage your organization's name, contact info, and time zone settings.",
+    "org-labels": "Customize what your organization calls each feature. These labels appear throughout the app.",
+    "org-display": "Choose how shift codes appear on the schedule grid — as short codes or full names.",
+    "staff-departments": "Organize staff into scheduled departments with focus areas, and management departments.",
+    "schedule-rules": "Configure scheduling behavior and constraints for your organization.",
+    "staff-indicators": "Indicators appear as colored dots on shift cells. Add, rename, or recolor them here.",
+  };
+
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - var(--app-shell-header-h, 56px))", width: "100%", overflow: "hidden", position: "relative" }}>
@@ -248,9 +257,14 @@ export default function SettingsPage({
         <div style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
         {activeItem && (
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 20px", width: "100%", maxWidth }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: sectionSubtitles[activeSection] ? "0 0 4px" : "0 0 20px", width: "100%", maxWidth }}>
             {activeItem.label}
           </h1>
+        )}
+        {sectionSubtitles[activeSection] && (
+          <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "0 0 20px", width: "100%", maxWidth }}>
+            {sectionSubtitles[activeSection]}
+          </p>
         )}
 
         {/* Permission info for users with limited access */}
