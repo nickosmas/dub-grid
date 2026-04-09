@@ -327,10 +327,15 @@ export default function CoverageRequirementsSettings({
                     {cat.name}
                     {!hasValues && !isEditing && (
                       <span style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "1px 7px",
+                        borderRadius: 20,
                         fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 600,
+                        fontWeight: 500,
+                        background: "var(--color-border-light)",
                         color: "var(--color-text-muted)",
-                        fontStyle: "italic",
+                        letterSpacing: "0.01em",
                       }}>
                         not configured
                       </span>
