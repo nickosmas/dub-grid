@@ -36,7 +36,6 @@ export default function DepartmentsStep({ onNext, onBack }: DepartmentsStepProps
         canManageOrgLabels={true}
         onDepartmentsChange={setDepartments}
         onFocusAreasChange={setFocusAreas}
-        hideRoster
       />
       {!hasDepartments && (
         <p

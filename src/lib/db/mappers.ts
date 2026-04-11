@@ -90,8 +90,6 @@ export function rowToFocusArea(row: DbFocusArea): FocusArea {
     orgId: row.org_id,
     departmentId: row.department_id ?? null,
     name: row.name,
-    colorBg: row.color_bg,
-    colorText: row.color_text,
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
   };

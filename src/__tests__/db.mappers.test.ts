@@ -80,8 +80,6 @@ describe("rowToFocusArea", () => {
       id: 7,
       org_id: "org-abc",
       name: "East Section",
-      color_bg: "#ff0000",
-      color_text: "#ffffff",
       sort_order: 3,
       department_id: null,
       archived_at: null,
@@ -92,8 +90,6 @@ describe("rowToFocusArea", () => {
     expect(result.id).toBe(7);
     expect(result.orgId).toBe("org-abc");
     expect(result.name).toBe("East Section");
-    expect(result.colorBg).toBe("#ff0000");
-    expect(result.colorText).toBe("#ffffff");
     expect(result.sortOrder).toBe(3);
     expect(result.archivedAt).toBeNull();
   });
@@ -103,8 +99,6 @@ describe("rowToFocusArea", () => {
       id: 8,
       org_id: "org-abc",
       name: "Archived Section",
-      color_bg: "#ccc",
-      color_text: "#000",
       sort_order: 4,
       department_id: null,
       archived_at: "2026-03-10T12:00:00Z",

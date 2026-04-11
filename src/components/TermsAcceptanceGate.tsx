@@ -89,8 +89,9 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
           alignItems: "center",
           justifyContent: "center",
           padding: 24,
-          background: "rgba(0, 0, 0, 0.5)",
-          backdropFilter: "blur(4px)",
+          background: "var(--dg-overlay)",
+          backdropFilter: "blur(var(--dg-overlay-blur))",
+          WebkitBackdropFilter: "blur(var(--dg-overlay-blur))",
         }}
       >
         <div style={{

@@ -81,15 +81,6 @@ export default function ExpandedCoverage({
                     <div key={sec.focusAreaId} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span
-                            style={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              background: sec.colorBg,
-                              flexShrink: 0,
-                            }}
-                          />
                           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>
                             {sec.focusAreaName}
                           </span>

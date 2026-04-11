@@ -94,7 +94,7 @@ export async function saveDepartments(
     }
   }
 
-  await cacheDel(CacheKey.departments(orgId));
+  await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("departments.saved", "department", null, { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length }, orgId);
   return fetchDepartments(orgId);
 }
@@ -121,7 +121,7 @@ export async function restoreDepartment(deptId: number, orgId: string): Promise<
     .eq("org_id", orgId)
     .eq("id", deptId);
   if (error) throw error;
-  await cacheDel(CacheKey.departments(orgId));
+  await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("department.restored", "department", String(deptId), {}, orgId);
 }
 
@@ -137,7 +137,7 @@ export async function updateDepartmentPermissions(
     .eq("id", departmentId)
     .eq("org_id", orgId);
   if (error) throw error;
-  await cacheDel(CacheKey.departments(orgId));
+  await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("department_permissions.updated", "department", String(departmentId), {}, orgId);
 }
 
@@ -234,8 +234,12 @@ export async function updateEmployeeDepartments(
   orgId: string,
   deptAdminIds?: number[],
 ): Promise<void> {
+  const deptSet = new Set(departmentIds);
   const updateData: Record<string, unknown> = { department_ids: departmentIds };
-  if (deptAdminIds !== undefined) updateData.dept_admin_ids = deptAdminIds;
+  // Always prune dept_admin_ids to remain a subset of department_ids
+  if (deptAdminIds !== undefined) {
+    updateData.dept_admin_ids = deptAdminIds.filter(id => deptSet.has(id));
+  }
   const { error } = await supabase
     .from("employees")
     .update(updateData)

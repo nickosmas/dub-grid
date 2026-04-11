@@ -251,10 +251,6 @@ export default function CoverageRequirementsSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: 0 }}>
-        Set minimum staffing requirements per focus area and shift code. These will be shown in the schedule grid tally rows and the coverage panel.
-      </p>
-
       {activeFocusAreas.map((fa) => (
         <div
           key={fa.id}
@@ -275,10 +271,8 @@ export default function CoverageRequirementsSettings({
               display: "flex",
               alignItems: "center",
               gap: 8,
-              borderBottom: "1px solid var(--color-border-light)",
             }}
           >
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: fa.colorBg, flexShrink: 0 }} />
             {fa.name}
           </div>
 
@@ -356,16 +350,7 @@ export default function CoverageRequirementsSettings({
                     <button
                       onClick={() => handleEdit(fa.id, cat.id)}
                       disabled={editingKey !== null}
-                      style={{
-                        padding: "4px 12px",
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        borderRadius: 6,
-                        border: "1px solid var(--color-border)",
-                        background: "none",
-                        color: editingKey !== null ? "var(--color-text-muted)" : "var(--color-text-secondary)",
-                        cursor: editingKey !== null ? "not-allowed" : "pointer",
-                      }}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
                     >
                       Edit
                     </button>
@@ -375,33 +360,14 @@ export default function CoverageRequirementsSettings({
                       <button
                         onClick={() => handleCancel(fa.id, cat.id)}
                         disabled={isSaving}
-                        style={{
-                          padding: "4px 12px",
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 600,
-                          borderRadius: 6,
-                          border: "1px solid var(--color-border)",
-                          background: "none",
-                          color: "var(--color-text-secondary)",
-                          cursor: isSaving ? "not-allowed" : "pointer",
-                        }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={() => handleSave(fa.id, cat.id)}
                         disabled={isSaving || !hasChanges}
-                        style={{
-                          padding: "4px 12px",
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 600,
-                          borderRadius: 6,
-                          border: "none",
-                          background: hasChanges ? "var(--color-brand)" : "var(--color-border)",
-                          color: hasChanges ? "var(--color-text-inverse)" : "var(--color-text-muted)",
-                          cursor: isSaving || !hasChanges ? "not-allowed" : "pointer",
-                          opacity: isSaving ? 0.7 : 1,
-                        }}
+                        className="dg-btn dg-btn-primary dg-btn-sm"
                       >
                         {isSaving ? "Saving..." : "Save"}
                       </button>

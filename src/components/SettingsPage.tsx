@@ -507,7 +507,7 @@ function FocusAreaRow({
   focusArea: FocusArea & { isNew?: boolean };
   orgId: string;
   onDeleted: (id: number) => void;
-  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
+  onFormChange: (id: number, patch: { name: string }) => void;
   isDragging: boolean;
   isDropTarget: boolean;
   isReordering: boolean;
@@ -518,8 +518,6 @@ function FocusAreaRow({
 }) {
   const [form, setForm] = useState({
     name: focusArea.name,
-    colorBg: focusArea.colorBg,
-    colorText: focusArea.colorText,
   });
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -577,7 +575,6 @@ function FocusAreaRow({
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
           {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
         </span>
       </div>
@@ -631,7 +628,6 @@ function FocusAreaRow({
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: form.colorBg, flexShrink: 0 }} />
           {form.name || "Preview"}
         </span>
 
@@ -675,15 +671,6 @@ function FocusAreaRow({
         />
       </div>
 
-      {/* Color */}
-      <div style={{ paddingLeft: 24 }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-        <label style={labelStyle}>COLOR</label>
-        <PresetColorPicker
-          valueBg={form.colorBg}
-          onChange={(c) => setForm((p) => ({ ...p, colorBg: c.bg, colorText: c.text }))}
-        />
-      </div>
-
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete Focus Area?"
@@ -722,8 +709,8 @@ function FocusAreasSettings({
   const [saving, setSaving] = useState(false);
   const nextTmpId = useRef(-1);
 
-  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })))
-    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name, colorBg: fa.colorBg, colorText: fa.colorText })));
+  const isDirty = JSON.stringify(localFocusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name })))
+    !== JSON.stringify(focusAreas.map((fa) => ({ id: fa.id, sortOrder: fa.sortOrder, name: fa.name })));
 
   // Live preview: show items in dragged order without committing
   const displayList = useMemo(() => {
@@ -757,8 +744,6 @@ function FocusAreasSettings({
             orgId,
             departmentId: fa.departmentId ?? null,
             name: fa.name,
-            colorBg: fa.colorBg,
-            colorText: fa.colorText,
             sortOrder: fa.sortOrder,
             version: 0,
           }),
@@ -781,8 +766,6 @@ function FocusAreasSettings({
       orgId: orgId,
       departmentId: null,
       name: "",
-      colorBg: PREDEFINED_COLORS[0].bg,
-      colorText: PREDEFINED_COLORS[0].text,
       sortOrder: localFocusAreas.length,
       version: 0,
       isNew: true,
@@ -791,7 +774,7 @@ function FocusAreasSettings({
     setIsEditing(true);
   };
 
-  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string }) => {
+  const handleFormChange = useCallback((id: number, patch: { name: string }) => {
     setLocalFocusAreas((prev) =>
       prev.map((fa) => (fa.id === id ? { ...fa, ...patch } : fa)),
     );
@@ -2112,7 +2095,6 @@ function ShiftCodesSettings({
         return (
           <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
             <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
               {focusArea.name}
             </div>
             {areaCodes.length > 0 ? (
@@ -3252,7 +3234,6 @@ function ShiftCategoriesSettings({
                 color: "var(--color-text-secondary)",
               }}
             >
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg || "var(--color-border)", flexShrink: 0 }} />
               {focusArea.name}
             </div>
             {areaCats.length > 0 ? (
@@ -3622,7 +3603,6 @@ function CoverageRequirementsSettings({
               borderBottom: "1px solid var(--color-border-light)",
             }}
           >
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: fa.colorBg, flexShrink: 0 }} />
             {fa.name}
           </div>
 

@@ -20,6 +20,8 @@ import {
   generateEmployeeCSV,
 } from "@/lib/staff-detail-stats";
 
+const CHART_COLORS = ["#94A3B8", "#64748B", "#475569", "#CBD5E1", "#E2E8F0", "#A1A1AA"];
+
 interface ReportsTabProps {
   employee: Employee;
   shifts: ShiftMap;
@@ -169,9 +171,9 @@ export function ReportsTab({
               <>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
                   <DonutChart
-                    segments={faDist.map(d => ({
+                    segments={faDist.map((d, i) => ({
                       value: d.shiftCount,
-                      color: d.colorBg,
+                      color: CHART_COLORS[i % CHART_COLORS.length],
                       label: d.name,
                     }))}
                     size={140}
@@ -180,10 +182,10 @@ export function ReportsTab({
                   />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {faDist.map((d) => (
+                  {faDist.map((d, i) => (
                     <div key={d.focusAreaId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: 3, background: d.colorBg, flexShrink: 0 }} />
+                        <div style={{ width: 10, height: 10, borderRadius: 3, background: CHART_COLORS[i % CHART_COLORS.length], flexShrink: 0 }} />
                         <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
                           {d.name}
                         </span>

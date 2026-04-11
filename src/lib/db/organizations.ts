@@ -143,8 +143,16 @@ export async function updateAppOnlyUser(
   if (data.phone !== undefined || data.departmentIds !== undefined || data.deptAdminIds !== undefined) {
     const membershipUpdate: Record<string, unknown> = {};
     if (data.phone !== undefined) membershipUpdate.phone = data.phone;
-    if (data.departmentIds !== undefined) membershipUpdate.department_ids = data.departmentIds;
-    if (data.deptAdminIds !== undefined) membershipUpdate.dept_admin_ids = data.deptAdminIds;
+    if (data.departmentIds !== undefined) {
+      membershipUpdate.department_ids = data.departmentIds;
+      // Auto-prune dept_admin_ids to remain a subset of department_ids
+      if (data.deptAdminIds !== undefined) {
+        const deptSet = new Set(data.departmentIds);
+        membershipUpdate.dept_admin_ids = data.deptAdminIds.filter(id => deptSet.has(id));
+      }
+    } else if (data.deptAdminIds !== undefined) {
+      membershipUpdate.dept_admin_ids = data.deptAdminIds;
+    }
     const { error } = await supabase.from("organization_memberships").update(membershipUpdate).eq("user_id", userId).eq("org_id", orgId);
     if (error) throw error;
   }
@@ -160,8 +168,16 @@ export async function updatePendingInvitation(
   if (data.firstName !== undefined) update.first_name = data.firstName;
   if (data.lastName !== undefined) update.last_name = data.lastName;
   if (data.phone !== undefined) update.phone = data.phone;
-  if (data.departmentIds !== undefined) update.department_ids = data.departmentIds;
-  if (data.deptAdminIds !== undefined) update.dept_admin_ids = data.deptAdminIds;
+  if (data.departmentIds !== undefined) {
+    update.department_ids = data.departmentIds;
+    // Auto-prune dept_admin_ids to remain a subset of department_ids
+    if (data.deptAdminIds !== undefined) {
+      const deptSet = new Set(data.departmentIds);
+      update.dept_admin_ids = data.deptAdminIds.filter(id => deptSet.has(id));
+    }
+  } else if (data.deptAdminIds !== undefined) {
+    update.dept_admin_ids = data.deptAdminIds;
+  }
   const { error } = await supabase.from("invitations").update(update).eq("id", invitationId).eq("org_id", orgId);
   if (error) throw error;
   await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));

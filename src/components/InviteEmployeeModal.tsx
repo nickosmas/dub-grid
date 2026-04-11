@@ -4,13 +4,12 @@ import { useState, useEffect, useMemo } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
 import { Employee, OrganizationUser, NamedItem, Department } from "@/types";
-import type { AssignableOrganizationRole, AdminPermissions } from "@/types";
+import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
 import { toast } from "sonner";
 import { z } from "zod";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { unionPermissions } from "@/hooks/usePermissions";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -18,13 +17,13 @@ const ROLE_OPTIONS = [
 ];
 
 interface InviteEmployeeModalProps {
-  /** Employee to invite. When null, operates in "app-only" mode (no employee link). */
+  /** Employee to invite. When null, operates in management staff mode (no employee link). */
   employee: Employee | null;
   orgId: string;
   orgName: string;
   onClose: () => void;
   onInvited: () => void;
-  /** Available departments (for app-only mode). Accepts NamedItem[] or Department[]. */
+  /** Available departments (for management staff mode). Accepts NamedItem[] or Department[]. */
   departments?: (NamedItem | Department)[];
 }
 
@@ -38,7 +37,7 @@ export default function InviteEmployeeModal({
   onInvited,
   departments = [],
 }: InviteEmployeeModalProps) {
-  const isAppOnlyInvite = !employee;
+  const isManagementInvite = !employee;
   const [email, setEmail] = useState(employee?.email || "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -55,36 +54,13 @@ export default function InviteEmployeeModal({
     [departments],
   );
 
-  // Permission preview: compute union of selected departments' permissions
-  const permissionPreview = useMemo(() => {
-    const selectedDepts = managementDepts.filter((d) => departmentIds.includes(d.id));
-    const permsWithValues = selectedDepts.filter((d) => d.permissions);
-    if (permsWithValues.length === 0) return [];
-    const union = unionPermissions(permsWithValues.map((d) => d.permissions as AdminPermissions));
-    const labels: string[] = [];
-    if (union.canEditShifts) labels.push("Edit Shifts");
-    if (union.canPublishSchedule) labels.push("Publish Schedule");
-    if (union.canApplyRecurringSchedule) labels.push("Apply Recurring Schedule");
-    if (union.canApproveShiftRequests) labels.push("Approve Shift Requests");
-    if (union.canEditNotes) labels.push("Edit Notes");
-    if (union.canManageRecurringShifts) labels.push("Manage Recurring Shifts");
-    if (union.canManageShiftSeries) labels.push("Manage Shift Series");
-    if (union.canManageEmployees) labels.push("Manage Employees");
-    if (union.canManageFocusAreas) labels.push("Manage Focus Areas");
-    if (union.canManageShiftCodes) labels.push("Manage Shift Codes");
-    if (union.canManageIndicatorTypes) labels.push("Manage Indicators");
-    if (union.canManageOrgLabels) labels.push("Manage Custom Labels");
-    if (union.canManageCoverageRequirements) labels.push("Manage Coverage");
-    return labels;
-  }, [managementDepts, departmentIds]);
-
   // Existing user detection
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [orgUsersLoaded, setOrgUsersLoaded] = useState(false);
 
   // On mount, fetch org users (only needed when linking an employee)
   useEffect(() => {
-    if (isAppOnlyInvite) {
+    if (isManagementInvite) {
       setOrgUsersLoaded(true);
       return;
     }
@@ -96,10 +72,10 @@ export default function InviteEmployeeModal({
         // fallback — leave empty
       })
       .finally(() => setOrgUsersLoaded(true));
-  }, [orgId, isAppOnlyInvite]);
+  }, [orgId, isManagementInvite]);
 
   // Derive mode and matchedUser inline
-  const matchedUser = !isAppOnlyInvite && orgUsersLoaded && email.trim()
+  const matchedUser = !isManagementInvite && orgUsersLoaded && email.trim()
     ? orgUsers.find(
         (u) => u.email && u.email.toLowerCase() === email.trim().toLowerCase()
       ) ?? null
@@ -136,7 +112,7 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      const { token } = await sendInvitation(email.trim(), role, orgId, employee?.id, isAppOnlyInvite ? {
+      const { token } = await sendInvitation(email.trim(), role, orgId, employee?.id, isManagementInvite ? {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
@@ -184,7 +160,7 @@ export default function InviteEmployeeModal({
 
   return (
     <Modal
-      title={isAppOnlyInvite ? "Invite to App" : mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
+      title={isManagementInvite ? "Invite Management Staff" : mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
       onClose={onClose}
       style={{ maxWidth: 480 }}
     >
@@ -244,14 +220,14 @@ export default function InviteEmployeeModal({
               color: "var(--color-text-secondary, #334766)",
             }}
           >
-            {isAppOnlyInvite
-              ? "Invite someone who needs app access but won\u2019t appear on the schedule (e.g. HR, finance, reception, management)."
+            {isManagementInvite
+              ? "Invite management staff who need app access but won\u2019t appear on the schedule."
               : <>Sending an invitation to <strong>{getEmployeeDisplayName(employee!)}</strong>. They will receive an email with a link to set their password and join your organization.</>
             }
           </div>
 
-          {/* Name fields (app-only mode) */}
-          {isAppOnlyInvite && (
+          {/* Name fields (management staff mode) */}
+          {isManagementInvite && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>First name</label>
@@ -288,8 +264,8 @@ export default function InviteEmployeeModal({
             />
           </div>
 
-          {/* Phone (app-only mode, optional) */}
-          {isAppOnlyInvite && (
+          {/* Phone (management staff mode, optional) */}
+          {isManagementInvite && (
             <div>
               <label style={labelStyle}>Phone <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span></label>
               <input
@@ -302,44 +278,18 @@ export default function InviteEmployeeModal({
             </div>
           )}
 
-          {/* Departments (multi-select for app-only invites) */}
-          {isAppOnlyInvite && managementDepts.length > 0 && (
+          {/* Department (single-select for management staff invites) */}
+          {isManagementInvite && managementDepts.length > 0 && (
             <div>
-              <label style={labelStyle}>Departments</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {managementDepts.map((d) => {
-                  const selected = departmentIds.includes(d.id);
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => setDepartmentIds((prev) =>
-                        selected ? prev.filter((id) => id !== d.id) : [...prev, d.id],
-                      )}
-                      style={{
-                        padding: "4px 12px",
-                        fontSize: "var(--dg-fs-label)",
-                        borderRadius: 6,
-                        border: selected ? "1px solid var(--color-brand)" : "1px solid var(--color-border-light)",
-                        background: selected ? "var(--color-brand-light, #E0E7FF)" : "var(--color-surface)",
-                        color: selected ? "var(--color-brand, #4338CA)" : "var(--color-text-secondary)",
-                        fontWeight: selected ? 600 : 400,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {d.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Permission preview for selected departments */}
-          {isAppOnlyInvite && permissionPreview.length > 0 && (
-            <div style={{ padding: "8px 12px", borderRadius: 8, background: "var(--color-surface-subtle, #F9FAFB)", border: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-caption)" }}>
-              <span style={{ fontWeight: 600, color: "var(--color-text-subtle)" }}>This person will be able to: </span>
-              <span style={{ color: "var(--color-text-secondary)" }}>{permissionPreview.join(", ")}</span>
+              <label style={labelStyle}>Department</label>
+              <CustomSelect
+                value={departmentIds.length > 0 ? departmentIds[0].toString() : ""}
+                options={[
+                  { value: "", label: "None" },
+                  ...managementDepts.map((d) => ({ value: d.id.toString(), label: d.name })),
+                ]}
+                onChange={(v) => setDepartmentIds(v ? [Number(v)] : [])}
+              />
             </div>
           )}
 

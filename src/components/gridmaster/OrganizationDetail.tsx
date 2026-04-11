@@ -1238,8 +1238,8 @@ function ConfigTab({
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: fa.colorBg,
-                    color: fa.colorText,
+                    background: "var(--color-bg-secondary)",
+                    color: "var(--color-text-secondary)",
                   }}
                 >
                   {fa.name}

@@ -3853,14 +3853,12 @@ BEGIN
       RAISE EXCEPTION 'Invalid department_ids: one or more department IDs do not exist or are archived';
     END IF;
   END IF;
-  -- Validate dept_admin_ids is a subset of department_ids
+  -- Auto-prune dept_admin_ids to stay a subset of department_ids
   IF NEW.dept_admin_ids != '{}' THEN
-    IF EXISTS (
-      SELECT 1 FROM unnest(NEW.dept_admin_ids) AS aid
-      WHERE aid NOT IN (SELECT unnest(NEW.department_ids))
-    ) THEN
-      RAISE EXCEPTION 'Invalid dept_admin_ids: must be a subset of department_ids';
-    END IF;
+    NEW.dept_admin_ids := ARRAY(
+      SELECT aid FROM unnest(NEW.dept_admin_ids) AS aid
+      WHERE aid = ANY(NEW.department_ids)
+    );
   END IF;
   RETURN NEW;
 END;

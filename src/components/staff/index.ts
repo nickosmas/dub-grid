@@ -1,12 +1,14 @@
 export { useStaffFilters } from "./useStaffFilters";
-export type { EmployeeTab, SortBy } from "./useStaffFilters";
+export type { EmployeeTab, SortKey, SortConfig } from "./useStaffFilters";
 export { useStaffSelection } from "./useStaffSelection";
 export { useStaffReorder } from "./useStaffReorder";
 export { StaffTableRow } from "./StaffTableRow";
 export { StaffEmptyState } from "./StaffEmptyState";
 export { StaffPagination } from "./StaffPagination";
 export { StaffDetailPanel } from "./StaffDetailPanel";
-export { StaffToolbar } from "./StaffToolbar";
 export { StaffFilterPopover } from "./StaffFilterPopover";
 export { StaffContextBar } from "./StaffContextBar";
 export { AddPersonDropdown } from "./AddPersonDropdown";
+export { SortIcon } from "./SortIcon";
+export { DirectorySummaryCards } from "./DirectorySummaryCards";
+export { DirectoryLoadingSkeleton } from "./DirectoryLoadingSkeleton";

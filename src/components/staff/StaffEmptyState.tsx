@@ -16,9 +16,7 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       ? "No active employees"
       : activeTab === "benched"
         ? "No benched employees"
-        : activeTab === "departments"
-          ? "No department members"
-          : "No terminated employees";
+        : "No terminated employees";
 
   const description = hasFilters
     ? "Try adjusting your search or filters."
@@ -26,9 +24,7 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       ? "Get started by adding your first staff member."
       : activeTab === "benched"
         ? "Employees you bench will appear here."
-        : activeTab === "departments"
-          ? "People assigned to a department will appear here."
-          : "Terminated employees will appear here.";
+        : "Terminated employees will appear here.";
 
   return (
     <EmptyState

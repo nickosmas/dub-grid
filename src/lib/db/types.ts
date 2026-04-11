@@ -32,8 +32,6 @@ export interface DbFocusArea {
   org_id: string;
   department_id: number | null;
   name: string;
-  color_bg: string;
-  color_text: string;
   sort_order: number;
   archived_at: string | null;
 }

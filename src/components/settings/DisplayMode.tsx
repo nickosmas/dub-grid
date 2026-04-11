@@ -210,17 +210,7 @@ export default function DisplayMode({
           type="button"
           onClick={handleSave}
           disabled={!isModified || saving}
-          style={{
-            padding: "9px 20px",
-            borderRadius: 8,
-            border: "none",
-            background: isModified ? "var(--color-brand)" : "var(--color-border-light)",
-            color: isModified ? "var(--color-text-inverse)" : "var(--color-text-muted)",
-            fontWeight: 700,
-            fontSize: "var(--dg-fs-label)",
-            cursor: isModified ? "pointer" : "not-allowed",
-            opacity: isModified ? 1 : 0.6,
-          }}
+          className="dg-btn dg-btn-primary"
         >
           {saving ? "Saving…" : "Save"}
         </button>

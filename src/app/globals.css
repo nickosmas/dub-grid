@@ -243,9 +243,8 @@
   /* ----------------------------------------------------------
      Overlay backgrounds
   ---------------------------------------------------------- */
-  --dg-overlay-light: rgba(0, 0, 0, 0.20);
-  --dg-overlay-heavy: rgba(10, 20, 40, 0.45);
-  --dg-overlay-blur: 4px;
+  --dg-overlay: rgba(10, 20, 40, 0.45);
+  --dg-overlay-blur: 0px;
 
   /* shadcn/ui tokens */
   --background: oklch(1 0 0);
@@ -405,6 +404,18 @@ textarea {
 
 .dg-btn-danger-filled:hover {
   background: var(--color-danger-text);
+}
+
+/* Dashed outline (add item) */
+.dg-btn-dashed {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.dg-btn-dashed:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-text-muted);
 }
 
 /* Small variant */
@@ -737,7 +748,7 @@ textarea {
 /* ── Slide-over Panel ───────────────────────────────────── */
 .dg-panel {
   position: fixed;
-  top: calc(var(--header-height) + 12px);
+  top: 12px;
   right: 12px;
   bottom: 12px;
   width: min(480px, calc(100vw - 24px));
@@ -755,7 +766,9 @@ textarea {
 .dg-panel-overlay {
   position: fixed;
   inset: 0;
-  background: var(--dg-overlay-light);
+  background: var(--dg-overlay);
+  backdrop-filter: blur(var(--dg-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
   z-index: 10000;
   animation: fade-in var(--dg-duration-standard) ease;
 }
@@ -782,13 +795,13 @@ textarea {
 
 /* ── Entrance Animations ──────────────────────────────── */
 @keyframes dg-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes dg-enter-scale {
-  from { opacity: 0; transform: scale(0.97) translateY(4px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .dg-page-enter {
@@ -879,9 +892,10 @@ textarea {
 .dg-modal-overlay {
   position: fixed;
   inset: 0;
-  background: var(--dg-overlay-heavy);
+  background: var(--dg-overlay);
   backdrop-filter: blur(var(--dg-overlay-blur));
-  z-index: 300;
+  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1141,23 +1155,23 @@ textarea {
 .staff-detail-overlay {
   position: fixed;
   inset: 0;
-  background: var(--dg-overlay-light);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: var(--dg-overlay);
+  backdrop-filter: blur(var(--dg-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
   z-index: 10000;
   animation: fade-in var(--dg-duration-standard) ease;
 }
 
 .staff-detail-pane {
   position: fixed;
-  top: calc(var(--header-height) + 12px);
+  top: 12px;
   right: 12px;
   bottom: 12px;
   width: min(480px, calc(100vw - 24px));
   background: var(--color-surface);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
   border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08);
@@ -1938,9 +1952,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   .dg-mobile-drawer-overlay {
     position: fixed;
     inset: 0;
-    background: var(--dg-overlay-heavy);
+    background: var(--dg-overlay);
     backdrop-filter: blur(var(--dg-overlay-blur));
-    z-index: 400;
+    z-index: 10000;
     animation: fade-in var(--dg-duration-standard) ease;
   }
 
@@ -1951,7 +1965,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     bottom: 0;
     width: min(300px, calc(100vw - 56px));
     background: var(--color-surface);
-    z-index: 401;
+    z-index: 10001;
     box-shadow: var(--shadow-panel);
     display: flex;
     flex-direction: column;
@@ -2007,9 +2021,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   .dg-bottom-sheet-overlay {
     position: fixed;
     inset: 0;
-    background: var(--dg-overlay-heavy);
+    background: var(--dg-overlay);
     backdrop-filter: blur(var(--dg-overlay-blur));
-    z-index: 500;
+    -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
+    z-index: 10000;
     animation: fade-in var(--dg-duration-standard) ease;
   }
 
@@ -2020,7 +2035,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     right: 0;
     background: var(--color-bg);
     border-radius: 12px 12px 0 0;
-    z-index: 501;
+    z-index: 10001;
     max-height: 85dvh;
     overflow-y: auto;
     animation: sheet-up var(--dg-duration-standard) cubic-bezier(0.32, 0.72, 0, 1);
@@ -2502,7 +2517,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   position: fixed;
   inset: 0;
   z-index: 9996;
-  background: var(--dg-overlay-heavy);
+  background: var(--dg-overlay);
+  backdrop-filter: blur(var(--dg-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
   display: flex;
   align-items: center;
   justify-content: center;

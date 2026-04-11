@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import { Department, FocusArea } from "@/types";
-import { saveDepartments, upsertFocusArea, deleteFocusArea } from "@/lib/db";
+import { saveDepartments, upsertFocusArea, deleteFocusArea, checkDepartmentDependencies } from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { PresetColorPicker, labelStyle } from "./shared";
-import DepartmentRoster from "./DepartmentRoster";
+import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
+import type { DependencyInfo } from "@/lib/db";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,17 +22,25 @@ interface DepartmentsSettingsProps {
   canManageOrgLabels: boolean;
   onDepartmentsChange: (departments: Department[]) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
-  /** Hide the member roster in management departments (e.g. during onboarding). */
-  hideRoster?: boolean;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Shared styles (matching StringListSettings) ─────────────────────────────
 
-const DEFAULT_COLOR_BG = "#E0E7FF";
-const DEFAULT_COLOR_TEXT = "#3730A3";
+const fieldStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "7px 10px",
+  fontSize: "var(--dg-fs-label)",
+  fontWeight: 500,
+  border: "1px solid var(--color-border)",
+  borderRadius: 6,
+  background: "var(--color-surface)",
+  color: "var(--color-text-primary)",
+  outline: "none",
+  transition: "border-color 150ms ease, box-shadow 150ms ease",
+};
 
 const DragHandle = () => (
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-faint)", flexShrink: 0, cursor: "grab" }}>
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-faint)" }}>
     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
       <rect x="3" y="2" width="2" height="2" rx="1" />
       <rect x="9" y="2" width="2" height="2" rx="1" />
@@ -44,767 +52,741 @@ const DragHandle = () => (
   </div>
 );
 
-const ColorBadge = ({ color, size = 8 }: { color: string; size?: number }) => (
-  <span style={{ width: size, height: size, borderRadius: "50%", background: color, flexShrink: 0, display: "inline-block" }} />
-);
+const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-body-sm)",
-  fontWeight: 700,
-  color: "var(--color-text-secondary)",
-  padding: "16px 16px 4px",
-  margin: 0,
-};
+// ── Section component (reusable for Scheduled & Management) ─────────────────
 
-const sectionBoxStyle: React.CSSProperties = {
-  background: "var(--color-bg-card, white)",
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  overflow: "hidden",
-};
-
-// ── Focus Area Row (within a scheduled department) ──────────────────────────
-
-function FocusAreaRow({
-  fa,
+function DepartmentSection({
+  title,
+  description,
+  depts,
+  allDepartments,
+  focusAreas: allFocusAreas,
   orgId,
-  isEditing,
-  onUpdate,
-  onDelete,
-  isDragging,
-  isDropTarget,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  isOnboarding,
+  type,
+  canEdit,
+  focusAreaLabel,
+  departmentLabel,
+  onDepartmentsChange,
+  onFocusAreasChange,
 }: {
-  fa: FocusArea;
+  title: string;
+  description: string;
+  depts: Department[];
+  allDepartments: Department[];
+  focusAreas: FocusArea[];
   orgId: string;
-  isEditing: boolean;
-  onUpdate: (updated: FocusArea) => void;
-  onDelete: (id: number) => void;
-  isDragging: boolean;
-  isDropTarget: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-  isOnboarding?: boolean;
+  type: "scheduled" | "management";
+  canEdit: boolean;
+  focusAreaLabel: string;
+  departmentLabel: string;
+  onDepartmentsChange: (departments: Department[]) => void;
+  onFocusAreasChange: (focusAreas: FocusArea[]) => void;
 }) {
-  const [editName, setEditName] = useState(fa.name);
-  const [editColorBg, setEditColorBg] = useState(fa.colorBg);
-  const [editColorText, setEditColorText] = useState(fa.colorText);
+  // ── Edit lifecycle state ────────────────────────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false);
+  const [localDepts, setLocalDepts] = useState<Department[]>([]);
+  const [localFAs, setLocalFAs] = useState<FocusArea[]>([]);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isInlineEdit, setIsInlineEdit] = useState(!fa.name);
-  const isNew = !fa.name && fa.id < 0;
-  const isModified = isNew || editName.trim() !== fa.name || editColorBg !== fa.colorBg || editColorText !== fa.colorText;
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; dept: Department; deps: DependencyInfo | null } | null>(null);
+  const [faDeleteConfirm, setFaDeleteConfirm] = useState<{ faId: number; fa: FocusArea } | null>(null);
 
-  const handleSave = useCallback(async () => {
-    if (!editName.trim()) return;
+  // ── Drag state ──────────────────────────────────────────────────────────────
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  // ── FA drag state (per department) ──────────────────────────────────────────
+  const [faDragDeptId, setFaDragDeptId] = useState<number | null>(null);
+  const [faDragIdx, setFaDragIdx] = useState<number | null>(null);
+  const [faDragOverIdx, setFaDragOverIdx] = useState<number | null>(null);
+
+  // ── Expand/collapse for focus areas (scheduled) or roster (management) ─────
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  const nextTmpId = useRef(-1);
+  const nextTmpFaId = useRef(-1000);
+  const nameRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
+  // ── Focus area helpers ────────────────────────────────────────────────────
+  const faByDept = useCallback(
+    (deptId: number, source: FocusArea[]) =>
+      source.filter(fa => fa.departmentId === deptId && !fa.archivedAt).sort((a, b) => a.sortOrder - b.sortOrder),
+    [],
+  );
+
+  const propFAs = useMemo(
+    () => allFocusAreas.filter(fa => depts.some(d => d.id === fa.departmentId)),
+    [allFocusAreas, depts],
+  );
+
+  // ── Dirty check ─────────────────────────────────────────────────────────────
+  const nonEmpty = useCallback(
+    (list: Department[]) => list.filter(d => d.name.trim()),
+    [],
+  );
+
+  const isDirty = useMemo(() => {
+    const deptsDirty = JSON.stringify(nonEmpty(localDepts)) !== JSON.stringify(depts);
+    if (type === "management") return deptsDirty;
+    const faDirty = JSON.stringify(localFAs.filter(fa => fa.name.trim())) !== JSON.stringify(propFAs);
+    return deptsDirty || faDirty;
+  }, [localDepts, depts, localFAs, propFAs, nonEmpty, type]);
+
+  // ── Display list with drag preview ──────────────────────────────────────────
+  const displayList = useMemo(() => {
+    if (!isEditing) return depts;
+    if (draggedIdx === null || dragOverIdx === null) return localDepts;
+    const list = [...localDepts];
+    const [item] = list.splice(draggedIdx, 1);
+    list.splice(dragOverIdx, 0, item);
+    return list;
+  }, [isEditing, localDepts, depts, draggedIdx, dragOverIdx]);
+
+  // ── FA display list with drag preview ───────────────────────────────────────
+  const faDisplayList = useCallback(
+    (deptId: number) => {
+      const source = isEditing ? localFAs : propFAs;
+      const fas = faByDept(deptId, source);
+      if (!isEditing || faDragDeptId !== deptId || faDragIdx === null || faDragOverIdx === null) return fas;
+      const list = [...fas];
+      const [item] = list.splice(faDragIdx, 1);
+      list.splice(faDragOverIdx, 0, item);
+      return list;
+    },
+    [isEditing, localFAs, propFAs, faByDept, faDragDeptId, faDragIdx, faDragOverIdx],
+  );
+
+  // ── Enter / Cancel / Save ───────────────────────────────────────────────────
+  const handleEnterEdit = () => {
+    setLocalDepts([...depts]);
+    setLocalFAs([...propFAs]);
+    setIsEditing(true);
+    setError(null);
+    // Auto-expand all depts with 2+ FAs in scheduled mode
+    if (type === "scheduled") {
+      const toExpand = new Set<number>();
+      for (const d of depts) {
+        const fas = faByDept(d.id, propFAs);
+        if (fas.length > 1) toExpand.add(d.id);
+      }
+      setExpandedIds(toExpand);
+    }
+  };
+
+  const handleCancel = () => {
+    setLocalDepts([]);
+    setLocalFAs([]);
+    setIsEditing(false);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+    setFaDragDeptId(null);
+    setFaDragIdx(null);
+    setFaDragOverIdx(null);
+    setError(null);
+  };
+
+  const handleSave = async () => {
+    const cleaned = nonEmpty(localDepts).map((d, i) => ({
+      ...d,
+      name: d.name.trim(),
+      abbr: d.abbr.trim() || d.name.trim(),
+      sortOrder: i,
+    }));
+
+    // Duplicate check
+    const names = cleaned.map(d => d.name.toLowerCase());
+    const dupes = names.filter((n, i) => n && names.indexOf(n) !== i);
+    if (dupes.length > 0) {
+      setError(`Duplicate name: "${dupes[0]}"`);
+      return;
+    }
+
     setSaving(true);
+    setError(null);
     try {
-      const saved = await upsertFocusArea({
-        id: fa.id > 0 ? fa.id : undefined,
-        orgId,
-        departmentId: fa.departmentId,
-        name: editName.trim(),
-        colorBg: editColorBg,
-        colorText: editColorText,
-        sortOrder: fa.sortOrder,
-        version: 0,
-      });
-      onUpdate(saved);
-      setIsInlineEdit(false);
-      toast.success("Focus area saved");
+      // Phase 1: Save departments
+      const otherDepts = allDepartments.filter(d => d.type !== type || !!d.archivedAt);
+      const savedDepts = await saveDepartments(orgId, [...otherDepts, ...cleaned], allDepartments);
+
+      // Phase 2: Save focus areas (scheduled only)
+      if (type === "scheduled") {
+        // Build temp→real ID map for new departments
+        const tempToReal = new Map<number, number>();
+        for (const c of cleaned) {
+          if (c.id < 0) {
+            const real = savedDepts.find(
+              sd => sd.type === "scheduled" && sd.name === c.name && !otherDepts.some(od => od.id === sd.id),
+            );
+            if (real) tempToReal.set(c.id, real.id);
+          }
+        }
+
+        // Determine deleted FAs
+        const localFaIds = new Set(localFAs.filter(fa => fa.id > 0).map(fa => fa.id));
+        const deletedFAs = propFAs.filter(fa => fa.id > 0 && !localFaIds.has(fa.id));
+        for (const fa of deletedFAs) {
+          await deleteFocusArea(fa.id, orgId);
+        }
+
+        // Upsert new and modified FAs
+        const savedFAsList: FocusArea[] = [];
+        const cleanedFAs = localFAs.filter(fa => fa.name.trim());
+        for (let i = 0; i < cleanedFAs.length; i++) {
+          const fa = cleanedFAs[i];
+          const realDeptId = fa.departmentId && fa.departmentId < 0
+            ? tempToReal.get(fa.departmentId) ?? fa.departmentId
+            : fa.departmentId;
+          const isNew = fa.id < 0;
+          const orig = propFAs.find(p => p.id === fa.id);
+          const isModified = !isNew && orig && (
+            orig.name !== fa.name.trim() || orig.sortOrder !== i || orig.departmentId !== realDeptId
+          );
+          if (isNew || isModified) {
+            const saved = await upsertFocusArea({
+              ...(isNew ? {} : { id: fa.id }),
+              orgId,
+              departmentId: realDeptId,
+              name: fa.name.trim(),
+              sortOrder: i,
+            });
+            savedFAsList.push(saved);
+          } else {
+            savedFAsList.push({ ...fa, departmentId: realDeptId });
+          }
+        }
+
+        // Merge saved FAs with unchanged FAs from other departments
+        const otherFAs = allFocusAreas.filter(fa => !depts.some(d => d.id === fa.departmentId) && !tempToReal.has(fa.departmentId ?? -999));
+        onFocusAreasChange([...otherFAs, ...savedFAsList]);
+      }
+
+      onDepartmentsChange(savedDepts);
+      setSaved(true);
+      setIsEditing(false);
+      setLocalDepts([]);
+      setLocalFAs([]);
+      setTimeout(() => setSaved(false), 2000);
+      toast.success(`${title} saved`);
     } catch (err) {
-      toast.error("Failed to save focus area");
+      const msg = err && typeof err === "object" && "message" in err
+        ? (err as { message: string }).message
+        : JSON.stringify(err);
+      setError(msg || "Unknown error");
       Sentry.captureException(err);
     } finally {
       setSaving(false);
     }
-  }, [fa, orgId, editName, editColorBg, editColorText, onUpdate]);
-
-  const handleDelete = useCallback(async () => {
-    if (fa.id < 0) {
-      onDelete(fa.id);
-      return;
-    }
-    setDeleting(true);
-    try {
-      await deleteFocusArea(fa.id, orgId);
-      onDelete(fa.id);
-      toast.success(isOnboarding ? "Focus area removed" : "Focus area archived");
-    } catch (err) {
-      toast.error("Failed to delete focus area");
-      Sentry.captureException(err);
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  }, [fa, orgId, onDelete]);
-
-  const cancelEdit = () => {
-    // If this was a newly added FA that was never saved, remove it entirely
-    if (!fa.name && fa.id < 0) {
-      onDelete(fa.id);
-      return;
-    }
-    setEditName(fa.name);
-    setEditColorBg(fa.colorBg);
-    setEditColorText(fa.colorText);
-    setIsInlineEdit(false);
   };
 
-  // Read-only row
-  if (!isEditing && !isInlineEdit) {
-    return (
-      <div
-        className="dg-hover-row"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "8px 12px 8px 16px",
-          marginLeft: 24,
-          borderLeft: "2px solid var(--color-border-light)",
-          borderBottom: "1px solid var(--color-border-light)",
-        }}
-      >
-        <ColorBadge color={fa.colorBg} />
-        <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
-          {fa.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
-        </span>
-        <button
-          onClick={() => setIsInlineEdit(true)}
-          className="dg-btn dg-btn-secondary"
-          style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => setShowDeleteConfirm(true)}
-          className="dg-btn dg-btn-danger"
-          style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
-        >
-          Delete
-        </button>
-        {showDeleteConfirm && (
-          <ConfirmDialog
-            title={isOnboarding ? "Remove Focus Area?" : "Archive Focus Area?"}
-            message={isOnboarding
-              ? <>Remove <strong>{fa.name || "this area"}</strong>?</>
-              : <>Archive <strong>{fa.name || "this area"}</strong>? Employees assigned to it will need reassignment.</>}
-            confirmLabel={isOnboarding ? "Remove" : "Archive"}
-            variant="danger"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // Edit/drag mode
-  return (
-    <div
-      draggable={isEditing}
-      onDragStart={isEditing ? onDragStart : undefined}
-      onDragOver={isEditing ? onDragOver : undefined}
-      onDrop={isEditing ? onDrop : undefined}
-      onDragEnd={isEditing ? onDragEnd : undefined}
-      style={{
-        padding: "10px 12px 10px 16px",
-        marginLeft: 24,
-        borderLeft: "2px solid var(--color-border-light)",
-        borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
-        borderBottom: "1px solid var(--color-border-light)",
-        opacity: isDragging ? 0.5 : 1,
-        userSelect: isEditing ? "none" : undefined,
-        transition: "opacity 150ms ease",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        {isEditing && <DragHandle />}
-        <ColorBadge color={editColorBg} size={10} />
-        <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-secondary)", flex: 1 }}>
-          {editName || "New Focus Area"}
-        </span>
-        {!isEditing && (
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={handleSave} disabled={saving || !editName.trim() || !isModified} className="dg-btn dg-btn-primary" style={{ padding: "4px 12px", fontSize: "var(--dg-fs-caption)" }}>
-              {saving ? "Saving\u2026" : "Save"}
-            </button>
-            <button onClick={cancelEdit} className="dg-btn dg-btn-secondary" style={{ padding: "4px 12px", fontSize: "var(--dg-fs-caption)" }}>
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Name */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, paddingLeft: isEditing ? 24 : 0 }}>
-        <label style={{ ...labelStyle, marginBottom: 0, minWidth: 48 }}>NAME</label>
-        <input
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          draggable={false}
-          placeholder="Focus area name"
-          maxLength={50}
-          className="dg-input"
-          style={{ flex: 1 }}
-        />
-      </div>
-
-      {/* Color */}
-      <div style={{ paddingLeft: isEditing ? 24 : 0 }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-        <label style={labelStyle}>COLOR</label>
-        <PresetColorPicker
-          valueBg={editColorBg}
-          onChange={(c) => { setEditColorBg(c.bg); setEditColorText(c.text); }}
-        />
-      </div>
-
-      {showDeleteConfirm && (
-        <ConfirmDialog
-          title={isOnboarding ? "Remove Focus Area?" : "Archive Focus Area?"}
-          message={isOnboarding
-            ? <>Remove <strong>{editName || "this area"}</strong>?</>
-            : <>Archive <strong>{editName || "this area"}</strong>? Employees assigned to it will need reassignment.</>}
-          confirmLabel={isOnboarding ? "Remove" : "Archive"}
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-
-// ── Scheduled Department Row ─────────────────────────────────────────────────
-
-function ScheduledDepartmentRow({
-  dept,
-  childFocusAreas,
-  orgId,
-  canEdit,
-  focusAreaLabel,
-  onDeptUpdate,
-  onDeptDelete,
-  onFocusAreasChange,
-  isDragging,
-  isDropTarget,
-  isEditing,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  hideRoster,
-}: {
-  dept: Department;
-  childFocusAreas: FocusArea[];
-  orgId: string;
-  canEdit: boolean;
-  focusAreaLabel: string;
-  onDeptUpdate: (updated: Department) => void;
-  onDeptDelete: (id: number) => void;
-  onFocusAreasChange: (focusAreas: FocusArea[]) => void;
-  isDragging: boolean;
-  isDropTarget: boolean;
-  isEditing: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-  hideRoster?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(childFocusAreas.length > 1);
-  const [editingName, setEditingName] = useState(!dept.name);
-  const [nameValue, setNameValue] = useState(dept.name);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const nextTmpFaId = useRef(-1000 - dept.id * 100);
-
-  const isSingleFA = childFocusAreas.length === 1;
-  const firstFA = childFocusAreas[0] ?? null;
-  const isNameModified = nameValue.trim() !== dept.name;
-
-  // FA drag state
-  const [faDragIdx, setFaDragIdx] = useState<number | null>(null);
-  const [faDragOverIdx, setFaDragOverIdx] = useState<number | null>(null);
-
-  const handleSaveName = useCallback(async () => {
-    if (!nameValue.trim()) return;
-    const updated = { ...dept, name: nameValue.trim() };
-    onDeptUpdate(updated);
-    // Single-FA departments: sync the FA name to match the dept name
-    if (isSingleFA && firstFA) {
-      onFocusAreasChange(childFocusAreas.map(fa =>
-        fa.id === firstFA.id ? { ...fa, name: nameValue.trim() } : fa
-      ));
-    }
-    setEditingName(false);
-  }, [dept, nameValue, onDeptUpdate, isSingleFA, firstFA, childFocusAreas, onFocusAreasChange]);
-
-  const handleDeleteDept = useCallback(async () => {
-    setDeleting(true);
-    try {
-      // Delete all child focus areas first
-      for (const fa of childFocusAreas) {
-        if (fa.id > 0) {
-          await deleteFocusArea(fa.id, orgId);
+  // ── Row handlers ──────────────────────────────────────────────────────────
+  const handleItemChange = (i: number, value: string) => {
+    setLocalDepts(prev => {
+      const updated = prev.map((d, idx) => (idx === i ? { ...d, name: value, abbr: value } : d));
+      // Single-FA departments: sync FA name to dept name
+      if (type === "scheduled") {
+        const dept = updated[i];
+        const fas = faByDept(dept.id, localFAs);
+        if (fas.length === 1) {
+          setLocalFAs(prevFAs => prevFAs.map(fa =>
+            fa.id === fas[0].id ? { ...fa, name: value } : fa,
+          ));
         }
       }
-      onDeptDelete(dept.id);
-      toast.success("Department deleted");
-    } catch (err) {
-      toast.error("Failed to delete department");
-      Sentry.captureException(err);
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  }, [dept, childFocusAreas, orgId, onDeptDelete]);
+      return updated;
+    });
+  };
 
-  const handleAddFocusArea = useCallback(async () => {
-    const tmpId = nextTmpFaId.current--;
-    // First FA defaults to the department name; subsequent FAs start blank
-    const defaultName = childFocusAreas.length === 0 ? dept.name : "";
-    const newFA: FocusArea = {
-      id: tmpId,
+  const addRow = useCallback(() => {
+    const id = nextTmpId.current--;
+    const newDept: Department = {
+      id,
       orgId,
-      departmentId: dept.id,
-      name: defaultName,
-      colorBg: DEFAULT_COLOR_BG,
-      colorText: DEFAULT_COLOR_TEXT,
-      sortOrder: childFocusAreas.length,
-      version: 0,
+      name: "",
+      abbr: "",
+      type,
+      sortOrder: localDepts.length,
     };
-    onFocusAreasChange([...childFocusAreas, newFA]);
-    setExpanded(true);
-  }, [dept.id, dept.name, orgId, childFocusAreas, onFocusAreasChange]);
+    setLocalDepts(prev => [...prev, newDept]);
 
-  const handleFAUpdate = useCallback((updated: FocusArea) => {
-    onFocusAreasChange(childFocusAreas.map(fa => fa.id === updated.id ? updated : fa));
-  }, [childFocusAreas, onFocusAreasChange]);
+    // Auto-create a default focus area for new scheduled departments
+    if (type === "scheduled") {
+      const faId = nextTmpFaId.current--;
+      setLocalFAs(prev => [...prev, {
+        id: faId,
+        orgId,
+        departmentId: id,
+        name: "",
+        sortOrder: 0,
+      }]);
+    }
 
-  const handleFADelete = useCallback((id: number) => {
-    onFocusAreasChange(childFocusAreas.filter(fa => fa.id !== id));
-  }, [childFocusAreas, onFocusAreasChange]);
+    requestAnimationFrame(() => {
+      nameRefs.current.get(id)?.focus();
+    });
+  }, [localDepts.length, orgId, type]);
 
-  // FA drag handlers
-  const handleFADragStart = (idx: number) => { setFaDragIdx(idx); setFaDragOverIdx(idx); };
+  const handleDeleteClick = async (i: number) => {
+    const dept = (isEditing ? localDepts : depts)[i];
+    if (dept.id <= 0) {
+      // New unsaved — remove immediately
+      setLocalDepts(prev => prev.filter((_, idx) => idx !== i));
+      if (type === "scheduled") {
+        setLocalFAs(prev => prev.filter(fa => fa.departmentId !== dept.id));
+      }
+      return;
+    }
+    const deps = await checkDepartmentDependencies(dept.id, orgId);
+    setDeleteConfirm({ idx: i, dept, deps });
+  };
+
+  const handleRemove = (i: number) => {
+    const dept = localDepts[i];
+    setLocalDepts(prev => prev.filter((_, idx) => idx !== i));
+    if (type === "scheduled") {
+      setLocalFAs(prev => prev.filter(fa => fa.departmentId !== dept.id));
+    }
+  };
+
+  // ── FA handlers (scheduled only) ──────────────────────────────────────────
+  const handleFAChange = (faId: number, value: string) => {
+    setLocalFAs(prev => prev.map(fa => fa.id === faId ? { ...fa, name: value } : fa));
+  };
+
+  const addFocusArea = (deptId: number) => {
+    const id = nextTmpFaId.current--;
+    const existing = faByDept(deptId, localFAs);
+    setLocalFAs(prev => [...prev, {
+      id,
+      orgId,
+      departmentId: deptId,
+      name: "",
+      sortOrder: existing.length,
+      version: 0,
+    }]);
+    setExpandedIds(prev => new Set(prev).add(deptId));
+  };
+
+  const handleFADeleteClick = (fa: FocusArea) => {
+    if (fa.id < 0) {
+      setLocalFAs(prev => prev.filter(f => f.id !== fa.id));
+      return;
+    }
+    setFaDeleteConfirm({ faId: fa.id, fa });
+  };
+
+  const handleFARemove = (faId: number) => {
+    setLocalFAs(prev => prev.filter(f => f.id !== faId));
+  };
+
+  // ── Dept drag handlers ────────────────────────────────────────────────────
+  const handleDragStart = (idx: number) => { setDraggedIdx(idx); setDragOverIdx(idx); };
+  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverIdx(idx); };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx && draggedIdx >= 0 && draggedIdx < localDepts.length && dragOverIdx >= 0 && dragOverIdx <= localDepts.length) {
+      const list = [...localDepts];
+      const [item] = list.splice(draggedIdx, 1);
+      list.splice(dragOverIdx, 0, item);
+      setLocalDepts(list);
+    }
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+  const handleDragEnd = () => { setDraggedIdx(null); setDragOverIdx(null); };
+
+  // ── FA drag handlers ──────────────────────────────────────────────────────
+  const handleFADragStart = (deptId: number, idx: number) => { setFaDragDeptId(deptId); setFaDragIdx(idx); setFaDragOverIdx(idx); };
   const handleFADragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setFaDragOverIdx(idx); };
-  const handleFADrop = (e: React.DragEvent) => {
+  const handleFADrop = (e: React.DragEvent, deptId: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (faDragIdx !== null && faDragOverIdx !== null && faDragIdx !== faDragOverIdx) {
-      const list = [...childFocusAreas];
+    if (faDragDeptId === deptId && faDragIdx !== null && faDragOverIdx !== null && faDragIdx !== faDragOverIdx) {
+      const fas = faByDept(deptId, localFAs);
+      const list = [...fas];
       const [item] = list.splice(faDragIdx, 1);
       list.splice(faDragOverIdx, 0, item);
-      onFocusAreasChange(list.map((fa, i) => ({ ...fa, sortOrder: i })));
+      const reordered = list.map((fa, i) => ({ ...fa, sortOrder: i }));
+      setLocalFAs(prev => [
+        ...prev.filter(fa => fa.departmentId !== deptId),
+        ...reordered,
+      ]);
     }
+    setFaDragDeptId(null);
     setFaDragIdx(null);
     setFaDragOverIdx(null);
   };
-  const handleFADragEnd = () => { setFaDragIdx(null); setFaDragOverIdx(null); };
+  const handleFADragEnd = () => { setFaDragDeptId(null); setFaDragIdx(null); setFaDragOverIdx(null); };
 
-  // Build display list with drag preview
-  const faDisplayList = (() => {
-    if (faDragIdx === null || faDragOverIdx === null) return childFocusAreas;
-    const list = [...childFocusAreas];
-    const [item] = list.splice(faDragIdx, 1);
-    list.splice(faDragOverIdx, 0, item);
-    return list;
-  })();
+  // ── Keyboard navigation ─────────────────────────────────────────────────────
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, dept: Department, idx: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!dept.name.trim()) return;
+      if (idx < localDepts.length - 1) {
+        nameRefs.current.get(localDepts[idx + 1].id)?.focus();
+      } else {
+        addRow();
+      }
+    }
+    if (e.key === "Backspace" && !dept.name && dept.id < 0) {
+      e.preventDefault();
+      handleRemove(idx);
+      if (idx > 0) {
+        const prevId = localDepts[idx - 1].id;
+        requestAnimationFrame(() => {
+          nameRefs.current.get(prevId)?.focus();
+        });
+      }
+    }
+  };
+
+  // ── Toggle expand/collapse ────────────────────────────────────────────────
+  const toggleExpand = (id: number) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // ── Action buttons ────────────────────────────────────────────────────────
+  const actionButtons = (
+    <>
+      {!isEditing && canEdit && displayList.length > 0 && (
+        <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">Edit</button>
+      )}
+      {isEditing && (
+        <>
+          {isDirty && (
+            <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary dg-btn-sm">
+              {saving ? "Saving\u2026" : "Save All"}
+            </button>
+          )}
+          <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">Cancel</button>
+        </>
+      )}
+      {saved && (
+        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>Saved!</span>
+      )}
+    </>
+  );
 
   return (
-    <div
-      draggable={isEditing}
-      onDragStart={isEditing ? (e) => { e.stopPropagation(); onDragStart(); } : undefined}
-      onDragOver={isEditing ? onDragOver : undefined}
-      onDrop={isEditing ? onDrop : undefined}
-      onDragEnd={isEditing ? onDragEnd : undefined}
-      style={{
-        borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
-        borderBottom: "1px solid var(--color-border-light)",
-        opacity: isDragging ? 0.5 : 1,
-        transition: "opacity 150ms ease",
-      }}
-    >
-      {/* Department header row */}
-      <div
-        className={!isEditing ? "dg-hover-row" : undefined}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "11px 12px",
-          cursor: isSingleFA ? "default" : "pointer",
-        }}
-        onClick={() => { if (!isSingleFA) setExpanded(p => !p); }}
-      >
-        {isEditing && <DragHandle />}
-
-        {/* Expand/collapse chevron */}
-        {!isSingleFA && (
-          <svg
-            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms ease", flexShrink: 0, color: "var(--color-text-muted)" }}
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        )}
-        {isSingleFA && <span style={{ width: 12 }} />}
-
-        {/* Dept name (inline edit or display) */}
-        {editingName ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, background: "var(--color-bg-secondary)", padding: "4px 8px", borderRadius: "var(--dg-radius-sm)" }} onClick={(e) => e.stopPropagation()}>
-            <input
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSaveName();
-                if (e.key === "Escape") { if (!dept.name) onDeptDelete(dept.id); else { setNameValue(dept.name); setEditingName(false); } }
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              draggable={false}
-              autoFocus
-              maxLength={80}
-              className="dg-input"
-              style={{ flex: 1, maxWidth: 300 }}
-            />
-            <button onClick={handleSaveName} disabled={!nameValue.trim() || !isNameModified} className="dg-btn dg-btn-primary" style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}>
-              Save
-            </button>
-            <button onClick={() => { if (!dept.name) onDeptDelete(dept.id); else { setNameValue(dept.name); setEditingName(false); } }} className="dg-btn dg-btn-secondary" style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}>
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)", flex: 1 }}>
-            {dept.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
-          </span>
-        )}
-
-        {/* Single-FA inline preview: color badge + break */}
-        {isSingleFA && firstFA && !editingName && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 10px",
-              borderRadius: 20, background: "var(--color-bg-secondary)", border: "1px solid var(--color-border-light)",
-              fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-secondary)",
-            }}>
-              <ColorBadge color={firstFA.colorBg} />
-              {firstFA.name}
-            </span>
-          </div>
-        )}
-
-        {/* Multi-FA collapsed summary */}
-        {!isSingleFA && !expanded && !editingName && (
-          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-            {childFocusAreas.length} focus area{childFocusAreas.length !== 1 ? "s" : ""}
-          </span>
-        )}
-
-        {/* Actions */}
-        {canEdit && !editingName && (
-          <div style={{ display: "flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setEditingName(true)}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="dg-btn dg-btn-danger"
-              style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
-            >
-              Delete
-            </button>
-          </div>
-        )}
+    <SectionCard noPadding>
+      {/* Header: title, description, actions */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "16px 16px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+        <div>
+          <h3 style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+            {title}
+          </h3>
+          <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            {description}
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {actionButtons}
+        </div>
       </div>
 
-      {/* Single focus area — name synced from department, show split option */}
-      {isSingleFA && firstFA && (
-        <div style={{ padding: "8px 16px 14px 40px" }}>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 8 }}>
-            Appears as &ldquo;{firstFA.name}&rdquo; on the schedule. Renaming the department updates this automatically. Only split if staff work in distinct sections.
-          </div>
-            {canEdit && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddFocusArea();
-                }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 4,
-                  background: "none", border: "1px solid var(--color-border)", borderRadius: 6,
-                  cursor: "pointer", color: "var(--color-text-secondary)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
-                  padding: "4px 10px", transition: "background 120ms ease",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bg-secondary)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Split into Focus Areas
-              </button>
-            )}
-        </div>
-      )}
-
-      {/* Multiple focus areas — full expandable list */}
-      {childFocusAreas.length > 1 && expanded && (
+      {/* Content */}
+      {displayList.length === 0 && !isEditing ? (
+        <EmptyState
+          compact
+          title={`No ${type} ${departmentLabel.toLowerCase()} defined yet`}
+          style={{ border: "none", borderRadius: 0 }}
+          action={canEdit ? (
+            <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
+              + Add {type === "scheduled" ? "Scheduled" : "Management"} {departmentLabel.replace(/s$/i, "")}
+            </button>
+          ) : undefined}
+        />
+      ) : (
         <div>
-          {faDisplayList.map((fa, i) => (
-            <FocusAreaRow
-              key={fa.id}
-              fa={fa}
-              orgId={orgId}
-              isEditing={isEditing}
-              onUpdate={handleFAUpdate}
-              onDelete={handleFADelete}
-              isDragging={faDragIdx !== null && childFocusAreas[faDragIdx]?.id === fa.id}
-              isDropTarget={faDragOverIdx === i && faDragIdx !== null && faDragIdx !== i}
-              onDragStart={() => handleFADragStart(i)}
-              onDragOver={(e) => handleFADragOver(e, i)}
-              onDrop={handleFADrop}
-              onDragEnd={handleFADragEnd}
-              isOnboarding={hideRoster}
-            />
-          ))}
+          {/* Department rows */}
+          {displayList.map((dept, i) => {
+            const isDragging = isEditing && draggedIdx !== null && localDepts[draggedIdx]?.id === dept.id;
+            const isDropTarget = isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
+            const childFAs = type === "scheduled" ? faDisplayList(dept.id) : [];
+            const hasMultipleFAs = childFAs.length > 1;
+            const isExpanded = expandedIds.has(dept.id);
+            const isSingleFA = type === "scheduled" && childFAs.length === 1;
 
-          {/* Add focus area button */}
-          {canEdit && (
-            <div style={{ padding: "8px 16px" }}>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleAddFocusArea(); }}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  width: "100%", padding: "8px 16px",
-                  background: "none", border: "1px dashed var(--color-border)", borderRadius: 8,
-                  cursor: "pointer", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
-                  fontFamily: "inherit",
-                }}
-              >
-                + Add {focusAreaLabel.replace(/s$/i, "")}
+            return (
+              <React.Fragment key={dept.id}>
+                {/* Divider between scheduled department groups */}
+                {type === "scheduled" && i > 0 && (
+                  <div style={{ borderTop: "1px solid var(--color-border-light)" }} />
+                )}
+
+                {/* Department row */}
+                <div
+                  className={!isEditing ? "dg-hover-row" : undefined}
+                  draggable={isEditing}
+                  onDragStart={isEditing ? () => handleDragStart(i) : undefined}
+                  onDragOver={isEditing ? (e) => handleDragOver(e, i) : undefined}
+                  onDrop={isEditing ? handleDrop : undefined}
+                  onDragEnd={isEditing ? handleDragEnd : undefined}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: isEditing ? "10px 16px" : "11px 16px",
+                    borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
+                    borderBottom: type === "management" && i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                    cursor: isEditing ? "grab" : (type === "scheduled" && hasMultipleFAs ? "pointer" : "default"),
+                    transition: "background 150ms ease, opacity 150ms ease",
+                    opacity: isDragging ? 0.5 : 1,
+                    userSelect: isEditing ? "none" : undefined,
+                  }}
+                  onClick={!isEditing && type === "scheduled" && hasMultipleFAs ? () => toggleExpand(dept.id) : undefined}
+                >
+                  {isEditing && <DragHandle />}
+
+                  {/* Name */}
+                  {isEditing ? (
+                    <input
+                      ref={(el) => { if (el) nameRefs.current.set(dept.id, el); else nameRefs.current.delete(dept.id); }}
+                      value={dept.name}
+                      onChange={(e) => handleItemChange(i, e.target.value)}
+                      onKeyDown={(e) => handleNameKeyDown(e, dept, i)}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      placeholder="Department name"
+                      style={{ ...fieldStyle, flex: 1 }}
+                    />
+                  ) : (
+                    <>
+                      <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                        {dept.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Unnamed</span>}
+                      </span>
+
+                      {/* Multi-FA count (next to name) */}
+                      {hasMultipleFAs && !isExpanded && (
+                        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                          {childFAs.length} {focusAreaLabel.toLowerCase()}
+                        </span>
+                      )}
+
+                      {/* Spacer */}
+                      <span style={{ flex: 1 }} />
+
+                      {/* Expand chevron (far right) */}
+                      {type === "scheduled" && hasMultipleFAs && (
+                        <svg
+                          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                          style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms ease", flexShrink: 0, color: "var(--color-text-muted)" }}
+                        >
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      )}
+                    </>
+                  )}
+
+                  {/* Delete button (edit mode) */}
+                  {isEditing && (
+                    <button
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(i); }}
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--color-danger-border, #FECACA)",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        color: "var(--color-danger)",
+                        padding: "5px 10px",
+                        fontSize: "var(--dg-fs-caption)",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        transition: "background 150ms, color 150ms",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+
+                {/* ── Focus area sub-rows (scheduled only) ─────────────────── */}
+                {type === "scheduled" && (isExpanded || isEditing) && hasMultipleFAs && (
+                  <>
+                    {childFAs.map((fa, fi) => {
+                      const faIsDragging = isEditing && faDragDeptId === dept.id && faDragIdx !== null && faByDept(dept.id, localFAs)[faDragIdx]?.id === fa.id;
+                      const faIsDropTarget = isEditing && faDragDeptId === dept.id && faDragOverIdx === fi && faDragIdx !== null && faDragIdx !== fi;
+                      const isLastFA = fi === childFAs.length - 1;
+                      return (
+                        <div
+                          key={fa.id}
+                          draggable={isEditing}
+                          onDragStart={isEditing ? (e) => { e.stopPropagation(); handleFADragStart(dept.id, fi); } : undefined}
+                          onDragOver={isEditing ? (e) => handleFADragOver(e, fi) : undefined}
+                          onDrop={isEditing ? (e) => handleFADrop(e, dept.id) : undefined}
+                          onDragEnd={isEditing ? handleFADragEnd : undefined}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: isEditing ? 8 : 10,
+                            padding: isLastFA && !isEditing ? "8px 16px 16px 32px" : "8px 16px 8px 32px",
+                            borderTop: faIsDropTarget ? "2px solid var(--color-brand)" : undefined,
+                            opacity: faIsDragging ? 0.5 : 1,
+                            transition: "opacity 150ms ease",
+                            userSelect: isEditing ? "none" : undefined,
+                          }}
+                        >
+                          {/* Tree connector (read mode) / drag handle (edit mode) */}
+                          {isEditing ? <DragHandle /> : (
+                            <svg width="20" height="16" viewBox="0 0 20 16" fill="none" style={{ flexShrink: 0 }}>
+                              <line x1="4" y1="0" x2="4" y2="16" stroke="var(--color-border)" strokeWidth="1.5" />
+                              <line x1="4" y1="8" x2="20" y2="8" stroke="var(--color-border)" strokeWidth="1.5" />
+                            </svg>
+                          )}
+                          {isEditing ? (
+                            <input
+                              value={fa.name}
+                              onChange={(e) => handleFAChange(fa.id, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              draggable={false}
+                              placeholder={`${focusAreaLabel.replace(/s$/i, "")} name`}
+                              style={{ ...fieldStyle, flex: 1 }}
+                            />
+                          ) : (
+                            <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
+                              {fa.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
+                            </span>
+                          )}
+                          {isEditing && (
+                            <button
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); handleFADeleteClick(fa); }}
+                              style={{
+                                background: "none",
+                                border: "1px solid var(--color-danger-border, #FECACA)",
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                color: "var(--color-danger)",
+                                padding: "5px 10px",
+                                fontSize: "var(--dg-fs-caption)",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                                flexShrink: 0,
+                                transition: "background 150ms, color 150ms",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Add focus area button (edit mode) */}
+                    {isEditing && (
+                      <div style={{ padding: "8px 16px 8px 60px" }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); addFocusArea(dept.id); }}
+                          className={addBtnClass}
+                          style={{ width: "100%" }}
+                        >
+                          + Add {focusAreaLabel.replace(/s$/i, "")}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Single-FA: split option (edit mode only) */}
+                {type === "scheduled" && isEditing && isSingleFA && (
+                  <div style={{ padding: "6px 16px 10px 60px" }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); addFocusArea(dept.id); }}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
+                      style={{ fontSize: "var(--dg-fs-caption)" }}
+                    >
+                      + Split into {focusAreaLabel}
+                    </button>
+                  </div>
+                )}
+
+              </React.Fragment>
+            );
+          })}
+
+          {/* Dashed add button (edit mode) */}
+          {isEditing && (
+            <div style={{ padding: "8px 16px 12px" }}>
+              <button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
+                + Add {type === "scheduled" ? "Scheduled" : "Management"} {departmentLabel.replace(/s$/i, "").toLowerCase()}
               </button>
             </div>
           )}
         </div>
       )}
 
-      {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Department?"
-          message={<>Delete <strong>{dept.name || "this department"}</strong> and its {childFocusAreas.length} focus area{childFocusAreas.length !== 1 ? "s" : ""}? This cannot be undone.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDeleteDept}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-
-// ── Management Department Row ────────────────────────────────────────────────
-
-function ManagementDepartmentRow({
-  dept,
-  orgId,
-  canEdit,
-  hideRoster,
-  onUpdate,
-  onDelete,
-  isDragging,
-  isDropTarget,
-  isEditing,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}: {
-  dept: Department;
-  orgId: string;
-  canEdit: boolean;
-  hideRoster?: boolean;
-  onUpdate: (updated: Department) => void;
-  onDelete: (id: number) => void;
-  isDragging: boolean;
-  isDropTarget: boolean;
-  isEditing: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-}) {
-  const [editingName, setEditingName] = useState(!dept.name);
-  const [nameValue, setNameValue] = useState(dept.name);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ deps: { hasDependencies: boolean; summary: string } | null } | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const isNameModified = nameValue.trim() !== dept.name;
-
-
-  const handleSave = () => {
-    if (!nameValue.trim()) return;
-    onUpdate({ ...dept, name: nameValue.trim() });
-    setEditingName(false);
-  };
-
-  const handleDeleteClick = async () => {
-    if (dept.id <= 0) { onDelete(dept.id); return; }
-    const { checkDepartmentDependencies } = await import("@/lib/db");
-    const deps = await checkDepartmentDependencies(dept.id, orgId);
-    setDeleteConfirm({ deps });
-  };
-
-  const handleDelete = () => {
-    setDeleting(true);
-    onDelete(dept.id);
-    setDeleting(false);
-    setDeleteConfirm(null);
-  };
-
-  return (
-    <div
-      draggable={isEditing}
-      onDragStart={isEditing ? onDragStart : undefined}
-      onDragOver={isEditing ? onDragOver : undefined}
-      onDrop={isEditing ? onDrop : undefined}
-      onDragEnd={isEditing ? onDragEnd : undefined}
-      style={{
-        borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
-        borderBottom: "1px solid var(--color-border-light)",
-        opacity: isDragging ? 0.5 : 1,
-        transition: "opacity 150ms ease",
-      }}
-    >
-      {/* ── Header row ────────────────────────────────────────────── */}
-      <div
-        className={!isEditing ? "dg-hover-row" : undefined}
-        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: dept.name && !hideRoster ? "pointer" : undefined }}
-        onClick={() => { if (dept.name && !editingName && !hideRoster) setExpanded(!expanded); }}
-      >
-        {isEditing && <DragHandle />}
-
-        {dept.name && !hideRoster && (
-          <svg
-            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms ease", flexShrink: 0, color: "var(--color-text-muted)" }}
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        )}
-
-        {editingName ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, background: "var(--color-bg-secondary)", padding: "4px 8px", borderRadius: "var(--dg-radius-sm)" }} onClick={(e) => e.stopPropagation()}>
-            <input
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSave();
-                if (e.key === "Escape") { if (!dept.name) onDelete(dept.id); else { setNameValue(dept.name); setEditingName(false); } }
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              draggable={false}
-              autoFocus
-              maxLength={80}
-              className="dg-input"
-              style={{ flex: 1, maxWidth: 300 }}
-            />
-            <button onClick={handleSave} disabled={!nameValue.trim() || !isNameModified} className="dg-btn dg-btn-primary" style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}>
-              Save
-            </button>
-            <button onClick={() => { if (!dept.name) onDelete(dept.id); else { setNameValue(dept.name); setEditingName(false); } }} className="dg-btn dg-btn-secondary" style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}>
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
-            {dept.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
-          </span>
-        )}
-
-        {canEdit && !editingName && (
-          <div style={{ display: "flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setEditingName(true)}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
-            >
-              Rename
-            </button>
-            <button
-              onClick={handleDeleteClick}
-              className="dg-btn dg-btn-danger"
-              style={{ padding: "4px 10px", fontSize: "var(--dg-fs-caption)" }}
-            >
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Expanded body: Roster ─────────────────────────────── */}
-      {expanded && dept.name && !hideRoster && (
-        <div style={{ padding: "4px 12px 16px 36px" }}>
-          <DepartmentRoster department={dept} orgId={orgId} canEdit={canEdit} />
+      {/* Error banner */}
+      {error && (
+        <div style={{ margin: "0 16px 12px", padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          <strong>Save Error:</strong> {error}
         </div>
       )}
 
+      {/* Delete confirmation dialogs */}
       {deleteConfirm && (
         deleteConfirm.deps?.hasDependencies ? (
           <ConfirmDialog
-            title={`Archive "${dept.name}"?`}
+            title={`Archive "${deleteConfirm.dept.name}"?`}
             message={<>
-              <strong>{dept.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
+              <strong>{deleteConfirm.dept.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
               <br /><br />
               Archiving will preserve historical records but remove it from active use. Consider renaming instead if this department is still needed.
             </>}
             confirmLabel="Archive"
             variant="warning"
-            isLoading={deleting}
-            onConfirm={handleDelete}
+            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
             onCancel={() => setDeleteConfirm(null)}
             secondaryConfirmLabel="Rename Instead"
-            onSecondaryConfirm={() => { setDeleteConfirm(null); setEditingName(true); }}
+            onSecondaryConfirm={() => {
+              setDeleteConfirm(null);
+              requestAnimationFrame(() => {
+                nameRefs.current.get(deleteConfirm.dept.id)?.focus();
+                nameRefs.current.get(deleteConfirm.dept.id)?.select();
+              });
+            }}
           />
         ) : (
           <ConfirmDialog
-            title={`Delete "${dept.name}"?`}
-            message={<>This will archive <strong>{dept.name || "this department"}</strong>. Historical records will be preserved.</>}
+            title={`Delete "${deleteConfirm.dept.name}"?`}
+            message={<>This will archive <strong>{deleteConfirm.dept.name || "this department"}</strong>. Historical records will be preserved.</>}
             confirmLabel="Delete"
             variant="danger"
-            isLoading={deleting}
-            onConfirm={handleDelete}
+            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
             onCancel={() => setDeleteConfirm(null)}
           />
         )
       )}
-    </div>
+
+      {faDeleteConfirm && (
+        <ConfirmDialog
+          title={`Delete "${faDeleteConfirm.fa.name}"?`}
+          message={<>This will archive <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Employees assigned to it will need reassignment.</>}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => { handleFARemove(faDeleteConfirm.faId); setFaDeleteConfirm(null); }}
+          onCancel={() => setFaDeleteConfirm(null)}
+        />
+      )}
+    </SectionCard>
   );
 }
 
-
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Main Component ──────────────────────────────────────────────────────────
 
 export default function DepartmentsSettings({
   departments,
@@ -816,12 +798,9 @@ export default function DepartmentsSettings({
   canManageOrgLabels,
   onDepartmentsChange,
   onFocusAreasChange,
-  hideRoster,
 }: DepartmentsSettingsProps) {
   const canEdit = canManageFocusAreas || canManageOrgLabels;
-  const [saving, setSaving] = useState(false);
 
-  // Separate departments by type
   const scheduledDepts = departments
     .filter(d => d.type === "scheduled" && !d.archivedAt)
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -829,409 +808,37 @@ export default function DepartmentsSettings({
     .filter(d => d.type === "management" && !d.archivedAt)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Group focus areas by department
-  const faByDept = (deptId: number) =>
-    focusAreas
-      .filter(fa => fa.departmentId === deptId && !fa.archivedAt)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  // Drag state for scheduled departments
-  const [schedDragIdx, setSchedDragIdx] = useState<number | null>(null);
-  const [schedDragOverIdx, setSchedDragOverIdx] = useState<number | null>(null);
-  const [schedEditing, setSchedEditing] = useState(false);
-
-  // Drag state for management departments
-  const [mgmtDragIdx, setMgmtDragIdx] = useState<number | null>(null);
-  const [mgmtDragOverIdx, setMgmtDragOverIdx] = useState<number | null>(null);
-  const [mgmtEditing, setMgmtEditing] = useState(false);
-
-  const nextTmpDeptId = useRef(-1);
-
-  // ── Scheduled dept helpers ──────────────────────────────────────────────────
-
-  const saveDepartmentsBatch = useCallback(async (updated: Department[]) => {
-    setSaving(true);
-    try {
-      const result = await saveDepartments(orgId, updated, departments);
-      onDepartmentsChange(result);
-      toast.success("Departments saved");
-    } catch (err) {
-      toast.error("Failed to save departments");
-      Sentry.captureException(err);
-    } finally {
-      setSaving(false);
-    }
-  }, [orgId, departments, onDepartmentsChange]);
-
-  const handleAddScheduledDept = useCallback(async () => {
-    const tmpId = nextTmpDeptId.current--;
-    const newDept: Department = {
-      id: tmpId,
-      orgId,
-      name: "",
-      abbr: "",
-      type: "scheduled",
-      sortOrder: scheduledDepts.length + managementDepts.length,
-    };
-
-    setSaving(true);
-    try {
-      const allDepts = [...departments, newDept];
-      const savedDepts = await saveDepartments(orgId, allDepts, departments);
-      onDepartmentsChange(savedDepts);
-
-      // Auto-create one FA with the dept name (single-FA depts inherit dept name)
-      const createdDept = savedDepts
-        .filter(d => d.type === "scheduled")
-        .sort((a, b) => b.sortOrder - a.sortOrder)[0];
-      if (createdDept) {
-        const newFA = await upsertFocusArea({
-          orgId,
-          departmentId: createdDept.id,
-          name: createdDept.name || "New Area",
-          colorBg: DEFAULT_COLOR_BG,
-          colorText: DEFAULT_COLOR_TEXT,
-          sortOrder: 0,
-          version: 0,
-        });
-        onFocusAreasChange([...focusAreas, newFA]);
-      }
-
-      toast.success("Department added");
-    } catch (err) {
-      toast.error("Failed to add department");
-      Sentry.captureException(err);
-    } finally {
-      setSaving(false);
-    }
-  }, [orgId, departments, scheduledDepts, managementDepts, focusAreas, onDepartmentsChange, onFocusAreasChange]);
-
-  const handleAddManagementDept = useCallback(async () => {
-    const tmpId = nextTmpDeptId.current--;
-    const newDept: Department = {
-      id: tmpId,
-      orgId,
-      name: "",
-      abbr: "",
-      type: "management",
-      sortOrder: scheduledDepts.length + managementDepts.length,
-    };
-
-    setSaving(true);
-    try {
-      const allDepts = [...departments, newDept];
-      const savedDepts = await saveDepartments(orgId, allDepts, departments);
-      onDepartmentsChange(savedDepts);
-      toast.success("Department added");
-    } catch (err) {
-      toast.error("Failed to add department");
-      Sentry.captureException(err);
-    } finally {
-      setSaving(false);
-    }
-  }, [orgId, departments, scheduledDepts, managementDepts, onDepartmentsChange]);
-
-  const handleScheduledDeptUpdate = useCallback(async (updated: Department) => {
-    const allDepts = departments.map(d => d.id === updated.id ? updated : d);
-    await saveDepartmentsBatch(allDepts);
-  }, [departments, saveDepartmentsBatch]);
-
-  const handleScheduledDeptDelete = useCallback(async (id: number) => {
-    const allDepts = departments.filter(d => d.id !== id);
-    // Also remove focus areas for this dept from state
-    const remainingFAs = focusAreas.filter(fa => fa.departmentId !== id);
-    onFocusAreasChange(remainingFAs);
-    await saveDepartmentsBatch(allDepts);
-  }, [departments, focusAreas, onFocusAreasChange, saveDepartmentsBatch]);
-
-  const handleManagementDeptUpdate = useCallback(async (updated: Department) => {
-    const allDepts = departments.map(d => d.id === updated.id ? updated : d);
-    await saveDepartmentsBatch(allDepts);
-  }, [departments, saveDepartmentsBatch]);
-
-  const handleManagementDeptDelete = useCallback(async (id: number) => {
-    const allDepts = departments.filter(d => d.id !== id);
-    await saveDepartmentsBatch(allDepts);
-  }, [departments, saveDepartmentsBatch]);
-
-  const handleFocusAreasChangeForDept = useCallback((deptId: number, updatedChildFAs: FocusArea[]) => {
-    const otherFAs = focusAreas.filter(fa => fa.departmentId !== deptId);
-    onFocusAreasChange([...otherFAs, ...updatedChildFAs]);
-  }, [focusAreas, onFocusAreasChange]);
-
-  // ── Scheduled drag ─────────────────────────────────────────────────────────
-
-  const schedDisplayList = (() => {
-    if (schedDragIdx === null || schedDragOverIdx === null) return scheduledDepts;
-    const list = [...scheduledDepts];
-    const [item] = list.splice(schedDragIdx, 1);
-    list.splice(schedDragOverIdx, 0, item);
-    return list;
-  })();
-
-  const handleSchedDragStart = (idx: number) => { setSchedDragIdx(idx); setSchedDragOverIdx(idx); };
-  const handleSchedDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setSchedDragOverIdx(idx); };
-  const handleSchedDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    if (schedDragIdx !== null && schedDragOverIdx !== null && schedDragIdx !== schedDragOverIdx) {
-      const list = [...scheduledDepts];
-      const [item] = list.splice(schedDragIdx, 1);
-      list.splice(schedDragOverIdx, 0, item);
-      const reordered = list.map((d, i) => ({ ...d, sortOrder: i }));
-      const otherDepts = departments.filter(d => d.type !== "scheduled" || !!d.archivedAt);
-      await saveDepartmentsBatch([...reordered, ...otherDepts]);
-    }
-    setSchedDragIdx(null);
-    setSchedDragOverIdx(null);
-  };
-  const handleSchedDragEnd = () => { setSchedDragIdx(null); setSchedDragOverIdx(null); };
-
-  // ── Management drag ────────────────────────────────────────────────────────
-
-  const mgmtDisplayList = (() => {
-    if (mgmtDragIdx === null || mgmtDragOverIdx === null) return managementDepts;
-    const list = [...managementDepts];
-    const [item] = list.splice(mgmtDragIdx, 1);
-    list.splice(mgmtDragOverIdx, 0, item);
-    return list;
-  })();
-
-  const handleMgmtDragStart = (idx: number) => { setMgmtDragIdx(idx); setMgmtDragOverIdx(idx); };
-  const handleMgmtDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setMgmtDragOverIdx(idx); };
-  const handleMgmtDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    if (mgmtDragIdx !== null && mgmtDragOverIdx !== null && mgmtDragIdx !== mgmtDragOverIdx) {
-      const list = [...managementDepts];
-      const [item] = list.splice(mgmtDragIdx, 1);
-      list.splice(mgmtDragOverIdx, 0, item);
-      const reordered = list.map((d, i) => ({ ...d, sortOrder: scheduledDepts.length + i }));
-      const otherDepts = departments.filter(d => d.type !== "management" || !!d.archivedAt);
-      await saveDepartmentsBatch([...otherDepts, ...reordered]);
-    }
-    setMgmtDragIdx(null);
-    setMgmtDragOverIdx(null);
-  };
-  const handleMgmtDragEnd = () => { setMgmtDragIdx(null); setMgmtDragOverIdx(null); };
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* ── Section 1: Scheduled Departments ──────────────────────────────── */}
-      <div className="dg-page-enter" style={sectionBoxStyle}>
-      <h3 style={sectionTitleStyle}>Scheduled {departmentLabel}</h3>
-      <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", padding: "0 16px 14px", margin: 0 }}>
-        Scheduled departments appear on the grid. Each department has one or more focus areas that define how staff are grouped on the schedule.
-      </p>
+      <DepartmentSection
+        title={`Scheduled ${departmentLabel}`}
+        description="Scheduled departments appear on the grid. Each department has one or more focus areas that define how staff are grouped on the schedule."
+        depts={scheduledDepts}
+        allDepartments={departments}
+        focusAreas={focusAreas}
+        orgId={orgId}
+        type="scheduled"
+        canEdit={canEdit}
+        focusAreaLabel={focusAreaLabel}
+        departmentLabel={departmentLabel}
+        onDepartmentsChange={onDepartmentsChange}
+        onFocusAreasChange={onFocusAreasChange}
+      />
 
-      {canEdit && schedDisplayList.length >= 2 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "0 16px 10px" }}>
-          <button
-            onClick={() => setSchedEditing(p => !p)}
-            className="dg-btn dg-btn-secondary"
-            style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
-          >
-            {schedEditing ? (
-              "Done Reordering"
-            ) : (
-              <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-                Reorder
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {schedDisplayList.length === 0 ? (
-        <EmptyState
-          compact
-          title={`No scheduled ${departmentLabel.toLowerCase()} defined yet`}
-          style={{ border: "none", borderRadius: 0 }}
-          action={canEdit ? (
-            <button
-              onClick={handleAddScheduledDept}
-              disabled={saving}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}
-            >
-              + Add Scheduled {departmentLabel.replace(/s$/i, "")}
-            </button>
-          ) : undefined}
-        />
-      ) : (
-        <>
-          {/* Column header */}
-          <div
-            style={{
-              padding: "10px 16px",
-              borderBottom: "1px solid var(--color-border-light)",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                letterSpacing: "0.06em",
-              }}
-            >
-              DEPARTMENT
-            </span>
-          </div>
-          {schedDisplayList.map((dept, i) => (
-            <ScheduledDepartmentRow
-              key={dept.id}
-              dept={dept}
-              childFocusAreas={faByDept(dept.id)}
-              orgId={orgId}
-              canEdit={canEdit}
-              focusAreaLabel={focusAreaLabel}
-              onDeptUpdate={handleScheduledDeptUpdate}
-              onDeptDelete={handleScheduledDeptDelete}
-              onFocusAreasChange={(fas) => handleFocusAreasChangeForDept(dept.id, fas)}
-              isDragging={schedDragIdx !== null && scheduledDepts[schedDragIdx]?.id === dept.id}
-              isDropTarget={schedEditing && schedDragOverIdx === i && schedDragIdx !== null && schedDragIdx !== i}
-              isEditing={schedEditing}
-              onDragStart={() => handleSchedDragStart(i)}
-              onDragOver={(e) => handleSchedDragOver(e, i)}
-              onDrop={handleSchedDrop}
-              onDragEnd={handleSchedDragEnd}
-              hideRoster={hideRoster}
-            />
-          ))}
-
-          {/* Add scheduled dept button */}
-          {canEdit && (
-            <div style={{ padding: "8px 16px" }}>
-              <button
-                onClick={handleAddScheduledDept}
-                disabled={saving}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  width: "100%", padding: "8px 16px",
-                  background: "none", border: "1px dashed var(--color-border)", borderRadius: 8,
-                  cursor: saving ? "wait" : "pointer", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
-                  fontFamily: "inherit",
-                }}
-              >
-                {saving ? "Adding…" : `+ Add Scheduled ${departmentLabel.replace(/s$/i, "")}`}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      </div>
-
-      {/* ── Section 2: Management Departments ─────────────────────────────── */}
-      <div className="dg-page-enter" style={sectionBoxStyle}>
-      <h3 style={sectionTitleStyle}>Management {departmentLabel}</h3>
-      <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", padding: "0 16px 14px", margin: 0 }}>
-        For people who use the app but don&rsquo;t appear on the schedule (e.g. HR, Reception, Finance).
-      </p>
-
-      {canEdit && mgmtDisplayList.length >= 2 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "0 16px 10px" }}>
-          <button
-            onClick={() => setMgmtEditing(p => !p)}
-            className="dg-btn dg-btn-secondary"
-            style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
-          >
-            {mgmtEditing ? (
-              "Done Reordering"
-            ) : (
-              <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-                Reorder
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {mgmtDisplayList.length === 0 ? (
-        <EmptyState
-          compact
-          title={`No management ${departmentLabel.toLowerCase()} defined yet`}
-          style={{ border: "none", borderRadius: 0 }}
-          action={canEdit ? (
-            <button
-              onClick={handleAddManagementDept}
-              disabled={saving}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}
-            >
-              + Add Management {departmentLabel.replace(/s$/i, "")}
-            </button>
-          ) : undefined}
-        />
-      ) : (
-        <>
-          {/* Column header */}
-          <div
-            style={{
-              padding: "10px 16px",
-              borderBottom: "1px solid var(--color-border-light)",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--color-text-subtle)",
-                letterSpacing: "0.06em",
-              }}
-            >
-              DEPARTMENT
-            </span>
-          </div>
-          {mgmtDisplayList.map((dept, i) => (
-            <ManagementDepartmentRow
-              key={dept.id}
-              dept={dept}
-              orgId={orgId}
-              canEdit={canEdit}
-              hideRoster={hideRoster}
-              onUpdate={handleManagementDeptUpdate}
-              onDelete={handleManagementDeptDelete}
-              isDragging={mgmtDragIdx !== null && managementDepts[mgmtDragIdx]?.id === dept.id}
-              isDropTarget={mgmtEditing && mgmtDragOverIdx === i && mgmtDragIdx !== null && mgmtDragIdx !== i}
-              isEditing={mgmtEditing}
-              onDragStart={() => handleMgmtDragStart(i)}
-              onDragOver={(e) => handleMgmtDragOver(e, i)}
-              onDrop={handleMgmtDrop}
-              onDragEnd={handleMgmtDragEnd}
-            />
-          ))}
-
-          {/* Add management dept button */}
-          {canEdit && (
-            <div style={{ padding: "8px 16px" }}>
-              <button
-                onClick={handleAddManagementDept}
-                disabled={saving}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  width: "100%", padding: "8px 16px",
-                  background: "none", border: "1px dashed var(--color-border)", borderRadius: 8,
-                  cursor: saving ? "wait" : "pointer", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", fontWeight: 600,
-                  fontFamily: "inherit",
-                }}
-              >
-                {saving ? "Adding…" : `+ Add Management ${departmentLabel.replace(/s$/i, "")}`}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-      </div>
+      <DepartmentSection
+        title={`Management ${departmentLabel}`}
+        description="For people who use the app but don't appear on the schedule (e.g. HR, Reception, Finance)."
+        depts={managementDepts}
+        allDepartments={departments}
+        focusAreas={focusAreas}
+        orgId={orgId}
+        type="management"
+        canEdit={canEdit}
+        focusAreaLabel={focusAreaLabel}
+        departmentLabel={departmentLabel}
+        onDepartmentsChange={onDepartmentsChange}
+        onFocusAreasChange={onFocusAreasChange}
+      />
     </div>
   );
 }

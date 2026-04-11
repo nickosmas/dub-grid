@@ -7,9 +7,7 @@ import type { AdminPermissions } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // ── View / Edit implication pairs ───────────────────────────────────────────
-// Enabling an edit permission auto-enables its paired view permission.
-// Disabling a view permission auto-disables its paired edit permission.
-const VIEW_EDIT_PAIRS: { view: keyof AdminPermissions; edit: keyof AdminPermissions }[] = [
+export const VIEW_EDIT_PAIRS: { view: keyof AdminPermissions; edit: keyof AdminPermissions }[] = [
   { view: "canViewEmployeeDetails", edit: "canManageEmployees" },
   { view: "canViewRecurringShifts", edit: "canManageRecurringShifts" },
   { view: "canViewFocusAreas", edit: "canManageFocusAreas" },
@@ -19,73 +17,105 @@ const VIEW_EDIT_PAIRS: { view: keyof AdminPermissions; edit: keyof AdminPermissi
   { view: "canViewCoverageRequirements", edit: "canManageCoverageRequirements" },
 ];
 
-// ── Section 1: View Access ──────────────────────────────────────────────────
-interface ViewPermEntry {
-  key: keyof AdminPermissions;
-  label: string;
-  /** Which management permission, if any, implies this view permission? */
-  impliedBy?: keyof AdminPermissions;
+// ── Module config ────────────────────────────────────────────────────────────
+
+type Category = "CORE" | "ADMINISTRATION";
+
+export interface PermissionModule {
+  id: string;
+  title: string;
+  description: string;
+  icon: keyof typeof MODULE_ICONS;
+  category: Category;
+  viewKeys: (keyof AdminPermissions)[];
+  editKeys: (keyof AdminPermissions)[];
+  alwaysOnView?: boolean;
 }
 
-const VIEW_PERMISSIONS: ViewPermEntry[] = [
-  { key: "canViewEmployeeDetails", label: "Employee Details", impliedBy: "canManageEmployees" },
-  { key: "canViewRecurringShifts", label: "Recurring Shift Templates", impliedBy: "canManageRecurringShifts" },
-  { key: "canViewFocusAreas", label: "Focus Areas", impliedBy: "canManageFocusAreas" },
-  { key: "canViewShiftCodes", label: "Shift Codes", impliedBy: "canManageShiftCodes" },
-  { key: "canViewIndicatorTypes", label: "Indicator Types", impliedBy: "canManageIndicatorTypes" },
-  { key: "canViewOrgLabels", label: "Custom Labels", impliedBy: "canManageOrgLabels" },
-  { key: "canViewCoverageRequirements", label: "Coverage Requirements", impliedBy: "canManageCoverageRequirements" },
-  { key: "canViewDashboardAnalytics", label: "Dashboard Analytics" },
+const CATEGORY_LABELS: Record<Category, string> = {
+  CORE: "Core Operations",
+  ADMINISTRATION: "Administration",
+};
+
+const CATEGORY_ORDER: Category[] = ["CORE", "ADMINISTRATION"];
+
+export const PERMISSION_MODULES: PermissionModule[] = [
+  {
+    id: "schedule",
+    title: "Schedule",
+    description: "View and edit the organization-wide shift schedule.",
+    icon: "calendar",
+    category: "CORE",
+    viewKeys: [],
+    editKeys: ["canEditShifts", "canPublishSchedule", "canEditNotes"],
+    alwaysOnView: true,
+  },
+  {
+    id: "recurring-shifts",
+    title: "Recurring Shifts",
+    description: "Manage recurring shift templates, series, and apply to date ranges.",
+    icon: "repeat",
+    category: "CORE",
+    viewKeys: ["canViewRecurringShifts"],
+    editKeys: ["canManageRecurringShifts", "canApplyRecurringSchedule", "canManageShiftSeries"],
+  },
+  {
+    id: "staff",
+    title: "Staff",
+    description: "Access employee profiles, contact info, and certifications.",
+    icon: "users",
+    category: "CORE",
+    viewKeys: ["canViewEmployeeDetails"],
+    editKeys: ["canManageEmployees"],
+  },
+  {
+    id: "shift-requests",
+    title: "Shift Requests",
+    description: "Approve or deny shift pickup and swap requests.",
+    icon: "checkCircle",
+    category: "CORE",
+    viewKeys: [],
+    editKeys: ["canApproveShiftRequests"],
+  },
+  {
+    id: "coverage",
+    title: "Coverage",
+    description: "Set staffing minimums and coverage targets.",
+    icon: "barChart",
+    category: "ADMINISTRATION",
+    viewKeys: ["canViewCoverageRequirements"],
+    editKeys: ["canManageCoverageRequirements"],
+  },
+  {
+    id: "configuration",
+    title: "Configuration",
+    description: "Manage departments, shift codes, indicators, and labels.",
+    icon: "settings",
+    category: "ADMINISTRATION",
+    viewKeys: ["canViewFocusAreas", "canViewShiftCodes", "canViewIndicatorTypes", "canViewOrgLabels"],
+    editKeys: ["canManageFocusAreas", "canManageShiftCodes", "canManageIndicatorTypes", "canManageOrgLabels"],
+  },
+  {
+    id: "org-settings",
+    title: "Organization Settings",
+    description: "Edit organization name, address, and timezone.",
+    icon: "building",
+    category: "ADMINISTRATION",
+    viewKeys: [],
+    editKeys: ["canManageOrgSettings"],
+  },
+  {
+    id: "dashboard",
+    title: "Dashboard",
+    description: "View analytics and statistics.",
+    icon: "pieChart",
+    category: "ADMINISTRATION",
+    viewKeys: ["canViewDashboardAnalytics"],
+    editKeys: [],
+  },
 ];
 
-// ── Section 2: Management Permissions ───────────────────────────────────────
-interface ManagePermEntry {
-  key: keyof AdminPermissions;
-  label: string;
-  /** Which view permission this management action implies. */
-  implies?: keyof AdminPermissions;
-}
-
-const MANAGEMENT_GROUPS: { label: string; permissions: ManagePermEntry[] }[] = [
-  {
-    label: "Scheduling",
-    permissions: [
-      { key: "canEditShifts", label: "Edit Shifts" },
-      { key: "canPublishSchedule", label: "Publish Schedule" },
-      { key: "canApplyRecurringSchedule", label: "Apply Recurring Templates" },
-      { key: "canApproveShiftRequests", label: "Approve Shift Requests" },
-    ],
-  },
-  {
-    label: "Content",
-    permissions: [
-      { key: "canEditNotes", label: "Edit Notes / Indicators" },
-    ],
-  },
-  {
-    label: "Staff",
-    permissions: [
-      { key: "canManageEmployees", label: "Manage Employees", implies: "canViewEmployeeDetails" },
-    ],
-  },
-  {
-    label: "Shift Templates",
-    permissions: [
-      { key: "canManageRecurringShifts", label: "Manage Recurring Shifts", implies: "canViewRecurringShifts" },
-      { key: "canManageShiftSeries", label: "Manage Shift Series" },
-    ],
-  },
-  {
-    label: "Organization Config",
-    permissions: [
-      { key: "canManageFocusAreas", label: "Manage Focus Areas", implies: "canViewFocusAreas" },
-      { key: "canManageShiftCodes", label: "Manage Shift Codes", implies: "canViewShiftCodes" },
-      { key: "canManageIndicatorTypes", label: "Manage Indicator Types", implies: "canViewIndicatorTypes" },
-      { key: "canManageOrgLabels", label: "Manage Custom Labels", implies: "canViewOrgLabels" },
-      { key: "canManageCoverageRequirements", label: "Manage Coverage Requirements", implies: "canViewCoverageRequirements" },
-    ],
-  },
-];
+const ALWAYS_ON_KEYS = new Set<keyof AdminPermissions>(["canViewSchedule", "canViewStaff"]);
 
 const DEFAULT_PERMISSIONS: AdminPermissions = {
   canViewSchedule: true,
@@ -114,54 +144,130 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canViewDashboardAnalytics: false,
 };
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-const EyeIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-  </svg>
-);
-const PencilIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-    <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-  </svg>
-);
+// ── Icons ────────────────────────────────────────────────────────────────────
 
-// ── Section header style ──────────────────────────────────────────────────────
-const sectionHeaderStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: 700,
-  color: "var(--color-text-primary)",
-  marginBottom: 4,
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
+const iconProps = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+export const MODULE_ICONS = {
+  calendar: () => <svg {...iconProps}><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
+  repeat: () => <svg {...iconProps}><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>,
+  users: () => <svg {...iconProps}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+  checkCircle: () => <svg {...iconProps}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
+  barChart: () => <svg {...iconProps}><line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></svg>,
+  settings: () => <svg {...iconProps}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>,
+  building: () => <svg {...iconProps}><rect width="16" height="20" x="4" y="2" rx="2" /><path d="M9 22v-4h6v4" /><line x1="8" y1="6" x2="8" y2="6.01" /><line x1="12" y1="6" x2="12" y2="6.01" /><line x1="16" y1="6" x2="16" y2="6.01" /><line x1="8" y1="10" x2="8" y2="10.01" /><line x1="12" y1="10" x2="12" y2="10.01" /><line x1="16" y1="10" x2="16" y2="10.01" /><line x1="8" y1="14" x2="8" y2="14.01" /><line x1="12" y1="14" x2="12" y2="14.01" /><line x1="16" y1="14" x2="16" y2="14.01" /></svg>,
+  pieChart: () => <svg {...iconProps}><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>,
 };
 
-const sectionSubtitleStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-caption)",
-  color: "var(--color-text-muted)",
-  marginBottom: 12,
-  lineHeight: 1.4,
-};
+// ── Toggle Switch ────────────────────────────────────────────────────────────
 
-const groupLabelStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-footnote)",
-  fontWeight: 700,
-  color: "var(--color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  marginBottom: 6,
-  marginTop: 12,
-};
+function ToggleSwitch({ on, disabled, onChange }: { on: boolean; disabled?: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      className={`
+        relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent
+        transition-colors duration-200 ease-in-out
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-2
+        ${on ? "bg-[var(--color-brand)]" : "bg-[var(--color-border)]"}
+        ${disabled ? "opacity-40 cursor-default" : "cursor-pointer"}
+      `}
+    >
+      <span
+        className={`
+          pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0
+          transition-transform duration-200 ease-in-out
+          ${on ? "translate-x-5" : "translate-x-0"}
+        `}
+      />
+    </button>
+  );
+}
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Module Row ───────────────────────────────────────────────────────────────
+
+function ModuleRow({
+  mod,
+  perms,
+  lockedFalseSet,
+  onToggleView,
+  onToggleEdit,
+}: {
+  mod: PermissionModule;
+  perms: AdminPermissions;
+  lockedFalseSet: Set<keyof AdminPermissions>;
+  onToggleView: () => void;
+  onToggleEdit: () => void;
+}) {
+  const Icon = MODULE_ICONS[mod.icon];
+
+  const hasView = mod.viewKeys.length > 0 || mod.alwaysOnView;
+  const hasEdit = mod.editKeys.length > 0;
+
+  const allEditLocked = mod.editKeys.length > 0 && mod.editKeys.every((k) => lockedFalseSet.has(k));
+  const allViewLocked = mod.viewKeys.length > 0 && mod.viewKeys.every((k) => lockedFalseSet.has(k));
+  if (allEditLocked && (mod.viewKeys.length === 0 || allViewLocked) && !mod.alwaysOnView) return null;
+
+  const viewOn = mod.alwaysOnView || (mod.viewKeys.length > 0 && mod.viewKeys.every((k) => perms[k] === true));
+  const editOn = mod.editKeys.length > 0 && mod.editKeys.every((k) => perms[k] === true);
+
+  const viewDisabled = mod.alwaysOnView || allViewLocked;
+  const editDisabled = allEditLocked;
+
+  const viewImplied = mod.viewKeys.length > 0 && mod.viewKeys.every((vk) => {
+    const pair = VIEW_EDIT_PAIRS.find((p) => p.view === vk);
+    return pair ? perms[pair.edit] === true : false;
+  });
+
+  const isActive = viewOn || editOn;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-[var(--color-bg)] transition-colors items-center">
+      {/* Module info */}
+      <div className="col-span-1 md:col-span-8 flex items-start">
+        <div className={`p-2 rounded-lg mr-4 shrink-0 ${isActive ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)]" : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)]"}`}>
+          <Icon />
+        </div>
+        <div>
+          <h4 className="font-medium text-[14px] text-[var(--color-text-primary)]">{mod.title}</h4>
+          <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5 pr-4 leading-relaxed">{mod.description}</p>
+        </div>
+      </div>
+
+      {/* Toggles */}
+      <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--color-border-light)]">
+        <div className="flex flex-col items-center justify-center gap-1.5">
+          <span className="md:hidden text-[11px] font-medium text-[var(--color-text-subtle)] uppercase">View</span>
+          {hasView ? (
+            <ToggleSwitch on={viewOn} disabled={viewDisabled || viewImplied} onChange={onToggleView} />
+          ) : (
+            <span className="text-[13px] text-[var(--color-text-faint)]">—</span>
+          )}
+        </div>
+        <div className="flex flex-col items-center justify-center gap-1.5">
+          <span className="md:hidden text-[11px] font-medium text-[var(--color-text-subtle)] uppercase">Edit</span>
+          {hasEdit ? (
+            <ToggleSwitch on={editOn} disabled={editDisabled} onChange={onToggleEdit} />
+          ) : (
+            <span className="text-[13px] text-[var(--color-text-faint)]">—</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 interface PermissionsEditorProps {
   title: string;
   subtitle: React.ReactNode;
   initialPermissions: AdminPermissions | null | undefined;
   showPermissionCounter?: boolean;
-  /** Permission keys that should be forcibly locked to false and excluded from toggles. */
   lockedFalse?: (keyof AdminPermissions)[];
   onSave: (perms: AdminPermissions) => Promise<void>;
   onClose: () => void;
@@ -185,7 +291,6 @@ export default function PermissionsEditor({
       canViewSchedule: true,
       canViewStaff: true,
     };
-    // Force locked permissions to false
     for (const key of lockedFalseSet) {
       (initial as unknown as Record<string, boolean>)[key] = false;
     }
@@ -193,49 +298,49 @@ export default function PermissionsEditor({
   });
   const [saving, setSaving] = useState(false);
 
-  function toggle(key: keyof AdminPermissions) {
+  function toggleKeys(keys: (keyof AdminPermissions)[], direction: "view" | "edit") {
     setPerms((prev) => {
-      const next = { ...prev };
-      const newVal = !prev[key];
-      (next as unknown as Record<string, boolean>)[key] = newVal;
+      const next = { ...prev } as unknown as Record<string, boolean>;
+      const allOn = keys.every((k) => prev[k] === true);
+      const newVal = !allOn;
 
-      if (newVal) {
-        // Enabling an edit permission → auto-enable its implied view permission
-        const pair = VIEW_EDIT_PAIRS.find((p) => p.edit === key);
-        if (pair) (next as unknown as Record<string, boolean>)[pair.view] = true;
-      } else {
-        // Disabling a view permission → auto-disable its paired edit permission
-        const pair = VIEW_EDIT_PAIRS.find((p) => p.view === key);
-        if (pair) (next as unknown as Record<string, boolean>)[pair.edit] = false;
+      for (const key of keys) {
+        if (ALWAYS_ON_KEYS.has(key) || lockedFalseSet.has(key)) continue;
+        next[key] = newVal;
       }
 
-      return next;
+      if (direction === "edit" && newVal) {
+        for (const key of keys) {
+          const pair = VIEW_EDIT_PAIRS.find((p) => p.edit === key);
+          if (pair) next[pair.view] = true;
+        }
+      } else if (direction === "view" && !newVal) {
+        for (const key of keys) {
+          const pair = VIEW_EDIT_PAIRS.find((p) => p.view === key);
+          if (pair) next[pair.edit] = false;
+        }
+      }
+
+      return next as unknown as AdminPermissions;
     });
   }
 
-  // Collect all toggleable permission keys (for Select All / Clear All / counter)
-  const allKeys = [
-    ...VIEW_PERMISSIONS.map((p) => p.key),
-    ...MANAGEMENT_GROUPS.flatMap((g) => g.permissions.map((p) => p.key)),
-  ].filter((k) => !lockedFalseSet.has(k));
+  const allKeys = PERMISSION_MODULES.flatMap((m) => [...m.viewKeys, ...m.editKeys])
+    .filter((k) => !lockedFalseSet.has(k) && !ALWAYS_ON_KEYS.has(k));
 
   function selectAll() {
     setPerms((prev) => {
-      const next = { ...prev };
-      for (const key of allKeys) {
-        (next as unknown as Record<string, boolean>)[key] = true;
-      }
-      return next;
+      const next = { ...prev } as unknown as Record<string, boolean>;
+      for (const key of allKeys) next[key] = true;
+      return next as unknown as AdminPermissions;
     });
   }
 
   function clearAll() {
     setPerms((prev) => {
-      const next = { ...prev };
-      for (const key of allKeys) {
-        (next as unknown as Record<string, boolean>)[key] = false;
-      }
-      return next;
+      const next = { ...prev } as unknown as Record<string, boolean>;
+      for (const key of allKeys) next[key] = false;
+      return next as unknown as AdminPermissions;
     });
   }
 
@@ -253,114 +358,68 @@ export default function PermissionsEditor({
 
   const enabledCount = allKeys.filter((k) => perms[k] === true).length;
 
-  return (
-    <Modal title={title} onClose={onClose} style={{ maxWidth: 540 }}>
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        {/* ── Header ──────────────────────────────────────────────────── */}
-        <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", marginBottom: 12, flexShrink: 0, lineHeight: 1.5 }}>
-          {subtitle}
-          {showPermissionCounter && (
-            <>
-              <br />
-              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
-                {enabledCount} of {allKeys.length} permissions enabled
-              </span>
-            </>
-          )}
-        </div>
+  const groupedModules = CATEGORY_ORDER.map((cat) => ({
+    category: cat,
+    label: CATEGORY_LABELS[cat],
+    modules: PERMISSION_MODULES.filter((m) => m.category === cat),
+  })).filter((g) => g.modules.some((m) => {
+    const allEditLocked = m.editKeys.length > 0 && m.editKeys.every((k) => lockedFalseSet.has(k));
+    const allViewLocked = m.viewKeys.length > 0 && m.viewKeys.every((k) => lockedFalseSet.has(k));
+    if (allEditLocked && (m.viewKeys.length === 0 || allViewLocked) && !m.alwaysOnView) return false;
+    return true;
+  }));
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexShrink: 0 }}>
-          <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: "var(--dg-fs-caption)" }}>Select All</button>
-          <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: "var(--dg-fs-caption)" }}>Clear All</button>
+  return (
+    <Modal title={title} onClose={onClose} style={{ maxWidth: 680 }}>
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div className="px-6 py-4 border-b border-[var(--color-border-light)] bg-[var(--color-bg)] shrink-0">
+          <p className="text-[14px] text-[var(--color-text-muted)] leading-relaxed">{subtitle}</p>
+          {showPermissionCounter && (
+            <p className="text-[12px] text-[var(--color-text-faint)] mt-1">{enabledCount} of {allKeys.length} permissions enabled</p>
+          )}
+          <div className="flex gap-2 mt-3">
+            <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: 12 }}>Select All</button>
+            <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: 12 }}>Clear All</button>
+          </div>
         </div>
 
         {/* ── Scrollable content ──────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {/* Column headers — desktop only */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-[var(--color-border-light)] text-[11px] font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider">
+            <div className="col-span-8">Module & Access Level</div>
+            <div className="col-span-2 text-center">View</div>
+            <div className="col-span-2 text-center">Edit</div>
+          </div>
 
-          {/* ── Section 1: View Access ────────────────────────────────── */}
-          <div style={sectionHeaderStyle}>
-            <EyeIcon /> View Access
-          </div>
-          <div style={sectionSubtitleStyle}>
-            Schedule and Staff List are always visible. Enabling a management action below also grants its related view access.
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            {VIEW_PERMISSIONS.map((vp) => {
-              const checked = perms[vp.key] === true;
-              const isImplied = vp.impliedBy ? perms[vp.impliedBy] === true : false;
-              return (
-                <label
-                  key={vp.key}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "5px 0",
-                    cursor: isImplied ? "default" : "pointer",
-                    fontSize: "var(--dg-fs-label)",
-                    color: isImplied ? "var(--color-text-muted)" : "var(--color-text-primary)",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isImplied}
-                    onChange={() => toggle(vp.key)}
-                    style={{ width: 16, height: 16, cursor: isImplied ? "default" : "pointer" }}
+          {groupedModules.map((group) => (
+            <div key={group.category} className="pb-1">
+              {/* Category header */}
+              <div className="px-6 py-3 bg-[var(--color-bg)]">
+                <h3 className="text-[13px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">{group.label}</h3>
+              </div>
+
+              {/* Module rows */}
+              <div className="divide-y divide-[var(--color-border-light)]">
+                {group.modules.map((mod) => (
+                  <ModuleRow
+                    key={mod.id}
+                    mod={mod}
+                    perms={perms}
+                    lockedFalseSet={lockedFalseSet}
+                    onToggleView={() => toggleKeys(mod.viewKeys, "view")}
+                    onToggleEdit={() => toggleKeys(mod.editKeys, "edit")}
                   />
-                  {vp.label}
-                </label>
-              );
-            })}
-          </div>
-
-          {/* ── Divider ───────────────────────────────────────────────── */}
-          <div style={{ borderTop: "1px solid var(--color-border-light)", marginBottom: 16 }} />
-
-          {/* ── Section 2: Management Permissions ─────────────────────── */}
-          <div style={sectionHeaderStyle}>
-            <PencilIcon /> Management Permissions
-          </div>
-          <div style={sectionSubtitleStyle}>
-            What can members change?
-          </div>
-          {MANAGEMENT_GROUPS.map((group) => (
-            <div key={group.label}>
-              <div style={groupLabelStyle}>{group.label}</div>
-              {group.permissions.map((mp) => {
-                if (lockedFalseSet.has(mp.key)) return null;
-                const checked = perms[mp.key] === true;
-                return (
-                  <label
-                    key={mp.key}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "5px 0",
-                      cursor: "pointer",
-                      fontSize: "var(--dg-fs-label)",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggle(mp.key)}
-                      style={{ width: 16, height: 16, cursor: "pointer" }}
-                    />
-                    {mp.label}
-                  </label>
-                );
-              })}
+                ))}
+              </div>
             </div>
           ))}
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 20, flexShrink: 0, borderTop: "1px solid var(--color-border-light)" }}>
-          <button className="dg-btn dg-btn-secondary" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
+        <div className="flex gap-2 justify-end px-6 py-4 shrink-0 border-t border-[var(--color-border-light)]">
+          <button className="dg-btn dg-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
             <ButtonLoading loading={saving} spinnerSize={16}>Save Permissions</ButtonLoading>
           </button>
@@ -372,10 +431,8 @@ export default function PermissionsEditor({
 
 /** Count how many configurable permissions are enabled in an AdminPermissions object. */
 export function countEnabledPermissions(perms: AdminPermissions | null | undefined): { enabled: number; total: number } {
-  const allKeys = [
-    ...VIEW_PERMISSIONS.map((p) => p.key),
-    ...MANAGEMENT_GROUPS.flatMap((g) => g.permissions.map((p) => p.key)),
-  ];
+  const allKeys = PERMISSION_MODULES.flatMap((m) => [...m.viewKeys, ...m.editKeys])
+    .filter((k) => !ALWAYS_ON_KEYS.has(k));
   const total = allKeys.length;
   if (!perms) return { enabled: 0, total };
   const enabled = allKeys.filter((k) => perms[k] === true).length;

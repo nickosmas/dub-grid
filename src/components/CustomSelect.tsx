@@ -57,7 +57,7 @@ export default function CustomSelect<T extends string | number>({
       width: "max-content",
       maxWidth: "min(350px, 90vw)",
       maxHeight: maxH,
-      zIndex: 9999,
+      zIndex: 10100,
     });
   }, []);
 

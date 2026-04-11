@@ -50,7 +50,7 @@ export function resolveCodeLabels(ids: number[], codeMap: Map<number, string>): 
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
 export const ORGANIZATION_COLS = "id, name, slug, address, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides";
-export const FOCUS_AREA_COLS = "id, org_id, department_id, name, color_bg, color_text, sort_order, archived_at";
+export const FOCUS_AREA_COLS = "id, org_id, department_id, name, sort_order, archived_at";
 export const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
 export const SHIFT_CODE_COLS = "id, org_id, label, name, color, border_color, text_color, category_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
 export const SHIFT_CATEGORY_COLS = "id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes, archived_at";

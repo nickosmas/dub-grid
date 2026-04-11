@@ -99,18 +99,8 @@ export default function Indicators({
           action={canManageIndicatorTypes ? (
             <button
               onClick={handleAdd}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "8px 20px",
-                background: "none",
-                border: "1px dashed var(--color-border)",
-                borderRadius: 8,
-                cursor: "pointer",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                fontFamily: "inherit",
-              }}
+              className="dg-btn dg-btn-dashed dg-btn-sm"
+              style={{ width: "100%" }}
             >
               + Add Indicator
             </button>
@@ -169,13 +159,7 @@ export default function Indicators({
               <button
                 onClick={() => handleSave(indicator)}
                 disabled={isSavingThis || !indicator.name.trim()}
-                className="dg-btn dg-btn-primary"
-                style={{
-                  padding: "7px 14px",
-                  fontSize: "var(--dg-fs-caption)",
-                  opacity: indicator.name.trim() ? 1 : 0.5,
-                  cursor: indicator.name.trim() ? "pointer" : "not-allowed",
-                }}
+                className="dg-btn dg-btn-primary dg-btn-sm"
               >
                 {isSavingThis ? "…" : "Save"}
               </button>
@@ -184,11 +168,7 @@ export default function Indicators({
               <button
                 onClick={() => indicator.isNew ? handleDelete(indicator) : setConfirmDeleteId(indicator.id)}
                 disabled={isDeletingThis}
-                className="dg-btn dg-btn-danger"
-                style={{
-                  padding: "7px 12px",
-                  fontSize: "var(--dg-fs-caption)",
-                }}
+                className="dg-btn dg-btn-danger dg-btn-sm"
               >
                 {isDeletingThis ? "…" : "Delete"}
               </button>
@@ -199,23 +179,8 @@ export default function Indicators({
       {local.length > 0 && canManageIndicatorTypes && (
         <button
           onClick={handleAdd}
-          style={{
-            marginTop: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            width: "100%",
-            padding: "8px 16px",
-            background: "none",
-            border: "1px dashed var(--color-border)",
-            borderRadius: 8,
-            cursor: "pointer",
-            color: "var(--color-text-muted)",
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 600,
-            fontFamily: "inherit",
-          }}
+          className="dg-btn dg-btn-dashed dg-btn-sm"
+          style={{ width: "100%", marginTop: 8 }}
         >
           + Add Indicator
         </button>

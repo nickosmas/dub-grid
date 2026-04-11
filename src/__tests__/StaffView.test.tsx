@@ -77,8 +77,6 @@ const focusAreas: FocusArea[] = [
     id: 1,
     orgId: "org-1",
     name: "North",
-    colorBg: "#EFF6FF",
-    colorText: "#1D4ED8",
     sortOrder: 1,
     departmentId: null,
   },
@@ -161,10 +159,11 @@ describe("StaffView", () => {
       expect(onAdd).toHaveBeenCalledTimes(1);
     });
 
-    it("renders sort selector with Seniority as default", async () => {
+    it("renders sortable column headers", async () => {
       renderWithProviders(<StaffView {...defaultProps} />);
-      // Sort trigger shows current sort via aria-label
-      expect(screen.getByRole("button", { name: /Sort by Seniority/ })).toBeInTheDocument();
+      // The # column header is clickable for seniority sort; the Name column header is clickable for name sort
+      expect(screen.getByText("#")).toBeInTheDocument();
+      expect(screen.getByText("Name")).toBeInTheDocument();
     });
   });
 
@@ -264,14 +263,15 @@ describe("Property-based tests", () => {
         // Seniority sort is the default — no interaction needed
         const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
 
-        // Employee data rows: skip the header row (first child), get remaining row wrappers
-        const allRowWrappers = Array.from(tableContainer.children).slice(1);
+        // Table uses <table> with <tbody>; each row is a <tr>
+        const tbody = tableContainer.querySelector("tbody") as HTMLElement;
+        const rows = Array.from(tbody.querySelectorAll("tr"));
 
-        // Each wrapper's first child is the grid row div; its first child div is the seniority cell
-        const seniorityValues = allRowWrappers.map((wrapper) => {
-          const gridRow = wrapper.children[0] as HTMLElement;
-          const seniorityCell = gridRow.children[0] as HTMLElement;
-          return parseInt(seniorityCell.textContent ?? "0", 10);
+        // Each row's first <td> contains a seniority number in a <span>
+        const seniorityValues = rows.map((row) => {
+          const firstCell = row.querySelector("td") as HTMLElement;
+          const span = firstCell.querySelector("span") as HTMLElement;
+          return parseInt(span?.textContent ?? "0", 10);
         });
 
         // Assert non-decreasing order
@@ -318,26 +318,21 @@ describe("Property-based tests", () => {
             />,
           );
 
-          // Click "Name" sort option (mock renders all options always)
-          await userEvent.click(screen.getByRole("button", { name: "Name" }));
-
+          // Click the "Name" column header to sort by name
           const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
+          const nameHeader = tableContainer.querySelector("th:nth-child(2)") as HTMLElement;
+          await userEvent.click(nameHeader);
 
-          // Employee data rows: skip the header row (first child), get remaining row wrappers
-          const allRowWrappers = Array.from(tableContainer.children).slice(1);
+          // Table uses <table> with <tbody>; each row is a <tr>
+          const tbody = tableContainer.querySelector("tbody") as HTMLElement;
+          const rows = Array.from(tbody.querySelectorAll("tr"));
 
-          // Each wrapper's first child is the grid row div
-          // gridRow.children[1] = name+avatar cell
-          // nameCell.children[1] = inner div containing name div + optional contact
-          // innerDiv.children[0] = name div whose textContent starts with emp.name
-          // The name div may contain an FTE badge <span> — grab only the first text node (no trim)
-          const names = allRowWrappers.map((wrapper) => {
-            const gridRow = wrapper.children[0] as HTMLElement;
-            const nameCell = gridRow.children[1] as HTMLElement;
-            const innerDiv = nameCell.children[1] as HTMLElement;
-            const nameDiv = innerDiv.children[0] as HTMLElement;
-            // First text node is the raw name string (before any badge span)
-            return nameDiv.childNodes[0]?.textContent ?? "";
+          // Each row's second <td> contains the name cell
+          // Inside: <div> > <Avatar/> + <div> > <div> > <a>Name</a>
+          const names = rows.map((row) => {
+            const nameCell = row.querySelectorAll("td")[1] as HTMLElement;
+            const link = nameCell.querySelector("a") as HTMLElement;
+            return link?.textContent ?? "";
           });
 
           unmount();

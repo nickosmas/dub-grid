@@ -155,8 +155,6 @@ CREATE TABLE public.focus_areas (
   org_id         UUID NOT NULL,
   department_id  BIGINT,
   name           TEXT NOT NULL,
-  color_bg       TEXT NOT NULL DEFAULT '#F1F5F9',
-  color_text     TEXT NOT NULL DEFAULT '#475569',
   sort_order     INTEGER NOT NULL DEFAULT 0,
   archived_at    TIMESTAMPTZ,
   created_by     UUID,

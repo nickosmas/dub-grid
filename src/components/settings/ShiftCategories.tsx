@@ -168,24 +168,7 @@ function ShiftCategoriesSettings({
     }
   };
 
-  const addBtnStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    width: "100%",
-    padding: "8px 16px",
-    background: "none",
-    border: "1px dashed var(--color-border)",
-    borderRadius: 8,
-    color: "var(--color-text-muted)",
-    padding: "7px 14px",
-    fontSize: "var(--dg-fs-caption)",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-    transition: "border-color 0.15s, color 0.15s",
-  };
+  const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
   const renderCategoryRow = (cat: ShiftCategory & { isNew?: boolean }) => {
     const isEditing = editingId === cat.id;
@@ -211,7 +194,6 @@ function ShiftCategoriesSettings({
             gap: 12,
             padding: "10px 8px",
             borderRadius: 8,
-            borderBottom: "1px solid var(--color-border-light)",
             transition: "background 0.15s",
             cursor: canManageShiftCodes ? "pointer" : undefined,
           }}
@@ -242,18 +224,7 @@ function ShiftCategoriesSettings({
           {canManageShiftCodes && (
             <button
               onClick={(e) => { e.stopPropagation(); setEditingId(cat.id); }}
-              style={{
-                background: "none",
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                color: "var(--color-text-primary)",
-                padding: "6px 12px",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Edit
             </button>
@@ -361,34 +332,14 @@ function ShiftCategoriesSettings({
           <button
             onClick={() => handleSave(cat)}
             disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
-            style={{
-              background: cat.name.trim() && isDirty && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border)",
-              border: "none",
-              color: "var(--color-text-inverse)",
-              borderRadius: 8,
-              padding: "7px 14px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              cursor: cat.name.trim() && isDirty && canManageShiftCodes ? "pointer" : "not-allowed",
-              whiteSpace: "nowrap",
-            }}
+            className="dg-btn dg-btn-primary dg-btn-sm"
           >
             {isSavingThis ? "…" : "Save"}
           </button>
           <button
             onClick={() => handleCancel(cat)}
             disabled={isSavingThis}
-            style={{
-              background: "none",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              color: "var(--color-text-primary)",
-              padding: "7px 12px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
+            className="dg-btn dg-btn-secondary dg-btn-sm"
           >
             Cancel
           </button>
@@ -396,18 +347,8 @@ function ShiftCategoriesSettings({
             <button
               onClick={() => cat.isNew ? handleDelete(cat) : handleDeleteClick(cat.id)}
               disabled={isDeletingThis}
-              style={{
-                background: "none",
-                border: "1px solid var(--color-danger-border)",
-                borderRadius: 8,
-                color: "var(--color-danger)",
-                padding: "7px 12px",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                marginLeft: "auto",
-              }}
+              className="dg-btn dg-btn-danger dg-btn-sm"
+              style={{ marginLeft: "auto" }}
             >
               {isDeletingThis ? "…" : "Delete"}
             </button>
@@ -455,19 +396,25 @@ function ShiftCategoriesSettings({
                 color: "var(--color-text-secondary)",
               }}
             >
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg || "var(--color-border)", flexShrink: 0 }} />
               {focusArea.name}
             </div>
             {areaCats.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
-                {areaCats.map(renderCategoryRow)}
+                {areaCats.map((cat, i) => (
+                  <React.Fragment key={cat.id}>
+                    {renderCategoryRow(cat)}
+                    {i < areaCats.length - 1 && (
+                      <div style={{ height: 1, background: "var(--color-border-light)" }} />
+                    )}
+                  </React.Fragment>
+                ))}
               </div>
             ) : (
               <EmptyState
                 compact
                 title="No categories yet"
                 action={canManageShiftCodes ? (
-                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">
                     + Add Category
                   </button>
                 ) : undefined}
@@ -476,7 +423,7 @@ function ShiftCategoriesSettings({
             )}
             {areaCats.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                <button onClick={() => handleAdd(focusArea.id)} className={addBtnClass} style={{ width: "100%" }}>
                   + Add Category
                 </button>
               </div>

@@ -74,7 +74,6 @@ function slugify(name: string): string {
 interface FocusAreaRow {
   id: string;
   name: string;
-  colorBg: string;
 }
 
 interface NamedItemRow {
@@ -180,7 +179,7 @@ export default function OrganizationSetupWizard({
   // ── Step 3: Config ────────────────────────────────────────────────────────
   const [shiftDisplayMode, setShiftDisplayMode] = useState<"code" | "name">("code");
   const [departments, setDepartments] = useState<DeptRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" }]);
-  const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([{ id: crypto.randomUUID(), name: "", colorBg: COLOR_PRESETS[0] }]);
+  const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([{ id: crypto.randomUUID(), name: "" }]);
   const [certifications, setCertifications] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
   const [orgRoles, setOrgRoles] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
   const [shiftCategories, setShiftCategories] = useState<ShiftCatRow[]>([{ id: crypto.randomUUID(), name: "", color: COLOR_PRESETS[0], startTime: "", endTime: "" }]);
@@ -367,8 +366,6 @@ export default function OrganizationSetupWizard({
           orgId: createdOrg.id,
           departmentId: null,
           name: fa.name.trim(),
-          colorBg: fa.colorBg,
-          colorText: "#FFFFFF",
           sortOrder: i,
           version: 0,
         });
@@ -577,7 +574,7 @@ export default function OrganizationSetupWizard({
   // ── Row helpers ───────────────────────────────────────────────────────────
 
   function addFocusAreaRow() {
-    setFocusAreas((prev) => [...prev, { id: crypto.randomUUID(), name: "", colorBg: COLOR_PRESETS[prev.length % COLOR_PRESETS.length] }]);
+    setFocusAreas((prev) => [...prev, { id: crypto.randomUUID(), name: "" }]);
   }
 
   function updateFocusArea(idx: number, updates: Partial<FocusAreaRow>) {
@@ -1065,12 +1062,6 @@ export default function OrganizationSetupWizard({
             </p>
             {focusAreas.map((fa, idx) => (
               <div key={fa.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <input
-                  type="color"
-                  value={fa.colorBg}
-                  onChange={(e) => updateFocusArea(idx, { colorBg: e.target.value })}
-                  style={{ width: 36, height: 36, border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: 2 }}
-                />
                 <input
                   className="dg-input"
                   value={fa.name}

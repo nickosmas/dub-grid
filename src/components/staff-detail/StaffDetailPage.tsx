@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProgressBar from "@/components/ProgressBar";
 import { useOrganizationData, usePermissions } from "@/hooks";
@@ -12,6 +13,9 @@ import {
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
   fetchShiftRequests,
+  benchEmployee,
+  activateEmployee,
+  deleteEmployee,
 } from "@/lib/db";
 import {
   computeEmployeeWeeklyHours,
@@ -141,6 +145,46 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return () => { cancelled = true; };
   }, [employeeId, orgId, orgLoading, shiftCodeMap, absenceTypeMap, perms.isGridmaster]);
 
+  // ── Status action handlers ──────────────────────────────────────────────────
+  const handleBench = useCallback(async (empId: string, note?: string) => {
+    if (!orgId) return;
+    setEmployee((prev) => prev ? { ...prev, status: "benched" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() } : prev);
+    try {
+      await benchEmployee(empId, note, orgId);
+      toast.success("Employee benched");
+    } catch {
+      // Revert on failure
+      setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "" } : prev);
+      toast.error("Failed to bench employee");
+    }
+  }, [orgId]);
+
+  const handleActivate = useCallback(async (empId: string) => {
+    if (!orgId) return;
+    const prevStatus = employee?.status;
+    setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "", statusChangedAt: new Date().toISOString() } : prev);
+    try {
+      await activateEmployee(empId, orgId);
+      toast.success("Employee activated");
+    } catch {
+      setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "benched" } : prev);
+      toast.error("Failed to activate employee");
+    }
+  }, [orgId, employee?.status]);
+
+  const handleTerminate = useCallback(async (empId: string) => {
+    if (!orgId) return;
+    const prevStatus = employee?.status;
+    setEmployee((prev) => prev ? { ...prev, status: "terminated" as const, statusChangedAt: new Date().toISOString() } : prev);
+    try {
+      await deleteEmployee(empId, orgId);
+      toast.success("Employee terminated");
+    } catch {
+      setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "active" } : prev);
+      toast.error("Failed to terminate employee");
+    }
+  }, [orgId, employee?.status]);
+
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
     const weekStart = getWeekStart(new Date());
@@ -225,6 +269,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             canManageEmployees={perms.canManageEmployees}
             thisWeekHours={thisWeekHours}
             pendingInvite={pendingInvite}
+            onBench={perms.canManageEmployees ? handleBench : undefined}
+            onActivate={perms.canManageEmployees ? handleActivate : undefined}
+            onTerminate={perms.canManageEmployees ? handleTerminate : undefined}
           />
 
           <Tabs defaultValue="overview" className="w-full">

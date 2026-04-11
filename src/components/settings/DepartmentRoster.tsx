@@ -162,7 +162,7 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
       source === "employee"
         ? { label: "Employee", bg: "var(--color-success-bg)", color: "var(--color-success-text)" }
         : source === "user_only"
-          ? { label: "App Only", bg: "var(--color-bg-secondary)", color: "var(--color-text-muted)" }
+          ? { label: "Management Staff", bg: "var(--color-bg-secondary)", color: "var(--color-text-muted)" }
           : { label: "Invited", bg: "var(--color-warning-bg)", color: "var(--color-warning-text)" };
     return (
       <span
@@ -307,8 +307,8 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
                   {p.firstName} {p.lastName}
                 </span>
                 {roleBadge(p)}
-                {/* Per-admin configure — only for members with app access */}
-                {isAdmin && hasAppAccess && canEdit && (
+                {/* Configure permissions — any member with app access */}
+                {hasAppAccess && canEdit && (
                   <button
                     className="dg-btn dg-btn-ghost"
                     onClick={() => openPermsEditor(p)}
@@ -317,7 +317,7 @@ export default function DepartmentRoster({ department, orgId, canEdit }: Departm
                     Configure
                   </button>
                 )}
-                {isAdmin && !hasAppAccess && (
+                {!hasAppAccess && (
                   <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)", fontStyle: "italic", flexShrink: 0 }}>
                     No account
                   </span>

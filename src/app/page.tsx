@@ -291,7 +291,7 @@ export default function RootPage() {
 
       {/* ── Mobile Menu Overlay ── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-[var(--color-surface)]/95 backdrop-blur-xl flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-[var(--color-surface)]/95 flex flex-col">
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
               <DubGridLogo size={28} color="var(--color-brand)" />

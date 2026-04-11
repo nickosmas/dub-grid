@@ -381,8 +381,6 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
     org_id: focusArea.orgId,
     department_id: focusArea.departmentId ?? null,
     name: focusArea.name,
-    color_bg: focusArea.colorBg,
-    color_text: focusArea.colorText,
     sort_order: focusArea.sortOrder,
   };
   if (focusArea.id) {

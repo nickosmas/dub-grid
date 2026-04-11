@@ -75,16 +75,14 @@ BEGIN
 
   -- ── Focus Areas ─────────────────────────────────────────────────────────────
 
-  INSERT INTO public.focus_areas (org_id, department_id, name, color_bg, color_text, sort_order)
+  INSERT INTO public.focus_areas (org_id, department_id, name, sort_order)
   VALUES
-    (org, dept_nursing, 'Skilled Nursing', '#FED7AA', '#9A3412', 0),
-    (org, dept_nursing, 'Sheltered Care',       '#E9D5FF', '#6B21A8', 1),
-    (org, dept_nursing, 'Night Shift',          '#FECDD3', '#9F1239', 2),
-    (org, dept_visiting, 'Visiting CSNS',       '#FDE68A', '#92400E', 3)
+    (org, dept_nursing, 'Skilled Nursing', 0),
+    (org, dept_nursing, 'Sheltered Care',  1),
+    (org, dept_nursing, 'Night Shift',     2),
+    (org, dept_visiting, 'Visiting CSNS',  3)
   ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO UPDATE
     SET department_id = EXCLUDED.department_id,
-        color_bg   = EXCLUDED.color_bg,
-        color_text = EXCLUDED.color_text,
         sort_order = EXCLUDED.sort_order;
 
   SELECT id INTO fa_snw  FROM public.focus_areas WHERE org_id = org AND name = 'Skilled Nursing';

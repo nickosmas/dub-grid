@@ -249,12 +249,12 @@ export default function SettingsPage({
         <div data-tour="settings-content" style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
         {activeItem && (
-          <div style={{ width: "100%", maxWidth, marginBottom: 20 }}>
+          <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
               {activeItem.label}
             </h1>
             {activeItem.description && (
-              <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+              <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: "5px 0 0", lineHeight: 1.5 }}>
                 {activeItem.description}
               </p>
             )}

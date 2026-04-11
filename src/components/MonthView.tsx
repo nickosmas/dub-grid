@@ -51,6 +51,8 @@ function buildMonthCells(monthStart: Date): (Date | null)[] {
   return cells;
 }
 
+const NEUTRAL_FA_STYLE = { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" } as const;
+
 function shortName(name: string): string {
   const parts = name.trim().split(" ");
   return parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
@@ -60,13 +62,11 @@ function shortName(name: string): string {
 function DayPopover({
   anchorEl,
   data,
-  focusAreaColorMap,
   onClose,
   isNameMode = false,
 }: {
   anchorEl: HTMLElement;
   data: DayCellData;
-  focusAreaColorMap: Record<string, { bg: string; text: string }>;
   onClose: () => void;
   isNameMode?: boolean;
 }) {
@@ -159,7 +159,7 @@ function DayPopover({
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {focusAreaSections.map((focusArea) => {
               const workers = byFocusArea.get(focusArea)!;
-              const wc = focusAreaColorMap[focusArea] ?? { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" };
+              const wc = NEUTRAL_FA_STYLE;
               return (
                 <div key={focusArea}>
                   <div style={{
@@ -235,12 +235,6 @@ export default function MonthView({
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
   const focusAreaNames = focusAreas.map((w) => w.name);
-
-  const focusAreaColorMap = useMemo(() => {
-    const map: Record<string, { bg: string; text: string }> = {};
-    for (const w of focusAreas) map[w.name] = { bg: w.colorBg, text: w.colorText };
-    return map;
-  }, [focusAreas]);
 
   // Look up shift codes by ID so cross-focus-area shifts render in their own color
   const shiftCodeById = useMemo(() => {
@@ -471,7 +465,7 @@ export default function MonthView({
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {focusAreaSections.map((focusArea) => {
                     const workers = byFocusArea.get(focusArea)!;
-                    const wc = focusAreaColorMap[focusArea] ?? { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" };
+                    const wc = NEUTRAL_FA_STYLE;
                     return (
                       <div
                         key={focusArea}
@@ -523,7 +517,6 @@ export default function MonthView({
         <DayPopover
           anchorEl={popoverAnchorRef.current}
           data={popoverData}
-          focusAreaColorMap={focusAreaColorMap}
           onClose={closePopover}
           isNameMode={isNameMode}
         />

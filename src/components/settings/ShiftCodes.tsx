@@ -483,7 +483,8 @@ function ShiftCodeRow({
                   <button
                     type="button"
                     onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
-                    style={{ marginTop: 6, background: "var(--color-surface)", border: "1px solid var(--color-brand)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    style={{ marginTop: 6 }}
                     disabled={!canManageShiftCodes}
                   >
                     Set actual times instead
@@ -527,7 +528,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-secondary)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Revert to category default
                       </button>
@@ -536,7 +537,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-secondary)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Remove custom time
                       </button>
@@ -545,7 +546,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-brand)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", padding: "5px 12px", fontFamily: "inherit" }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Use duration instead
                       </button>
@@ -997,15 +998,15 @@ function AbsenceTypeRow({
             </p>
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} style={{ background: canSave && canEdit ? "var(--color-brand)" : "var(--color-border)", border: "none", color: "var(--color-text-inverse)", borderRadius: 8, padding: "8px 18px", fontSize: "var(--dg-fs-label)", fontWeight: 700, cursor: canSave && canEdit ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
+            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary">
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} style={{ background: "none", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-primary)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} className="dg-btn dg-btn-secondary">
               Cancel
             </button>
             <div style={{ flex: 1 }} />
             {canEdit && !at.isNew && (
-              <button onClick={handleDeleteClick} disabled={deleting} style={{ background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={handleDeleteClick} disabled={deleting} className="dg-btn dg-btn-danger">
                 {deleting ? "…" : "Delete"}
               </button>
             )}
@@ -1114,7 +1115,7 @@ function AbsenceTypesSettings({
           compact
           title="No off day types yet"
           action={canManageShiftCodes ? (
-            <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+            <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
               + Add Off Day Type
             </button>
           ) : undefined}
@@ -1123,7 +1124,7 @@ function AbsenceTypesSettings({
       )}
       {local.length > 0 && canManageShiftCodes && (
         <div style={{ padding: "8px 16px 12px" }}>
-          <button onClick={handleAdd} style={{ background: "none", border: "1px dashed var(--color-border)", borderRadius: 8, color: "var(--color-text-muted)", padding: "7px 14px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.15s, color 0.15s" }}>
+          <button onClick={handleAdd} className="dg-btn dg-btn-dashed dg-btn-sm" style={{ width: "100%" }}>
             + Add Off Day Type
           </button>
         </div>
@@ -1208,24 +1209,7 @@ function ShiftCodesSettings({
     onChange(updated);
   };
 
-  const addBtnStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    width: "100%",
-    padding: "8px 16px",
-    background: "none",
-    border: "1px dashed var(--color-border)",
-    borderRadius: 8,
-    color: "var(--color-text-muted)",
-    padding: "7px 14px",
-    fontSize: "var(--dg-fs-caption)",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-    transition: "border-color 0.15s, color 0.15s",
-  };
+  const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
   const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], hideAreaSelect = false) =>
     codes.map((st) => (
@@ -1261,7 +1245,6 @@ function ShiftCodesSettings({
         return (
           <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
               {focusArea.name}
             </div>
             {areaCodes.length > 0 ? (
@@ -1273,7 +1256,7 @@ function ShiftCodesSettings({
                 compact
                 title="No shift codes yet"
                 action={canManageShiftCodes ? (
-                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">
                     + Add Shift Code
                   </button>
                 ) : undefined}
@@ -1282,7 +1265,7 @@ function ShiftCodesSettings({
             )}
             {areaCodes.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                <button onClick={() => handleAdd(focusArea.id)} className={addBtnClass} style={{ width: "100%" }}>
                   + Add Shift Code
                 </button>
               </div>
@@ -1314,7 +1297,7 @@ function ShiftCodesSettings({
               }}>
                 <span>No general codes yet</span>
                 {canManageShiftCodes && (
-                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary dg-btn-sm">
                     + Add General Code
                   </button>
                 )}
@@ -1322,7 +1305,7 @@ function ShiftCodesSettings({
             )}
             {generalCodes.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(null)} style={addBtnStyle}>
+                <button onClick={() => handleAdd(null)} className={addBtnClass} style={{ width: "100%" }}>
                   + Add General Code
                 </button>
               </div>

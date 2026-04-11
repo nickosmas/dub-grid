@@ -237,18 +237,7 @@ export default function StringListSettings({
     transition: "border-color 150ms ease, box-shadow 150ms ease",
   };
 
-  const addBtnStyle: React.CSSProperties = {
-    background: "none",
-    border: "1px dashed var(--color-border)",
-    borderRadius: 8,
-    color: "var(--color-text-muted)",
-    padding: "7px 14px",
-    fontSize: "var(--dg-fs-caption)",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-    transition: "border-color 0.15s, color 0.15s",
-  };
+  const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
   const deptCol = showDept ? (isMobile ? " minmax(100px, 1fr)" : " minmax(140px, 1fr)") : "";
   const gridCols = hideAbbr
@@ -264,24 +253,19 @@ export default function StringListSettings({
       {!isEditing && canEdit && displayList.length > 0 && (
         <button
           onClick={handleEnterEdit}
-          className="dg-btn dg-btn-secondary"
-          style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
+          className="dg-btn dg-btn-secondary dg-btn-sm"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
           Edit
         </button>
       )}
       {isEditing && (
         <>
           {isDirty && (
-            <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary" style={{ padding: "7px 14px" }}>
+            <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary dg-btn-sm">
               {saving ? "Saving\u2026" : "Save All"}
             </button>
           )}
-          <button onClick={handleCancel} className="dg-btn dg-btn-secondary" style={{ padding: "7px 14px" }}>
+          <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">
             Cancel
           </button>
         </>
@@ -301,7 +285,7 @@ export default function StringListSettings({
           compact
           title={`No ${label.toLowerCase()} defined yet`}
           action={canEdit ? (
-            <button onClick={handleEnterEdit} style={addBtnStyle}>
+            <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
               + Add {label.replace(/s$/, "")}
             </button>
           ) : undefined}
@@ -351,7 +335,7 @@ export default function StringListSettings({
                   padding: isEditing ? "10px 16px" : "11px 16px",
                   gap: 16,
                   borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
-                  borderBottom: "1px solid var(--color-border-light)",
+                  borderBottom: i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
                   alignItems: "center",
                   cursor: isEditing ? "grab" : "default",
                   transition: "background 150ms ease, opacity 150ms ease",
@@ -437,13 +421,13 @@ export default function StringListSettings({
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
-                          padding: "1px 8px",
+                          padding: "2px 8px",
                           borderRadius: 20,
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
-                          background: "var(--color-bg-secondary)",
-                          border: "1px solid var(--color-border-light)",
-                          color: "var(--color-text-secondary)",
+                          background: "var(--color-brand-bg, rgba(0,95,2,0.08))",
+                          border: "1px solid var(--color-brand-border, rgba(0,95,2,0.2))",
+                          color: "var(--color-brand)",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -483,7 +467,7 @@ export default function StringListSettings({
           {/* Dashed add button — only in edit mode */}
           {isEditing && (
             <div style={{ padding: "8px 16px 12px" }}>
-              <button onClick={addRow} style={addBtnStyle}>
+              <button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {placeholder.toLowerCase()}
               </button>
             </div>
@@ -538,8 +522,10 @@ export default function StringListSettings({
   if (sectionTitle) {
     return (
       <SectionCard noPadding>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, padding: "12px 16px" }}>
-          {actionButtons}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {actionButtons}
+          </div>
         </div>
         {content}
       </SectionCard>

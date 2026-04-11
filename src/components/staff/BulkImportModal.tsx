@@ -197,7 +197,9 @@ export function BulkImportModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0,0,0,0.5)",
+        background: "var(--dg-overlay)",
+        backdropFilter: "blur(var(--dg-overlay-blur))",
+        WebkitBackdropFilter: "blur(var(--dg-overlay-blur))",
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >

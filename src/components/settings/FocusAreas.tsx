@@ -7,7 +7,7 @@ import type { DependencyInfo } from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { PresetColorPicker, labelStyle } from "./shared";
+import { labelStyle } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 
 // ── Focus Area row ────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ function FocusAreaRow({
   focusArea: FocusArea & { isNew?: boolean };
   orgId: string;
   onDeleted: (id: number) => void;
-  onFormChange: (id: number, patch: { name: string; colorBg: string; colorText: string }) => void;
+  onFormChange: (id: number, patch: { name: string }) => void;
   isDragging: boolean;
   isDropTarget: boolean;
   isReordering: boolean;
@@ -38,8 +38,6 @@ function FocusAreaRow({
 }) {
   const [form, setForm] = useState({
     name: focusArea.name,
-    colorBg: focusArea.colorBg,
-    colorText: focusArea.colorText,
   });
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -102,7 +100,6 @@ function FocusAreaRow({
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
           {focusArea.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
         </span>
       </div>
@@ -156,7 +153,6 @@ function FocusAreaRow({
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: form.colorBg, flexShrink: 0 }} />
           {form.name || "Preview"}
         </span>
 
@@ -168,16 +164,7 @@ function FocusAreaRow({
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); handleDeleteClick(); }}
             disabled={deleting}
-            style={{
-              background: "none",
-              border: "1px solid var(--color-danger-border)",
-              borderRadius: 8,
-              color: "var(--color-danger)",
-              padding: "5px 10px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            className="dg-btn dg-btn-danger dg-btn-sm"
           >
             {deleting ? "…" : "Delete"}
           </button>
@@ -197,15 +184,6 @@ function FocusAreaRow({
           maxLength={50}
           className="dg-input"
           style={{ flex: 1 }}
-        />
-      </div>
-
-      {/* Color */}
-      <div style={{ paddingLeft: 24 }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-        <label style={labelStyle}>COLOR</label>
-        <PresetColorPicker
-          valueBg={form.colorBg}
-          onChange={(c) => setForm((p) => ({ ...p, colorBg: c.bg, colorText: c.text }))}
         />
       </div>
 
@@ -265,7 +243,7 @@ export default function FocusAreas({
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const nextTmpId = useRef(-1);
   const [saving, setSaving] = useState(false);
-  const formEditsRef = useRef<Map<number, { name: string; colorBg: string; colorText: string }>>(new Map());
+  const formEditsRef = useRef<Map<number, { name: string }>>(new Map());
   const [formEditCount, setFormEditCount] = useState(0);
 
   const isDirty = useMemo(() => {
@@ -273,13 +251,13 @@ export default function FocusAreas({
     if (formEditCount > 0) {
       for (const [id, patch] of formEditsRef.current) {
         const orig = focusAreas.find((fa) => fa.id === id);
-        if (orig && (patch.name !== orig.name || patch.colorBg !== orig.colorBg || patch.colorText !== orig.colorText)) return true;
+        if (orig && patch.name !== orig.name) return true;
       }
     }
     return localFocusAreas.some((fa, i) => {
       const orig = focusAreas[i];
       if (!orig) return true;
-      return fa.id !== orig.id || fa.name !== orig.name || fa.colorBg !== orig.colorBg;
+      return fa.id !== orig.id || fa.name !== orig.name;
     });
   }, [localFocusAreas, focusAreas, formEditCount]);
 
@@ -291,7 +269,7 @@ export default function FocusAreas({
     return list;
   }, [isEditing, localFocusAreas, focusAreas, draggedIdx, dragOverIdx]);
 
-  const handleFormChange = useCallback((id: number, patch: { name: string; colorBg: string; colorText: string }) => {
+  const handleFormChange = useCallback((id: number, patch: { name: string }) => {
     formEditsRef.current.set(id, patch);
     setFormEditCount((c) => c + 1);
   }, []);
@@ -318,8 +296,6 @@ export default function FocusAreas({
       orgId,
       departmentId: null,
       name: "",
-      colorBg: "#E0E7FF",
-      colorText: "#3730A3",
       sortOrder: localFocusAreas.length,
       version: 0,
       isNew: true,
@@ -344,8 +320,6 @@ export default function FocusAreas({
         return {
           ...fa,
           name: edits?.name ?? fa.name,
-          colorBg: edits?.colorBg ?? fa.colorBg,
-          colorText: edits?.colorText ?? fa.colorText,
           sortOrder: i,
         };
       });
@@ -358,8 +332,6 @@ export default function FocusAreas({
           orgId,
           departmentId: item.departmentId ?? null,
           name: item.name.trim(),
-          colorBg: item.colorBg,
-          colorText: item.colorText,
           sortOrder: item.sortOrder,
           version: 0,
         });
@@ -415,19 +387,13 @@ export default function FocusAreas({
           <>
             <button
               onClick={handleEnterEdit}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)", display: "flex", alignItems: "center", gap: 5 }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
               Edit
             </button>
             <button
               onClick={handleAdd}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)" }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               + Add
             </button>
@@ -439,19 +405,17 @@ export default function FocusAreas({
               <button
                 onClick={handleSaveAll}
                 disabled={saving}
-                className="dg-btn dg-btn-primary"
-                style={{ padding: "7px 14px" }}
+                className="dg-btn dg-btn-primary dg-btn-sm"
               >
                 {saving ? "Saving…" : "Save All"}
               </button>
             )}
-            <button onClick={handleCancel} className="dg-btn dg-btn-secondary" style={{ padding: "7px 14px" }}>
+            <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">
               Cancel
             </button>
             <button
               onClick={handleAdd}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 12px", fontSize: "var(--dg-fs-caption)" }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               + Add
             </button>
@@ -465,7 +429,7 @@ export default function FocusAreas({
           compact
           title={`No ${label.toLowerCase()} defined yet`}
           action={canManageFocusAreas ? (
-            <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}>
+            <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
               + Add {label.replace(/s$/, "")}
             </button>
           ) : undefined}

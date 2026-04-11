@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import React from "react";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
@@ -102,7 +103,7 @@ export default function Modal({ title, onClose, children, style, "aria-described
     [handleClose]
   );
 
-  return (
+  return createPortal(
     <div
       className={`dg-modal-overlay${closing ? " closing" : ""}`}
       onClick={handleClose}
@@ -135,6 +136,7 @@ export default function Modal({ title, onClose, children, style, "aria-described
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

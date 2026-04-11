@@ -134,17 +134,7 @@ export default function OrganizationLabels({
         <button
           onClick={handleSave}
           disabled={!isModified || saving}
-          style={{
-            background: isModified ? "var(--color-brand)" : "var(--color-border-light)",
-            border: "none",
-            color: isModified ? "var(--color-text-inverse)" : "var(--color-text-muted)",
-            borderRadius: 8,
-            padding: "9px 20px",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 700,
-            cursor: isModified ? "pointer" : "not-allowed",
-            opacity: isModified ? 1 : 0.6,
-          }}
+          className="dg-btn dg-btn-primary"
         >
           {saving ? "Saving…" : "Save"}
         </button>

@@ -341,8 +341,8 @@ export default function MobileDayView({
                             text: sc.text || borderColor(sc.color),
                             border: sc.border || borderColor(sc.color),
                             foreignInitials,
-                            foreignBg: homeFa?.colorBg ?? null,
-                            foreignText: homeFa?.colorText ?? null,
+                            foreignBg: null,
+                            foreignText: null,
                           };
                         });
 

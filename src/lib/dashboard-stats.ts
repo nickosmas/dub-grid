@@ -43,7 +43,6 @@ export interface WeeklyStats {
 export interface SectionCoverage {
   focusAreaId: number;
   focusAreaName: string;
-  colorBg: string;
   filledTotal: number;
   requiredTotal: number;
   pct: number;
@@ -77,7 +76,6 @@ export interface ShiftCodeCount {
 export interface FocusAreaBreakdown {
   focusAreaId: number;
   focusAreaName: string;
-  colorBg: string;
   total: number;
   codes: ShiftCodeCount[];
 }
@@ -561,7 +559,6 @@ export function computeCoverageBySection(
     return {
       focusAreaId: fa.id,
       focusAreaName: fa.name,
-      colorBg: fa.colorBg,
       filledTotal: totalFilled,
       requiredTotal: totalRequired,
       pct,
@@ -725,7 +722,6 @@ export function computeShiftBreakdown(
       return {
         focusAreaId: faId,
         focusAreaName: fa?.name ?? "Unassigned",
-        colorBg: fa?.colorBg ?? "#CED4DA",
         total: codes.reduce((s, c) => s + c.count, 0),
         codes,
       };

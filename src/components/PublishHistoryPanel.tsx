@@ -298,6 +298,8 @@ export default function PublishHistoryPanel({
   const panelWidth = isMobile ? "100vw" : 440;
 
   return (
+    <>
+    <div className="dg-panel-overlay" onClick={onClose} />
     <div
       style={{
         position: "fixed",
@@ -307,7 +309,7 @@ export default function PublishHistoryPanel({
         height: "100vh",
         background: "var(--color-surface)",
         boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
-        zIndex: 100,
+        zIndex: 10001,
         display: "flex",
         flexDirection: "column",
         animation: "slideInRight 0.2s ease-out",
@@ -437,5 +439,6 @@ export default function PublishHistoryPanel({
         )}
       </div>
     </div>
+    </>
   );
 }

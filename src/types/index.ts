@@ -78,8 +78,6 @@ export interface FocusArea {
   /** Parent scheduled department. Null if not yet assigned. */
   departmentId: number | null;
   name: string;
-  colorBg: string;
-  colorText: string;
   sortOrder: number;
   /** Non-null when the focus area has been archived (soft-deleted). */
   archivedAt?: string | null;
@@ -493,7 +491,7 @@ export interface OrganizationUser {
   deptAdminIds: number[];
 }
 
-/** A unified person record for the People Directory (union of employees + app-only users + pending invites). */
+/** A unified person record for the People Directory (union of employees + management staff + pending invites). */
 export interface DirectoryPerson {
   personId: string;
   source: 'employee' | 'user_only' | 'pending_invite';
@@ -649,7 +647,6 @@ export interface FocusAreaDistributionEntry {
   name: string;
   shiftCount: number;
   percentage: number;
-  colorBg: string;
 }
 
 // ── Gridmaster Portal Types ──────────────────────────────────────────────────

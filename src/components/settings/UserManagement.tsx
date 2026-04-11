@@ -18,6 +18,7 @@ import { queueNotification } from "@/lib/notify";
 import { useAuth } from "@/components/AuthProvider";
 import CustomSelect from "@/components/CustomSelect";
 import { ROLE_BADGE_COLORS } from "@/lib/styles";
+import { PERMISSION_MODULES, VIEW_EDIT_PAIRS, MODULE_ICONS } from "@/components/PermissionsEditor";
 import {
   Table,
   TableHeader,
@@ -242,6 +243,16 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
       toast.success("Role updated");
       queueNotification({ action: "role_changed", orgId, targetUserId: userId, fromRole: oldRole, toRole: newRole });
+      // Auto-expand permissions panel when promoting to admin
+      if (newRole === "admin") {
+        setExpandedUserId(userId);
+        setEditingPerms((prev) => ({
+          ...prev,
+          [userId]: { ...emptyAdminPerms(), ...(target?.adminPermissions ?? {}) },
+        }));
+      } else if (expandedUserId === userId) {
+        setExpandedUserId(null);
+      }
     } catch (e) {
       toast.error("Failed to change role");
       setError(e instanceof Error ? e.message : "Failed to change role");
@@ -399,7 +410,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Error banner */}
       {error && (
         <div className="rounded-lg border px-4 py-3 text-[13px]" style={{ background: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
@@ -409,11 +420,9 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
 
       {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">Users & Access</h2>
-        <p className="text-[13px] text-[var(--color-text-muted)] mt-1">Manage staff accounts, roles, and access requests</p>
+        <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Users & Access</h2>
+        <p className="text-[14px] text-[var(--color-text-muted)] mt-1">Manage staff accounts, roles, and permissions.</p>
       </div>
-
-      <Separator />
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -526,7 +535,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
               <TableHeader>
                 <TableRow className="hover:bg-transparent bg-[var(--color-bg)]">
                   <TableHead
-                    className="pl-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold cursor-pointer select-none"
+                    className="pl-6 text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold cursor-pointer select-none"
                     onClick={() => handleSort("name")}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -534,7 +543,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                     </span>
                   </TableHead>
                   <TableHead
-                    className="text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold cursor-pointer select-none"
+                    className="text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold cursor-pointer select-none"
                     onClick={() => handleSort("role")}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -542,14 +551,14 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                     </span>
                   </TableHead>
                   <TableHead
-                    className="hidden md:table-cell text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold cursor-pointer select-none"
+                    className="hidden md:table-cell text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold cursor-pointer select-none"
                     onClick={() => handleSort("lastLogin")}
                   >
                     <span className="inline-flex items-center gap-1">
                       Last Login <SortIcon active={sortConfig.key === "lastLogin"} dir={sortConfig.dir} />
                     </span>
                   </TableHead>
-                  <TableHead className="text-right pr-4 text-[11px] tracking-wide uppercase text-[var(--color-text-subtle)] font-bold">Actions</TableHead>
+                  <TableHead className="text-right pr-6 text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -589,9 +598,12 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
 
                   return (
                     <React.Fragment key={user.id}>
-                      <TableRow className={`transition-colors ${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"}`}>
+                      <TableRow
+                        className={`transition-colors ${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${user.orgRole === "admin" && isSuperAdmin ? "cursor-pointer" : ""}`}
+                        onClick={() => { if (user.orgRole === "admin" && isSuperAdmin) openPermissions(user); }}
+                      >
                         {/* User */}
-                        <TableCell className="pl-4 py-3">
+                        <TableCell className="pl-6 py-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <Avatar>
                               <AvatarFallback className="text-[11px] font-bold text-white" style={{ background: avatarColor }}>
@@ -599,17 +611,13 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                               </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--color-text-primary)] truncate">
+                              <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--color-text-primary)] truncate">
                                 {displayName}
                                 {isYou && (
                                   <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-brand-bg)] text-[var(--color-brand)] shrink-0">You</span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-[var(--color-text-muted)] truncate flex items-center gap-1 mt-0.5">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-faint)]">
-                                  <rect width="20" height="16" x="2" y="4" rx="2" />
-                                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                                </svg>
+                              <div className="text-[12px] text-[var(--color-text-muted)] truncate mt-0.5">
                                 {user.email ?? "—"}
                               </div>
                             </div>
@@ -617,7 +625,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                         </TableCell>
 
                         {/* Role */}
-                        <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                        <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
                           {canEditRole ? (
                             <div className="flex items-center gap-2">
                               <CustomSelect
@@ -630,130 +638,157 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                                 onChange={(v) => requestRoleChange(user, v as OrganizationRole)}
                                 disabled={saving === user.id}
                                 style={{ width: 140 }}
-                                fontSize={11}
+                                fontSize={12}
                               />
                               {saving === user.id && (
-                                <span className="text-[11px] text-[var(--color-text-muted)] animate-pulse">Saving...</span>
+                                <span className="text-[12px] text-[var(--color-text-muted)] animate-pulse">Saving...</span>
                               )}
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <RoleBadge role={user.orgRole} icon={isSuperAdminUser} />
-                              {user.orgRole === "user" && user.departmentIds.length > 0 && (
-                                <span className="text-[10px] text-[var(--color-text-faint)] italic">
-                                  via {user.departmentIds.map((id) => deptNameById.get(id)).filter(Boolean).join(", ") || "dept"}
-                                </span>
-                              )}
                             </div>
                           )}
                         </TableCell>
 
                         {/* Last Login */}
-                        <TableCell className="hidden md:table-cell py-3">
-                          <div className="flex items-center gap-1.5 text-[12px] text-[var(--color-text-muted)]">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-faint)]">
-                              <circle cx="12" cy="12" r="10" />
-                              <polyline points="12 6 12 12 16 14" />
-                            </svg>
-                            {lastLogin ?? <span className="italic text-[var(--color-text-faint)]">Never Logged In</span>}
-                          </div>
+                        <TableCell className="hidden md:table-cell py-4">
+                          <span className="text-[13px] text-[var(--color-text-muted)]">
+                            {lastLogin ?? <span className="italic text-[var(--color-text-faint)]">Never</span>}
+                          </span>
                         </TableCell>
 
                         {/* Actions */}
-                        <TableCell className="pr-4 py-3">
+                        <TableCell className="pr-6 py-4">
                           <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
-                            {(user.orgRole === "admin" || user.orgRole === "user") && isSuperAdmin && (
-                              <button
-                                onClick={() => openPermissions(user)}
-                                className="dg-btn dg-btn-secondary"
-                                style={{ padding: "4px 10px", fontSize: 11 }}
-                              >
-                                {isMobile ? (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-                                    <circle cx="12" cy="12" r="3" />
-                                  </svg>
-                                ) : "Configure"}
-                              </button>
+                            {user.orgRole === "admin" && isSuperAdmin && (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-[var(--color-text-faint)] transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
                             )}
-
                             {!isYou && isSuperAdmin && (
                               <button
                                 onClick={() => {
                                   const name = getDisplayName(user) !== "—" ? getDisplayName(user) : user.email ?? "User";
                                   setRevokeConfirm({ userId: user.id, userName: name });
                                 }}
-                                className="dg-btn dg-btn-danger"
-                                style={{ padding: "4px 10px", fontSize: 11 }}
+                                className="dg-btn dg-btn-danger dg-btn-sm"
                               >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                                   <circle cx="12" cy="12" r="10" />
                                   <line x1="15" y1="9" x2="9" y2="15" />
                                   <line x1="9" y1="9" x2="15" y2="15" />
                                 </svg>
-                                {!isMobile && "Revoke Access"}
+                                {!isMobile && "Revoke"}
                               </button>
                             )}
                           </div>
                         </TableCell>
                       </TableRow>
 
-                      {/* Expanded permissions panel (admin + user) */}
-                      {isExpanded && (user.orgRole === "admin" || user.orgRole === "user") && myRole === "super_admin" && (
+                      {/* Expanded permissions panel (admin only) */}
+                      {isExpanded && user.orgRole === "admin" && myRole === "super_admin" && (
                         <TableRow className="hover:bg-transparent border-0">
                           <TableCell colSpan={4} className="p-0 bg-[var(--color-bg)]">
-                            <div className="border-t border-[var(--color-border-light)]" style={{ padding: isMobile ? "16px" : "16px 16px 20px 52px" }}>
-                              {/* Info banner for user-role members */}
-                              {user.orgRole === "user" && (
-                                <div className="text-[12px] text-[var(--color-text-muted)] mb-1 p-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)]">
-                                  <strong>Custom Permissions</strong> — Combined with department permissions (most permissive wins).
-                                  {(user.departmentIds?.length ?? 0) > 0 && (
-                                    <span className="block mt-1 text-[11px] text-[var(--color-text-faint)]">
-                                      Departments: {user.departmentIds?.map((id: number) => deptNameById.get(id)).filter(Boolean).join(", ") || "—"}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+                            <div className="border-t border-[var(--color-border-light)]">
+                              {/* Column headers */}
+                              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-[var(--color-border-light)] text-[11px] font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider">
+                                <div className="col-span-8">Module & Access Level</div>
+                                <div className="col-span-2 text-center">View</div>
+                                <div className="col-span-2 text-center">Edit</div>
+                              </div>
 
-                              {/* Permission groups */}
-                              <div className="flex flex-col gap-5">
-                                {PERM_GROUPS.map((group) => {
-                                  const keys = group.keys.filter((k) => !SUPER_ADMIN_ONLY.has(k));
-                                  if (keys.length === 0) return null;
+                              {/* Permission modules */}
+                              {(() => {
+                                const catLabels: Record<string, string> = { CORE: "Core Operations", ADMINISTRATION: "Administration" };
+                                const categories = [...new Set(PERMISSION_MODULES.map((m) => m.category))];
+                                return categories.map((cat) => {
+                                  const modules = PERMISSION_MODULES.filter((m) => m.category === cat && !m.editKeys.every((k) => SUPER_ADMIN_ONLY.has(k)));
+                                  if (modules.length === 0) return null;
                                   return (
-                                    <div key={group.label}>
-                                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-subtle)] mb-1.5">{group.label}</p>
-                                      <div className="flex flex-col gap-0.5">
-                                        {keys.map((key) => {
-                                          const alwaysOn = ALWAYS_ON.has(key);
-                                          const isOn = perms[key] ?? false;
-                                          const toggleDisabled = alwaysOn || savingPerms === user.id;
+                                    <div key={cat} className="pb-1">
+                                      <div className="px-6 py-3 bg-[var(--color-bg)]">
+                                        <h3 className="text-[13px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">{catLabels[cat] ?? cat}</h3>
+                                      </div>
+                                      <div className="divide-y divide-[var(--color-border-light)]">
+                                        {modules.map((mod) => {
+                                          const hasView = mod.viewKeys.length > 0 || mod.alwaysOnView;
+                                          const hasEdit = mod.editKeys.length > 0;
+                                          const viewOn = mod.alwaysOnView || (mod.viewKeys.length > 0 && mod.viewKeys.every((k) => perms[k] === true));
+                                          const editOn = mod.editKeys.length > 0 && mod.editKeys.every((k) => perms[k] === true);
+                                          const viewDisabled = mod.alwaysOnView || savingPerms === user.id;
+                                          const editDisabled = savingPerms === user.id;
+                                          const isActive = viewOn || editOn;
+                                          const viewImplied = mod.viewKeys.length > 0 && mod.viewKeys.every((vk) => {
+                                            const pair = VIEW_EDIT_PAIRS.find((p) => p.view === vk);
+                                            return pair ? perms[pair.edit] === true : false;
+                                          });
                                           return (
-                                            <div
-                                              key={key}
-                                              role="button"
-                                              tabIndex={toggleDisabled ? -1 : 0}
-                                              onClick={() => { if (!toggleDisabled) handlePermToggle(user.id, key, !isOn); }}
-                                              onKeyDown={(e) => { if (!toggleDisabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handlePermToggle(user.id, key, !isOn); } }}
-                                              className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${toggleDisabled ? "cursor-default opacity-50" : "cursor-pointer hover:bg-[var(--color-bg-secondary)]"}`}
-                                            >
-                                              <span className="text-[12px] text-[var(--color-text-secondary)]">
-                                                {PERM_LABELS[key]}
-                                              </span>
-                                              <div
-                                                className="relative shrink-0 rounded-full transition-colors"
-                                                style={{
-                                                  width: 34, height: 20,
-                                                  background: isOn ? "var(--color-brand)" : "var(--color-border)",
-                                                }}
-                                              >
-                                                <div
-                                                  className="absolute top-0.5 rounded-full bg-white shadow-sm transition-[left]"
-                                                  style={{
-                                                    left: isOn ? 16 : 2,
-                                                    width: 16, height: 16,
-                                                  }}
-                                                />
+                                            <div key={mod.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-[var(--color-bg)] transition-colors items-center">
+                                              <div className="col-span-1 md:col-span-8 flex items-start">
+                                                <div className={`p-2 rounded-lg mr-4 shrink-0 ${isActive ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)]" : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)]"}`}>
+                                                  {(() => { const ModIcon = MODULE_ICONS[mod.icon as keyof typeof MODULE_ICONS]; return ModIcon ? <ModIcon /> : null; })()}
+                                                </div>
+                                                <div>
+                                                  <h4 className="font-medium text-[14px] text-[var(--color-text-primary)]">{mod.title}</h4>
+                                                  <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5 pr-4 leading-relaxed">{mod.description}</p>
+                                                </div>
+                                              </div>
+                                              <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--color-border-light)]">
+                                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                                  <span className="md:hidden text-[11px] font-medium text-[var(--color-text-subtle)] uppercase">View</span>
+                                                  {hasView ? (
+                                                    <button
+                                                      type="button" role="switch" aria-checked={viewOn}
+                                                      disabled={viewDisabled || viewImplied}
+                                                      onClick={() => {
+                                                        if (!viewDisabled && !viewImplied) {
+                                                          const allOn = mod.viewKeys.every((k) => perms[k]);
+                                                          for (const k of mod.viewKeys) handlePermToggle(user.id, k, !allOn);
+                                                          if (allOn) {
+                                                            for (const vk of mod.viewKeys) {
+                                                              const pair = VIEW_EDIT_PAIRS.find((p) => p.view === vk);
+                                                              if (pair) handlePermToggle(user.id, pair.edit, false);
+                                                            }
+                                                          }
+                                                        }
+                                                      }}
+                                                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${(viewDisabled || viewImplied) ? "opacity-40 cursor-default" : "cursor-pointer"}`}
+                                                      style={{ background: viewOn ? "var(--color-brand)" : "var(--color-border)" }}
+                                                    >
+                                                      <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${viewOn ? "translate-x-5" : "translate-x-0"}`} />
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-[13px] text-[var(--color-text-faint)]">—</span>
+                                                  )}
+                                                </div>
+                                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                                  <span className="md:hidden text-[11px] font-medium text-[var(--color-text-subtle)] uppercase">Edit</span>
+                                                  {hasEdit ? (
+                                                    <button
+                                                      type="button" role="switch" aria-checked={editOn}
+                                                      disabled={editDisabled}
+                                                      onClick={() => {
+                                                        if (!editDisabled) {
+                                                          const allOn = mod.editKeys.every((k) => perms[k]);
+                                                          for (const k of mod.editKeys) handlePermToggle(user.id, k, !allOn);
+                                                          if (!allOn) {
+                                                            for (const ek of mod.editKeys) {
+                                                              const pair = VIEW_EDIT_PAIRS.find((p) => p.edit === ek);
+                                                              if (pair) handlePermToggle(user.id, pair.view, true);
+                                                            }
+                                                          }
+                                                        }
+                                                      }}
+                                                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${editDisabled ? "opacity-40 cursor-default" : "cursor-pointer"}`}
+                                                      style={{ background: editOn ? "var(--color-brand)" : "var(--color-border)" }}
+                                                    >
+                                                      <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${editOn ? "translate-x-5" : "translate-x-0"}`} />
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-[13px] text-[var(--color-text-faint)]">—</span>
+                                                  )}
+                                                </div>
                                               </div>
                                             </div>
                                           );
@@ -761,11 +796,18 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                                       </div>
                                     </div>
                                   );
-                                })}
-                              </div>
+                                });
+                              })()}
 
                               {/* Save / Undo */}
-                              <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[var(--color-border-light)]">
+                              <div className="flex items-center gap-3 px-6 py-4 border-t border-[var(--color-border-light)] bg-[var(--color-bg)]">
+                                <button
+                                  onClick={() => handlePermsSave(user.id)}
+                                  disabled={savingPerms === user.id || !hasUnsavedChanges}
+                                  className="dg-btn dg-btn-primary dg-btn-sm"
+                                >
+                                  {savingPerms === user.id ? "Saving..." : "Save Permissions"}
+                                </button>
                                 <button
                                   onClick={() => {
                                     if (hasUnsavedChanges) {
@@ -775,18 +817,9 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                                     }
                                   }}
                                   disabled={savingPerms === user.id}
-                                  className="dg-btn dg-btn-secondary"
-                                  style={{ padding: "7px 14px" }}
+                                  className="dg-btn dg-btn-secondary dg-btn-sm"
                                 >
-                                  {hasUnsavedChanges ? "Undo" : "Cancel"}
-                                </button>
-                                <button
-                                  onClick={() => handlePermsSave(user.id)}
-                                  disabled={savingPerms === user.id || !hasUnsavedChanges}
-                                  className="dg-btn dg-btn-primary"
-                                  style={{ padding: "7px 14px" }}
-                                >
-                                  {savingPerms === user.id ? "Saving..." : "Save"}
+                                  {hasUnsavedChanges ? "Undo Changes" : "Collapse"}
                                 </button>
                               </div>
                             </div>
@@ -870,8 +903,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                                 } catch { toast.error("Failed to resend"); }
                                 finally { setInvitationAction(null); }
                               }}
-                              className="dg-btn dg-btn-secondary"
-                              style={{ padding: "4px 10px", fontSize: 11 }}
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
                             >
                               Resend
                             </button>
@@ -888,8 +920,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
                                   } catch { toast.error("Failed to revoke"); }
                                   finally { setInvitationAction(null); }
                                 }}
-                                className="dg-btn dg-btn-danger"
-                                style={{ padding: "4px 10px", fontSize: 11 }}
+                                className="dg-btn dg-btn-danger dg-btn-sm"
                               >
                                 Revoke
                               </button>
