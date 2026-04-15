@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { getServiceClient } from "@/lib/supabase-service";
-import { decodeJwt } from "jose";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { sendNotification } from "@/lib/notifications";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -149,32 +148,14 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   // ── Auth ────────────────────────────────────────────────────────────
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          /* Route handler — read-only */
-        },
-      },
-    },
-  );
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuthenticatedUserWithClaims(req);
+  if ("response" in auth) return auth.response;
+  const { user, claims } = auth;
 
   // ── Rate limit ──────────────────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(
     apiLimiter,
-    session.user.id,
+    user.id,
   );
   if (misconfigured) {
     return NextResponse.json(
@@ -206,16 +187,12 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
 
   // ── Org isolation: verify the caller's JWT org_id matches the body orgId ──
-  try {
-    const claims = decodeJwt(session.access_token) as { org_id?: string };
-    if (claims.org_id && claims.org_id !== data.orgId) {
-      return NextResponse.json(
-        { error: "Org mismatch: cannot send notifications for another org" },
-        { status: 403 },
-      );
-    }
-  } catch {
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  const claimOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
+  if (claimOrgId && claimOrgId !== data.orgId) {
+    return NextResponse.json(
+      { error: "Org mismatch: cannot send notifications for another org" },
+      { status: 403 },
+    );
   }
 
   try {
@@ -236,7 +213,7 @@ export async function POST(req: NextRequest) {
 
         await Promise.all(
           adminIds
-            .filter((id) => id !== session.user.id)
+            .filter((id) => id !== user.id)
             .map((adminId) =>
               sendNotification(
                 adminId,
@@ -259,7 +236,7 @@ export async function POST(req: NextRequest) {
         );
         await Promise.all(
           adminIds
-            .filter((id) => id !== session.user.id)
+            .filter((id) => id !== user.id)
             .map((adminId) =>
               sendNotification(
                 adminId,
@@ -276,7 +253,7 @@ export async function POST(req: NextRequest) {
 
       case "shift_request_resolved": {
         const { userId } = await getRequestInfo(data.requestId);
-        if (userId && userId !== session.user.id) {
+        if (userId && userId !== user.id) {
           const status = data.approved ? "approved" : "rejected";
           const notifType: NotificationType = data.approved
             ? "shift_request_approved"
@@ -311,7 +288,7 @@ export async function POST(req: NextRequest) {
 
         await Promise.all(
           userIds
-            .filter((id) => id !== session.user.id) // Don't notify the publisher
+            .filter((id) => id !== user.id) // Don't notify the publisher
             .map((userId) =>
               sendNotification(
                 userId,
@@ -328,7 +305,7 @@ export async function POST(req: NextRequest) {
 
       // ── Role changed ──────────────────────────────────────────────
       case "role_changed": {
-        if (data.targetUserId !== session.user.id) {
+        if (data.targetUserId !== user.id) {
           await sendNotification(
             data.targetUserId,
             data.orgId,

@@ -1,23 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { getServiceClient } from "@/lib/supabase-service";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
-
-function getUserClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {},
-      },
-    },
-  );
-}
 
 /**
  * GET /api/auth/data-export
@@ -25,15 +10,15 @@ function getUserClient(req: NextRequest) {
  * Returns all user data as a downloadable JSON file.
  * Rate limited to one export per hour.
  */
+const GDPR_EXPORT_AUDIT_ACTION = "data.portability_exported";
+
 export async function GET(req: NextRequest) {
   try {
-    const userClient = getUserClient(req);
-    const { data: { session } } = await userClient.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-    }
+    const auth = await requireAuthenticatedUser(req);
+    if ("response" in auth) return auth.response;
+    const { user } = auth;
 
-    const userId = session.user.id;
+    const userId = user.id;
     const serviceClient = getServiceClient();
 
     // Rate limit: one export per hour
@@ -42,7 +27,7 @@ export async function GET(req: NextRequest) {
       .from("audit_log")
       .select("*", { count: "exact", head: true })
       .eq("actor_id", userId)
-      .eq("action", "data.exported")
+      .eq("action", GDPR_EXPORT_AUDIT_ACTION)
       .gte("created_at", oneHourAgo);
 
     if ((recentExports ?? 0) > 0) {
@@ -87,7 +72,7 @@ export async function GET(req: NextRequest) {
     const exportData = {
       exported_at: new Date().toISOString(),
       user_id: userId,
-      email: session.user.email,
+      email: user.email,
       profile: profileResult.data ?? null,
       organization_memberships: membershipsResult.data ?? [],
       employees: employeesResult.data ?? [],
@@ -101,8 +86,8 @@ export async function GET(req: NextRequest) {
     // Log the export to audit trail
     await serviceClient.from("audit_log").insert({
       actor_id: userId,
-      actor_email: session.user.email,
-      action: "data.exported",
+      actor_email: user.email,
+      action: GDPR_EXPORT_AUDIT_ACTION,
       resource_type: "data_export",
       resource_id: userId,
       details: {

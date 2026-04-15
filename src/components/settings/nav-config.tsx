@@ -54,6 +54,7 @@ export interface NavItem {
   id: SectionId;
   label: string;
   icon: React.ReactNode;
+  description?: string;
 }
 
 export interface NavGroup {
@@ -89,27 +90,27 @@ export function buildNavGroups(
 
   if (perms.canAccessSettings) {
     const orgItems: NavItem[] = [];
-    if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "General", icon: iconBuilding });
-    if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels });
+    if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "Organization Details", icon: iconBuilding, description: "Manage your organization's name and basic profile information." });
+    if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels, description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
     if (orgItems.length > 0) groups.push({ id: "organization", label: "Organization", items: orgItems });
   }
 
   if (perms.canAccessSettings) {
     const staffItems: NavItem[] = [];
-    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: overrides?.departmentLabel ?? "Departments", icon: iconDepartment });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations });
+    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: overrides?.departmentLabel ?? "Departments", icon: iconDepartment, description: "Organize your workforce into scheduled and management departments, and define focus areas within each." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, description: "Display roles shown as tags on the schedule grid (e.g., Charge Nurse). These are cosmetic and don't affect permissions." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations, description: "The certification badge shown next to the employee's name on the schedule grid." });
     if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff & Designations", items: staffItems });
   }
 
   if (perms.canAccessSettings) {
     const schedItems: NavItem[] = [];
-    if (perms.canManageOrgSettings) schedItems.push({ id: "org-display", label: "Display Mode", icon: iconDisplay });
-    if (perms.isSuperAdmin) schedItems.push({ id: "schedule-rules", label: "Schedule Rules", icon: iconRules });
-    if (perms.canManageShiftCodes || perms.canViewShiftCodes) schedItems.push({ id: "schedule-categories", label: "Shift Categories", icon: iconTag });
-    if (perms.canManageShiftCodes || perms.canViewShiftCodes) schedItems.push({ id: "schedule-codes", label: overrides?.shiftCodesLabel ?? "Schedule Codes", icon: iconCalendar });
-    if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", icon: iconCoverage });
-    if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes) schedItems.push({ id: "staff-indicators", label: "Indicators", icon: iconIndicator });
+    if (perms.canManageOrgSettings) schedItems.push({ id: "org-display", label: "Shift Display Mode", icon: iconDisplay, description: "Choose how shifts appear on the schedule grid — short codes or full names." });
+    if (perms.isSuperAdmin) schedItems.push({ id: "schedule-rules", label: "Schedule Rules", icon: iconRules, description: "Configure automated scheduling rules and constraints." });
+    if (perms.canManageShiftCodes || perms.canViewShiftCodes) schedItems.push({ id: "schedule-categories", label: "Shift Categories", icon: iconTag, description: "Group shifts by type (e.g. Day, Evening, Night) with default times and colors." });
+    if (perms.canManageShiftCodes || perms.canViewShiftCodes) schedItems.push({ id: "schedule-codes", label: overrides?.shiftCodesLabel ?? "Schedule Codes", icon: iconCalendar, description: "Define the individual shifts available for scheduling, including codes, names, times, and required certifications." });
+    if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", icon: iconCoverage, description: "Set minimum staffing requirements per shift and day so the schedule can flag when coverage falls short." });
+    if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes) schedItems.push({ id: "staff-indicators", label: "Indicators", icon: iconIndicator, description: "Define custom indicators that can be attached to shift cells on the schedule." });
     if (schedItems.length > 0) groups.push({ id: "scheduling", label: "Scheduling", items: schedItems });
   }
 
@@ -118,7 +119,7 @@ export function buildNavGroups(
       id: "platform",
       label: "Platform",
       items: [
-        { id: "platform-impersonation", label: "Impersonation", icon: iconImpersonate },
+        { id: "platform-impersonation", label: "Impersonation", icon: iconImpersonate, description: "Temporarily access an organization's account as any of its users for support or debugging." },
       ],
     });
   }

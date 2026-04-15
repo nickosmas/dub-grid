@@ -10,32 +10,40 @@ import * as Sentry from "@/lib/sentry";
 interface CompletionStepProps {
   role: string;
   onComplete: () => Promise<void>;
+  isOrgSetup?: boolean;
 }
 
-export default function CompletionStep({ role, onComplete }: CompletionStepProps) {
+export default function CompletionStep({ role, onComplete, isOrgSetup }: CompletionStepProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const isSuperAdmin = role === "super_admin";
+  const isSaOrientation = isSuperAdmin && (isOrgSetup ?? false);
   const isUser = role === "user";
 
-  const heading = isSuperAdmin
+  const heading = isSuperAdmin && !isSaOrientation
     ? "Your Workspace is Ready!"
     : "You\u2019re All Set!";
 
-  const subtext = isSuperAdmin
-    ? "Everything is configured and ready to go. Next, head to the People page to add your employees and start building schedules."
-    : isUser
-      ? "You\u2019re all set up. Head to the schedule to see your upcoming shifts."
-      : "Your account is set up and ready. Head to the dashboard to get started.";
+  const subtext = isSaOrientation
+    ? "You have full super admin access. Head to the dashboard to see how things are running."
+    : isSuperAdmin
+      ? "Everything is configured and ready to go. Next, head to the People page to add your employees and start building schedules."
+      : isUser
+        ? "You\u2019re all set up. Head to the schedule to see your upcoming shifts."
+        : "Your account is set up and ready. Head to the dashboard to get started.";
 
-  const ctaLabel = isSuperAdmin
-    ? "Go to People"
-    : isUser
-      ? "View My Schedule"
-      : "Go to Dashboard";
+  const ctaLabel = isSaOrientation
+    ? "Go to Dashboard"
+    : isSuperAdmin
+      ? "Go to People"
+      : isUser
+        ? "View My Schedule"
+        : "Go to Dashboard";
 
-  const destination = isUser ? "/schedule" : isSuperAdmin ? "/people" : "/dashboard";
+  const destination = isSaOrientation
+    ? "/dashboard"
+    : isUser ? "/schedule" : isSuperAdmin ? "/people" : "/dashboard";
 
   async function handleComplete() {
     setLoading(true);
@@ -64,12 +72,12 @@ export default function CompletionStep({ role, onComplete }: CompletionStepProps
           width: 80,
           height: 80,
           borderRadius: "50%",
-          background: "var(--color-brand)",
+          background: "var(--color-success)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           margin: "0 auto 28px",
-          boxShadow: "0 8px 24px rgba(0, 95, 2, 0.3)",
+          boxShadow: "0 8px 24px rgba(22, 163, 74, 0.28)",
           animation: "onboarding-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
         }}
       >
@@ -119,7 +127,7 @@ export default function CompletionStep({ role, onComplete }: CompletionStepProps
           fontWeight: 700,
           cursor: loading ? "not-allowed" : "pointer",
           transition: "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: "0 4px 16px rgba(0, 95, 2, 0.25)",
+          boxShadow: "0 4px 16px rgba(37, 99, 235, 0.25)",
         }}
       >
         <ButtonLoading

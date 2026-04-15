@@ -4,7 +4,8 @@ import type { CSSProperties, ReactNode } from "react";
 
 interface EmptyStateProps {
   icon?: ReactNode;
-  title: string;
+  title?: string;
+  heading?: string;
   description?: string;
   action?: ReactNode;
   /** Compact variant for use inside cards/sections with less padding and smaller text */
@@ -19,7 +20,17 @@ interface EmptyStateProps {
  * - Default: full-page empty state with large padding, icon circle, dashed border
  * - Compact: smaller padding and text for use inside cards or settings sections
  */
-export function EmptyState({ icon, title, description, action, compact, style }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  heading,
+  description,
+  action,
+  compact,
+  style,
+}: EmptyStateProps) {
+  const headingText = heading ?? title;
+
   return (
     <div
       style={{
@@ -53,11 +64,24 @@ export function EmptyState({ icon, title, description, action, compact, style }:
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: compact ? "var(--dg-fs-body)" : "var(--dg-fs-heading)", fontWeight: compact ? 600 : 700, color: "var(--color-text-primary)" }}>
-          {title}
+        <div
+          style={{
+            fontSize: compact ? "var(--dg-fs-body)" : "var(--dg-fs-heading)",
+            fontWeight: compact ? 600 : 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          {headingText}
         </div>
         {description && (
-          <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", maxWidth: 400 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-muted)",
+              maxWidth: 400,
+            }}
+          >
             {description}
           </p>
         )}

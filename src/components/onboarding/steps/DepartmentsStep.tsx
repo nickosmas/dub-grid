@@ -26,26 +26,17 @@ export default function DepartmentsStep({ onNext, onBack }: DepartmentsStepProps
       nextDisabled={!hasDepartments}
       wide
     >
-      <div
-        style={{
-          background: "var(--color-bg-card, white)",
-          borderRadius: 16,
-          border: "1px solid var(--color-border)",
-          padding: "20px",
-        }}
-      >
-        <DepartmentsSettings
-          departments={departments}
-          focusAreas={focusAreas}
-          orgId={org.id}
-          focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
-          departmentLabel={org.departmentLabel || "Departments"}
-          canManageFocusAreas={true}
-          canManageOrgLabels={true}
-          onDepartmentsChange={setDepartments}
-          onFocusAreasChange={setFocusAreas}
-        />
-      </div>
+      <DepartmentsSettings
+        departments={departments}
+        focusAreas={focusAreas}
+        orgId={org.id}
+        focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
+        departmentLabel={org.departmentLabel || "Departments"}
+        canManageFocusAreas={true}
+        canManageOrgLabels={true}
+        onDepartmentsChange={setDepartments}
+        onFocusAreasChange={setFocusAreas}
+      />
       {!hasDepartments && (
         <p
           style={{

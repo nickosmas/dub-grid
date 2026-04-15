@@ -5,6 +5,7 @@ import { fetchImpersonationHistory } from "@/lib/db";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
+import { MaybeHint } from "@/components/ui/hint";
 
 function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -160,12 +161,13 @@ export default function ImpersonationHistory() {
                             {e.gridmasterEmail}
                           </td>
                           <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-primary)", maxWidth: 200 }}>
-                            <span
-                              style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                              title={e.justification || undefined}
-                            >
-                              {e.justification || "—"}
-                            </span>
+                            <MaybeHint content={e.justification} side="bottom">
+                              <span
+                                style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                              >
+                                {e.justification || "—"}
+                              </span>
+                            </MaybeHint>
                           </td>
                           <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
                             {startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

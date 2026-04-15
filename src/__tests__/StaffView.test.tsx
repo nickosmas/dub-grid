@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Employee, FocusArea, NamedItem } from "@/types";
+
+let mockSearchParams = new URLSearchParams();
 const DESIGNATIONS: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
@@ -29,7 +31,7 @@ vi.mock("@/components/EditEmployeePanel", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/people",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
@@ -39,6 +41,21 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/components/AuthProvider", () => ({
   useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
+}));
+
+vi.mock("@/lib/db", () => ({
+  fetchInvitations: vi.fn().mockResolvedValue([]),
+  revokeInvitation: vi.fn(),
+  resendInvitation: vi.fn(),
+  fetchRecurringShifts: vi.fn().mockResolvedValue([]),
+  getRecurringDraft: vi.fn().mockResolvedValue(null),
+  upsertRecurringShift: vi.fn(),
+  deleteRecurringShift: vi.fn(),
+  saveRecurringDraft: vi.fn(),
+  deleteRecurringDraft: vi.fn(),
+  removeUserFromOrganization: vi.fn(),
+  updateAppOnlyUser: vi.fn(),
+  updatePendingInvitation: vi.fn(),
 }));
 
 vi.mock("@/components/ui/sidebar", () => {
@@ -77,8 +94,6 @@ const focusAreas: FocusArea[] = [
     id: 1,
     orgId: "org-1",
     name: "North",
-    colorBg: "#EFF6FF",
-    colorText: "#1D4ED8",
     sortOrder: 1,
     departmentId: null,
   },
@@ -101,6 +116,8 @@ const employees: Employee[] = [
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
   },
   {
     id: "emp-2",
@@ -118,6 +135,8 @@ const employees: Employee[] = [
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
   },
 ];
 
@@ -143,6 +162,10 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
+beforeEach(() => {
+  mockSearchParams = new URLSearchParams();
+});
+
 describe("StaffView", () => {
   describe("Controls", () => {
     it("renders 'Add' button", () => {
@@ -157,10 +180,11 @@ describe("StaffView", () => {
       expect(onAdd).toHaveBeenCalledTimes(1);
     });
 
-    it("renders sort selector with Seniority as default", async () => {
+    it("renders sortable column headers", async () => {
       renderWithProviders(<StaffView {...defaultProps} />);
-      // Sort trigger shows current sort via aria-label
-      expect(screen.getByRole("button", { name: /Sort by Seniority/ })).toBeInTheDocument();
+      // The # column header is clickable for seniority sort; the Name column header is clickable for name sort
+      expect(screen.getByText("#")).toBeInTheDocument();
+      expect(screen.getByText("Name")).toBeInTheDocument();
     });
   });
 
@@ -203,6 +227,31 @@ describe("StaffView", () => {
       expect(screen.getByText("Bob Jones")).toBeInTheDocument();
     });
   });
+
+  describe("Recurring permissions", () => {
+    it("hides the Recurring Shifts section when recurring view permission is absent", async () => {
+      renderWithProviders(<StaffView {...defaultProps} orgId="org-1" canViewRecurringShifts={false} />);
+      expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
+    });
+
+    it("renders the recurring section read-only when recurring manage permission is absent", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          canViewRecurringShifts
+          canManageRecurringShifts={false}
+        />,
+      );
+
+      expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
+      expect(screen.getAllByRole("gridcell")[0]).toHaveAttribute("tabindex", "-1");
+      expect(screen.queryByRole("button", { name: "Save Draft" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
+    });
+  });
 });
 
 // Feature: ui-ux-test-suite, Property 3: Seniority sort produces non-decreasing sequence
@@ -227,6 +276,8 @@ describe("Property-based tests", () => {
         contactNotes: fc.string(),
         userId: fc.constant(null as string | null),
         departmentIds: fc.constant([] as number[]),
+        deptAdminIds: fc.constant([] as number[]),
+        version: fc.constant(0),
       }),
       { minLength: 1, maxLength: 20 },
     )
@@ -258,14 +309,15 @@ describe("Property-based tests", () => {
         // Seniority sort is the default — no interaction needed
         const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
 
-        // Employee data rows: skip the header row (first child), get remaining row wrappers
-        const allRowWrappers = Array.from(tableContainer.children).slice(1);
+        // Table uses <table> with <tbody>; each row is a <tr>
+        const tbody = tableContainer.querySelector("tbody") as HTMLElement;
+        const rows = Array.from(tbody.querySelectorAll("tr"));
 
-        // Each wrapper's first child is the grid row div; its first child div is the seniority cell
-        const seniorityValues = allRowWrappers.map((wrapper) => {
-          const gridRow = wrapper.children[0] as HTMLElement;
-          const seniorityCell = gridRow.children[0] as HTMLElement;
-          return parseInt(seniorityCell.textContent ?? "0", 10);
+        // Each row's first <td> contains a seniority number in a <span>
+        const seniorityValues = rows.map((row) => {
+          const firstCell = row.querySelector("td") as HTMLElement;
+          const span = firstCell.querySelector("span") as HTMLElement;
+          return parseInt(span?.textContent ?? "0", 10);
         });
 
         // Assert non-decreasing order
@@ -312,26 +364,21 @@ describe("Property-based tests", () => {
             />,
           );
 
-          // Click "Name" sort option (mock renders all options always)
-          await userEvent.click(screen.getByRole("button", { name: "Name" }));
-
+          // Click the "Name" column header to sort by name
           const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
+          const nameHeader = tableContainer.querySelector("th:nth-child(2)") as HTMLElement;
+          await userEvent.click(nameHeader);
 
-          // Employee data rows: skip the header row (first child), get remaining row wrappers
-          const allRowWrappers = Array.from(tableContainer.children).slice(1);
+          // Table uses <table> with <tbody>; each row is a <tr>
+          const tbody = tableContainer.querySelector("tbody") as HTMLElement;
+          const rows = Array.from(tbody.querySelectorAll("tr"));
 
-          // Each wrapper's first child is the grid row div
-          // gridRow.children[1] = name+avatar cell
-          // nameCell.children[1] = inner div containing name div + optional contact
-          // innerDiv.children[0] = name div whose textContent starts with emp.name
-          // The name div may contain an FTE badge <span> — grab only the first text node (no trim)
-          const names = allRowWrappers.map((wrapper) => {
-            const gridRow = wrapper.children[0] as HTMLElement;
-            const nameCell = gridRow.children[1] as HTMLElement;
-            const innerDiv = nameCell.children[1] as HTMLElement;
-            const nameDiv = innerDiv.children[0] as HTMLElement;
-            // First text node is the raw name string (before any badge span)
-            return nameDiv.childNodes[0]?.textContent ?? "";
+          // Each row's second <td> contains the name cell
+          // Inside: <div> > <Avatar/> + <div> > <div> > <a>Name</a>
+          const names = rows.map((row) => {
+            const nameCell = row.querySelectorAll("td")[1] as HTMLElement;
+            const link = nameCell.querySelector("a") as HTMLElement;
+            return link?.textContent ?? "";
           });
 
           unmount();

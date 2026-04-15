@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { getServiceClient } from "@/lib/supabase-service";
+import {
+  PUBLISHED_SHIFT_COLS,
+  resolvePublishedScheduleEntry,
+  type PublishedShiftRow,
+} from "@/lib/published-shifts";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -12,23 +17,6 @@ const querySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
-
-function getUserClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Route handler — cookies are read-only
-        },
-      },
-    },
-  );
-}
 
 function escapeCsvField(value: string | number | null | undefined): string {
   if (value == null) return "";
@@ -116,7 +104,7 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
   // Fetch shifts in date range
   const { data: shifts, error: shiftErr } = await supabase
     .from("shifts")
-    .select("emp_id, date, published_shift_code_ids, draft_shift_code_ids, published_absence_type_id, draft_absence_type_id")
+    .select(PUBLISHED_SHIFT_COLS)
     .eq("org_id", orgId)
     .gte("date", start)
     .lte("date", end);
@@ -124,11 +112,33 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
 
   // Fetch shift codes and absence types in parallel
   const [{ data: shiftCodes }, { data: absenceTypes }] = await Promise.all([
-    supabase.from("shift_codes").select("id, code").eq("org_id", orgId),
-    supabase.from("absence_types").select("id, code").eq("org_id", orgId),
+    supabase
+      .from("shift_codes")
+      .select("id, label, default_start_time, default_end_time")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    supabase
+      .from("absence_types")
+      .select("id, label")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
   ]);
-  const scMap = new Map((shiftCodes ?? []).map((sc: Record<string, unknown>) => [sc.id as number, sc.code as string]));
-  const atMap = new Map((absenceTypes ?? []).map((at: Record<string, unknown>) => [at.id as number, at.code as string]));
+  const shiftCodeById = new Map(
+    (shiftCodes ?? []).map((code: Record<string, unknown>) => [
+      code.id as number,
+      {
+        label: code.label as string,
+        defaultStartTime: code.default_start_time as string | null,
+        defaultEndTime: code.default_end_time as string | null,
+      },
+    ]),
+  );
+  const absenceTypeById = new Map(
+    (absenceTypes ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      row.label as string,
+    ]),
+  );
 
   // Build date columns
   const dates: string[] = [];
@@ -141,22 +151,14 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
 
   // Index shifts by emp_id:date
   const shiftIndex = new Map<string, string>();
-  for (const shift of (shifts ?? []) as Record<string, unknown>[]) {
-    const empId = shift.emp_id as string;
-    const date = shift.date as string;
-    // Prefer published, fall back to draft
-    const codeIds = (shift.published_shift_code_ids as number[] | null)?.length
-      ? (shift.published_shift_code_ids as number[])
-      : (shift.draft_shift_code_ids as number[] | null) ?? [];
-    const absId = (shift.published_absence_type_id as number | null) ?? (shift.draft_absence_type_id as number | null);
-
-    let label = "";
-    if (absId) {
-      label = atMap.get(absId) ?? "OFF";
-    } else if (codeIds.length > 0) {
-      label = codeIds.map((id) => scMap.get(id) ?? String(id)).join("+");
-    }
-    shiftIndex.set(`${empId}:${date}`, label);
+  for (const row of (shifts ?? []) as unknown as PublishedShiftRow[]) {
+    const entry = resolvePublishedScheduleEntry(
+      row,
+      shiftCodeById,
+      absenceTypeById,
+    );
+    if (!entry) continue;
+    shiftIndex.set(`${entry.empId}:${entry.date}`, entry.label);
   }
 
   const headers = ["Employee", ...dates.map((d) => {
@@ -175,14 +177,12 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
 export async function GET(req: NextRequest) {
   try {
     // Auth check
-    const userClient = getUserClient(req);
-    const { data: { session } } = await userClient.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-    }
+    const auth = await requireAuthenticatedUser(req);
+    if ("response" in auth) return auth.response;
+    const { user } = auth;
 
     // Rate limit by user ID
-    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
       return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
@@ -213,13 +213,13 @@ export async function GET(req: NextRequest) {
       serviceClient
         .from("organization_memberships")
         .select("org_role, admin_permissions")
-        .eq("user_id", session.user.id)
+        .eq("user_id", user.id)
         .eq("org_id", orgId)
         .maybeSingle(),
       serviceClient
         .from("profiles")
         .select("platform_role")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .single(),
     ]);
 
@@ -254,8 +254,8 @@ export async function GET(req: NextRequest) {
     // Audit log the export
     await serviceClient.from("audit_log").insert({
       org_id: orgId,
-      actor_id: session.user.id,
-      actor_email: session.user.email,
+      actor_id: user.id,
+      actor_email: user.email,
       action: "data.exported",
       resource_type: "data_export",
       resource_id: type,

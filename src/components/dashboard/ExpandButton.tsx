@@ -8,28 +8,29 @@ export default function ExpandButton({ onClick, label = "Expand" }: ExpandButton
     <button
       onClick={onClick}
       aria-label={label}
-      title={label}
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         width: 28,
         height: 28,
-        borderRadius: 6,
+        borderRadius: 8,
         border: "none",
         background: "transparent",
-        color: "var(--color-text-subtle)",
+        color: "var(--color-text-secondary)",
         cursor: "pointer",
         flexShrink: 0,
-        transition: "background 0.15s, color 0.15s",
+        transition: "background 0.15s, color 0.15s, transform 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--color-bg-secondary)";
-        e.currentTarget.style.color = "var(--color-text-primary)";
+        e.currentTarget.style.background = "var(--color-brand-bg)";
+        e.currentTarget.style.color = "var(--color-brand)";
+        e.currentTarget.style.transform = "translateY(-1px)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "var(--color-text-subtle)";
+        e.currentTarget.style.color = "var(--color-text-secondary)";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

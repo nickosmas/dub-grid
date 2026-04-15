@@ -12,7 +12,12 @@ export function extractErrorMessage(err: unknown, fallback: string): string {
     return fallback;
 }
 
-export async function handleApiError(error: unknown) {
+/**
+ * Handle an API / async error with a contextual toast message.
+ * @param error   The caught error value
+ * @param action  Optional verb phrase describing what failed (e.g. "delete shift", "save profile")
+ */
+export async function handleApiError(error: unknown, action?: string) {
     const message = extractErrorMessage(error, "");
 
     if (message.includes("jwt expired") || message.includes("Refresh Token Not Found") || message.includes("Invalid Refresh Token")) {
@@ -33,5 +38,10 @@ export async function handleApiError(error: unknown) {
     if (message) {
         console.error("handleApiError:", message);
     }
-    toast.error("Something went wrong. Please try again.", { id: "generic-error" });
+
+    const prefix = action ? `Failed to ${action}` : "Something went wrong";
+    const detail = message && !message.includes("PGRST") && message.length < 120
+        ? `: ${message}`
+        : ". Please try again.";
+    toast.error(`${prefix}${detail}`, { id: action ? `error-${action.replace(/\s+/g, "-")}` : "generic-error" });
 }

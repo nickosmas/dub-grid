@@ -125,8 +125,11 @@ CREATE TABLE public.organization_memberships (
   archived_at                TIMESTAMPTZ,
   archived_by                UUID,
   department_ids             BIGINT[] NOT NULL DEFAULT '{}',
+  /** Subset of department_ids where this user is a dept admin (gets dept permission template). */
+  dept_admin_ids             BIGINT[] NOT NULL DEFAULT '{}',
   phone                      TEXT,
   onboarding_completed_at    TIMESTAMPTZ,
+  tooltip_tours_completed    JSONB NOT NULL DEFAULT '{}'::jsonb,
 
   UNIQUE (user_id, org_id)
 );
@@ -152,8 +155,6 @@ CREATE TABLE public.focus_areas (
   org_id         UUID NOT NULL,
   department_id  BIGINT,
   name           TEXT NOT NULL,
-  color_bg       TEXT NOT NULL DEFAULT '#F1F5F9',
-  color_text     TEXT NOT NULL DEFAULT '#475569',
   sort_order     INTEGER NOT NULL DEFAULT 0,
   archived_at    TIMESTAMPTZ,
   created_by     UUID,
@@ -225,7 +226,11 @@ CREATE TABLE public.employees (
   /** Linked Supabase auth user. Set when invitation is accepted. */
   user_id           UUID,
   /** Management department IDs (for employees who also belong to management departments). */
-  department_ids    BIGINT[] NOT NULL DEFAULT '{}'
+  department_ids    BIGINT[] NOT NULL DEFAULT '{}',
+  /** Subset of department_ids where this employee is a dept admin (gets dept permission template). */
+  dept_admin_ids    BIGINT[] NOT NULL DEFAULT '{}',
+  /** Optimistic concurrency control version counter. */
+  version           INTEGER NOT NULL DEFAULT 0
 );
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
@@ -429,11 +434,16 @@ CREATE TABLE public.shift_series (
   end_date        DATE,
   max_occurrences INTEGER,
   shift_code_id   BIGINT,
+  absence_type_id BIGINT,
   archived_at     TIMESTAMPTZ,
   created_by      UUID,
   updated_by      UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT shift_series_code_or_absence CHECK (
+    NOT (shift_code_id IS NOT NULL AND absence_type_id IS NOT NULL)
+  )
 );
 
 
@@ -456,7 +466,9 @@ CREATE TABLE public.invitations (
   first_name     TEXT,
   last_name      TEXT,
   phone          TEXT,
-  department_ids BIGINT[] NOT NULL DEFAULT '{}'
+  department_ids BIGINT[] NOT NULL DEFAULT '{}',
+  /** Subset of department_ids where this invitee will be a dept admin. */
+  dept_admin_ids BIGINT[] NOT NULL DEFAULT '{}'
 );
 
 -- Only one pending (non-accepted, non-revoked) invitation per email per org.
@@ -630,7 +642,7 @@ CREATE TABLE public.recurring_shifts_draft_sessions (
   saved_by   UUID NOT NULL,
   draft_data JSONB NOT NULL DEFAULT '{}'::JSONB,
   saved_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (org_id)
+  UNIQUE (org_id, saved_by)
 );
 
 
@@ -833,6 +845,7 @@ ALTER TABLE public.shift_series
   ADD CONSTRAINT shift_series_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_series_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_series_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_series_absence_type_id_fkey FOREIGN KEY (absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -955,6 +968,7 @@ CREATE INDEX idx_employees_status ON public.employees(org_id, status) WHERE arch
 CREATE UNIQUE INDEX idx_employees_user_id_per_org ON public.employees(org_id, user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_employees_user_id ON public.employees(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_employees_department_ids ON public.employees USING GIN (department_ids) WHERE department_ids != '{}';
+CREATE INDEX idx_employees_dept_admin_ids ON public.employees USING GIN (dept_admin_ids) WHERE dept_admin_ids != '{}';
 CREATE INDEX idx_focus_areas_department_id ON public.focus_areas(department_id) WHERE department_id IS NOT NULL;
 
 -- shift_categories
@@ -1004,6 +1018,7 @@ CREATE INDEX idx_recurring_shifts_active ON public.recurring_shifts(org_id) WHER
 CREATE INDEX idx_shift_series_org ON public.shift_series(org_id);
 CREATE INDEX idx_shift_series_emp ON public.shift_series(emp_id);
 CREATE INDEX idx_shift_series_code_id ON public.shift_series(shift_code_id);
+CREATE INDEX idx_shift_series_absence_type_id ON public.shift_series(absence_type_id);
 CREATE INDEX idx_shift_series_active ON public.shift_series(org_id) WHERE archived_at IS NULL;
 
 -- invitations

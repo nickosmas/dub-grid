@@ -113,11 +113,11 @@ export default function ExpandedStats({
   return (
     <Modal title={`${periodLabel}ly stats comparison`} onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 12, color: "var(--color-text-subtle)" }}>
+        <div style={{ fontSize: 12, color: "var(--color-text-subtle)", padding: "14px 16px", borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           Last {NUM_PERIODS} {periodLabelPlural} &middot; most recent first
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: 18, background: "var(--color-bg)", padding: 12 }}>
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -155,7 +155,7 @@ export default function ExpandedStats({
                     <td style={{ ...tdStyle, textAlign: "left", fontWeight: isCurrent ? 600 : 400 }}>
                       {row.label}
                       {isCurrent && (
-                        <span style={{ fontSize: 9, color: "var(--color-primary)", marginLeft: 6, fontWeight: 600 }}>
+                        <span style={{ fontSize: 9, color: "var(--color-brand)", marginLeft: 6, fontWeight: 600 }}>
                           CURRENT
                         </span>
                       )}
@@ -176,8 +176,8 @@ export default function ExpandedStats({
                                 fontWeight: 600,
                                 marginLeft: 6,
                                 color: col.key === "otCount"
-                                  ? (delta > 0 ? "var(--color-danger)" : "var(--color-brand)")
-                                  : (delta > 0 ? "var(--color-brand)" : "var(--color-danger)"),
+                                  ? (delta > 0 ? "var(--color-danger)" : "var(--color-success)")
+                                  : (delta > 0 ? "var(--color-success)" : "var(--color-danger)"),
                               }}
                             >
                               {delta > 0 ? "\u2191" : "\u2193"}{Math.abs(delta)}

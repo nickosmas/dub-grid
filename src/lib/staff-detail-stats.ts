@@ -189,7 +189,6 @@ export function computeFocusAreaDistribution(
         name: fa?.name ?? "Unknown",
         shiftCount: count,
         percentage: total > 0 ? Math.round((count / total) * 100) : 0,
-        colorBg: fa?.colorBg ?? "#CED4DA",
       };
     })
     .sort((a, b) => b.shiftCount - a.shiftCount);

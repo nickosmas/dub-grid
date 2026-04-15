@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { Bell, Mail } from "lucide-react";
+import { MaybeHint } from "@/components/ui/hint";
 
 interface CategoryPrefs {
   in_app: boolean;
@@ -33,27 +35,45 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   system: "Impersonation notices and system updates",
 };
 
+function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
+  const merged = { ...DEFAULT_PREFS, ...nextPrefs };
+  return Object.fromEntries(
+    Object.keys(merged)
+      .sort()
+      .map((category) => [
+        category,
+        {
+          in_app: merged[category]?.in_app ?? DEFAULT_PREFS[category]?.in_app ?? true,
+          email: merged[category]?.email ?? DEFAULT_PREFS[category]?.email ?? false,
+        },
+      ]),
+  ) as AllPrefs;
+}
+
 export function NotificationPreferences({ visibleCategories }: { visibleCategories?: string[] } = {}) {
   const [prefs, setPrefs] = useState<AllPrefs>(DEFAULT_PREFS);
+  const [savedPrefs, setSavedPrefs] = useState<AllPrefs>(normalizePrefs(DEFAULT_PREFS));
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const normalizedPrefs = normalizePrefs(prefs);
+  const hasChanges = JSON.stringify(normalizedPrefs) !== JSON.stringify(savedPrefs);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || cancelled) return;
+      const user = await getVerifiedBrowserUser();
+      if (!user || cancelled) return;
 
       const { data } = await supabase
         .from("notification_preferences")
         .select("prefs")
-        .eq("user_id", session.user.id)
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (!cancelled) {
-        if (data?.prefs) {
-          setPrefs({ ...DEFAULT_PREFS, ...(data.prefs as AllPrefs) });
-        }
+        const initialPrefs = normalizePrefs((data?.prefs as AllPrefs | undefined) ?? DEFAULT_PREFS);
+        setPrefs(initialPrefs);
+        setSavedPrefs(initialPrefs);
         setLoaded(true);
       }
     }
@@ -64,18 +84,20 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
   async function save() {
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      const user = await getVerifiedBrowserUser();
+      if (!user) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from("notification_preferences")
         .upsert({
-          user_id: session.user.id,
-          prefs,
+          user_id: user.id,
+          prefs: normalizedPrefs,
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
 
       if (error) throw error;
+      setPrefs(normalizedPrefs);
+      setSavedPrefs(normalizedPrefs);
       toast.success("Notification preferences saved.");
     } catch {
       toast.error("Failed to save preferences.");
@@ -114,12 +136,16 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
         <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
           Category
         </span>
-        <span style={{ textAlign: "center" }} title="In-App">
-          <Bell size={14} style={{ color: "var(--color-text-muted)" }} />
-        </span>
-        <span style={{ textAlign: "center" }} title="Email">
-          <Mail size={14} style={{ color: "var(--color-text-muted)" }} />
-        </span>
+        <MaybeHint content="In-App" side="top">
+          <span style={{ textAlign: "center" }} aria-label="In-App">
+            <Bell size={14} style={{ color: "var(--color-text-muted)" }} />
+          </span>
+        </MaybeHint>
+        <MaybeHint content="Email" side="top">
+          <span style={{ textAlign: "center" }} aria-label="Email">
+            <Mail size={14} style={{ color: "var(--color-text-muted)" }} />
+          </span>
+        </MaybeHint>
       </div>
 
       {/* Category rows */}
@@ -162,7 +188,7 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
 
       <button
         onClick={save}
-        disabled={saving}
+        disabled={!hasChanges || saving}
         className="dg-btn dg-btn-primary"
         style={{ alignSelf: "flex-start", marginTop: 4 }}
       >

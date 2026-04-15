@@ -15,6 +15,7 @@ vi.mock("@/lib/impersonation", () => ({
 
 // ── Mock supabase ────────────────────────────────────────────────────────────
 const mockGetSession = vi.fn();
+const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSupabaseFrom = vi.fn();
 
@@ -22,6 +23,7 @@ vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),
+      getUser: () => mockGetUser(),
       onAuthStateChange: (cb: unknown) => {
         mockOnAuthStateChange(cb);
         return { data: { subscription: { unsubscribe: vi.fn() } } };
@@ -44,10 +46,21 @@ import {
 } from "@/hooks/usePermissions";
 import { ALL_FALSE_PERMS } from "./factories";
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   clearPermsCache();
   mockGetImpersonation.mockReturnValue(null);
+  mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -222,10 +235,11 @@ describe("permission derivation", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("usePermissions hook", () => {
-  it("starts with loading state", () => {
+  it("starts with loading state", async () => {
     mockGetSession.mockResolvedValue({ data: { session: null } });
     const { result } = renderHook(() => usePermissions());
     expect(result.current.isLoading).toBe(true);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
   });
 
   it("resolves gridmaster perms from session", async () => {
@@ -313,6 +327,97 @@ describe("usePermissions hook", () => {
     });
 
     await waitFor(() => expect(result.current.role).toBe("user"));
+  });
+
+  it("keeps resolved perms during same-user TOKEN_REFRESHED revalidation", async () => {
+    const session = { access_token: "jwt-1", user: { id: "u-1" } };
+    mockGetSession.mockResolvedValue({ data: { session } });
+    mockDecodeJwt.mockImplementation((token: string) => {
+      if (token === "jwt-1") {
+        return {
+          platform_role: "none",
+          org_role: "super_admin",
+          org_id: "org-1",
+        };
+      }
+      return {
+        platform_role: "none",
+        org_role: "user",
+        org_id: "org-1",
+      };
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+
+    const sessionDeferred = deferred<{ data: { session: typeof session } }>();
+    const userDeferred = deferred<{ data: { user: { id: string } } }>();
+    mockGetSession.mockReturnValueOnce(sessionDeferred.promise);
+    mockGetUser.mockReturnValueOnce(userDeferred.promise);
+
+    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
+    act(() => {
+      authCallback("TOKEN_REFRESHED", session);
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.role).toBe("super_admin");
+
+    await act(async () => {
+      sessionDeferred.resolve({ data: { session } });
+      userDeferred.resolve({ data: { user: { id: "u-1" } } });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+  });
+
+  it("enters blocking loading when auth changes to a different user", async () => {
+    const firstSession = { access_token: "jwt-1", user: { id: "u-1" } };
+    const secondSession = { access_token: "jwt-2", user: { id: "u-2" } };
+    mockGetSession.mockResolvedValue({ data: { session: firstSession } });
+    mockDecodeJwt.mockImplementation((token: string) => {
+      if (token === "jwt-1") {
+        return {
+          platform_role: "none",
+          org_role: "super_admin",
+          org_id: "org-1",
+        };
+      }
+      return {
+        platform_role: "gridmaster",
+        org_role: "user",
+        org_id: null,
+      };
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+
+    const sessionDeferred = deferred<{ data: { session: typeof secondSession } }>();
+    const userDeferred = deferred<{ data: { user: { id: string } } }>();
+    mockGetSession.mockReturnValueOnce(sessionDeferred.promise);
+    mockGetUser.mockReturnValueOnce(userDeferred.promise);
+
+    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
+    act(() => {
+      authCallback("SIGNED_IN", secondSession);
+    });
+
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      sessionDeferred.resolve({ data: { session: secondSession } });
+      userDeferred.resolve({ data: { user: { id: "u-2" } } });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("gridmaster");
+    expect(result.current.isGridmaster).toBe(true);
   });
 
   it("resolves user role correctly", async () => {
@@ -574,14 +679,41 @@ describe("canAccessSettings", () => {
 
   it("is false for user with no view or manage permissions", async () => {
     mockGetSession.mockResolvedValue({
-      data: { session: { access_token: "tok" } },
+      data: { session: { access_token: "tok", user: { id: "user-1" } } },
       error: null,
     });
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     mockDecodeJwt.mockReturnValue({
       platform_role: "none",
       org_role: "user",
       org_id: "org-1",
       org_slug: "acme",
+    });
+    let callCount = 0;
+    mockSupabaseFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: { org_id: "org-1", platform_role: "none" },
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: { org_role: "user", admin_permissions: null },
+              }),
+            }),
+          }),
+        }),
+      };
     });
 
     const { result } = renderHook(() => usePermissions());
@@ -598,10 +730,10 @@ describe("canAccessSettings", () => {
 // Part H: buildPerms — user role with direct + department permissions
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("buildPerms — user role direct permissions", () => {
-  it("user with direct perms only (no department perms)", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, null);
+describe("buildPerms — user role per-user permissions", () => {
+  it("user with admin_permissions set", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canViewDashboardAnalytics).toBe(true);
     expect(result.canViewEmployeeDetails).toBe(true);
     expect(result.canEditShifts).toBe(false);
@@ -610,9 +742,9 @@ describe("buildPerms — user role direct permissions", () => {
     expect(result.canManageOrgSettings).toBe(false);
   });
 
-  it("user with department perms only (no direct perms) — no regression", () => {
-    const deptPerms = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
-    const result = buildPerms("user", "org-1", false, null, false, deptPerms);
+  it("user with edit perms configured per-user", () => {
+    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canEditShifts).toBe(true);
     expect(result.canEditNotes).toBe(true);
     expect(result.canViewSchedule).toBe(true);
@@ -620,33 +752,14 @@ describe("buildPerms — user role direct permissions", () => {
     expect(result.canManageOrgSettings).toBe(false);
   });
 
-  it("user with both direct + department perms — union (most permissive wins)", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewFocusAreas: true };
-    const deptPerms = { ...ALL_FALSE_PERMS, canEditShifts: true, canViewShiftCodes: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, deptPerms);
-    expect(result.canViewDashboardAnalytics).toBe(true);
-    expect(result.canViewFocusAreas).toBe(true);
-    expect(result.canEditShifts).toBe(true);
-    expect(result.canViewShiftCodes).toBe(true);
-    expect(result.canPublishSchedule).toBe(false);
-  });
-
-  it("user with both — conflicting values resolve to most permissive", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canEditShifts: false };
-    const deptPerms = { ...ALL_FALSE_PERMS, canEditShifts: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, deptPerms);
-    expect(result.canEditShifts).toBe(true);
-  });
-
-  it("user with both — canManageOrgSettings forced false even if set true", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
-    const deptPerms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, deptPerms);
+  it("user with canManageOrgSettings true — forced false", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canManageOrgSettings).toBe(false);
   });
 
-  it("user with no direct or department perms gets READ_ONLY_PERMS", () => {
-    const result = buildPerms("user", "org-1", false, null, false, null);
+  it("user with no permissions gets READ_ONLY_PERMS", () => {
+    const result = buildPerms("user", "org-1", false, null);
     expect(result.canViewSchedule).toBe(true);
     expect(result.canViewStaff).toBe(true);
     expect(result.canEditShifts).toBe(false);
@@ -654,9 +767,9 @@ describe("buildPerms — user role direct permissions", () => {
     expect(result.canAccessSettings).toBe(false);
   });
 
-  it("user with direct view perms gets canAccessSettings", () => {
-    const directPerms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
-    const result = buildPerms("user", "org-1", false, directPerms, false, null);
+  it("user with view perms gets canAccessSettings", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const result = buildPerms("user", "org-1", false, perms);
     expect(result.canAccessSettings).toBe(true);
     expect(result.canManageOrg).toBe(false);
   });

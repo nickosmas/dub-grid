@@ -3,6 +3,8 @@
 import { useState, useMemo, useCallback } from "react";
 import type { Employee } from "@/types";
 import Modal from "@/components/Modal";
+import { Hint, MaybeHint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
@@ -142,12 +144,14 @@ export default function ShiftSwapModal({
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 2 }}>
           Your shift
         </div>
-        <div title={shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {shiftLabel}
-          <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
-            {shiftDate}
-          </span>
-        </div>
+        <MaybeHint content={shiftLabel} side="bottom">
+          <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {shiftLabel}
+            <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
+              {shiftDate}
+            </span>
+          </div>
+        </MaybeHint>
       </div>
 
       {/* ── Confirmation view ── */}
@@ -166,25 +170,29 @@ export default function ShiftSwapModal({
           >
             <div>
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You give</span>
-              <div title={shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {shiftLabel}
-                <span
-                  style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
-                >
-                  on {shiftDate}
-                </span>
-              </div>
+              <MaybeHint content={shiftLabel} side="bottom">
+                <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {shiftLabel}
+                  <span
+                    style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
+                  >
+                    on {shiftDate}
+                  </span>
+                </div>
+              </MaybeHint>
             </div>
             <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You get</span>
-              <div title={selectedTarget.shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {selectedTarget.shiftLabel}
-                <span
-                  style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
-                >
-                  on {viewDate}
-                </span>
-              </div>
+              <MaybeHint content={selectedTarget.shiftLabel} side="bottom">
+                <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {selectedTarget.shiftLabel}
+                  <span
+                    style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
+                  >
+                    on {viewDate}
+                  </span>
+                </div>
+              </MaybeHint>
               <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
                 from {selectedTarget.name}
               </div>
@@ -212,45 +220,51 @@ export default function ShiftSwapModal({
               marginBottom: 12,
             }}
           >
-            <button
-              type="button"
-              onClick={() => goDay(-1)}
-              disabled={!canGoPrev}
-              title="Previous day"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: canGoPrev ? "pointer" : "not-allowed",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-title)",
-                color: canGoPrev ? "var(--color-text-secondary)" : "var(--color-text-faint)",
-                borderRadius: 8,
-                fontFamily: "inherit",
-                opacity: canGoPrev ? 1 : 0.5,
-              }}
-            >
-              ‹
-            </button>
+            <Hint content={hint("Go to previous day")} side="bottom">
+              <span style={{ display: "inline-flex" }}>
+                <button
+                  type="button"
+                  onClick={() => goDay(-1)}
+                  disabled={!canGoPrev}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: canGoPrev ? "pointer" : "not-allowed",
+                    padding: "4px 8px",
+                    fontSize: "var(--dg-fs-title)",
+                    color: canGoPrev ? "var(--color-text-secondary)" : "var(--color-text-faint)",
+                    borderRadius: 8,
+                    fontFamily: "inherit",
+                    opacity: canGoPrev ? 1 : 0.5,
+                  }}
+                  aria-label="Go to previous day"
+                >
+                  ‹
+                </button>
+              </span>
+            </Hint>
             <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>
               {formatDisplayDate(viewDate)}
             </span>
-            <button
-              type="button"
-              onClick={() => goDay(1)}
-              title="Next day"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-title)",
-                color: "var(--color-text-secondary)",
-                borderRadius: 8,
-                fontFamily: "inherit",
-              }}
-            >
-              ›
-            </button>
+            <Hint content={hint("Go to next day")} side="bottom">
+              <button
+                type="button"
+                onClick={() => goDay(1)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  fontSize: "var(--dg-fs-title)",
+                  color: "var(--color-text-secondary)",
+                  borderRadius: 8,
+                  fontFamily: "inherit",
+                }}
+                aria-label="Go to next day"
+              >
+                ›
+              </button>
+            </Hint>
           </div>
 
           {/* Eligible employee list */}

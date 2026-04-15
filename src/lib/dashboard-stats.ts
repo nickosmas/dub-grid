@@ -12,6 +12,8 @@ import type {
   ShiftCategory,
   ShiftRequest,
   PublishHistoryEntry,
+  PublishHistoryEntryWithName,
+  Invitation,
 } from "@/types";
 import { resolveRequirement } from "@/lib/schedule-logic";
 
@@ -43,7 +45,6 @@ export interface WeeklyStats {
 export interface SectionCoverage {
   focusAreaId: number;
   focusAreaName: string;
-  colorBg: string;
   filledTotal: number;
   requiredTotal: number;
   pct: number;
@@ -77,7 +78,6 @@ export interface ShiftCodeCount {
 export interface FocusAreaBreakdown {
   focusAreaId: number;
   focusAreaName: string;
-  colorBg: string;
   total: number;
   codes: ShiftCodeCount[];
 }
@@ -97,6 +97,13 @@ export interface ActivityItem {
   highlight: string;
   timestamp: string;
   relativeTime: string;
+}
+
+export interface TrendDataPoint {
+  week: string;
+  coveragePct: number;
+  staffScheduled: number;
+  totalSlots: number;
 }
 
 // ─── Private Helpers ────────────────────────────────────
@@ -383,8 +390,10 @@ export function computeCoveragePctAndSlots(
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
-): { pct: number; openSlots: number } {
-  if (requirements.length === 0) return { pct: 100, openSlots: 0 };
+): { pct: number; openSlots: number; totalRequired: number } {
+  if (requirements.length === 0) {
+    return { pct: 100, openSlots: 0, totalRequired: 0 };
+  }
 
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
@@ -429,7 +438,7 @@ export function computeCoveragePctAndSlots(
   }
 
   const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
-  return { pct, openSlots: totalRequired - totalFilled };
+  return { pct, openSlots: totalRequired - totalFilled, totalRequired };
 }
 
 /** Derive global coverage stats from pre-computed section data. */
@@ -561,7 +570,6 @@ export function computeCoverageBySection(
     return {
       focusAreaId: fa.id,
       focusAreaName: fa.name,
-      colorBg: fa.colorBg,
       filledTotal: totalFilled,
       requiredTotal: totalRequired,
       pct,
@@ -725,7 +733,6 @@ export function computeShiftBreakdown(
       return {
         focusAreaId: faId,
         focusAreaName: fa?.name ?? "Unassigned",
-        colorBg: fa?.colorBg ?? "#CED4DA",
         total: codes.reduce((s, c) => s + c.count, 0),
         codes,
       };
@@ -752,23 +759,45 @@ function relativeTimeString(date: Date): string {
 }
 
 export function buildActivityFeed(
-  publishHistory: PublishHistoryEntry | null,
+  publishHistory: Array<PublishHistoryEntry | PublishHistoryEntryWithName>,
   shiftRequests: ShiftRequest[],
-  otAlerts: OTAlert[],
+  invitations: Invitation[],
   maxItems = 8,
 ): ActivityItem[] {
   const items: ActivityItem[] = [];
 
-  if (publishHistory) {
+  for (const historyEntry of publishHistory) {
     items.push({
-      id: `pub_${publishHistory.id}`,
+      id: `pub_${historyEntry.id}`,
       type: "publish",
       iconVariant: "success",
       description: "Schedule published",
-      highlight: `${publishHistory.changeCount} changes`,
-      timestamp: publishHistory.publishedAt,
-      relativeTime: relativeTimeString(new Date(publishHistory.publishedAt)),
+      highlight: `${historyEntry.changeCount} changes`,
+      timestamp: historyEntry.publishedAt,
+      relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
     });
+
+    for (const change of historyEntry.changes.slice(0, 12)) {
+      items.push({
+        id: `chg_${historyEntry.id}_${change.empId}_${change.date}_${change.kind}`,
+        type: "shift_change",
+        iconVariant:
+          change.kind === "new"
+            ? "success"
+            : change.kind === "deleted"
+              ? "danger"
+              : "warning",
+        description:
+          change.kind === "new"
+            ? `Shift added · ${change.date}`
+            : change.kind === "deleted"
+              ? `Shift removed · ${change.date}`
+              : `Shift updated · ${change.date}`,
+        highlight: `Employee ${change.empId}`,
+        timestamp: historyEntry.publishedAt,
+        relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
+      });
+    }
   }
 
   for (const req of shiftRequests) {
@@ -782,7 +811,7 @@ export function buildActivityFeed(
 
     items.push({
       id: `req_${req.id}`,
-      type: isPickup ? "open_shift" : "shift_change",
+      type: "request",
       iconVariant:
         req.status === "open"
           ? "warning"
@@ -790,7 +819,7 @@ export function buildActivityFeed(
             ? "success"
             : "neutral",
       description: isPickup
-        ? `Shift pickup · ${req.requesterShiftLabel}`
+        ? `Pickup request · ${req.requesterShiftLabel}`
         : `Swap request · ${req.requesterName}`,
       highlight: `${req.requesterShiftDate} · ${statusLabel}`,
       timestamp: req.createdAt,
@@ -798,15 +827,16 @@ export function buildActivityFeed(
     });
   }
 
-  for (const alert of otAlerts) {
+  for (const invitation of invitations) {
+    if (!invitation.acceptedAt) continue;
     items.push({
-      id: `ot_${alert.empId}`,
-      type: "ot_alert",
-      iconVariant: "danger",
-      description: `OT alert — ${alert.empName} at ${alert.totalHours}h`,
-      highlight: `+${alert.overtimeHours}h over limit`,
-      timestamp: new Date().toISOString(),
-      relativeTime: "Now",
+      id: `signup_${invitation.id}`,
+      type: "user_signup",
+      iconVariant: "success",
+      description: `User sign-up completed · ${invitation.email}`,
+      highlight: invitation.roleToAssign,
+      timestamp: invitation.acceptedAt,
+      relativeTime: relativeTimeString(new Date(invitation.acceptedAt)),
     });
   }
 
@@ -816,4 +846,55 @@ export function buildActivityFeed(
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     )
     .slice(0, maxItems);
+}
+
+/**
+ * Compute coverage trend data for the current and previous periods.
+ * Useful for displaying a trend line chart on the dashboard.
+ */
+export function computeCoverageTrendData(
+  focusAreas: FocusArea[],
+  shiftCodes: ShiftCode[],
+  coverageRequirements: CoverageRequirement[],
+  allEmployees: Employee[],
+  allShifts: ShiftMap,
+  periodStart: Date,
+  periodDays: number,
+): TrendDataPoint[] {
+  const trend: TrendDataPoint[] = [];
+  const activeEmployees = allEmployees.filter((e) => e.status === "active");
+  const periods = 5; // Look back 5 periods
+
+  for (let i = periods - 1; i >= 0; i--) {
+    const periodStartDate = new Date(periodStart);
+    periodStartDate.setDate(periodStartDate.getDate() - i * periodDays);
+    const periodEndDate = new Date(periodStartDate);
+    periodEndDate.setDate(periodEndDate.getDate() + periodDays - 1);
+
+    const periodDates = getDatesInRange(periodStartDate, periodDays);
+    const startKey = formatDateKey(periodStartDate);
+    const endKey = formatDateKey(periodEndDate);
+
+    const periodShifts = filterShiftsByWeek(allShifts, startKey, endKey);
+    const coverage = computeCoveragePctAndSlots(
+      focusAreas,
+      shiftCodes,
+      coverageRequirements,
+      periodDates,
+      activeEmployees,
+      periodShifts,
+    );
+
+    const staffScheduled = countStaffScheduled(periodShifts, new Map(shiftCodes.map((sc) => [sc.id, sc])));
+    const totalSlots = coverage.totalRequired || 0;
+
+    trend.push({
+      week: formatDateKey(periodStartDate).slice(5), // e.g., "04-11"
+      coveragePct: coverage.pct,
+      staffScheduled,
+      totalSlots,
+    });
+  }
+
+  return trend;
 }

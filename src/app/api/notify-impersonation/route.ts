@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -18,34 +18,16 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // ── Auth check ──────────────────────────────────────────────────────
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Route handler — cookies are read-only here
-        },
-      },
-    },
-  );
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthenticated" },
-      { status: 401 },
-    );
-  }
+  // ── Auth check ──────────────────────────────────────────────────────
+  const auth = await requireAuthenticatedUserWithClaims(req);
+  if ("response" in auth) return auth.response;
+  const { user, claims } = auth;
 
   // ── Rate limit ────────────────────────────────────────────────────
-  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json(
       { success: false, error: "Service temporarily unavailable" },
@@ -63,63 +45,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── CSRF: validate Origin header ──────────────────────────────────
-  const origin = req.headers.get("origin");
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : null);
-  if (!origin || !siteUrl) {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
-    }
-  } else {
-    const allowedHost = new URL(
-      siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`,
-    ).host;
-    const originHost = new URL(origin).host;
-    if (originHost !== allowedHost && !originHost.endsWith(`.${allowedHost}`)) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
-    }
-  }
-
   // ── Authorization — only gridmaster can trigger impersonation notifications ──
-  // Use JWKS-based verification (supports ES256 asymmetric signing).
-  // Falls back to unverified decode in dev if JWKS is unavailable.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  try {
-    let claims: { platform_role?: unknown };
-    if (supabaseUrl) {
-      const jwks = createRemoteJWKSet(
-        new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
-      );
-      const { payload } = await jwtVerify(session.access_token, jwks);
-      claims = payload as typeof claims;
-    } else if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "Server misconfigured" },
-        { status: 500 },
-      );
-    } else {
-      claims = decodeJwt(session.access_token) as typeof claims;
-    }
-    if (claims.platform_role !== "gridmaster") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 403 },
-      );
-    }
-  } catch {
+  if (claims.platform_role !== "gridmaster") {
     return NextResponse.json(
-      { success: false, error: "Invalid session" },
-      { status: 401 },
+      { success: false, error: "Unauthorized" },
+      { status: 403 },
     );
   }
 

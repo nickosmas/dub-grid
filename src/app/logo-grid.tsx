@@ -4,7 +4,7 @@
  */
 
 export const COLORS = {
-  light: "#005F02",
+  light: "#2563EB",
 } as const;
 
 interface GridProps {

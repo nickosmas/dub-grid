@@ -39,10 +39,10 @@ const TENANTS = [
     certification_label: "Certifications",
     role_label: "Positions",
     focusAreas: [
-      { name: "Memory Care", color_bg: "#BAE6FD", color_text: "#075985" },
-      { name: "Assisted Living", color_bg: "#BBF7D0", color_text: "#166534" },
-      { name: "Independent Living", color_bg: "#F5D0FE", color_text: "#86198F" },
-      { name: "Respite Care", color_bg: "#FECACA", color_text: "#991B1B" },
+      { name: "Memory Care" },
+      { name: "Assisted Living" },
+      { name: "Independent Living" },
+      { name: "Respite Care" },
     ],
     certifications: [
       { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
@@ -132,10 +132,10 @@ const TENANTS = [
     certification_label: "Licenses",
     role_label: "Roles",
     focusAreas: [
-      { name: "Skilled Nursing", color_bg: "#FBCFE8", color_text: "#9D174D" },
-      { name: "Rehabilitation", color_bg: "#A5F3FC", color_text: "#155E75" },
-      { name: "Hospice", color_bg: "#FDE68A", color_text: "#92400E" },
-      { name: "Outpatient", color_bg: "#FBCFE8", color_text: "#9D174D" },
+      { name: "Skilled Nursing" },
+      { name: "Rehabilitation" },
+      { name: "Hospice" },
+      { name: "Outpatient" },
     ],
     certifications: [
       { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
@@ -209,10 +209,10 @@ const TENANTS = [
     certification_label: "Skill Levels",
     role_label: "Titles",
     focusAreas: [
-      { name: "East Wing", color_bg: "#FECACA", color_text: "#991B1B" },
-      { name: "West Wing", color_bg: "#BBF7D0", color_text: "#166534" },
-      { name: "Garden Wing", color_bg: "#FDE047", color_text: "#854D0E" },
-      { name: "North Wing", color_bg: "#FECACA", color_text: "#991B1B" },
+      { name: "East Wing" },
+      { name: "West Wing" },
+      { name: "Garden Wing" },
+      { name: "North Wing" },
     ],
     certifications: [
       { name: "Caregiver", abbr: "CG", deptIndex: 0 },
@@ -287,11 +287,11 @@ const TENANTS = [
     certification_label: "Credentials",
     role_label: "Roles",
     focusAreas: [
-      { name: "Acute Care", color_bg: "#BBF7D0", color_text: "#166534" },
-      { name: "Long-term Care", color_bg: "#F5D0FE", color_text: "#86198F" },
-      { name: "Outpatient", color_bg: "#A7F3D0", color_text: "#065F46" },
-      { name: "Emergency", color_bg: "#E9D5FF", color_text: "#6B21A8" },
-      { name: "Behavioral Health", color_bg: "#FECACA", color_text: "#991B1B" },
+      { name: "Acute Care" },
+      { name: "Long-term Care" },
+      { name: "Outpatient" },
+      { name: "Emergency" },
+      { name: "Behavioral Health" },
     ],
     certifications: [
       { name: "Doctor of Medicine", abbr: "MD", deptIndex: null },
@@ -372,9 +372,9 @@ const TENANTS = [
     certification_label: "Certifications",
     role_label: "Disciplines",
     focusAreas: [
-      { name: "Inpatient Hospice", color_bg: "#D9F99D", color_text: "#3F6212" },
-      { name: "Home Care", color_bg: "#C7D2FE", color_text: "#3730A3" },
-      { name: "Bereavement", color_bg: "#BBF7D0", color_text: "#166534" },
+      { name: "Inpatient Hospice" },
+      { name: "Home Care" },
+      { name: "Bereavement" },
     ],
     certifications: [
       { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
@@ -564,9 +564,9 @@ async function main() {
         ? deptIds[tenant.focusAreaDeptIndex[i]]
         : null;
       const { rows: [row] } = await db.query(
-        `INSERT INTO public.focus_areas (org_id, department_id, name, color_bg, color_text, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [orgId, deptId, fa.name, fa.color_bg, fa.color_text, i]
+        `INSERT INTO public.focus_areas (org_id, department_id, name, sort_order)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [orgId, deptId, fa.name, i]
       );
       focusAreaIds.push(id(row.id));
     }
@@ -702,15 +702,18 @@ async function main() {
     }
 
     // 9b. Assign ~20% of employees to management departments
+    // Every 5th employee gets a mgmt dept. First of each pair is a dept admin, rest are users.
     const mgmtDeptIds = deptIds.filter((_, idx) => tenant.departments?.[idx]?.type === 'management');
     if (mgmtDeptIds.length > 0) {
+      let adminToggle = true; // alternate admin/user within each dept
       for (let i = 0; i < employees.length; i++) {
         if (i % 5 === 0) {
           const mgmtId = mgmtDeptIds[i % mgmtDeptIds.length];
           await db.query(
-            `UPDATE public.employees SET department_ids = $1 WHERE id = $2`,
-            [[mgmtId], employees[i].id]
+            `UPDATE public.employees SET department_ids = $1, dept_admin_ids = $2 WHERE id = $3`,
+            [[mgmtId], adminToggle ? [mgmtId] : [], employees[i].id]
           );
+          adminToggle = !adminToggle;
         }
       }
     }

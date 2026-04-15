@@ -24,6 +24,15 @@ export const queryKeys = {
     all: (orgId: string) => ["employees", orgId] as const,
     detail: (empId: string) => ["employees", "detail", empId] as const,
   },
+  shifts: {
+    all: (orgId: string) => ["shifts", orgId] as const,
+  },
+  recurringShifts: {
+    all: (orgId: string) => ["recurringShifts", orgId] as const,
+  },
+  shiftRequests: {
+    all: (orgId: string) => ["shiftRequests", orgId] as const,
+  },
   gridmaster: {
     allOrganizations: () => ["gm", "organizations"] as const,
     allUsers: () => ["gm", "users"] as const,

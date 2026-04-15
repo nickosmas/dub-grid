@@ -80,8 +80,6 @@ describe("rowToFocusArea", () => {
       id: 7,
       org_id: "org-abc",
       name: "East Section",
-      color_bg: "#ff0000",
-      color_text: "#ffffff",
       sort_order: 3,
       department_id: null,
       archived_at: null,
@@ -92,8 +90,6 @@ describe("rowToFocusArea", () => {
     expect(result.id).toBe(7);
     expect(result.orgId).toBe("org-abc");
     expect(result.name).toBe("East Section");
-    expect(result.colorBg).toBe("#ff0000");
-    expect(result.colorText).toBe("#ffffff");
     expect(result.sortOrder).toBe(3);
     expect(result.archivedAt).toBeNull();
   });
@@ -103,8 +99,6 @@ describe("rowToFocusArea", () => {
       id: 8,
       org_id: "org-abc",
       name: "Archived Section",
-      color_bg: "#ccc",
-      color_text: "#000",
       sort_order: 4,
       department_id: null,
       archived_at: "2026-03-10T12:00:00Z",
@@ -223,6 +217,7 @@ describe("rowToShiftCode — Property 9: field mapping correctness", () => {
     default_duration_hours: fc.option(fc.integer({ min: 0, max: 23 }), { nil: null }),
     default_duration_minutes: fc.option(fc.integer({ min: 0, max: 59 }), { nil: null }),
     archived_at: fc.option(fc.string(), { nil: null }),
+    version: fc.constant(0),
   });
 
   it("category_id passes through correctly; is_general preserves boolean value", () => {
@@ -299,7 +294,9 @@ const baseEmployeeRow: DbEmployee = {
   contact_notes: "Call after 9am",
   user_id: null,
   department_ids: [],
+  dept_admin_ids: [],
   archived_at: null,
+  version: 0,
 };
 
 describe("rowToEmployee", () => {
@@ -358,6 +355,8 @@ describe("employeeToRow", () => {
     contactNotes: "Prefers text",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
   };
 
   it("maps all fields correctly to snake_case", () => {
@@ -407,7 +406,9 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     contact_notes: fc.string(),
     user_id: fc.constant(null as string | null),
     department_ids: fc.constant([] as number[]),
+    dept_admin_ids: fc.constant([] as number[]),
     archived_at: fc.constant(null as string | null),
+    version: fc.constant(0),
   });
 
   it("rowToEmployee(employeeToRow(rowToEmployee(row))) equals rowToEmployee(row)", () => {

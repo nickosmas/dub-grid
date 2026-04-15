@@ -16,8 +16,6 @@ const focusAreas: FocusArea[] = [
     id: 1,
     orgId: "org-1",
     name: "North",
-    colorBg: "#EFF6FF",
-    colorText: "#1D4ED8",
     sortOrder: 1,
     departmentId: null,
   },
@@ -25,8 +23,6 @@ const focusAreas: FocusArea[] = [
     id: 2,
     orgId: "org-1",
     name: "South",
-    colorBg: "#F0FDF4",
-    colorText: "#166534",
     sortOrder: 2,
     departmentId: null,
   },
@@ -53,20 +49,21 @@ function renderModal(
 
 // The component renders 3 rows by default. Each row has first/last name inputs.
 // Focus area buttons appear per-row. We scope row interactions by index.
-function getFirstNameInputs(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLInputElement>('input[placeholder="First name"]'));
+// Modal uses createPortal to document.body, so always query document.body.
+function getFirstNameInputs() {
+  return Array.from(document.body.querySelectorAll<HTMLInputElement>('input[placeholder="First name"]'));
 }
-function getLastNameInputs(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLInputElement>('input[placeholder="Last name"]'));
+function getLastNameInputs() {
+  return Array.from(document.body.querySelectorAll<HTMLInputElement>('input[placeholder="Last name"]'));
 }
 
 describe("AddEmployeeModal", () => {
   describe("Rendering", () => {
     it("renders first name inputs with 'First name' placeholder (one per default row)", () => {
-      const { container } = render(
+      render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
       );
-      const inputs = getFirstNameInputs(container);
+      const inputs = getFirstNameInputs();
       // 3 rows by default
       expect(inputs.length).toBeGreaterThanOrEqual(1);
       expect(inputs[0]).toBeInTheDocument();
@@ -80,14 +77,14 @@ describe("AddEmployeeModal", () => {
     });
 
     it("renders focus area toggle buttons for each focus area (in at least the first row)", () => {
-      const { container } = render(
+      render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
       );
       // At minimum one "North" and one "South" button should be present (per-row)
-      const northBtns = Array.from(container.querySelectorAll("button")).filter(
+      const northBtns = Array.from(document.body.querySelectorAll("button")).filter(
         (b) => b.textContent === "North",
       );
-      const southBtns = Array.from(container.querySelectorAll("button")).filter(
+      const southBtns = Array.from(document.body.querySelectorAll("button")).filter(
         (b) => b.textContent === "South",
       );
       expect(northBtns.length).toBeGreaterThanOrEqual(1);
@@ -110,23 +107,31 @@ describe("AddEmployeeModal", () => {
       expect(onAdd).not.toHaveBeenCalled();
     });
 
-    it("clicking submit with name but no focus areas selected does NOT call onAdd", async () => {
-      const { onAdd, container } = (() => {
-        const onAdd = vi.fn();
-        const onClose = vi.fn();
-        const { container } = render(
-          <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />,
-        );
-        return { onAdd, container };
-      })();
+    it("clicking submit with only a first name does NOT call onAdd", async () => {
+      const { onAdd } = renderModal();
+      const firstNameInputs = getFirstNameInputs();
 
-      const inputs = getFirstNameInputs(container);
-      // Type a name in the first row
-      await userEvent.type(inputs[0], "Alice");
+      await userEvent.type(firstNameInputs[0], "Alice");
+
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
+      expect(onAdd).not.toHaveBeenCalled();
+    });
+
+    it("clicking submit with name but no focus areas selected does NOT call onAdd", async () => {
+      const onAdd = vi.fn();
+      const onClose = vi.fn();
+      render(
+        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />,
+      );
+
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+      await userEvent.type(firstNameInputs[0], "Alice");
+      await userEvent.type(lastNameInputs[0], "Smith");
 
       // Deselect North (selected by default) in the first row
-      // Find the first row's North button
-      const allNorthBtns = Array.from(container.querySelectorAll("button")).filter(
+      const allNorthBtns = Array.from(document.body.querySelectorAll("button")).filter(
         (b) => b.textContent === "North",
       );
       await userEvent.click(allNorthBtns[0]);
@@ -140,11 +145,11 @@ describe("AddEmployeeModal", () => {
   describe("Submission", () => {
     it("valid submission calls onAdd with correct shape (array of employees, no id or seniority)", async () => {
       const onAdd = vi.fn();
-      const { container } = render(
+      render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const firstNameInputs = getFirstNameInputs(container);
-      const lastNameInputs = getLastNameInputs(container);
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
       await userEvent.type(firstNameInputs[0], "Alice");
       await userEvent.type(lastNameInputs[0], "Smith");
 
@@ -177,14 +182,16 @@ describe("AddEmployeeModal", () => {
   describe("Toggles", () => {
     it("clicking a focus area button selects it; resulting submission includes that focus area", async () => {
       const onAdd = vi.fn();
-      const { container } = render(
+      render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getFirstNameInputs(container);
-      await userEvent.type(inputs[0], "Test");
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+      await userEvent.type(firstNameInputs[0], "Test");
+      await userEvent.type(lastNameInputs[0], "User");
 
       // Click South in the first row to add it
-      const allSouthBtns = Array.from(container.querySelectorAll("button")).filter(
+      const allSouthBtns = Array.from(document.body.querySelectorAll("button")).filter(
         (b) => b.textContent === "South",
       );
       await userEvent.click(allSouthBtns[0]);
@@ -198,14 +205,16 @@ describe("AddEmployeeModal", () => {
 
     it("clicking a focus area button twice returns to original state", async () => {
       const onAdd = vi.fn();
-      const { container } = render(
+      render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getFirstNameInputs(container);
-      await userEvent.type(inputs[0], "Test");
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+      await userEvent.type(firstNameInputs[0], "Test");
+      await userEvent.type(lastNameInputs[0], "User");
 
       // North is selected by default in first row; click twice
-      const allNorthBtns = Array.from(container.querySelectorAll("button")).filter(
+      const allNorthBtns = Array.from(document.body.querySelectorAll("button")).filter(
         (b) => b.textContent === "North",
       );
       await userEvent.click(allNorthBtns[0]);
@@ -256,15 +265,14 @@ describe("AddEmployeeModal", () => {
               id: i + 1,
               orgId: "org-1",
               name,
-              colorBg: "#EFF6FF",
-              colorText: "#1D4ED8",
               sortOrder: i + 1,
               departmentId: null,
+              version: 0,
             }));
 
             const onAdd = vi.fn();
             const onClose = vi.fn();
-            const { container, unmount } = render(
+            const { unmount } = render(
               <AddEmployeeModal
                 focusAreas={testFocusAreas}
                 certifications={defaultCertifications}
@@ -276,7 +284,7 @@ describe("AddEmployeeModal", () => {
             // Find the focus area buttons in the first row.
             // We locate focus area buttons by matching their exact textContent to the focus area name.
             const findFocusAreaBtnInFirstRow = (name: string): HTMLElement => {
-              const allBtns = container.querySelectorAll("button");
+              const allBtns = document.body.querySelectorAll("button");
               const btn = Array.from(allBtns).find(
                 (b) => b.textContent === name,
               );
@@ -284,12 +292,12 @@ describe("AddEmployeeModal", () => {
               return btn as HTMLElement;
             };
 
-            // Helper: read which focus area buttons are "active" in the first row by checking background style.
-            // Active buttons have colorBg (#EFF6FF = rgb(239, 246, 255)) as background.
+            // Helper: read which focus area buttons are active in the first row
+            // using the shared selectable-tag pressed semantics.
             const getActiveFocusAreasInFirstRow = () =>
               uniqueNames.filter((name) => {
                 const btn = findFocusAreaBtnInFirstRow(name);
-                return btn.style.background === "rgb(239, 246, 255)";
+                return btn.getAttribute("aria-pressed") === "true";
               });
 
             // Record initial selection

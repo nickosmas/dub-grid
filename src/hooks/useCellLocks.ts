@@ -1,182 +1,358 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, type MutableRefObject } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  type MutableRefObject,
+} from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface CellLock {
+  editorSessionId: string;
   userId: string;
   userName: string;
   cellKey: string;
+  lockRevision: number;
 }
 
 export interface OnlineUser {
+  editorSessionId: string;
   userId: string;
   userName: string;
   editingCell: string | null;
+  canLockCells: boolean;
+  isSameUser: boolean;
+  sessionCount: number;
 }
 
 interface PresencePayload {
   editingCell: string | null;
   userId: string;
   userName: string;
-  canEdit?: boolean;
+  editorSessionId: string;
+  canLockCells?: boolean;
+  isScheduleEditor?: boolean;
+  lockRevision?: number;
+}
+
+interface RemoteEditorSession {
+  editorSessionId: string;
+  userId: string;
+  userName: string;
+  editingCell: string | null;
+  canLockCells: boolean;
+  isScheduleEditor: boolean;
+  lockRevision: number;
 }
 
 interface UseCellLocksReturn {
   lockCell: (cellKey: string) => void;
-  unlockCell: () => void;
+  unlockCell: (options?: { removePresence?: boolean }) => void;
   getCellLock: (cellKey: string) => CellLock | null;
+  getCellActivity: (cellKey: string) => OnlineUser | null;
+  getCurrentCell: () => string | null;
   lockedCells: Map<string, CellLock>;
   onlineUsers: OnlineUser[];
   syncPresence: () => void;
-  handleLockBroadcast: (payload: { cellKey: string; userId: string; userName: string }) => void;
-  handleUnlockBroadcast: (payload: { userId: string }) => void;
+  handleLockBroadcast: (payload: {
+    cellKey: string;
+    userId: string;
+    userName: string;
+    editorSessionId: string;
+    lockRevision: number;
+    canLockCells?: boolean;
+  }) => void;
+  handleUnlockBroadcast: (payload: {
+    userId: string;
+    editorSessionId: string;
+    cellKey: string | null;
+    lockRevision: number;
+  }) => void;
 }
 
 export function useCellLocks(
   channelRef: MutableRefObject<RealtimeChannel | null>,
   currentUser: { id: string; name: string } | null,
-  canEdit = true,
+  editorSessionId: string,
+  canTrackPresence = true,
+  canLockCells = true,
 ): UseCellLocksReturn {
-  const [lockedCells, setLockedCells] = useState<Map<string, CellLock>>(
-    () => new Map(),
-  );
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [remoteSessions, setRemoteSessions] = useState<
+    Map<string, RemoteEditorSession>
+  >(() => new Map());
   const currentUserRef = useRef(currentUser);
-  const canEditRef = useRef(canEdit);
+  const canTrackPresenceRef = useRef(canTrackPresence);
+  const canLockCellsRef = useRef(canLockCells);
+  const currentCellRef = useRef<string | null>(null);
+  const lockRevisionRef = useRef(0);
   useEffect(() => {
     currentUserRef.current = currentUser;
-    canEditRef.current = canEdit;
-  }, [currentUser, canEdit]);
+    canTrackPresenceRef.current = canTrackPresence;
+    canLockCellsRef.current = canLockCells;
+  }, [currentUser, canTrackPresence, canLockCells]);
 
-  // Rebuild lockedCells map + onlineUsers list from presence state.
-  // Returned so the parent can register it directly on the channel —
-  // this ensures the handler is always on the active channel, even
-  // after channel recreation (which orphaned the old useEffect approach).
+  const trackPresence = useCallback(
+    (
+      editingCell: string | null,
+      lockRevision: number,
+      options?: { removePresence?: boolean },
+    ) => {
+      const channel = channelRef.current;
+      const user = currentUserRef.current;
+      if (!channel || !user || channel.state !== "joined") return;
+
+      if (options?.removePresence) {
+        void channel.untrack();
+        return;
+      }
+
+      void channel.track({
+        editingCell,
+        userId: user.id,
+        userName: user.name,
+        editorSessionId,
+        canLockCells: canLockCellsRef.current,
+        isScheduleEditor: canTrackPresenceRef.current,
+        lockRevision,
+      });
+    },
+    [channelRef, editorSessionId],
+  );
+
+  const applyRemoteSessionUpdate = useCallback(
+    (
+      editorSessionIdToUpdate: string,
+      updater: (
+        current: RemoteEditorSession | undefined,
+      ) => RemoteEditorSession | undefined,
+    ) => {
+      if (editorSessionIdToUpdate === editorSessionId) return;
+      setRemoteSessions((prev) => {
+        const current = prev.get(editorSessionIdToUpdate);
+        const nextValue = updater(current);
+        if (nextValue === current) return prev;
+        const next = new Map(prev);
+        if (nextValue) next.set(editorSessionIdToUpdate, nextValue);
+        else next.delete(editorSessionIdToUpdate);
+        return next;
+      });
+    },
+    [editorSessionId],
+  );
+
   const syncPresence = useCallback(() => {
     const channel = channelRef.current;
     if (!channel) return;
 
     const state = channel.presenceState<PresencePayload>();
-    const next = new Map<string, CellLock>();
-    const users: OnlineUser[] = [];
-    const seenUserIds = new Set<string>();
+    const next = new Map<string, RemoteEditorSession>();
 
     for (const presences of Object.values(state)) {
       for (const p of presences as PresencePayload[]) {
-        if (!p.userId) continue;
+        if (!p.userId || !p.editorSessionId) continue;
+        if (p.editorSessionId === editorSessionId) continue;
+        if (p.isScheduleEditor === false) continue;
 
-        // Build online users list (deduplicated, excluding current user and non-editors)
-        if (
-          !seenUserIds.has(p.userId) &&
-          p.canEdit !== false &&
-          currentUserRef.current &&
-          p.userId !== currentUserRef.current.id
-        ) {
-          seenUserIds.add(p.userId);
-          users.push({
-            userId: p.userId,
-            userName: p.userName,
-            editingCell: p.editingCell,
-          });
-        }
-
-        // Build cell locks map (only cells being edited by others)
-        if (
-          p.editingCell &&
-          currentUserRef.current &&
-          p.userId !== currentUserRef.current.id
-        ) {
-          next.set(p.editingCell, {
-            userId: p.userId,
-            userName: p.userName,
-            cellKey: p.editingCell,
-          });
+        const existing = next.get(p.editorSessionId);
+        const candidate: RemoteEditorSession = {
+          editorSessionId: p.editorSessionId,
+          userId: p.userId,
+          userName: p.userName,
+          editingCell: p.editingCell,
+          canLockCells: p.canLockCells === false ? false : true,
+          isScheduleEditor: true,
+          lockRevision: p.lockRevision ?? 0,
+        };
+        if (!existing || candidate.lockRevision >= existing.lockRevision) {
+          next.set(p.editorSessionId, candidate);
         }
       }
     }
 
-    setLockedCells(next);
-    setOnlineUsers(users);
-  }, [channelRef]);
+    setRemoteSessions(next);
+  }, [channelRef, editorSessionId]);
 
   const lockCell = useCallback(
     (cellKey: string) => {
       const channel = channelRef.current;
       const user = currentUserRef.current;
       if (!channel || !user) return;
+      if (channel.state !== "joined") return;
 
-      if (channel.state !== 'joined') return;
+      const prev = currentCellRef.current;
+      if (prev === cellKey) {
+        const revision = lockRevisionRef.current;
+        trackPresence(cellKey, revision);
+        return;
+      }
 
-      // Presence for consistency (slower, server round-trip)
-      channel.track({
-        editingCell: cellKey,
-        userId: user.id,
-        userName: user.name,
-        canEdit: canEditRef.current,
-      });
-      // Broadcast for instant delivery to other clients
-      channel.send({
-        type: 'broadcast',
-        event: 'cell_locked',
-        payload: { cellKey, userId: user.id, userName: user.name },
-      });
+      if (prev) {
+        const unlockRevision = ++lockRevisionRef.current;
+        if (canLockCellsRef.current) {
+          channel.send({
+            type: "broadcast",
+            event: "cell_unlocked",
+            payload: {
+              userId: user.id,
+              editorSessionId,
+              cellKey: prev,
+              lockRevision: unlockRevision,
+            },
+          });
+        }
+        trackPresence(null, unlockRevision);
+      }
+
+      currentCellRef.current = cellKey;
+      const lockRevision = ++lockRevisionRef.current;
+
+      trackPresence(cellKey, lockRevision);
+      if (canLockCellsRef.current) {
+        channel.send({
+          type: "broadcast",
+          event: "cell_locked",
+          payload: {
+            cellKey,
+            userId: user.id,
+            userName: user.name,
+            editorSessionId,
+            lockRevision,
+            canLockCells: canLockCellsRef.current,
+          },
+        });
+      }
     },
-    [channelRef],
+    [channelRef, editorSessionId, trackPresence],
   );
 
-  const unlockCell = useCallback(() => {
+  const unlockCell = useCallback((options?: { removePresence?: boolean }) => {
     const channel = channelRef.current;
     const user = currentUserRef.current;
+    const prev = currentCellRef.current;
+
+    currentCellRef.current = null;
+    const lockRevision = ++lockRevisionRef.current;
+
     if (!channel || !user) return;
+    if (channel.state !== "joined") return;
 
-    if (channel.state !== 'joined') return;
+    trackPresence(null, lockRevision, options);
+    if (!prev) return;
+    if (!canLockCellsRef.current) return;
 
-    channel.track({
-      editingCell: null,
-      userId: user.id,
-      userName: user.name,
-      canEdit: canEditRef.current,
-    });
     channel.send({
-      type: 'broadcast',
-      event: 'cell_unlocked',
-      payload: { userId: user.id },
+      type: "broadcast",
+      event: "cell_unlocked",
+      payload: {
+        userId: user.id,
+        editorSessionId,
+        cellKey: prev,
+        lockRevision,
+      },
     });
-  }, [channelRef]);
+  }, [channelRef, editorSessionId, trackPresence]);
 
-  // Optimistic lock application from broadcast (instant, no server round-trip)
   const handleLockBroadcast = useCallback(
-    (payload: { cellKey: string; userId: string; userName: string }) => {
-      if (payload.userId === currentUserRef.current?.id) return;
-      setLockedCells(prev => {
-        const next = new Map(prev);
-        next.set(payload.cellKey, {
+    (payload: {
+      cellKey: string;
+      userId: string;
+      userName: string;
+      editorSessionId: string;
+      lockRevision: number;
+      canLockCells?: boolean;
+    }) => {
+      applyRemoteSessionUpdate(payload.editorSessionId, (current) => {
+        if (current && payload.lockRevision < current.lockRevision) {
+          return current;
+        }
+        return {
+          editorSessionId: payload.editorSessionId,
           userId: payload.userId,
           userName: payload.userName,
-          cellKey: payload.cellKey,
-        });
-        return next;
+          editingCell: payload.cellKey,
+          canLockCells: payload.canLockCells !== false,
+          isScheduleEditor: true,
+          lockRevision: payload.lockRevision,
+        };
       });
     },
-    [],
+    [applyRemoteSessionUpdate],
   );
 
-  // Optimistic unlock application from broadcast
   const handleUnlockBroadcast = useCallback(
-    (payload: { userId: string }) => {
-      if (payload.userId === currentUserRef.current?.id) return;
-      setLockedCells(prev => {
-        const next = new Map<string, CellLock>();
-        for (const [key, lock] of prev) {
-          if (lock.userId !== payload.userId) next.set(key, lock);
+    (payload: {
+      userId: string;
+      editorSessionId: string;
+      cellKey: string | null;
+      lockRevision: number;
+    }) => {
+      applyRemoteSessionUpdate(payload.editorSessionId, (current) => {
+        if (!current) return current;
+        if (payload.lockRevision < current.lockRevision) return current;
+        if (payload.cellKey && current.editingCell !== payload.cellKey) {
+          return current;
         }
-        if (next.size === prev.size) return prev; // no change
-        return next;
+        return {
+          ...current,
+          editingCell: null,
+          lockRevision: payload.lockRevision,
+        };
       });
     },
-    [],
+    [applyRemoteSessionUpdate],
   );
+
+  const onlineUsers = useMemo(() => {
+    const currentUserId = currentUser?.id ?? null;
+    const grouped = new Map<string, RemoteEditorSession[]>();
+    for (const session of remoteSessions.values()) {
+      if (!session.isScheduleEditor) continue;
+      const list = grouped.get(session.userId) ?? [];
+      list.push(session);
+      grouped.set(session.userId, list);
+    }
+
+    return Array.from(grouped.values())
+      .map((sessions) => {
+        const sorted = [...sessions].sort((a, b) => b.lockRevision - a.lockRevision);
+        const latest = sorted[0];
+        const editingSession =
+          sorted.find((session) => session.editingCell) ?? latest;
+        return {
+          editorSessionId: editingSession.editorSessionId,
+          userId: latest.userId,
+          userName: latest.userName,
+          editingCell: editingSession.editingCell,
+          canLockCells: sorted.some((session) => session.canLockCells),
+          isSameUser: currentUserId != null && latest.userId === currentUserId,
+          sessionCount: sessions.length,
+        };
+      })
+      .sort((a, b) => a.userName.localeCompare(b.userName));
+  }, [remoteSessions, currentUser?.id]);
+
+  const lockedCells = useMemo(() => {
+    const currentUserId = currentUser?.id ?? null;
+    const next = new Map<string, CellLock>();
+    for (const session of remoteSessions.values()) {
+      if (!session.editingCell || !session.canLockCells) continue;
+      if (currentUserId != null && session.userId === currentUserId) continue;
+      const existing = next.get(session.editingCell);
+      if (!existing || session.lockRevision >= existing.lockRevision) {
+        next.set(session.editingCell, {
+          editorSessionId: session.editorSessionId,
+          userId: session.userId,
+          userName: session.userName,
+          cellKey: session.editingCell,
+          lockRevision: session.lockRevision,
+        });
+      }
+    }
+    return next;
+  }, [remoteSessions, currentUser?.id]);
 
   const getCellLock = useCallback(
     (cellKey: string): CellLock | null => {
@@ -185,5 +361,41 @@ export function useCellLocks(
     [lockedCells],
   );
 
-  return { lockCell, unlockCell, getCellLock, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast };
+  const getCellActivity = useCallback(
+    (cellKey: string): OnlineUser | null => {
+      const currentUserId = currentUser?.id ?? null;
+      const sessions = Array.from(remoteSessions.values())
+        .filter((session) => session.editingCell === cellKey)
+        .sort((a, b) => b.lockRevision - a.lockRevision);
+      const match = sessions[0];
+      if (!match) return null;
+      return {
+        editorSessionId: match.editorSessionId,
+        userId: match.userId,
+        userName: match.userName,
+        editingCell: match.editingCell,
+        canLockCells: match.canLockCells,
+        isSameUser: currentUserId != null && match.userId === currentUserId,
+        sessionCount: sessions.length,
+      };
+    },
+    [remoteSessions, currentUser?.id],
+  );
+
+  const getCurrentCell = useCallback((): string | null => {
+    return currentCellRef.current;
+  }, []);
+
+  return {
+    lockCell,
+    unlockCell,
+    getCellLock,
+    getCellActivity,
+    getCurrentCell,
+    lockedCells,
+    onlineUsers,
+    syncPresence,
+    handleLockBroadcast,
+    handleUnlockBroadcast,
+  };
 }

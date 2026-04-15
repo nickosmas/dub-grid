@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { z } from "zod";
 import { passwordResetLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { requireGridmasterSession } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -12,36 +12,17 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // ── Auth check ──────────────────────────────────────────────────────
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Route handler — cookies are read-only here
-        },
-      },
-    },
-  );
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthenticated" },
-      { status: 401 },
-    );
-  }
+  const auth = await requireGridmasterSession(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   // ── Rate limit by user ID ────────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(
     passwordResetLimiter,
-    session.user.id,
+    user.id,
   );
   if (misconfigured) {
     return NextResponse.json(
@@ -57,74 +38,6 @@ export async function POST(req: NextRequest) {
         status: 429,
         headers: { "Retry-After": String(retryAfter) },
       },
-    );
-  }
-
-  // ── CSRF: validate Origin header ────────────────────────────────────
-  const origin = req.headers.get("origin");
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : null);
-  if (!origin || !siteUrl) {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
-    }
-  } else {
-    const allowedHost = new URL(
-      siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`,
-    ).host;
-    const originHost = new URL(origin).host;
-    if (originHost !== allowedHost && !originHost.endsWith(`.${allowedHost}`)) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
-    }
-  }
-
-  // ── Authorization — gridmaster only ─────────────────────────────────
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  type JwtClaims = { platform_role?: unknown };
-  let claims: JwtClaims | null = null;
-
-  if (supabaseUrl) {
-    try {
-      const jwks = createRemoteJWKSet(
-        new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
-      );
-      const { payload } = await jwtVerify(session.access_token, jwks);
-      claims = payload as JwtClaims;
-    } catch {
-      // jwtVerify can fail in dev (JWKS unavailable) — fall through to unverified decode
-    }
-  }
-
-  if (!claims) {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: supabaseUrl ? "Invalid session" : "Server misconfigured" },
-        { status: supabaseUrl ? 401 : 500 },
-      );
-    }
-    try {
-      claims = decodeJwt(session.access_token) as JwtClaims;
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid session" },
-        { status: 401 },
-      );
-    }
-  }
-
-  if (claims!.platform_role !== "gridmaster") {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 403 },
     );
   }
 
@@ -173,8 +86,8 @@ export async function POST(req: NextRequest) {
     try {
       await supabaseAdmin.from("audit_log").insert({
         org_id: null,
-        actor_id: session.user.id,
-        actor_email: session.user.email ?? null,
+        actor_id: user.id,
+        actor_email: user.email ?? null,
         action: "user.password_reset_sent",
         resource_type: "user",
         resource_id: data.user?.id ?? null,

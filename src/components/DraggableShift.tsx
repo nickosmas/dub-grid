@@ -9,6 +9,9 @@ export interface ShiftDragData {
   dateKey: string;
   label: string;
   shiftCodeIds: number[];
+  absenceTypeId: number | null;
+  customStartTime: string | null;
+  customEndTime: string | null;
   focusAreaName: string;
   pillColor: string;
   pillText: string;
@@ -49,7 +52,7 @@ export default function DraggableShift({
     <div
       ref={(el) => { setNodeRef(el); nodeRef.current = el; }}
       {...(disabled ? {} : { ...attributes, ...listeners })}
-      aria-roledescription="draggable shift"
+      aria-roledescription="draggable schedule entry"
       aria-label={data.label}
       className={disabled ? undefined : "dg-draggable-shift"}
       style={{

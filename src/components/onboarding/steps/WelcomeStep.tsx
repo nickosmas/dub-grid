@@ -12,6 +12,7 @@ import {
 interface WelcomeStepProps {
   role: string;
   onNext: () => void;
+  isOrgSetup?: boolean;
 }
 
 const featureCards: Record<
@@ -71,22 +72,27 @@ const featureCards: Record<
   ],
 };
 
-export default function WelcomeStep({ role, onNext }: WelcomeStepProps) {
+export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepProps) {
   const { org } = useOrganizationData();
   const orgName = org?.name;
 
   const isSuperAdmin = role === "super_admin";
+  const isSaOrientation = isSuperAdmin && (isOrgSetup ?? false);
   const features = featureCards[role] ?? featureCards.user;
 
-  const heading = isSuperAdmin
-    ? "Welcome to DubGrid"
-    : `Welcome to ${orgName ?? "DubGrid"}`;
+  const heading = isSaOrientation
+    ? `Welcome to ${orgName ?? "DubGrid"}`
+    : isSuperAdmin
+      ? "Welcome to DubGrid"
+      : `Welcome to ${orgName ?? "DubGrid"}`;
 
-  const subtext = isSuperAdmin
-    ? "Smart staff scheduling built for care facilities. Let's set up your workspace \u2014 it only takes a few minutes."
-    : role === "admin"
-      ? "You've been added as an administrator. Here's what you'll have access to."
-      : "You're all set up and ready to go. Here's what you'll find here.";
+  const subtext = isSaOrientation
+    ? "You\u2019ve been added as a super admin. Let\u2019s take a quick look at what you can do."
+    : isSuperAdmin
+      ? "Smart staff scheduling built for care facilities. Let\u2019s set up your workspace \u2014 it only takes a few minutes."
+      : role === "admin"
+        ? "You\u2019ve been added as an administrator. Here\u2019s what you\u2019ll have access to."
+        : "You\u2019re all set up and ready to go. Here\u2019s what you\u2019ll find here.";
 
   return (
     <div
@@ -165,7 +171,7 @@ export default function WelcomeStep({ role, onNext }: WelcomeStepProps) {
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                background: "var(--color-brand-bg, #f0f8f0)",
+                background: "var(--color-brand-bg, #eff6ff)",
                 color: "var(--color-brand)",
                 display: "flex",
                 alignItems: "center",
@@ -216,10 +222,10 @@ export default function WelcomeStep({ role, onNext }: WelcomeStepProps) {
           fontWeight: 700,
           cursor: "pointer",
           transition: "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: "0 4px 16px rgba(0, 95, 2, 0.25)",
+          boxShadow: "0 4px 16px rgba(37, 99, 235, 0.25)",
         }}
       >
-        {isSuperAdmin ? "Let\u2019s Get Started" : "Continue"}
+        {isSuperAdmin && !isOrgSetup ? "Let\u2019s Get Started" : "Continue"}
       </button>
     </div>
   );

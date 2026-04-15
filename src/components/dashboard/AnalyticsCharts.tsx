@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import * as Sentry from "@/lib/sentry";
 import {
   fetchWeeklyShiftHours,
   fetchEmployeeUtilization,
@@ -34,9 +35,11 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
   const [hoursData, setHoursData] = useState<WeeklyShiftHours[]>([]);
   const [utilData, setUtilData] = useState<EmployeeUtilization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [hours, util] = await Promise.all([
         fetchWeeklyShiftHours(orgId, weeks),
@@ -44,8 +47,13 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
       ]);
       setHoursData(hours);
       setUtilData(util);
-    } catch {
-      // silently fail — charts just show empty
+    } catch (err) {
+      Sentry.captureException(err, {
+        extra: { context: "dashboard-analytics-charts", orgId, weeks },
+      });
+      setHoursData([]);
+      setUtilData([]);
+      setError("Analytics are temporarily unavailable.");
     } finally {
       setLoading(false);
     }
@@ -85,6 +93,18 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
       {loading ? (
         <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
           Loading analytics...
+        </div>
+      ) : error ? (
+        <div
+          style={{
+            padding: 24,
+            borderRadius: 12,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          {error}
         </div>
       ) : (
         <RechartsProvider>

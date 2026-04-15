@@ -8,6 +8,7 @@ import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
+import { MaybeHint } from "@/components/ui/hint";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -335,8 +336,8 @@ function PrintSection({
                                     fontSize: "1em",
                                     fontWeight: 800,
                                     lineHeight: 1,
-                                    background: crossHomeFa.colorBg,
-                                    color: crossHomeFa.colorText,
+                                    background: "var(--color-bg-secondary)",
+                                    color: "var(--color-text-secondary)",
                                     borderRadius: "3px 0 0 3px",
                                     padding: "0 0.3em",
                                     letterSpacing: "0.02em",
@@ -345,7 +346,9 @@ function PrintSection({
                                   {getFocusAreaInitials(crossHomeFa.name)}
                                 </span>
                               )}
-                              <span title={isNameMode ? label : undefined} style={{ fontWeight: 800, lineHeight: 1, ...(isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : {}) }}>{isNameMode ? pillText(label, 14) : label}</span>
+                              <MaybeHint content={isNameMode ? label : undefined} side="top">
+                                <span style={{ fontWeight: 800, lineHeight: 1, ...(isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : {}) }}>{isNameMode ? pillText(label, 14) : label}</span>
+                              </MaybeHint>
                               {customTimes && (
                                 <span style={{
                                   fontSize: "0.75em",
@@ -421,8 +424,8 @@ function PrintSection({
                                         fontSize: "0.75em",
                                         fontWeight: 800,
                                         lineHeight: 1,
-                                        background: crossHomeFaLi.colorBg,
-                                        color: crossHomeFaLi.colorText,
+                                        background: "var(--color-bg-secondary)",
+                                        color: "var(--color-text-secondary)",
                                         borderRadius: "2px 0 0 2px",
                                         padding: "0 0.2em",
                                         letterSpacing: "0.02em",
@@ -431,7 +434,9 @@ function PrintSection({
                                       {getFocusAreaInitials(crossHomeFaLi.name)}
                                     </span>
                                   )}
-                                  <span title={isNameMode ? label : undefined} style={isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : undefined}>{isNameMode ? pillText(label, 8) : label}</span>
+                                  <MaybeHint content={isNameMode ? label : undefined} side="top">
+                                    <span style={isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : undefined}>{isNameMode ? pillText(label, 8) : label}</span>
+                                  </MaybeHint>
                                   {hasTime && (
                                     <span style={{ fontSize: "0.7em", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
                                       {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
@@ -548,10 +553,12 @@ function TallyRow({
             {entries.length === 0
               ? "-"
               : entries.map(([lbl, cnt], ei) => (
-                  <span key={lbl} title={`${lbl}: ${cnt}`} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isNameMode ? 90 : undefined, display: isNameMode ? "inline-block" : undefined, verticalAlign: isNameMode ? "middle" : undefined }}>
-                    {ei > 0 && <span style={{ color:"#94A3B8", margin: "0 0.3em" }}>|</span>}
-                    {lbl}: {cnt}
-                  </span>
+                  <MaybeHint key={lbl} content={`${lbl}: ${cnt}`} side="top">
+                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isNameMode ? 90 : undefined, display: isNameMode ? "inline-block" : undefined, verticalAlign: isNameMode ? "middle" : undefined }}>
+                      {ei > 0 && <span style={{ color:"#94A3B8", margin: "0 0.3em" }}>|</span>}
+                      {lbl}: {cnt}
+                    </span>
+                  </MaybeHint>
                 ))}
           </div>
         );
@@ -633,11 +640,7 @@ export default function PrintScheduleView({
 
   // Filter focus areas to print
   const printFocusAreas = useMemo(
-    () =>
-      focusAreas.filter(
-        (w) =>
-          selectedWings.length === 0 || selectedWings.includes(w.name),
-      ),
+    () => focusAreas.filter((w) => selectedWings.includes(w.name)),
     [focusAreas, selectedWings],
   );
 

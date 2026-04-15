@@ -167,7 +167,7 @@ export default function GridmasterDashboard({
         <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           Dashboard
         </h2>
-        <button className="dg-btn dg-btn-primary" onClick={onCreateOrg}>
+        <button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>
           + New Organization
         </button>
       </div>

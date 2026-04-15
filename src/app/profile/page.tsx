@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { usePermissions } from "@/hooks";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -87,7 +88,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
-function ProfilePageContent() {
+export function ProfilePageContent() {
   const router = useRouter();
   const { role, orgId, isLoading } = usePermissions();
   const [user, setUser] = useState<User | null>(null);
@@ -126,13 +127,13 @@ function ProfilePageContent() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (cancelled || !data.session) return;
-      setUser(data.session.user);
+      const verifiedUser = await getVerifiedBrowserUser();
+      if (cancelled || !verifiedUser) return;
+      setUser(verifiedUser);
       const { data: prof } = await supabase
         .from("profiles")
         .select("first_name, last_name, mfa_enabled")
-        .eq("id", data.session.user.id)
+        .eq("id", verifiedUser.id)
         .single();
       if (!cancelled) {
         setProfile(prof ? { first_name: prof.first_name, last_name: prof.last_name } : null);
@@ -151,6 +152,12 @@ function ProfilePageContent() {
     : (user?.email?.[0] ?? "?").toUpperCase();
 
   const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.user;
+  const hasNameChanges =
+    editFirstName.trim() !== (firstName ?? "") ||
+    editLastName.trim() !== (lastName ?? "");
+  const savedEmail = (user?.email ?? "").trim().toLowerCase();
+  const editedEmail = editEmail.trim().toLowerCase();
+  const hasEmailChanges = editedEmail !== "" && editedEmail !== savedEmail;
 
   const createdAt = user?.created_at
     ? new Date(user.created_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -386,7 +393,7 @@ function ProfilePageContent() {
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       onClick={saveName}
-                      disabled={savingName}
+                      disabled={savingName || !hasNameChanges}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -398,7 +405,7 @@ function ProfilePageContent() {
                         borderRadius: 8,
                         fontSize: "var(--dg-fs-caption)",
                         fontWeight: 600,
-                        cursor: savingName ? "not-allowed" : "pointer",
+                        cursor: savingName || !hasNameChanges ? "not-allowed" : "pointer",
                       }}
                     >
                       <Check size={14} />
@@ -495,7 +502,7 @@ function ProfilePageContent() {
                     />
                     <button
                       onClick={saveEmail}
-                      disabled={savingEmail}
+                      disabled={savingEmail || !hasEmailChanges}
                       style={{
                         padding: "6px 12px",
                         fontSize: "var(--dg-fs-footnote)",
@@ -504,7 +511,7 @@ function ProfilePageContent() {
                         border: "none",
                         background: "var(--color-primary)",
                         color: "#fff",
-                        cursor: savingEmail ? "wait" : "pointer",
+                        cursor: savingEmail || !hasEmailChanges ? "wait" : "pointer",
                       }}
                     >
                       {savingEmail ? "Saving..." : "Save"}

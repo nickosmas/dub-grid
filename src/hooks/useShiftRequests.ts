@@ -78,6 +78,7 @@ export function useShiftRequests(
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const orgIdRef = useRef(orgId);
   orgIdRef.current = orgId;
   const requestsRef = useRef(requests);
@@ -167,23 +168,48 @@ export function useShiftRequests(
     };
   }, [orgId]);
 
+  useEffect(() => {
+    const expiryTimes = requests
+      .filter(
+        (r) =>
+          !["expired", "cancelled", "approved", "rejected"].includes(r.status),
+      )
+      .map((r) => Date.parse(r.expiresAt))
+      .filter((ms) => ms > Date.now());
+
+    if (expiryTimes.length === 0) return undefined;
+
+    const nextExpiry = Math.min(...expiryTimes);
+    const timeout = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, nextExpiry - Date.now() + 50),
+    );
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [requests]);
+
   // Filter expired at read time: must be a non-terminal status AND not past expiry.
   // Memoized so consumers get a stable array reference when the underlying data hasn't changed.
   const activeRequests = useMemo(
     () => {
-      const now = new Date().toISOString();
+      const nowIso = new Date(now).toISOString();
       return requests.filter(
         (r) =>
           !["expired", "cancelled", "approved", "rejected"].includes(r.status) &&
-          r.expiresAt > now
+          r.expiresAt > nowIso,
       );
     },
-    [requests],
+    [requests, now],
   );
 
+  // BUG 1.13: Filter out user's own pickup requests from available shifts tab
   const openPickups = useMemo(
-    () => activeRequests.filter((r) => r.type === "pickup" && r.status === "open"),
-    [activeRequests],
+    () => activeRequests.filter(
+      (r) => r.type === "pickup" && r.status === "open" && r.requesterEmpId !== currentEmpId
+    ),
+    [activeRequests, currentEmpId],
   );
 
   const myRequests = useMemo(

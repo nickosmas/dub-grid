@@ -8,6 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import type { Employee, FocusArea, NamedItem, Organization, Invitation } from "@/types";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { getInitials, getEmployeeDisplayName, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
+import { EmployeeStatusActions } from "./EmployeeStatusActions";
 
 interface StaffDetailHeaderProps {
   employee: Employee;
@@ -18,6 +19,9 @@ interface StaffDetailHeaderProps {
   canManageEmployees: boolean;
   thisWeekHours: EmployeeHours | null;
   pendingInvite: Invitation | null;
+  onBench?: (empId: string, note?: string) => void;
+  onActivate?: (empId: string) => void;
+  onTerminate?: (empId: string) => void;
 }
 
 export function StaffDetailHeader({
@@ -25,8 +29,12 @@ export function StaffDetailHeader({
   focusAreas,
   certifications,
   orgRoles,
+  canManageEmployees,
   thisWeekHours,
   pendingInvite,
+  onBench,
+  onActivate,
+  onTerminate,
 }: StaffDetailHeaderProps) {
   const displayName = getEmployeeDisplayName(employee);
   const certAbbr = getCertAbbr(employee.certificationId, certifications);
@@ -108,6 +116,20 @@ export function StaffDetailHeader({
               </div>
             )}
           </div>
+
+          {/* Status actions */}
+          {canManageEmployees && onBench && onActivate && onTerminate && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <EmployeeStatusActions
+                employee={employee}
+                canEdit={canManageEmployees}
+                onBench={onBench}
+                onActivate={onActivate}
+                onTerminate={onTerminate}
+                variant="page"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -124,7 +146,7 @@ export function StaffDetailHeader({
                     key={faId}
                     variant="outline"
                     className="border-transparent px-2"
-                    style={{ background: fa.colorBg, color: fa.colorText }}
+                    style={{ background: "var(--color-bg-secondary)", color: "var(--color-text-secondary)" }}
                   >
                     {fa.name}
                   </Badge>

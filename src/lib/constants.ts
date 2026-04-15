@@ -10,3 +10,6 @@ export const MS_PER_DAY = 86_400_000;
 
 /** Standard card box-shadow used across the app. */
 export const BOX_SHADOW_CARD = "0 1px 4px rgba(0,0,0,0.06)";
+
+/** Default hover delay for Hint tooltips (ms). Keyboard focus opens instantly. */
+export const TOOLTIP_DELAY_MS = 500;

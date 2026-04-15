@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { ShieldCheck, ShieldOff, Copy, Check } from "lucide-react";
 import Image from "next/image";
+import { MaybeHint } from "@/components/ui/hint";
 
 type MFAStep = "idle" | "enrolling" | "verifying" | "disabling";
 
@@ -70,12 +72,12 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       if (error) throw error;
 
       // Update the profile to reflect MFA enabled
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      const user = await getVerifiedBrowserUser();
+      if (user) {
         await supabase
           .from("profiles")
           .update({ mfa_enabled: true })
-          .eq("id", session.user.id);
+          .eq("id", user.id);
       }
 
       toast.success("Two-factor authentication enabled.");
@@ -106,12 +108,12 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       }
 
       // Update the profile
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      const user = await getVerifiedBrowserUser();
+      if (user) {
         await supabase
           .from("profiles")
           .update({ mfa_enabled: false })
-          .eq("id", session.user.id);
+          .eq("id", user.id);
       }
 
       toast.success("Two-factor authentication disabled.");
@@ -266,20 +268,22 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             wordBreak: "break-all",
           }}>
             <span style={{ flex: 1, color: "var(--color-text-primary)" }}>{secret}</span>
-            <button
-              onClick={copySecret}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: 4,
-                color: "var(--color-text-muted)",
-                flexShrink: 0,
-              }}
-              title="Copy secret"
-            >
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-            </button>
+            <MaybeHint content="Copy secret" side="top">
+              <button
+                onClick={copySecret}
+                aria-label="Copy secret"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 4,
+                  color: "var(--color-text-muted)",
+                  flexShrink: 0,
+                }}
+              >
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+            </MaybeHint>
           </div>
         </div>
       )}

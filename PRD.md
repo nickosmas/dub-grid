@@ -277,7 +277,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-38 | Staff Detail Overview   | Should   | ✅     | Full employee profile page with personal info, certifications, focus areas, and status.                                |
 | FR-39 | Staff Schedule Tab      | Should   | ✅     | Historical schedule view for an individual employee with date range filtering.                                          |
 | FR-40 | Staff Activity Tab      | Should   | ✅     | Employee activity timeline showing status changes, role changes, and events.                                            |
-| FR-41 | Staff Reports Tab       | Should   | ✅     | Hours reports, shift distribution charts, day-of-week patterns, and focus area distribution per employee.              |
+| FR-41 | Staff Reports Tab       | Should   | Deferred | Not currently surfaced in the active staff detail experience. |
 
 ### 7.10 Shift Requests
 
@@ -365,7 +365,7 @@ Organizations are routed via subdomains:
 Edge middleware (`middleware.ts`) enforces:
 - JWT verification and role calculation
 - Subdomain-to-org matching
-- Route-level access control (`/staff` and `/settings` → admin+, `/gridmaster` → gridmaster only)
+- Route-level access control (`/settings` → admin+, `/gridmaster` → gridmaster only)
 - Header injection (`x-dubgrid-role`, `x-dubgrid-org-id`, `x-dubgrid-org-slug`)
 
 ### 9.2 Application Routes
@@ -384,9 +384,8 @@ Edge middleware (`middleware.ts`) enforces:
 | `/setup`                 | Authenticated   | Organization setup wizard (admin)                          |
 | `/dashboard`             | Authenticated   | Organization dashboard with analytics                      |
 | `/schedule`              | Authenticated   | Main schedule grid                                         |
-| `/schedules`             | Authenticated   | Redirect alias to `/schedule`                              |
-| `/staff`                 | Admin+          | Staff roster management                                    |
-| `/staff/[id]`            | Admin+          | Individual staff member detail (tabs: Overview, Schedule, Activity, Reports) |
+| `/people`                | Authenticated   | People roster management                                   |
+| `/people/[id]`           | Authenticated   | Individual staff member detail (tabs: Overview, Schedule, Activity) |
 | `/settings`              | Admin+          | Organization configuration (8 sections)                    |
 | `/profile`               | Authenticated   | User profile settings                                      |
 | `/gridmaster`            | Gridmaster      | Platform command center                                    |
@@ -399,8 +398,8 @@ Edge middleware (`middleware.ts`) enforces:
 | --------------------------------- | ---------------------------------------------------------- |
 | `src/app/schedule/page.tsx`       | Main scheduler UI — grid, toolbar, DND                     |
 | `src/app/dashboard/page.tsx`      | Organization dashboard with analytics                      |
-| `src/app/staff/page.tsx`          | Staff roster management                                    |
-| `src/app/staff/[id]/page.tsx`     | Staff detail page with tabbed views                        |
+| `src/app/people/page.tsx`         | People roster management                                   |
+| `src/app/people/[id]/page.tsx`    | Staff detail page with tabbed views                        |
 | `src/app/settings/page.tsx`       | Organization settings (terminology, shift codes, etc.)     |
 | `src/app/gridmaster/page.tsx`     | Gridmaster command center                                  |
 | `src/app/login/page.tsx`          | Auth login with org subdomain validation                   |
@@ -412,7 +411,6 @@ Edge middleware (`middleware.ts`) enforces:
 | `src/lib/staff-detail-stats.ts`   | Staff detail analytics                                     |
 | `src/lib/email.ts`                | Branded HTML email templates + sanitization utilities       |
 | `src/lib/rate-limit.ts`           | Upstash Redis rate limiters (API, invite, demo)            |
-| `src/lib/palette.ts`              | Static hex color values for JS inline styles               |
 | `src/lib/colors.ts`               | Color presets for shift codes, focus areas, drafts          |
 | `src/lib/styles.ts`               | Shared CSS-in-JS style objects for layout consistency       |
 | `src/types/index.ts`              | All domain + RBAC TypeScript types                         |
@@ -481,12 +479,11 @@ AppShell.tsx (root layout — sidebar, header, navigation)
 │   ├── InviteEmployeeModal.tsx
 │   └── StaffDetailPanel.tsx (side panel)
 │
-├── StaffDetailPage.tsx (individual staff member at /staff/[id])
+├── StaffDetailPage.tsx (individual staff member at /people/[id])
 │   ├── StaffDetailHeader.tsx (avatar, name, status, actions)
 │   ├── tabs/OverviewTab.tsx (profile, certs, focus areas)
 │   ├── tabs/ScheduleTab.tsx (historical schedule)
 │   ├── tabs/ActivityTab.tsx (timeline)
-│   └── tabs/ReportsTab.tsx (hours, shift distribution, day patterns, focus area breakdown)
 │
 ├── SettingsPage.tsx (org configuration — 8 sections)
 │
@@ -521,7 +518,7 @@ gridmaster/page.tsx
 ├── OrganizationDetail.tsx (org management)
 │   └── AdminPermissionsEditor.tsx (per-admin permission config)
 ├── OrganizationSetupWizard.tsx (guided setup for new orgs)
-├── CreateOrganizationForm.tsx (new org registration)
+├── OrganizationSetupWizard.tsx (new org registration)
 ├── EnhancedImpersonation.tsx (impersonate org users)
 └── ImpersonationHistory.tsx (impersonation session log)
 ```
@@ -569,13 +566,12 @@ gridmaster/page.tsx
 
 ### 10.5 Staff Detail
 
-- Full-page employee profile view at `/staff/[id]`
+- Full-page employee profile view at `/people/[id]`
 - Header: avatar, name, status badge, certifications
-- Tabs: Overview, Schedule, Activity, Reports
+- Tabs: Overview, Schedule, Activity
 - Overview: personal info, focus areas, roles, certifications
 - Schedule: historical shift view with date range picker
 - Activity: status change timeline, events
-- Reports: hours history, shift distribution, day-of-week patterns, focus area breakdown
 
 ### 10.6 Print View
 
@@ -692,7 +688,7 @@ These items were open questions in previous PRD versions and have been resolved 
 | Cross-staff counting?            | Employees belong to multiple focus areas. Shift entries are per-employee per-date.            |
 | Authentication & RBAC?           | Fully implemented. Four-tier role hierarchy with granular admin permissions. JWT-based claims. |
 | Dashboard analytics?             | Implemented with stat cards, charts, coverage tracking, and expandable detail views.          |
-| Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity, Reports.                                 |
+| Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity.                                          |
 | Shift requests?                  | Pickup and swap requests implemented with admin approval workflow.                            |
 | Coverage tracking?               | Coverage requirements and status visualization implemented.                                   |
 | Password reset flow?             | Implemented. Forgot password → email link → reset form with strength meter → sign out.        |

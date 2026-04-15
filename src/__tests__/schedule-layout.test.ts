@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+
+import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
+import { resolveScheduleSpan } from "@/lib/schedule-view";
+import { AUTO_ONE_WEEK } from "@/hooks";
+
+describe("schedule view fallback", () => {
+  it("widens the auto one-week breakpoint", () => {
+    expect(AUTO_ONE_WEEK).toBe("(min-width: 768px) and (max-width: 1200px)");
+  });
+
+  it("auto-resolves preferred 2-week view to 1-week inside the cramped range", () => {
+    expect(resolveScheduleSpan(2, true)).toBe(1);
+    expect(resolveScheduleSpan(1, true)).toBe(1);
+    expect(resolveScheduleSpan("month", true)).toBe("month");
+    expect(resolveScheduleSpan(2, false)).toBe(2);
+  });
+});
+
+describe("schedule grid layout", () => {
+  it("fits a wide 2-week code grid to the container when content is compact", () => {
+    const layout = getScheduleGridLayout({
+      spanWeeks: 2,
+      shiftDisplayMode: "code",
+      containerWidth: 1600,
+      hasOpenShifts: false,
+      hasStackedCellContent: false,
+    });
+
+    expect(layout.fitToContainer).toBe(true);
+    expect(layout.nameColWidth).toBe(200);
+    expect(layout.colWidth).toBeGreaterThanOrEqual(80);
+  });
+
+  it("keeps readable minimum widths with horizontal scroll when 2-week content is dense", () => {
+    const layout = getScheduleGridLayout({
+      spanWeeks: 2,
+      shiftDisplayMode: "code",
+      containerWidth: 1200,
+      hasOpenShifts: true,
+      hasStackedCellContent: true,
+    });
+
+    expect(layout.fitToContainer).toBe(false);
+    expect(layout.nameColWidth).toBe(220);
+    expect(layout.colWidth).toBe(88);
+    expect(layout.minGridWidth).toBe(1452);
+  });
+
+  it("preserves wider readable columns for 2-week name mode", () => {
+    const layout = getScheduleGridLayout({
+      spanWeeks: 2,
+      shiftDisplayMode: "name",
+      containerWidth: 1700,
+      hasOpenShifts: false,
+      hasStackedCellContent: true,
+    });
+
+    expect(layout.fitToContainer).toBe(false);
+    expect(layout.nameColWidth).toBe(220);
+    expect(layout.colWidth).toBe(160);
+  });
+});

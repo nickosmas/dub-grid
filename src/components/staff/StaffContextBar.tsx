@@ -99,43 +99,33 @@ export function StaffContextBar({
 
       {/* Bulk action bar */}
       {showBulk && (
-        <div className="flex items-center gap-3 flex-wrap px-4 py-2.5 border-b border-[var(--color-info-border)] bg-[var(--color-info-bg)]">
-          <span className="text-[13px] font-bold text-[var(--color-info-text)]">{selectionCount} selected</span>
+        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[var(--color-control-active-border)] bg-[var(--color-control-active-bg)]">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: "var(--color-control-primary)" }}>
+              <span className="text-[12px] font-bold text-white">{selectionCount}</span>
+            </div>
+            <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">{selectionCount} selected</span>
+          </div>
           <div className="flex-1" />
           {invitableEmployees.length > 0 && (
-            <button
-              onClick={() => onBulkInvite(invitableEmployees)}
-              className="px-3 py-1 min-h-[32px] rounded-lg text-xs font-semibold text-[var(--color-link)] border border-[var(--color-info-border)] hover:bg-[var(--color-info-bg)] transition-colors"
-            >
+            <button onClick={() => onBulkInvite(invitableEmployees)} className="dg-btn dg-btn-secondary dg-btn-sm">
               Invite ({invitableEmployees.length})
             </button>
           )}
           {activeTab === "active" && (
-            <button
-              onClick={() => onBulkBench([...selectedIds])}
-              className="px-3 py-1 min-h-[32px] rounded-lg text-xs font-semibold text-[var(--color-warning)] border border-[var(--color-warning-border)] hover:bg-[var(--color-warning-bg)] transition-colors"
-            >
-              Bench ({selectionCount})
+            <button onClick={() => onBulkBench([...selectedIds])} className="dg-btn dg-btn-secondary dg-btn-sm">
+              Bench
             </button>
           )}
           {activeTab === "benched" && (
-            <button
-              onClick={() => onBulkActivate([...selectedIds])}
-              className="px-3 py-1 min-h-[32px] rounded-lg text-xs font-semibold text-[var(--color-success)] border border-[var(--color-success-bg)] hover:bg-[var(--color-success-bg)] transition-colors"
-            >
-              Activate ({selectionCount})
+            <button onClick={() => onBulkActivate([...selectedIds])} className="dg-btn dg-btn-secondary dg-btn-sm">
+              Activate
             </button>
           )}
-          <button
-            onClick={() => onBulkTerminate([...selectedIds])}
-            className="px-3 py-1 min-h-[32px] rounded-lg text-xs font-semibold text-[var(--color-danger)] border border-[var(--color-danger-border)] hover:bg-[var(--color-danger-bg)] transition-colors"
-          >
-            Terminate ({selectionCount})
+          <button onClick={() => onBulkTerminate([...selectedIds])} className="dg-btn dg-btn-danger dg-btn-sm">
+            Terminate
           </button>
-          <button
-            onClick={onClearSelection}
-            className="px-3 py-1 min-h-[32px] rounded-lg text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
-          >
+          <button onClick={onClearSelection} className="dg-btn dg-btn-secondary dg-btn-sm">
             Cancel
           </button>
         </div>
@@ -143,33 +133,38 @@ export function StaffContextBar({
 
       {/* Reorder bar */}
       {showReorder && (
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-info-border)] bg-[var(--color-info-bg)]">
-          <div className="flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="var(--color-info)" style={{ flexShrink: 0 }}>
-              <rect x="3" y="2" width="2" height="2" rx="1" />
-              <rect x="9" y="2" width="2" height="2" rx="1" />
-              <rect x="3" y="6" width="2" height="2" rx="1" />
-              <rect x="9" y="6" width="2" height="2" rx="1" />
-              <rect x="3" y="10" width="2" height="2" rx="1" />
-              <rect x="9" y="10" width="2" height="2" rx="1" />
-            </svg>
-            <span className="text-[13px] font-semibold text-[var(--color-info-text)]">Drag rows to reorder</span>
+        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[var(--color-control-active-border)] bg-[var(--color-control-active-bg)]">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: "var(--color-control-primary)" }}>
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="white">
+                <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" />
+                <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" />
+                <rect x="3" y="5.75" width="2.5" height="2.5" rx="1.25" />
+                <rect x="8.5" y="5.75" width="2.5" height="2.5" rx="1.25" />
+                <rect x="3" y="10.5" width="2.5" height="2.5" rx="1.25" />
+                <rect x="8.5" y="10.5" width="2.5" height="2.5" rx="1.25" />
+              </svg>
+            </div>
+            <div>
+              <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">Reorder Mode</span>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Drag rows to change seniority order</p>
+            </div>
           </div>
           <div className="flex-1" />
-          {isDirty && (
-            <button
-              onClick={onSaveOrder}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity"
-            >
-              Save
-            </button>
-          )}
           <button
             onClick={onCancelReorder}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--color-text-muted)] border border-[var(--color-border-light)] hover:bg-[var(--color-bg-secondary)] transition-colors"
+            className="dg-btn dg-btn-secondary dg-btn-sm"
           >
             Cancel
           </button>
+          {isDirty && (
+            <button
+              onClick={onSaveOrder}
+              className="dg-btn dg-btn-primary dg-btn-sm"
+            >
+              Save Order
+            </button>
+          )}
         </div>
       )}
     </div>

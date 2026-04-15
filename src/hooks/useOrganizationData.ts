@@ -307,22 +307,33 @@ export function useOrganizationData(): OrganizationData {
     ? !ctx.resolved
     : !ctx.resolved || orgQuery.isLoading || configQueriesLoading;
 
+  // Only the org query error is fatal — config query failures degrade gracefully
   const loadError = orgQuery.isError
-    ? (orgQuery.error instanceof Error ? orgQuery.error.message : "Failed to load data")
+    ? (orgQuery.error instanceof Error ? orgQuery.error.message : "Failed to load organization")
     : null;
 
-  // Handle API errors (JWT expiry, network issues) — once only
-  const errorHandledRef = useRef(false);
+  // Handle API errors per-query — each fires its own toast, clears on recovery
+  const handledErrorsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (errorHandledRef.current) return;
-    const firstError = orgQuery.error ??
-      focusAreasQuery.error ?? allShiftCodesQuery.error ??
-      allAbsenceTypesQuery.error ?? shiftCategoriesQuery.error ??
-      indicatorTypesQuery.error ?? certificationsQuery.error ??
-      orgRolesQuery.error ?? coverageReqsQuery.error;
-    if (firstError) {
-      errorHandledRef.current = true;
-      handleApiError(firstError);
+    const queries = [
+      { key: "org", error: orgQuery.error },
+      { key: "focusAreas", error: focusAreasQuery.error },
+      { key: "shiftCodes", error: allShiftCodesQuery.error },
+      { key: "absenceTypes", error: allAbsenceTypesQuery.error },
+      { key: "shiftCategories", error: shiftCategoriesQuery.error },
+      { key: "indicatorTypes", error: indicatorTypesQuery.error },
+      { key: "certifications", error: certificationsQuery.error },
+      { key: "orgRoles", error: orgRolesQuery.error },
+      { key: "coverageReqs", error: coverageReqsQuery.error },
+    ];
+    for (const { key, error } of queries) {
+      if (error && !handledErrorsRef.current.has(key)) {
+        handledErrorsRef.current.add(key);
+        handleApiError(error);
+      }
+      if (!error && handledErrorsRef.current.has(key)) {
+        handledErrorsRef.current.delete(key);
+      }
     }
   }, [
     orgQuery.error, focusAreasQuery.error, allShiftCodesQuery.error,

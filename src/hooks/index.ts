@@ -23,7 +23,14 @@ export type { DirectoryData } from "./useDirectory";
 export { useCellLocks } from "./useCellLocks";
 export type { CellLock, OnlineUser } from "./useCellLocks";
 
-export { useMediaQuery, MOBILE, TABLET, SMALL_DESKTOP, DESKTOP } from "./useMediaQuery";
+export {
+  useMediaQuery,
+  MOBILE,
+  TABLET,
+  SMALL_DESKTOP,
+  AUTO_ONE_WEEK,
+  DESKTOP,
+} from "./useMediaQuery";
 
 export { useShiftRequests } from "./useShiftRequests";
 export type { ShiftRequestsData } from "./useShiftRequests";

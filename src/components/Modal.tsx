@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import React from "react";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
@@ -42,6 +43,13 @@ export default function Modal({ title, onClose, children, style, "aria-described
     const first = dialog.querySelector<HTMLElement>(FOCUSABLE);
     if (first) first.focus();
     else dialog.focus();
+  }, []);
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
   }, []);
 
   // Clear timeout on unmount to prevent stale onClose calls
@@ -95,7 +103,7 @@ export default function Modal({ title, onClose, children, style, "aria-described
     [handleClose]
   );
 
-  return (
+  return createPortal(
     <div
       className={`dg-modal-overlay${closing ? " closing" : ""}`}
       onClick={handleClose}
@@ -128,6 +136,7 @@ export default function Modal({ title, onClose, children, style, "aria-described
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

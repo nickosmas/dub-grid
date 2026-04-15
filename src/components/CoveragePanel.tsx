@@ -55,6 +55,8 @@ export default function CoveragePanel({
   const panelWidth = isMobile ? "100vw" : 380;
 
   return (
+    <>
+    <div className="dg-panel-overlay" onClick={onClose} />
     <div
       style={{
         position: "fixed",
@@ -64,7 +66,7 @@ export default function CoveragePanel({
         height: "100vh",
         background: "var(--color-surface)",
         boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
-        zIndex: 100,
+        zIndex: 10001,
         display: "flex",
         flexDirection: "column",
         animation: "slideInRight 0.2s ease-out",
@@ -187,8 +189,8 @@ export default function CoveragePanel({
                     gap: 6,
                     padding: "4px 10px",
                     borderRadius: 8,
-                    background: fa?.colorBg ?? "var(--color-bg-secondary)",
-                    color: fa?.colorText ?? "var(--color-text-muted)",
+                    background: "var(--color-bg-secondary)",
+                    color: "var(--color-text-muted)",
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 700,
                     marginBottom: 8,
@@ -240,5 +242,6 @@ export default function CoveragePanel({
         }
       `}</style>
     </div>
+    </>
   );
 }

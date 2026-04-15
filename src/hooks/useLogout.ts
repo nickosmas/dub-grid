@@ -1,6 +1,7 @@
 // src/hooks/useLogout.ts
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { parseHost } from "@/lib/subdomain";
 import { clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "./usePermissions";
@@ -20,9 +21,9 @@ export function useLogout() {
 
     // Best-effort impersonation cleanup — fire-and-forget.
     // Sessions auto-expire after 30 min, so this is non-critical.
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: { user?: { id: string } } | null } }) => {
-      if (session?.user?.id) {
-        supabase.from("impersonation_sessions").delete().eq("gridmaster_id", session.user.id);
+    getVerifiedBrowserUser().then((user) => {
+      if (user?.id) {
+        supabase.from("impersonation_sessions").delete().eq("gridmaster_id", user.id);
       }
     }).catch(() => {});
 

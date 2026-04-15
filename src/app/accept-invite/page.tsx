@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { acceptInvitation } from "@/lib/db";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -145,9 +146,9 @@ export default function AcceptInvitePage() {
 
       // 2b. Record terms acceptance (best-effort — user is already authenticated)
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (currentSession) {
-          await acceptTerms(currentSession.user.id);
+        const user = await getVerifiedBrowserUser();
+        if (user) {
+          await acceptTerms(user.id);
         }
       } catch {
         // Non-blocking — TermsAcceptanceGate will catch this on next login
@@ -304,7 +305,7 @@ export default function AcceptInvitePage() {
                   fontSize: "var(--dg-fs-title)",
                   fontWeight: 700,
                   transition: "transform 150ms ease, box-shadow 150ms ease",
-                  boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
+                  boxShadow: "0 4px 12px rgba(37, 99, 235, 0.18)",
                 }}
               >
                 <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Set Password & Accept</ButtonLoading>
@@ -376,7 +377,7 @@ function SuccessState({
           fontSize: "var(--dg-fs-title)",
           fontWeight: 700,
           transition: "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: "0 4px 12px rgba(27, 58, 45, 0.15)",
+          boxShadow: "0 4px 12px rgba(37, 99, 235, 0.18)",
         }}
       >
         Sign In Now

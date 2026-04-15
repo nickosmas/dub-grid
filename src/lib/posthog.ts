@@ -20,17 +20,33 @@ export function initPostHog() {
     capture_pageleave: true,
     persistence: "localStorage+cookie",
     autocapture: false, // manual events only
-    loaded: () => {
-      initialized = true;
-    },
   });
+  initialized = true;
+}
+
+export function enablePostHog() {
+  initPostHog();
+  if (!initialized) return;
+  posthog.opt_in_capturing();
+}
+
+export function disablePostHog() {
+  if (typeof window === "undefined" || !initialized) return;
+  posthog.opt_out_capturing();
+  posthog.reset();
 }
 
 /**
  * Identify the current user for PostHog.
  */
 export function identifyUser(userId: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
+  if (
+    typeof window === "undefined" ||
+    !initialized ||
+    posthog.has_opted_out_capturing()
+  ) {
+    return;
+  }
   posthog.identify(userId, properties);
 }
 
@@ -38,7 +54,7 @@ export function identifyUser(userId: string, properties?: Record<string, unknown
  * Reset PostHog identity (on logout).
  */
 export function resetPostHog() {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !initialized) return;
   posthog.reset();
 }
 
@@ -46,7 +62,13 @@ export function resetPostHog() {
  * Capture a custom event.
  */
 export function captureEvent(event: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
+  if (
+    typeof window === "undefined" ||
+    !initialized ||
+    posthog.has_opted_out_capturing()
+  ) {
+    return;
+  }
   posthog.capture(event, properties);
 }
 
@@ -54,7 +76,13 @@ export function captureEvent(event: string, properties?: Record<string, unknown>
  * Evaluate a feature flag (client-side).
  */
 export function getFeatureFlag(flag: string): boolean | string | undefined {
-  if (typeof window === "undefined") return undefined;
+  if (
+    typeof window === "undefined" ||
+    !initialized ||
+    posthog.has_opted_out_capturing()
+  ) {
+    return undefined;
+  }
   return posthog.getFeatureFlag(flag) as boolean | string | undefined;
 }
 

@@ -401,22 +401,40 @@ CREATE POLICY "gridmaster_all_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR ALL TO authenticated
   USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
 
-CREATE POLICY "members_select_recurring_drafts"
+CREATE POLICY "users_select_own_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR SELECT TO authenticated
-  USING (org_id = public.caller_org_id());
+  USING (
+    org_id = public.caller_org_id()
+    AND saved_by = auth.uid()
+  );
 
-CREATE POLICY "admin_insert_recurring_drafts"
+CREATE POLICY "users_insert_own_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageRecurringShifts'));
+  WITH CHECK (
+    org_id = public.caller_org_id()
+    AND saved_by = auth.uid()
+    AND public.check_admin_permission('canManageRecurringShifts')
+  );
 
-CREATE POLICY "admin_update_recurring_drafts"
+CREATE POLICY "users_update_own_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageRecurringShifts'))
-  WITH CHECK (org_id = public.caller_org_id());
+  USING (
+    org_id = public.caller_org_id()
+    AND saved_by = auth.uid()
+    AND public.check_admin_permission('canManageRecurringShifts')
+  )
+  WITH CHECK (
+    org_id = public.caller_org_id()
+    AND saved_by = auth.uid()
+  );
 
-CREATE POLICY "admin_delete_recurring_drafts"
+CREATE POLICY "users_delete_own_recurring_drafts"
   ON public.recurring_shifts_draft_sessions FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageRecurringShifts'));
+  USING (
+    org_id = public.caller_org_id()
+    AND saved_by = auth.uid()
+    AND public.check_admin_permission('canManageRecurringShifts')
+  );
 
 
 -- ── publish_history ──────────────────────────────────────────────────────────
@@ -455,7 +473,7 @@ CREATE POLICY "admin_insert_shifts"
       SELECT 1 FROM public.employees e
       WHERE e.id = emp_id
         AND e.org_id = public.caller_org_id()
-        AND e.status IN ('active', 'benched')
+        AND e.status = 'active'
         AND e.archived_at IS NULL
     )
   );
@@ -468,7 +486,7 @@ CREATE POLICY "admin_update_shifts"
       SELECT 1 FROM public.employees e
       WHERE e.id = shifts.emp_id
         AND e.org_id = public.caller_org_id()
-        AND e.status IN ('active', 'benched')
+        AND e.status = 'active'
         AND e.archived_at IS NULL
     )
   )
@@ -477,6 +495,8 @@ CREATE POLICY "admin_update_shifts"
       SELECT 1 FROM public.employees e
       WHERE e.id = emp_id
         AND e.org_id = public.caller_org_id()
+        AND e.status = 'active'
+        AND e.archived_at IS NULL
     )
   );
 
@@ -503,7 +523,13 @@ CREATE POLICY "gridmaster_all_recurring_shifts"
 
 CREATE POLICY "recurring_shifts_select"
   ON public.recurring_shifts FOR SELECT TO authenticated
-  USING (org_id = public.caller_org_id());
+  USING (
+    org_id = public.caller_org_id()
+    AND (
+      public.check_admin_permission('canViewRecurringShifts')
+      OR public.check_admin_permission('canManageRecurringShifts')
+    )
+  );
 
 CREATE POLICY "recurring_shifts_insert"
   ON public.recurring_shifts FOR INSERT TO authenticated
@@ -932,4 +958,3 @@ CREATE POLICY "gridmaster_insert_audit_log"
 -- No UPDATE/DELETE for gridmaster — audit_log is append-only
 
 -- Service role bypasses RLS for server-side audit logging
-

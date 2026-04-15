@@ -141,8 +141,8 @@ export default function DisplayMode({
                 gap: 12,
                 padding: 16,
                 borderRadius: 12,
-                border: isActive ? "2px solid var(--color-brand)" : "1px solid var(--color-border)",
-                background: isActive ? "var(--color-brand-bg, rgba(59,130,246,0.06))" : "var(--color-surface)",
+                border: isActive ? "2px solid var(--color-brand-border)" : "1px solid var(--color-border)",
+                background: isActive ? "var(--color-brand-bg)" : "var(--color-surface)",
                 cursor: "pointer",
                 textAlign: "left",
                 transition: "border-color 150ms ease, background 150ms ease",
@@ -210,19 +210,9 @@ export default function DisplayMode({
           type="button"
           onClick={handleSave}
           disabled={!isModified || saving}
-          style={{
-            padding: "10px 24px",
-            borderRadius: 8,
-            border: "none",
-            background: isModified ? "var(--color-brand)" : "var(--color-bg-secondary)",
-            color: isModified ? "#fff" : "var(--color-text-faint)",
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: isModified ? "pointer" : "not-allowed",
-            opacity: saving ? 0.6 : 1,
-          }}
+          className="dg-btn dg-btn-primary"
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? "Saving…" : "Save"}
         </button>
       </div>
     </div>

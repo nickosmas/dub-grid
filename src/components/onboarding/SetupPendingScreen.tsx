@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { DubGridLogo } from "@/components/Logo";
 import { useLogout } from "@/hooks";
-import { Shield } from "lucide-react";
+
 
 /**
  * Shown to regular users when they log in before the org is fully configured.
@@ -31,7 +31,7 @@ export default function SetupPendingScreen() {
         justifyContent: "center",
         padding: 24,
         background:
-          "linear-gradient(145deg, var(--color-bg) 0%, var(--color-brand-bg, #f5faf5) 100%)",
+          "linear-gradient(145deg, var(--color-bg) 0%, var(--color-brand-bg, #eff6ff) 100%)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
       }}
     >
@@ -43,24 +43,8 @@ export default function SetupPendingScreen() {
         }}
       >
         {/* Logo */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 28, display: "flex", justifyContent: "center" }}>
           <DubGridLogo size={48} />
-        </div>
-
-        {/* Icon */}
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 16,
-            background: "var(--color-brand)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 24px",
-          }}
-        >
-          <Shield size={28} color="white" />
         </div>
 
         <h1

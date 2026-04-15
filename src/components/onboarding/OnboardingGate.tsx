@@ -110,6 +110,11 @@ function OnboardingCheck({
 
   // Show onboarding wizard
   return (
-    <OnboardingWizard role={role} orgId={orgId} userId={userId} />
+    <OnboardingWizard
+      role={role}
+      orgId={orgId}
+      userId={userId}
+      isOrgSetup={isOrgSetupComplete}
+    />
   );
 }
