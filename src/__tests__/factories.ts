@@ -30,6 +30,8 @@ export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     contactNotes: "",
     userId: null,
     departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
     ...overrides,
   };
 }
@@ -55,8 +57,6 @@ export function makeFocusArea(overrides: Partial<FocusArea> = {}): FocusArea {
     orgId: "org1",
     departmentId: null,
     name: "ICU",
-    colorBg: "#e0f2fe",
-    colorText: "#0369a1",
     sortOrder: 1,
     ...overrides,
   };

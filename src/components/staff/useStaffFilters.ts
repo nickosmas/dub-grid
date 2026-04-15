@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Employee } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
-export type EmployeeTab = "active" | "benched" | "terminated" | "departments";
-export type SortBy = "seniority" | "name";
+export type EmployeeTab = "active" | "benched" | "terminated";
+export type SortKey = "seniority" | "name";
+export interface SortConfig { key: SortKey; dir: "asc" | "desc" }
 
 const PAGE_SIZE = 15;
 
@@ -22,7 +23,7 @@ export function useStaffFilters({
 }: UseStaffFiltersOptions) {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortBy>("seniority");
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "seniority", dir: "asc" });
   const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
   const [filterRole, setFilterRole] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -35,11 +36,17 @@ export function useStaffFilters({
     setSearchQuery("");
   }
 
-  // Reset page, close detail, clear selection when filters/sort/tab change
+  const handleSort = useCallback((key: SortKey) => {
+    setSortConfig((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+    );
+  }, []);
+
+  // Reset page when filters/sort/tab change
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
-  }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy, showOnlyUnlinked]);
+  }, [activeTab, searchQuery, filterFocusArea, filterRole, sortConfig, showOnlyUnlinked]);
 
   const tabCounts = useMemo(
     () => ({
@@ -74,16 +81,16 @@ export function useStaffFilters({
   }, [activeTab, employees, benchedEmployees, terminatedEmployees, searchQuery, filterFocusArea, filterRole, showOnlyUnlinked]);
 
   const sorted = useMemo(
-    () =>
-      [...rawList].sort((a, b) => {
-        switch (sortBy) {
-          case "name":
-            return a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
-          default:
-            return a.seniority - b.seniority;
+    () => {
+      const mul = sortConfig.dir === "asc" ? 1 : -1;
+      return [...rawList].sort((a, b) => {
+        if (sortConfig.key === "name") {
+          return (a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName)) * mul;
         }
-      }),
-    [rawList, sortBy],
+        return (a.seniority - b.seniority) * mul;
+      });
+    },
+    [rawList, sortConfig],
   );
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
@@ -108,8 +115,8 @@ export function useStaffFilters({
     searchQuery,
     setSearchQuery,
     // Sort & filter
-    sortBy,
-    setSortBy,
+    sortConfig,
+    handleSort,
     filterFocusArea,
     setFilterFocusArea,
     filterRole,

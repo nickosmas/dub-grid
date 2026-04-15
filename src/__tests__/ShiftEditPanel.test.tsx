@@ -1,7 +1,10 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
-import { EditModalState, FocusArea, NamedItem, ShiftCode } from "@/types";
+import { supabase } from "@/lib/supabase";
+import { AbsenceType, EditModalState, FocusArea, NamedItem, ShiftCode } from "@/types";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -51,14 +54,27 @@ const generalShift: ShiftCode = {
 
 const shiftCodes = [northShift, southShift, generalShift];
 
+const absenceTypes: AbsenceType[] = [
+  {
+    id: 7,
+    orgId: "org-1",
+    label: "VAC",
+    name: "Vacation",
+    color: "#DCFCE7",
+    border: "#86EFAC",
+    text: "#166534",
+    sortOrder: 1,
+  },
+];
+
 const certifications: NamedItem[] = [
   { id: 1, name: "JLCSN", orgId: "org-1", abbr: "JLCSN", sortOrder: 0 },
   { id: 2, name: "CSN II", orgId: "org-1", abbr: "CSN2", sortOrder: 1 },
 ];
 
 const focusAreas: FocusArea[] = [
-  { id: 1, orgId: "org-1", name: "North", colorBg: "#EFF6FF", colorText: "#1E40AF", sortOrder: 0, departmentId: null },
-  { id: 2, orgId: "org-1", name: "South", colorBg: "#FEF3C7", colorText: "#92400E", sortOrder: 1, departmentId: null },
+  { id: 1, orgId: "org-1", name: "North", sortOrder: 0, departmentId: null },
+  { id: 2, orgId: "org-1", name: "South", sortOrder: 1, departmentId: null },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,9 +105,109 @@ function renderPanel(
   return { ...result, onSelect, onClose };
 }
 
+function createSupabaseBuilder() {
+  const builder = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    gte: vi.fn(),
+    lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+  };
+
+  builder.select.mockReturnValue(builder);
+  builder.eq.mockReturnValue(builder);
+  builder.gte.mockReturnValue(builder);
+
+  return builder as unknown as ReturnType<typeof supabase.from>;
+}
+
+function RepeatFlowPanel() {
+  const [currentShift, setCurrentShift] = useState<string | null>("D");
+  const [currentShiftCodeIds, setCurrentShiftCodeIds] = useState<number[]>([1]);
+
+  return (
+    <ShiftEditPanel
+      modal={modal}
+      currentShift={currentShift}
+      currentShiftCodeIds={currentShiftCodeIds}
+      shiftCodes={shiftCodes}
+      focusAreas={focusAreas}
+      certifications={certifications}
+      allowShiftEdits
+      empId={modal.empId}
+      onSelect={(label, shiftCodeIds) => {
+        setCurrentShift(label === "OFF" ? null : label);
+        setCurrentShiftCodeIds(shiftCodeIds);
+      }}
+      onClose={vi.fn()}
+      onRepeatConfirm={vi.fn()}
+    />
+  );
+}
+
+function RepeatAbsenceFlowPanel() {
+  const [currentShift, setCurrentShift] = useState<string | null>("Vacation");
+  const [currentAbsenceTypeId, setCurrentAbsenceTypeId] = useState<number | null>(7);
+
+  return (
+    <ShiftEditPanel
+      modal={modal}
+      currentShift={currentShift}
+      currentShiftCodeIds={[]}
+      currentAbsenceTypeId={currentAbsenceTypeId}
+      shiftCodes={shiftCodes}
+      absenceTypes={absenceTypes}
+      focusAreas={focusAreas}
+      certifications={certifications}
+      allowShiftEdits
+      empId={modal.empId}
+      onSelect={() => {}}
+      onAbsenceSelect={(absenceType) => {
+        setCurrentShift(absenceType.label);
+        setCurrentAbsenceTypeId(absenceType.id);
+      }}
+      onClose={vi.fn()}
+      onRepeatConfirm={vi.fn()}
+    />
+  );
+}
+
+function ConfirmDraftHarness({
+  onConfirmDraft,
+  isStale = false,
+}: {
+  onConfirmDraft: ReturnType<typeof vi.fn>;
+  isStale?: boolean;
+}) {
+  const [currentShift, setCurrentShift] = useState<string | null>(null);
+  const [currentShiftCodeIds, setCurrentShiftCodeIds] = useState<number[]>([]);
+
+  return (
+    <ShiftEditPanel
+      modal={modal}
+      currentShift={currentShift}
+      currentShiftCodeIds={currentShiftCodeIds}
+      shiftCodes={shiftCodes}
+      focusAreas={focusAreas}
+      certifications={certifications}
+      allowShiftEdits
+      onSelect={(label, shiftCodeIds) => {
+        setCurrentShift(label === "OFF" ? null : label);
+        setCurrentShiftCodeIds(shiftCodeIds);
+      }}
+      onClose={vi.fn()}
+      onConfirmDraft={onConfirmDraft}
+      isStale={isStale}
+    />
+  );
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("ShiftEditPanel", () => {
+  beforeEach(() => {
+    vi.mocked(supabase.from).mockImplementation(() => createSupabaseBuilder());
+  });
+
   describe("Rendering", () => {
     it("renders employee name from modal.empName", () => {
       renderPanel();
@@ -279,6 +395,88 @@ describe("ShiftEditPanel", () => {
         />
       );
       expect(screen.queryByText("🔒")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Repeat mode", () => {
+    it("shows repeat mode only before local edits and keeps the sticky footer hidden while backing out", async () => {
+      const user = userEvent.setup();
+
+      render(<RepeatFlowPanel />);
+
+      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+
+      const createRepeatingShiftButton = screen.getByRole("button", { name: "Create Repeating Shift" });
+      expect(createRepeatingShiftButton).toBeInTheDocument();
+      expect(createRepeatingShiftButton).toBeEnabled();
+      const backButtons = screen.getAllByRole("button", { name: "Back" });
+      expect(backButtons).toHaveLength(2);
+      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Monday" }));
+      expect(screen.getByRole("button", { name: "Create Repeating Shift" })).toBeDisabled();
+
+      await user.click(backButtons[1]);
+
+      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Make this a repeating shift" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Create Repeating Shift" })).not.toBeInTheDocument();
+    });
+
+    it("shows the absence repeat flow for off days", async () => {
+      const user = userEvent.setup();
+
+      render(<RepeatAbsenceFlowPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Make this repeating" }));
+
+      expect(screen.getByText("Repeating Off Day")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Create Repeating Off Day" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("Confirm-save flow", () => {
+    it("undoes a new local shift and allows recreating it before confirming once", async () => {
+      const user = userEvent.setup();
+      const onConfirmDraft = vi.fn();
+
+      render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} />);
+
+      await user.click(screen.getByText("D"));
+      expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Undo" }));
+      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+      expect(onConfirmDraft).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText("D"));
+      await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+      expect(onConfirmDraft).toHaveBeenCalledTimes(1);
+      expect(onConfirmDraft).toHaveBeenCalledWith(undefined);
+    });
+
+    it("shows a stale warning and disables confirm when the cell changed externally", async () => {
+      const user = userEvent.setup();
+      const onConfirmDraft = vi.fn();
+
+      render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} isStale />);
+
+      await user.click(screen.getByText("D"));
+
+      expect(
+        screen.getByText(
+          "This shift changed in another tab or by another editor. Close and reopen it before saving.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeDisabled();
     });
   });
 });

@@ -5,7 +5,6 @@ import MyScheduleCard from "./MyScheduleCard";
 import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
 import ShiftRequestsSummaryCard from "./ShiftRequestsSummaryCard";
 import RecentChangesCard from "./RecentChangesCard";
-import ActivityFeed from "./ActivityFeed";
 
 export default function UserDashboard(props: DashboardContentProps) {
   const {
@@ -18,10 +17,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     shiftCodeById,
     absenceTypeById,
     publishHistory,
-    activityItems,
-    onExpandPanel,
   } = props;
-
   // Swap proposals directed at me
   const swapProposals = useMemo(
     () =>
@@ -38,7 +34,6 @@ export default function UserDashboard(props: DashboardContentProps) {
         pendingApproval: [],
         swapProposals,
         openPickups: shiftRequests.openPickups,
-        otAlerts: [],       // Users should not see OT alerts about others
         openShifts: [],
         draftTotal: 0,
         currentEmpId,
@@ -48,11 +43,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     [swapProposals, shiftRequests.openPickups, currentEmpId, shiftRequests.respond, shiftRequests.claim],
   );
 
-  // Filter out OT alert items from activity feed — users shouldn't see other employees' overtime
-  const userActivityItems = useMemo(
-    () => activityItems.filter((item) => item.type !== "ot_alert"),
-    [activityItems],
-  );
+
 
   return (
     <>
@@ -78,30 +69,45 @@ export default function UserDashboard(props: DashboardContentProps) {
         <ActionQueueCard items={actionItems} />
       )}
 
-      {/* Shift Requests — my requests + available pickups */}
-      <ShiftRequestsSummaryCard
-        isAdmin={false}
-        openPickups={shiftRequests.openPickups}
-        myRequests={shiftRequests.myRequests}
-        pendingApproval={[]}
-        currentEmpId={currentEmpId}
-        onClaim={shiftRequests.claim}
-        onRespond={shiftRequests.respond}
-        onCancel={shiftRequests.cancel}
-      />
+      {/* Combined Requests & Changes Card */}
+      <div className="dg-card">
+        <div className="dg-card-header">
+          <div>
+            <div className="dg-card-title">Requests & Updates</div>
+            <div className="dg-card-subtitle">Your shift requests and recent changes</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--dg-space-md)" }}>
+          {/* Shift Requests Section */}
+          <div>
+            <div style={{ fontSize: "var(--dg-fs-small)", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--dg-space-sm)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Shift Requests
+            </div>
+            <ShiftRequestsSummaryCard
+              isAdmin={false}
+              openPickups={shiftRequests.openPickups.slice(0, 2)} // Limit to 2
+              myRequests={shiftRequests.myRequests.slice(0, 2)} // Limit to 2
+              pendingApproval={[]}
+              currentEmpId={currentEmpId}
+              onClaim={shiftRequests.claim}
+              onRespond={shiftRequests.respond}
+              onCancel={shiftRequests.cancel}
+            />
+          </div>
 
-      {/* Recent Changes — what changed since last visit */}
-      <RecentChangesCard
-        publishHistory={publishHistory}
-        currentEmpId={currentEmpId}
-        isAdmin={false}
-      />
-
-      {/* Activity Feed — filtered to exclude OT alerts */}
-      <ActivityFeed
-        items={userActivityItems}
-        onExpand={() => onExpandPanel("activity")}
-      />
+          {/* Recent Changes Section */}
+          <div>
+            <div style={{ fontSize: "var(--dg-fs-small)", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--dg-space-sm)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Recent Changes
+            </div>
+            <RecentChangesCard
+              publishHistory={publishHistory}
+              currentEmpId={currentEmpId}
+              isAdmin={false}
+            />
+          </div>
+        </div>
+      </div>
     </>
   );
 }

@@ -5,18 +5,43 @@ import { z } from "zod";
  * Imported at startup to fail fast on misconfiguration.
  */
 
-const serverSchema = z.object({
-  // Note: SUPABASE_JWT_SECRET is no longer required — JWT verification uses JWKS
-  // (ES256 asymmetric keys fetched from Supabase's .well-known/jwks.json endpoint).
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
-  RESEND_API_KEY: z.string().optional(),
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_PRICE_ID_MONTHLY: z.string().optional(),
-  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
-  SENTRY_DSN: z.string().url().optional(),
-});
+const isStrictProductionEnv =
+  process.env.NODE_ENV === "production" &&
+  (process.env.VERCEL_ENV === "production" ||
+    process.env.STRICT_PROD_ENV_VALIDATION === "1");
+
+const serverSchema = z
+  .object({
+    // Note: SUPABASE_JWT_SECRET is no longer required — JWT verification uses JWKS
+    // (ES256 asymmetric keys fetched from Supabase's .well-known/jwks.json endpoint).
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+    RESEND_API_KEY: z.string().optional(),
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_PRICE_ID_MONTHLY: z.string().optional(),
+    UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+    UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+    SENTRY_DSN: z.string().url().optional(),
+  })
+  .superRefine((env, ctx) => {
+    if (!isStrictProductionEnv) return;
+
+    if (!env.UPSTASH_REDIS_REST_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "UPSTASH_REDIS_REST_URL is required in production",
+        path: ["UPSTASH_REDIS_REST_URL"],
+      });
+    }
+
+    if (!env.UPSTASH_REDIS_REST_TOKEN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "UPSTASH_REDIS_REST_TOKEN is required in production",
+        path: ["UPSTASH_REDIS_REST_TOKEN"],
+      });
+    }
+  });
 
 const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
@@ -35,7 +60,7 @@ function validateServerEnv() {
 
   const result = serverSchema.safeParse(process.env);
   if (!result.success) {
-    if (process.env.NODE_ENV === "production") {
+    if (isStrictProductionEnv) {
       console.error(
         "[env] Server environment validation failed:\n",
         result.error.flatten().fieldErrors,
@@ -71,4 +96,7 @@ function validateClientEnv() {
 }
 
 export const serverEnv = validateServerEnv();
-export const clientEnv = validateClientEnv();
+export const clientEnv =
+  typeof window !== "undefined" && process.env.NODE_ENV !== "test"
+    ? validateClientEnv()
+    : null;

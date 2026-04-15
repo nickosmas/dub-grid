@@ -68,7 +68,7 @@ export default function ExpandedStaffHours({
     <Modal title="Staff hours" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Controls row */}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           {/* Sort buttons */}
           <div style={{ display: "flex", gap: 4 }}>
             {([["hours", "By hours"], ["name", "By name"], ["ot", "OT only"]] as const).map(([key, label]) => {
@@ -83,8 +83,8 @@ export default function ExpandedStaffHours({
                     padding: "5px 10px",
                     borderRadius: 6,
                     border: "1px solid",
-                    borderColor: active ? "var(--color-primary)" : "var(--color-border)",
-                    background: active ? "var(--color-primary)" : "transparent",
+                    borderColor: active ? "var(--color-brand)" : "var(--color-border)",
+                    background: active ? "var(--color-brand)" : "transparent",
                     color: active ? "#fff" : "var(--color-text-secondary)",
                     cursor: "pointer",
                   }}
@@ -131,8 +131,11 @@ export default function ExpandedStaffHours({
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
-                    padding: "10px 6px",
-                    borderBottom: "1px solid var(--color-border-light)",
+                    padding: "14px 16px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 14,
+                    background: "var(--color-bg)",
+                    marginBottom: 8,
                   }}
                 >
                   {/* Avatar */}
@@ -170,7 +173,7 @@ export default function ExpandedStaffHours({
                       style={{
                         fontSize: 10,
                         fontWeight: 600,
-                        color: delta > 0 ? "var(--color-danger)" : "var(--color-brand)",
+                        color: delta > 0 ? "var(--color-danger)" : "var(--color-success)",
                       }}
                     >
                       {delta > 0 ? "+" : ""}{Math.round(delta * 10) / 10}h

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { IndicatorType } from "@/types";
 import { upsertIndicatorType, deleteIndicatorType } from "@/lib/db";
 import { toast } from "sonner";
@@ -27,6 +27,13 @@ export default function Indicators({
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const nextTmpId = useRef(-1);
+  const originalRef = useRef<Map<number, IndicatorType>>(
+    new Map(indicatorTypes.map((indicator) => [indicator.id, indicator])),
+  );
+
+  useEffect(() => {
+    originalRef.current = new Map(indicatorTypes.map((indicator) => [indicator.id, indicator]));
+  }, [indicatorTypes]);
 
   const handleAdd = () => {
     const tmp: IndicatorType & { isNew: boolean } = {
@@ -51,6 +58,7 @@ export default function Indicators({
         color: indicator.color,
         sortOrder: indicator.sortOrder,
       });
+      originalRef.current.set(saved.id, saved);
       const updated = local.map((i) => (i.id === indicator.id ? saved : i));
       setLocal(updated);
       onChange(updated);
@@ -92,9 +100,6 @@ export default function Indicators({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "0 0 14px" }}>
-        Indicators appear as colored dots on shift cells. Add, rename, or recolor them here.
-      </p>
       {local.length === 0 && (
         <EmptyState
           compact
@@ -102,8 +107,8 @@ export default function Indicators({
           action={canManageIndicatorTypes ? (
             <button
               onClick={handleAdd}
-              className="dg-btn dg-btn-secondary"
-              style={{ padding: "7px 16px", fontSize: "var(--dg-fs-caption)" }}
+              className="dg-btn dg-btn-dashed dg-btn-sm"
+              style={{ width: "100%" }}
             >
               + Add Indicator
             </button>
@@ -113,6 +118,12 @@ export default function Indicators({
       {local.map((indicator) => {
         const isSavingThis = saving === indicator.id;
         const isDeletingThis = deleting === indicator.id;
+        const original = originalRef.current.get(indicator.id);
+        const isDirty =
+          indicator.isNew ||
+          !original ||
+          indicator.name.trim() !== original.name ||
+          indicator.color !== original.color;
         return (
           <div
             key={indicator.id}
@@ -161,14 +172,8 @@ export default function Indicators({
             {canManageIndicatorTypes && (
               <button
                 onClick={() => handleSave(indicator)}
-                disabled={isSavingThis || !indicator.name.trim()}
-                className="dg-btn dg-btn-primary"
-                style={{
-                  padding: "7px 14px",
-                  fontSize: "var(--dg-fs-caption)",
-                  opacity: indicator.name.trim() ? 1 : 0.5,
-                  cursor: indicator.name.trim() ? "pointer" : "not-allowed",
-                }}
+                disabled={isSavingThis || !indicator.name.trim() || !isDirty}
+                className="dg-btn dg-btn-primary dg-btn-sm"
               >
                 {isSavingThis ? "…" : "Save"}
               </button>
@@ -177,11 +182,7 @@ export default function Indicators({
               <button
                 onClick={() => indicator.isNew ? handleDelete(indicator) : setConfirmDeleteId(indicator.id)}
                 disabled={isDeletingThis}
-                className="dg-btn dg-btn-danger"
-                style={{
-                  padding: "7px 12px",
-                  fontSize: "var(--dg-fs-caption)",
-                }}
+                className="dg-btn dg-btn-danger dg-btn-sm"
               >
                 {isDeletingThis ? "…" : "Delete"}
               </button>
@@ -192,17 +193,8 @@ export default function Indicators({
       {local.length > 0 && canManageIndicatorTypes && (
         <button
           onClick={handleAdd}
-          style={{
-            marginTop: 8,
-            background: "none",
-            border: "none",
-            color: "var(--color-text-muted)",
-            padding: "6px 0",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          className="dg-btn dg-btn-dashed dg-btn-sm"
+          style={{ width: "100%", marginTop: 8 }}
         >
           + Add Indicator
         </button>

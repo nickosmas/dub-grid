@@ -8,7 +8,7 @@ const MAX_VISIBLE = 4;
 
 const AVATAR_GRADIENTS = [
   "linear-gradient(135deg, #66B3FF, #0052E0)",
-  "linear-gradient(135deg, #34D399, #06B6D4)",
+  "linear-gradient(135deg, #3B82F6, #06B6D4)",
   "linear-gradient(135deg, #F472B6, #0066FF)",
   "linear-gradient(135deg, #FB923C, #F472B6)",
   "linear-gradient(135deg, #0066FF, #66B3FF)",
@@ -44,7 +44,9 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
 
   const visible = onlineUsers.slice(0, MAX_VISIBLE);
   const overflow = onlineUsers.length - MAX_VISIBLE;
-  const hoveredUserData = onlineUsers.find((u) => u.userId === hoveredUser);
+  const hoveredUserData = onlineUsers.find(
+    (u) => u.editorSessionId === hoveredUser,
+  );
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
@@ -74,9 +76,9 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
 
       {visible.map((user, i) => (
         <div
-          key={user.userId}
+          key={user.editorSessionId}
           onMouseEnter={(e) => {
-            setHoveredUser(user.userId);
+            setHoveredUser(user.editorSessionId);
             const rect = e.currentTarget.getBoundingClientRect();
             setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
           }}
@@ -114,7 +116,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: user.editingCell ? "var(--color-primary)" : "var(--color-success)",
+              background: user.editingCell ? "var(--color-brand)" : "var(--color-success)",
               border: "2px solid var(--color-surface)",
             }}
           />
@@ -156,7 +158,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             borderRadius: 8,
             boxShadow:
               "0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)",
-            zIndex: 1000,
+            zIndex: 10000,
             fontSize: "var(--dg-fs-caption)",
             fontWeight: 600,
             color: "var(--color-text-primary)",
@@ -174,6 +176,19 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               }}
             >
               editing
+            </span>
+          )}
+          {hoveredUserData.sessionCount > 1 && (
+            <span
+              style={{
+                fontWeight: 400,
+                color: "var(--color-text-muted)",
+                marginLeft: 6,
+              }}
+            >
+              {hoveredUserData.isSameUser
+                ? "another session open"
+                : `${hoveredUserData.sessionCount} sessions`}
             </span>
           )}
         </div>,

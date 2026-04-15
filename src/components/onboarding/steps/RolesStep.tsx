@@ -4,7 +4,7 @@ import { useRef } from "react";
 import StepLayout from "../StepLayout";
 import StringListSettings from "@/components/settings/StringListSettings";
 import { useOrganizationData } from "@/hooks";
-import { saveOrganizationRoles } from "@/lib/db";
+import { saveOrganizationRoles, checkRoleDependencies } from "@/lib/db";
 import type { NamedItem } from "@/types";
 
 interface RolesStepProps {
@@ -30,27 +30,20 @@ export default function RolesStep({ onNext, onBack }: RolesStepProps) {
       nextDisabled={!hasRoles}
       wide
     >
-      <div
-        style={{
-          background: "var(--color-bg-card, white)",
-          borderRadius: 16,
-          border: "1px solid var(--color-border)",
-          padding: "20px",
+      <StringListSettings
+        label={label}
+        items={orgRoles}
+        onSave={async (items) => {
+          const saved = await saveOrganizationRoles(org.id, items, existingRef.current);
+          existingRef.current = saved;
+          setOrgRoles(saved);
         }}
-      >
-        <StringListSettings
-          label={label}
-          items={orgRoles}
-          onSave={async (items) => {
-            const saved = await saveOrganizationRoles(org.id, items, existingRef.current);
-            existingRef.current = saved;
-            setOrgRoles(saved);
-          }}
-          placeholder={`Add a ${label.toLowerCase().replace(/s$/, "")}...`}
-          canEdit={true}
-          departments={departments}
-        />
-      </div>
+        placeholder={`Add a ${label.toLowerCase().replace(/s$/, "")}...`}
+        canEdit={true}
+        initialEditing
+        departments={departments}
+        onCheckDependencies={(id) => checkRoleDependencies(id, org.id)}
+      />
       {!hasRoles && (
         <p
           style={{

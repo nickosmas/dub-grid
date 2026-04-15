@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { formatDateKey } from "@/lib/dashboard-stats";
 import type { ShiftMap, ShiftCode, Employee, AbsenceType } from "@/types";
 
@@ -54,15 +53,9 @@ export default function MyScheduleCard({
             {employee.firstName} {employee.lastName}
           </div>
         </div>
-        <Link
-          href="/schedule"
-          style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", textDecoration: "none" }}
-        >
-          Full schedule &rarr;
-        </Link>
       </div>
 
-      <div style={{ padding: "10px 14px 14px" }}>
+      <div style={{ padding: "16px" }}>
         {weeks.map((week, wi) => (
           <div
             key={wi}
@@ -97,10 +90,10 @@ export default function MyScheduleCard({
                     flexDirection: "column",
                     alignItems: "center",
                     gap: 3,
-                    padding: "6px 2px 8px",
-                    borderRadius: 10,
-                    background: isToday ? "var(--color-brand-bg)" : undefined,
-                    border: isToday ? "1px solid var(--color-brand-border, var(--color-border))" : "1px solid transparent",
+                    padding: "12px 8px",
+                    borderRadius: 14,
+                    background: isToday ? "var(--color-brand-bg)" : "var(--color-bg)",
+                    border: isToday ? "1px solid var(--color-brand-border, var(--color-border))" : "1px solid var(--color-border-light)",
                   }}
                 >
                   {/* Day name */}
@@ -129,7 +122,6 @@ export default function MyScheduleCard({
                       codes.map((sc) => (
                         <div
                           key={sc.id}
-                          title={sc.name || sc.label}
                           style={{
                             fontSize: 10,
                             fontWeight: 600,
@@ -150,7 +142,6 @@ export default function MyScheduleCard({
                       ))
                     ) : absence ? (
                       <div
-                        title={absence.name || absence.label}
                         style={{
                           fontSize: 10,
                           fontWeight: 600,

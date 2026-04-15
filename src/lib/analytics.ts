@@ -1,4 +1,9 @@
 import { supabase } from "@/lib/supabase";
+import {
+  PUBLISHED_SHIFT_COLS,
+  resolvePublishedScheduleEntry,
+  type PublishedShiftRow,
+} from "@/lib/published-shifts";
 
 export interface WeeklyShiftHours {
   weekStart: string; // YYYY-MM-DD
@@ -7,17 +12,19 @@ export interface WeeklyShiftHours {
 }
 
 export interface EmployeeUtilization {
-  employeeId: number;
+  employeeId: string;
   employeeName: string;
   totalHours: number;
   shiftCount: number;
 }
 
 interface ShiftWithEmployee {
-  employee_id: number;
+  emp_id: string;
   date: string;
-  start_time: string | null;
-  end_time: string | null;
+  published_shift_code_ids: number[] | null;
+  published_absence_type_id: number | null;
+  published_custom_start_time: string | null;
+  published_custom_end_time: string | null;
   employees: { first_name: string; last_name: string };
 }
 
@@ -34,18 +41,42 @@ export async function fetchWeeklyShiftHours(
 
   const { data, error } = await supabase
     .from("shifts")
-    .select("date, start_time, end_time, employee_id, employees!inner(org_id)")
+    .select(`${PUBLISHED_SHIFT_COLS}, employees!inner(org_id)`)
     .eq("employees.org_id", orgId)
     .gte("date", start.toISOString().slice(0, 10))
     .lte("date", end.toISOString().slice(0, 10));
 
   if (error) throw error;
 
+  const { data: shiftCodes, error: shiftCodeError } = await supabase
+    .from("shift_codes")
+    .select("id, label, default_start_time, default_end_time")
+    .eq("org_id", orgId)
+    .is("archived_at", null);
+  if (shiftCodeError) throw shiftCodeError;
+
+  const shiftCodeById = new Map<
+    number,
+    { label: string; defaultStartTime: string | null; defaultEndTime: string | null }
+  >(
+    (shiftCodes ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      {
+        label: row.label as string,
+        defaultStartTime: row.default_start_time as string | null,
+        defaultEndTime: row.default_end_time as string | null,
+      },
+    ]),
+  );
+
   // Group by week (Monday start)
   const weekMap = new Map<string, { totalHours: number; shiftCount: number }>();
 
-  for (const row of data ?? []) {
-    const d = new Date(row.date as string);
+  for (const row of (data ?? []) as unknown as PublishedShiftRow[]) {
+    const publishedEntry = resolvePublishedScheduleEntry(row, shiftCodeById);
+    if (!publishedEntry || publishedEntry.kind !== "shift") continue;
+
+    const d = new Date(publishedEntry.date);
     // Get Monday of this week
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -53,11 +84,10 @@ export async function fetchWeeklyShiftHours(
     weekStart.setDate(diff);
     const weekKey = weekStart.toISOString().slice(0, 10);
 
-    const hours = calcHours(row.start_time as string | null, row.end_time as string | null);
-    const entry = weekMap.get(weekKey) ?? { totalHours: 0, shiftCount: 0 };
-    entry.totalHours += hours;
-    entry.shiftCount += 1;
-    weekMap.set(weekKey, entry);
+    const totals = weekMap.get(weekKey) ?? { totalHours: 0, shiftCount: 0 };
+    totals.totalHours += publishedEntry.durationHours;
+    totals.shiftCount += 1;
+    weekMap.set(weekKey, totals);
   }
 
   return Array.from(weekMap.entries())
@@ -79,29 +109,55 @@ export async function fetchEmployeeUtilization(
 
   const { data, error } = await supabase
     .from("shifts")
-    .select("employee_id, date, start_time, end_time, employees!inner(org_id, first_name, last_name)")
+    .select(`${PUBLISHED_SHIFT_COLS}, employees!inner(org_id, first_name, last_name)`)
     .eq("employees.org_id", orgId)
     .gte("date", start.toISOString().slice(0, 10))
     .lte("date", end.toISOString().slice(0, 10));
 
   if (error) throw error;
 
-  const empMap = new Map<number, { name: string; totalHours: number; shiftCount: number }>();
+  const { data: shiftCodes, error: shiftCodeError } = await supabase
+    .from("shift_codes")
+    .select("id, label, default_start_time, default_end_time")
+    .eq("org_id", orgId)
+    .is("archived_at", null);
+  if (shiftCodeError) throw shiftCodeError;
+
+  const shiftCodeById = new Map<
+    number,
+    { label: string; defaultStartTime: string | null; defaultEndTime: string | null }
+  >(
+    (shiftCodes ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      {
+        label: row.label as string,
+        defaultStartTime: row.default_start_time as string | null,
+        defaultEndTime: row.default_end_time as string | null,
+      },
+    ]),
+  );
+
+  const empMap = new Map<string, { name: string; totalHours: number; shiftCount: number }>();
   const rows = (data ?? []) as unknown as ShiftWithEmployee[];
 
   for (const row of rows) {
-    const empId = row.employee_id;
-    const emp = row.employees;
-    const hours = calcHours(row.start_time, row.end_time);
+    const publishedEntry = resolvePublishedScheduleEntry(
+      row as unknown as PublishedShiftRow,
+      shiftCodeById,
+    );
+    if (!publishedEntry || publishedEntry.kind !== "shift") continue;
 
-    const entry = empMap.get(empId) ?? {
+    const empId = row.emp_id;
+    const emp = row.employees;
+
+    const totals = empMap.get(empId) ?? {
       name: `${emp.first_name} ${emp.last_name}`,
       totalHours: 0,
       shiftCount: 0,
     };
-    entry.totalHours += hours;
-    entry.shiftCount += 1;
-    empMap.set(empId, entry);
+    totals.totalHours += publishedEntry.durationHours;
+    totals.shiftCount += 1;
+    empMap.set(empId, totals);
   }
 
   return Array.from(empMap.entries())
@@ -113,13 +169,4 @@ export async function fetchEmployeeUtilization(
     }))
     .sort((a, b) => b.totalHours - a.totalHours)
     .slice(0, limit);
-}
-
-function calcHours(startTime: string | null, endTime: string | null): number {
-  if (!startTime || !endTime) return 8; // default 8h shift
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  let hours = (eh * 60 + em - (sh * 60 + sm)) / 60;
-  if (hours <= 0) hours += 24; // overnight
-  return hours;
 }

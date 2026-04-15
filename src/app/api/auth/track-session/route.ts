@@ -1,20 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { getServiceClient } from "@/lib/supabase-service";
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+const bodySchema = z.object({
+  refreshTokenHash: z.string().min(1),
+  deviceLabel: z.string().min(1),
+});
 
 export async function POST(req: NextRequest) {
-  try {
-    const { userId, refreshTokenHash, deviceLabel } = await req.json();
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
-    if (!userId || !refreshTokenHash || !deviceLabel) {
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+
+  try {
+    const parsed = bodySchema.safeParse(await req.json());
+    if (!parsed.success) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
+
+    const { refreshTokenHash, deviceLabel } = parsed.data;
 
     // Extract IP from request headers (Vercel / reverse proxy)
     const ip =
@@ -22,11 +30,11 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ??
       null;
 
-    const { error } = await getSupabaseAdmin()
+    const { error } = await getServiceClient()
       .from("user_sessions")
       .upsert(
         {
-          user_id: userId,
+          user_id: auth.user.id,
           refresh_token_hash: refreshTokenHash,
           device_label: deviceLabel,
           ip_address: ip,
@@ -36,6 +44,11 @@ export async function POST(req: NextRequest) {
       );
 
     if (error) {
+      // FK violation (23503) means auth.users row doesn't exist yet — race condition
+      // during sign-up. Return 409 so the client can retry silently.
+      if (error.code === "23503") {
+        return NextResponse.json({ error: "User not ready" }, { status: 409 });
+      }
       console.error("track-session upsert error:", error);
       return NextResponse.json({ error: "Failed to track session" }, { status: 500 });
     }

@@ -9,11 +9,12 @@ import { queryKeys } from "@/lib/query-keys";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
+import { MaybeHint } from "@/components/ui/hint";
 import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode, DirectoryPerson, Department } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { BulkImportModal } from "@/components/staff/BulkImportModal";
-import { fetchInvitations, revokeInvitation, resendInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft, removeUserFromOrganization, updateAppOnlyUser, updatePendingInvitation, updateEmployeeDepartments } from "@/lib/db";
+import { fetchInvitations, revokeInvitation, resendInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft, removeUserFromOrganization, updateAppOnlyUser, updatePendingInvitation } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import * as Sentry from "@/lib/sentry";
 import { toast } from "sonner";
@@ -21,10 +22,14 @@ import CustomSelect, { SelectOption } from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
 import { useMediaQuery, MOBILE, TABLET, useDirectory } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
-import { useStaffFilters, useStaffSelection, useStaffReorder, StaffTableRow, StaffEmptyState, StaffPagination, StaffDetailPanel, StaffToolbar, StaffFilterPopover, StaffContextBar } from "./staff";
-import { AppOnlyDetailPanel } from "./staff/AppOnlyDetailPanel";
+import { useStaffFilters, useStaffSelection, useStaffReorder, StaffTableRow, StaffEmptyState, StaffPagination, StaffDetailPanel, StaffFilterPopover, StaffContextBar } from "./staff";
+import { SortIcon } from "./staff/SortIcon";
+import { DirectorySummaryCards } from "./staff/DirectorySummaryCards";
+import { ManagementStaffPanel } from "./staff/ManagementStaffPanel";
+import { AddManagementUserToScheduleModal } from "./staff/AddManagementUserToScheduleModal";
+import { EmployeeManagementAccessModal } from "./staff/EmployeeManagementAccessModal";
 import { EmptyState } from "@/components/EmptyState";
-import type { EmployeeTab } from "./staff";
+import { Table, TableHeader, TableBody, TableRow as UITableRow, TableHead, TableCell } from "@/components/ui/table";
 import UserManagementSettings from "@/components/settings/UserManagement";
 import OrgActivityLog from "@/components/settings/ActivityLog";
 import {
@@ -61,9 +66,11 @@ interface StaffViewProps {
   /** Full code map (including archived) for resolving historical labels. */
   shiftCodeMap?: Map<number, string>;
   absenceTypes?: AbsenceType[];
-  departments?: NamedItem[];
+  departments?: Department[];
   departmentLabel?: string;
   canEditShifts?: boolean;
+  canViewRecurringShifts?: boolean;
+  canManageRecurringShifts?: boolean;
   canViewEmployeeDetails?: boolean;
   canManageEmployees?: boolean;
   isSuperAdmin?: boolean;
@@ -75,338 +82,6 @@ interface StaffViewProps {
   shiftDisplayMode?: ShiftDisplayMode;
   /** True when org settings data (focus areas, shift codes, etc.) is not fully configured. */
   setupIncomplete?: boolean;
-}
-
-// ── Departments section (people with a department assignment — includes on-schedule employees) ──
-
-function DepartmentsSection({
-  users,
-  isMobile,
-  isTablet,
-  canManageEmployees,
-  isSuperAdmin,
-  onInviteToApp,
-  setupIncomplete = false,
-  departments = [],
-  departmentLabel = "Department",
-  onSaveAppOnlyUser,
-  onRevokeAccess,
-  onRevokeInvitation,
-  onResendInvitation,
-  onAddToSchedule,
-}: {
-  users: DirectoryPerson[];
-  isMobile: boolean;
-  isTablet: boolean;
-  canManageEmployees: boolean;
-  isSuperAdmin?: boolean;
-  onInviteToApp?: () => void;
-  setupIncomplete?: boolean;
-  departments?: NamedItem[];
-  departmentLabel?: string;
-  onSaveAppOnlyUser?: (person: DirectoryPerson, data: { firstName: string; lastName: string; phone: string; departmentIds: number[] }) => Promise<void>;
-  onRevokeAccess?: (userId: string) => Promise<void>;
-  onRevokeInvitation?: (invitationId: string) => Promise<void>;
-  onResendInvitation?: (invitationId: string) => Promise<void>;
-  onAddToSchedule?: (person: DirectoryPerson) => void;
-}) {
-  const [filterDeptId, setFilterDeptId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
-
-  const filteredUsers = useMemo(() => {
-    let list = users;
-    // Department filter
-    if (filterDeptId === -1) list = list.filter((u) => u.departmentIds.length === 0);
-    else if (filterDeptId !== null) list = list.filter((u) => u.departmentIds.includes(filterDeptId));
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter((u) =>
-        `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        (u.phone && u.phone.includes(q))
-      );
-    }
-    return list;
-  }, [users, filterDeptId, searchQuery]);
-
-  const selectedPerson = expandedPersonId ? users.find((u) => u.personId === expandedPersonId) ?? null : null;
-
-  // Build department counts for filter chips
-  const deptCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    for (const u of users) {
-      for (const dId of u.departmentIds) {
-        counts.set(dId, (counts.get(dId) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [users]);
-
-  const noDeptCount = useMemo(() => users.filter((u) => u.departmentIds.length === 0).length, [users]);
-
-  if (users.length === 0) {
-    return (
-      <EmptyState
-        icon={
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-        }
-        title="No department members yet"
-        description="People assigned to a department will show here — including schedule staff who also belong to a department."
-        action={canManageEmployees && onInviteToApp && !setupIncomplete ? (
-          <button className="dg-btn dg-btn-primary" onClick={onInviteToApp}>
-            Invite to App
-          </button>
-        ) : undefined}
-      />
-    );
-  }
-
-  const roleLabel = (role: string | null) => {
-    if (!role) return "";
-    switch (role) {
-      case "super_admin": return "Super Admin";
-      case "admin": return "Admin";
-      case "user": return "User";
-      default: return role;
-    }
-  };
-
-  const roleBadgeColor = (role: string | null) => {
-    switch (role) {
-      case "super_admin": return { bg: "var(--color-brand-bg)", text: "var(--color-brand)" };
-      case "admin": return { bg: "rgba(59, 130, 246, 0.1)", text: "rgb(59, 130, 246)" };
-      default: return { bg: "var(--color-surface)", text: "var(--color-text-muted)" };
-    }
-  };
-
-  const gridCols = isMobile ? "1fr" : isTablet ? "1.5fr 0.8fr 1fr" : "1.2fr 0.7fr 0.8fr 1fr 0.8fr";
-
-  return (
-    <>
-    <div>
-      {/* Setup incomplete banner */}
-      {setupIncomplete && canManageEmployees && (
-        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-[10px] bg-[var(--color-warning-bg,rgba(245,158,11,0.08))] border border-[var(--color-warning,#f59e0b)]/20">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning,#f59e0b)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <p className="text-[12px] font-medium text-[var(--color-text-secondary)]">
-            Complete your <Link href="/settings" className="underline text-[var(--color-brand)] hover:opacity-80">organization settings</Link> (focus areas, shift codes, certifications, and roles) before managing people.
-          </p>
-        </div>
-      )}
-
-      {/* Section header with search + invite */}
-      <div className="flex items-center gap-3 mb-4">
-        {/* Search */}
-        <div className="relative flex-1 max-w-xs">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-faint)] pointer-events-none">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] pl-8 pr-8 text-[13px] font-medium text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-border-focus)] focus:ring-[3px] focus:ring-[rgba(46,153,48,0.15)] outline-none transition-all"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--color-text-faint)] hover:text-[var(--color-text-secondary)]">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-            </button>
-          )}
-        </div>
-
-        <p className="text-[var(--dg-fs-caption)] text-[var(--color-text-muted)] shrink-0">
-          {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""}
-        </p>
-
-        {canManageEmployees && onInviteToApp && !setupIncomplete && (
-          <button className="dg-btn dg-btn-primary dg-btn-sm shrink-0" onClick={onInviteToApp}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Invite to App
-          </button>
-        )}
-      </div>
-
-      {/* Department filter chips */}
-      {departments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => setFilterDeptId(null)}
-            className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-              filterDeptId === null
-                ? "bg-[var(--color-brand)] text-white"
-                : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
-            }`}
-          >
-            All ({users.length})
-          </button>
-          {departments.filter((d) => deptCounts.has(d.id)).map((dept) => (
-            <button
-              key={dept.id}
-              onClick={() => setFilterDeptId(filterDeptId === dept.id ? null : dept.id)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                filterDeptId === dept.id
-                  ? "bg-[var(--color-brand)] text-white"
-                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
-              }`}
-            >
-              {dept.name} ({deptCounts.get(dept.id) ?? 0})
-            </button>
-          ))}
-          {noDeptCount > 0 && (
-            <button
-              onClick={() => setFilterDeptId(-1)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                filterDeptId === -1
-                  ? "bg-[var(--color-brand)] text-white"
-                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]"
-              }`}
-            >
-              No dept ({noDeptCount})
-            </button>
-          )}
-        </div>
-      )}
-
-    <div className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
-      {/* Header row */}
-      {!isMobile && (
-        <div
-          className="grid border-b border-[var(--color-border-light)] bg-[var(--color-row-alt)] px-6 py-3"
-          style={{ gridTemplateColumns: gridCols }}
-        >
-          {(isTablet
-            ? ["Name", "Role", "Email"]
-            : ["Name", departmentLabel, "Role", "Email", "Status"]
-          ).map((h) => (
-            <div key={h} className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-[0.06em]">
-              {h}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* User rows */}
-      {filteredUsers.map((person) => {
-        const colors = roleBadgeColor(person.orgRole);
-        const personDepts = person.departmentIds
-          .map(id => departments.find(d => d.id === id))
-          .filter((d): d is NonNullable<typeof d> => d != null);
-        const isPending = person.source === "pending_invite";
-        const isExpanded = person.personId === expandedPersonId;
-        return (
-          <div
-            key={person.personId}
-            onClick={() => setExpandedPersonId(isExpanded ? null : person.personId)}
-            className="grid items-center border-b border-[var(--color-border-light)] last:border-b-0 hover:bg-[var(--color-row-hover)] transition-colors cursor-pointer"
-            style={{
-              gridTemplateColumns: isMobile ? "1fr" : gridCols,
-              padding: isMobile ? "12px 16px" : "10px 24px",
-              opacity: isPending ? 0.7 : 1,
-              background: isExpanded ? "var(--color-brand-bg)" : undefined,
-            }}
-          >
-            {/* Name */}
-            <div className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                style={{ background: isPending ? "var(--color-surface)" : "var(--color-primary-bg)", color: isPending ? "var(--color-text-muted)" : "var(--color-primary)" }}
-              >
-                {(person.firstName?.[0] ?? "").toUpperCase()}{(person.lastName?.[0] ?? "").toUpperCase() || "?"}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
-                    {person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}
-                  </span>
-                  {person.source === "employee" && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0" style={{ background: "var(--color-today-bg)", color: "var(--color-today-text)" }}>
-                      On Schedule
-                    </span>
-                  )}
-                </div>
-                {isMobile && (
-                  <div className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">
-                    {person.email}{personDepts.length > 0 ? ` \u00b7 ${personDepts.map(d => d.name).join(", ")}` : ""} &middot; {roleLabel(person.orgRole)}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Department */}
-            {!isMobile && !isTablet && (
-              <div className="text-[13px] text-[var(--color-text-muted)] truncate">
-                {personDepts.length > 0 ? personDepts.map(d => d.name).join(", ") : "\u2014"}
-              </div>
-            )}
-
-            {/* Role badge */}
-            {!isMobile && (
-              <div>
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  style={{ background: colors.bg, color: colors.text }}
-                >
-                  {roleLabel(person.orgRole)}
-                </span>
-              </div>
-            )}
-
-            {/* Email */}
-            {!isMobile && (
-              <div className="text-[13px] text-[var(--color-text-muted)] truncate">
-                {person.email}
-              </div>
-            )}
-
-            {/* Status */}
-            {!isMobile && !isTablet && (
-              <div>
-                {isPending ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }}>
-                    {person.invitationStatus === "expired" ? "Expired" : "Pending"}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--color-success-bg)", color: "var(--color-success-text)" }}>
-                    Active
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-    </div>
-
-      {/* Detail panel */}
-      {selectedPerson && (
-        <AppOnlyDetailPanel
-          person={selectedPerson}
-          departments={departments}
-          departmentLabel={departmentLabel}
-          canManageEmployees={canManageEmployees}
-          onClose={() => setExpandedPersonId(null)}
-          onSave={async (data) => {
-            if (onSaveAppOnlyUser) await onSaveAppOnlyUser(selectedPerson, data);
-          }}
-          onRevokeAccess={isSuperAdmin ? onRevokeAccess : undefined}
-          onRevokeInvitation={isSuperAdmin ? onRevokeInvitation : undefined}
-          onResendInvitation={isSuperAdmin ? onResendInvitation : undefined}
-          onAddToSchedule={canManageEmployees ? onAddToSchedule : undefined}
-        />
-      )}
-    </>
-  );
 }
 
 // ── Members section (the existing staff table) ────────────────────────────────
@@ -431,9 +106,9 @@ function MembersSection({
   orgId,
   orgName,
   isSuperAdmin,
+  isGridmaster,
   departments: departmentItems = [],
   departmentLabel = "Department",
-  setupIncomplete = false,
 }: {
   employees: Employee[];
   benchedEmployees: Employee[];
@@ -454,13 +129,15 @@ function MembersSection({
   orgId?: string;
   orgName?: string;
   isSuperAdmin?: boolean;
-  departments?: NamedItem[];
+  isGridmaster?: boolean;
+  departments?: Department[];
   departmentLabel?: string;
   setupIncomplete?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
   const queryClient = useQueryClient();
+  const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
@@ -468,7 +145,7 @@ function MembersSection({
 
   // ── Extracted hooks ──
   const filters = useStaffFilters({ employees, benchedEmployees, terminatedEmployees, showOnlyUnlinked });
-  const { activeTab, setActiveTab, searchQuery, setSearchQuery, sortBy, setSortBy, filterFocusArea, setFilterFocusArea, filterRole, setFilterRole, hasActiveFilters, clearFilters: clearFiltersBase, rawList, sorted, paginatedList: filterPaginatedList, page, setPage, totalPages, totalCount, pageSize: PAGE_SIZE, unlinkedCount } = filters;
+  const { activeTab, setActiveTab, searchQuery, setSearchQuery, sortConfig, handleSort, filterFocusArea, setFilterFocusArea, filterRole, setFilterRole, hasActiveFilters, clearFilters: clearFiltersBase, rawList, sorted, paginatedList: filterPaginatedList, page, setPage, totalPages, totalCount, pageSize: PAGE_SIZE, unlinkedCount } = filters;
   const clearFilters = useCallback(() => { clearFiltersBase(); setShowOnlyUnlinked(false); }, [clearFiltersBase]);
   const selection = useStaffSelection();
   const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } = selection;
@@ -477,18 +154,18 @@ function MembersSection({
 
   // When reordering, paginate from displayList; otherwise use filter's paginated list
   const paginatedList = useMemo(
-    () => isReordering ? displayList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : filterPaginatedList,
-    [isReordering, displayList, filterPaginatedList, page, PAGE_SIZE],
+    () => isReordering ? displayList : filterPaginatedList,
+    [isReordering, displayList, filterPaginatedList],
   );
 
   // Reset selection and close detail when filters/tab change
-  useEffect(() => { clearSelection(); setExpandedEmpId(null); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortBy, showOnlyUnlinked, clearSelection]);
+  useEffect(() => { clearSelection(); setExpandedEmpId(null); }, [activeTab, searchQuery, filterFocusArea, filterRole, sortConfig, showOnlyUnlinked, clearSelection]);
 
   // Invitation state
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [, setRevokingId] = useState<string | null>(null);
 
   // Fetch pending invitations for badge display
   useEffect(() => {
@@ -513,15 +190,59 @@ function MembersSection({
     return map;
   }, [pendingInvitations]);
 
-  // Directory data — for the "Departments" tab showing everyone with a department
+  // ── Management (directory) data ──
   const { directory } = useDirectory(orgId ?? null);
   const departmentUsers = useMemo(
-    () => directory.filter((p) => p.departmentIds.length > 0),
+    () => directory.filter((p) => p.managementDepartmentIds.length > 0),
     [directory],
   );
+  const activeManagementUsers = useMemo(
+    () => departmentUsers.filter((person) => person.isManagementUser),
+    [departmentUsers],
+  );
+
+  // Management filter state
+  const [showManagement, setShowManagement] = useState(false);
+  const [deptFilterId, setDeptFilterId] = useState<number | null>(null);
+  const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
+  const [managementAccessEmployee, setManagementAccessEmployee] = useState<Employee | null>(null);
+  const [managementSchedulePerson, setManagementSchedulePerson] = useState<DirectoryPerson | null>(null);
+
+  const filteredDeptUsers = useMemo(() => {
+    let list = departmentUsers;
+    if (deptFilterId === -1) list = list.filter((u) => u.managementDepartmentIds.length === 0);
+    else if (deptFilterId !== null) list = list.filter((u) => u.managementDepartmentIds.includes(deptFilterId));
+    if (showManagement && searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((u) =>
+        `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.phone && u.phone.includes(q))
+      );
+    }
+    return list;
+  }, [departmentUsers, deptFilterId, showManagement, searchQuery]);
+
+  const deptCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const u of departmentUsers) {
+      for (const dId of u.managementDepartmentIds) {
+        counts.set(dId, (counts.get(dId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [departmentUsers]);
+
+  const managementDepts = useMemo(
+    () => (departmentItems ?? []).filter(d => d.type === "management"),
+    [departmentItems],
+  );
+
+  // Reset management filters when toggling off
+  useEffect(() => { if (!showManagement) { setDeptFilterId(null); setExpandedPersonId(null); } }, [showManagement]);
 
   // App-only invite modal state
-  const [showAppOnlyInvite, setShowAppOnlyInvite] = useState(false);
+  const [showManagementInvite, setShowAppOnlyInvite] = useState(false);
 
   // Bulk import state
   const [showImport, setShowImport] = useState(false);
@@ -541,6 +262,7 @@ function MembersSection({
   }
 
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
+    if (!orgId) return false;
     setRevokingId(invitationId);
     try {
       await revokeInvitation(invitationId, orgId);
@@ -570,290 +292,547 @@ function MembersSection({
     [onDelete],
   );
 
-  const gridCols = isMobile
-    ? "36px 1fr 28px"
-    : isTablet
-      ? "36px 1.2fr 1fr 0.6fr 28px"
-      : "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px";
+  // Can reorder only when: active tab, seniority sort asc, no filters/search, canManageEmployees
+  const canReorder = activeTab === "active" && sortConfig.key === "seniority" && sortConfig.dir === "asc" && !searchQuery && !filterFocusArea && !filterRole && !showOnlyUnlinked && canManageEmployees && employees.length >= 2 && !showManagement;
 
-  const tabItems: { key: EmployeeTab; label: string; count: number; color: string }[] = [
-    { key: "active", label: "On Schedule", count: employees.length, color: "var(--color-today-text)" },
-    { key: "departments", label: "Departments", count: departmentUsers.length, color: "var(--color-primary)" },
-    { key: "benched", label: "Benched", count: benchedEmployees.length, color: "var(--color-warning)" },
-    { key: "terminated", label: "Terminated", count: terminatedEmployees.length, color: "var(--color-danger)" },
+  // Tab items for the dg-span-tabs
+  const tabs: { key: "active" | "benched" | "terminated"; label: string; count: number }[] = [
+    { key: "active", label: "All", count: employees.length },
+    { key: "benched", label: "Benched", count: benchedEmployees.length },
+    { key: "terminated", label: "Terminated", count: terminatedEmployees.length },
   ];
 
   // Find the currently selected employee for the detail panel
   const selectedEmployee = expandedEmpId
     ? [...employees, ...benchedEmployees, ...terminatedEmployees].find((e) => e.id === expandedEmpId)
     : null;
+  const selectedEmployeeDirectoryPerson = selectedEmployee
+    ? directory.find((person) => person.employeeId === selectedEmployee.id) ?? null
+    : null;
 
-  // Can reorder only when: active tab, seniority sort, no filters/search, canManageEmployees
-  const canReorder = activeTab === "active" && sortBy === "seniority" && !searchQuery && !filterFocusArea && !filterRole && !showOnlyUnlinked && canManageEmployees && employees.length >= 2;
+  const selectedPerson = expandedPersonId ? departmentUsers.find((u) => u.personId === expandedPersonId) ?? null : null;
 
   return (
     <>
-      {/* ── Sticky header: toolbar + context bar ── */}
-      <div style={{ position: "sticky", top: "var(--app-shell-header-h, 56px)", zIndex: 50, background: "var(--color-bg)" }}>
-      <StaffToolbar
-        tabs={tabItems}
-        activeTab={activeTab}
-        onTabChange={(tab) => { setActiveTab(tab); setExpandedEmpId(null); if (isReordering) handleCancelReorder(); }}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        sortBy={sortBy}
-        onSortChange={setSortBy}
-        canReorder={canReorder}
-        onEnterReorder={() => { handleEnterReorder(); setExpandedEmpId(null); setPage(1); }}
-        hasActiveFilters={hasActiveFilters}
-        hasUnlinked={unlinkedCount > 0 && activeTab === "active"}
-        isReordering={isReordering}
-        canManageEmployees={canManageEmployees}
-        employeeCount={employees.length}
-        showAdd={activeTab === "active"}
-        onAdd={onAdd}
-        onImport={canManageEmployees && orgId ? () => setShowImport(true) : undefined}
-        onExport={orgId ? handleExport : undefined}
-        onFilterToggle={() => setFilterOpen((v) => !v)}
-        filterOpen={filterOpen}
-        filterBtnRef={filterBtnRef}
-        hideControls={activeTab === "departments"}
-        setupIncomplete={setupIncomplete}
-      />
+      <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+        <div className="space-y-8 mx-auto" style={{ maxWidth: 1100 }}>
 
-      {/* Context bar: filter pills, bulk actions, or reorder bar (hidden on departments tab) */}
-      {activeTab !== "departments" && <StaffContextBar
-        filterFocusArea={filterFocusArea}
-        filterRole={filterRole}
-        hasActiveFilters={hasActiveFilters}
-        onClearFocusArea={() => setFilterFocusArea(null)}
-        onClearRole={() => setFilterRole(null)}
-        onClearAll={clearFilters}
-        focusAreas={focusAreas}
-        roles={roles}
-        focusAreaLabel={focusAreaLabel}
-        selectionCount={selectedIds.size}
-        selectedIds={selectedIds}
-        activeTab={activeTab}
-        canManageEmployees={canManageEmployees}
-        displayList={displayList}
-        pendingInviteByEmployeeId={pendingInviteByEmployeeId}
-        onBulkInvite={(emps) => { setInviteEmployee(emps[0]); setInviteQueue(emps.slice(1)); }}
-        onBulkBench={(ids) => { for (const id of ids) onBench(id); clearSelection(); }}
-        onBulkActivate={(ids) => { for (const id of ids) onActivate(id); clearSelection(); }}
-        onBulkTerminate={(ids) => { for (const id of ids) onDelete(id); clearSelection(); }}
-        onClearSelection={clearSelection}
-        isReordering={isReordering}
-        isDirty={isDirty}
-        onSaveOrder={handleSaveOrder}
-        onCancelReorder={handleCancelReorder}
-      />}
-      </div>
+          {/* Header */}
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Directory</h2>
+            <p className="text-[14px] text-[var(--color-text-muted)] mt-1">View and manage your organization&apos;s staff roster.</p>
+          </div>
 
-      {/* Filter popover */}
-      <StaffFilterPopover
-        open={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        anchorRef={filterBtnRef.current}
-        filterFocusArea={filterFocusArea}
-        onFilterFocusAreaChange={setFilterFocusArea}
-        filterRole={filterRole}
-        onFilterRoleChange={setFilterRole}
-        focusAreas={focusAreas}
-        roles={roles}
-        focusAreaLabel={focusAreaLabel}
-        roleLabel={roleLabel}
-        unlinkedCount={unlinkedCount}
-        showOnlyUnlinked={showOnlyUnlinked}
-        onShowOnlyUnlinkedChange={setShowOnlyUnlinked}
-        onClearAll={clearFilters}
-        hasActiveFilters={hasActiveFilters}
-      />
-
-      {/* Content area with padding — below sticky toolbar */}
-      <div
-        className="px-4 md:px-6 lg:px-12 py-4 md:py-6 lg:py-10 pb-32"
-      >
-        {/* ── Departments tab: people with department assignments ── */}
-        {activeTab === "departments" && (
-          <DepartmentsSection
-            users={departmentUsers}
-            isMobile={isMobile}
-            isTablet={isTablet}
-            canManageEmployees={canManageEmployees}
-            isSuperAdmin={isSuperAdmin}
-            onInviteToApp={isSuperAdmin ? () => setShowAppOnlyInvite(true) : undefined}
-            setupIncomplete={setupIncomplete}
-            departments={departmentItems}
-            onSaveAppOnlyUser={orgId ? async (person, data) => {
-              if (person.source === "employee" && person.employeeId) {
-                // Employee: only update departments on the employee record
-                await updateEmployeeDepartments(person.employeeId, data.departmentIds, orgId);
-              } else if (person.source === "pending_invite") {
-                await updatePendingInvitation(person.personId.replace("inv:", ""), orgId, data);
-              } else if (person.userId) {
-                await updateAppOnlyUser(person.userId, orgId, data);
-              }
-              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
-              void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
-              toast.success("Changes saved");
-            } : undefined}
-            onRevokeAccess={orgId ? async (userId) => {
-              await removeUserFromOrganization(userId, orgId);
-              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
-              toast.success("Access revoked");
-            } : undefined}
-            onRevokeInvitation={orgId ? async (invitationId) => {
-              await revokeInvitation(invitationId, orgId);
-              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
-              toast.success("Invitation revoked");
-            } : undefined}
-            onResendInvitation={orgId ? async (invitationId) => {
-              await resendInvitation(invitationId, orgId);
-              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
-              toast.success("Invitation resent");
-            } : undefined}
+          {/* Summary Cards */}
+          <DirectorySummaryCards
+            activeCount={employees.length}
+            benchedCount={benchedEmployees.length}
+            terminatedCount={terminatedEmployees.length}
+            managementCount={activeManagementUsers.length}
           />
-        )}
 
-        {/* ── Schedule staff tabs: employee table & empty states ── */}
-        {activeTab !== "departments" && rawList.length > 0 ? (
-          <>
-          <div data-testid="staff-table" className="bg-white rounded-[14px] border border-[var(--color-border)] overflow-hidden shadow-[var(--shadow-raised)]">
-            {/* Header row */}
-            <div
-              className={`grid border-b border-[var(--color-border-light)] bg-[var(--color-row-alt)] ${isMobile ? "px-3 py-2.5" : "px-6 py-3"}`}
-              style={{ gridTemplateColumns: gridCols }}
-            >
-            {(isMobile
-              ? ["", "Name", ""]
-              : isTablet
-                ? ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, ""]
-                : ["", "Name", `Assigned ${focusAreaLabel}`, certificationLabel, "Roles", "Account", ""]
-            ).map((h, i) => (
-              <div
-                key={i}
-                className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-[0.06em] flex items-center gap-1.5"
+          {/* Search Bar */}
+          <div className="relative">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-faint)]" style={{ left: 12 }}>
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              className="dg-input w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, email, or phone..."
+              style={{ height: 40, paddingLeft: 36 }}
+            />
+          </div>
+
+          {/* Action row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* View selector: On Schedule / Management */}
+            {managementDepts.length > 0 && (
+              <CustomSelect
+                value={showManagement ? "management" : "schedule"}
+                options={[
+                  { value: "schedule", label: `On Schedule (${employees.length})` },
+                  { value: "management", label: `Management (${activeManagementUsers.length})` },
+                ]}
+                onChange={(v) => { setShowManagement(v === "management"); if (v === "schedule") { setActiveTab("active"); } }}
+                style={{ minWidth: 180 }}
+                fontSize={13}
+              />
+            )}
+
+            {/* Filter button */}
+            {!showManagement && (
+              <button
+                ref={filterBtnRef}
+                onClick={() => setFilterOpen((v) => !v)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                style={{ position: "relative" }}
               >
-                {i === 0 && canManageEmployees && !isReordering && (
-                  <input
-                    type="checkbox"
-                    checked={paginatedList.length > 0 && paginatedList.every((e) => selectedIds.has(e.id))}
-                    onChange={() => toggleSelectAll(paginatedList)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                {isMobile ? "" : "Filter"}
+                {hasActiveFilters && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--color-brand)]" />
+                )}
+              </button>
+            )}
+
+            {/* Reorder button */}
+            {canReorder && !showManagement && (
+              <button
+                onClick={() => { handleEnterReorder(); setExpandedEmpId(null); setPage(1); }}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <rect x="3" y="2" width="2" height="2" rx="1" />
+                  <rect x="9" y="2" width="2" height="2" rx="1" />
+                  <rect x="3" y="6" width="2" height="2" rx="1" />
+                  <rect x="9" y="6" width="2" height="2" rx="1" />
+                  <rect x="3" y="10" width="2" height="2" rx="1" />
+                  <rect x="9" y="10" width="2" height="2" rx="1" />
+                </svg>
+                {isMobile ? "" : "Reorder"}
+              </button>
+            )}
+
+            <div className="flex-1" />
+
+            {/* Import */}
+            {!showManagement && canManageEmployees && orgId && !isMobile && (
+              <button onClick={() => setShowImport(true)} className="dg-btn dg-btn-secondary dg-btn-sm">Import</button>
+            )}
+
+            {/* Export */}
+            {!showManagement && orgId && !isMobile && (
+              <button onClick={handleExport} className="dg-btn dg-btn-secondary dg-btn-sm">Export</button>
+            )}
+
+            {/* Add */}
+            {((showManagement && canManageManagementAccess) || (!showManagement && canManageEmployees)) && (
+              <button
+                onClick={showManagement ? () => setShowAppOnlyInvite(true) : onAdd}
+                className="dg-btn dg-btn-primary dg-btn-sm"
+              >
+                + Add
+              </button>
+            )}
+          </div>
+
+          {/* Tabs — only when NOT in management mode */}
+          {!showManagement && (
+            <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+              {tabs.map((tab, i) => {
+                const active = activeTab === tab.key;
+                const prevActive = i > 0 && activeTab === tabs[i - 1].key;
+                const showDivider = i > 0 && !active && !prevActive;
+                return (
+                  <span key={tab.key} style={{ display: "contents" }}>
+                    {i > 0 && (
+                      <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                    )}
+                    <button
+                      onClick={() => { setActiveTab(tab.key); setExpandedEmpId(null); if (isReordering) handleCancelReorder(); }}
+                      className={`dg-span-tab${active ? " active" : ""}`}
+                    >
+                      {tab.label}
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                        fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                        background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                        color: active ? "inherit" : "var(--color-text-muted)",
+                        marginLeft: 3,
+                      }}>{tab.count}</span>
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Department sub-filter tabs — management mode */}
+          {showManagement && departmentItems.length > 0 && (
+            <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+              <button
+                onClick={() => setDeptFilterId(null)}
+                className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
+              >
+                All
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                  fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                  background: deptFilterId === null ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                  color: deptFilterId === null ? "inherit" : "var(--color-text-muted)",
+                  marginLeft: 3,
+                }}>{departmentUsers.length}</span>
+              </button>
+              {managementDepts.filter((d) => deptCounts.has(d.id)).map((dept, i) => {
+                const active = deptFilterId === dept.id;
+                const prevActive = i === 0 ? deptFilterId === null : deptFilterId === managementDepts.filter((d2) => deptCounts.has(d2.id))[i - 1]?.id;
+                const showDivider = !active && !prevActive;
+                return (
+                  <span key={dept.id} style={{ display: "contents" }}>
+                    <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                    <button
+                      onClick={() => setDeptFilterId(active ? null : dept.id)}
+                      className={`dg-span-tab${active ? " active" : ""}`}
+                    >
+                      {dept.name}
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                        fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                        background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                        color: active ? "inherit" : "var(--color-text-muted)",
+                        marginLeft: 3,
+                      }}>{deptCounts.get(dept.id) ?? 0}</span>
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Context bar: filter pills, bulk actions, reorder bar (employee mode only) */}
+          {!showManagement && (
+            <StaffContextBar
+              filterFocusArea={filterFocusArea}
+              filterRole={filterRole}
+              hasActiveFilters={hasActiveFilters}
+              onClearFocusArea={() => setFilterFocusArea(null)}
+              onClearRole={() => setFilterRole(null)}
+              onClearAll={clearFilters}
+              focusAreas={focusAreas}
+              roles={roles}
+              focusAreaLabel={focusAreaLabel}
+              selectionCount={selectedIds.size}
+              selectedIds={selectedIds}
+              activeTab={activeTab}
+              canManageEmployees={canManageEmployees}
+              displayList={displayList}
+              pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+              onBulkInvite={(emps) => { setInviteEmployee(emps[0]); setInviteQueue(emps.slice(1)); }}
+              onBulkBench={(ids) => { for (const id of ids) onBench(id); clearSelection(); }}
+              onBulkActivate={(ids) => { for (const id of ids) onActivate(id); clearSelection(); }}
+              onBulkTerminate={(ids) => { for (const id of ids) onDelete(id); clearSelection(); }}
+              onClearSelection={clearSelection}
+              isReordering={isReordering}
+              isDirty={isDirty}
+              onSaveOrder={handleSaveOrder}
+              onCancelReorder={handleCancelReorder}
+            />
+          )}
+
+          {/* Filter popover */}
+          {!showManagement && (
+            <StaffFilterPopover
+              open={filterOpen}
+              onClose={() => setFilterOpen(false)}
+              anchorRef={filterBtnRef.current}
+              filterFocusArea={filterFocusArea}
+              onFilterFocusAreaChange={setFilterFocusArea}
+              filterRole={filterRole}
+              onFilterRoleChange={setFilterRole}
+              focusAreas={focusAreas}
+              roles={roles}
+              focusAreaLabel={focusAreaLabel}
+              roleLabel={roleLabel}
+              unlinkedCount={unlinkedCount}
+              showOnlyUnlinked={showOnlyUnlinked}
+              onShowOnlyUnlinkedChange={setShowOnlyUnlinked}
+              onClearAll={clearFilters}
+              hasActiveFilters={hasActiveFilters}
+            />
+          )}
+
+          {/* ── Employee Table ── */}
+          {!showManagement && (
+            rawList.length > 0 ? (
+              <>
+                <div data-tour="staff-table" data-testid="staff-table" className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+                  <Table>
+                    <TableHeader>
+                      <UITableRow className="hover:bg-transparent bg-[var(--color-bg)]">
+                        <TableHead className="pl-6 w-[60px] text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          <div className="flex items-center gap-1.5">
+                            {canManageEmployees && !isReordering && (
+                              <input
+                                type="checkbox"
+                                checked={paginatedList.length > 0 && paginatedList.every((e) => selectedIds.has(e.id))}
+                                onChange={() => toggleSelectAll(paginatedList)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
+                              />
+                            )}
+                            <span
+                              className="inline-flex items-center gap-1 cursor-pointer select-none"
+                              onClick={() => handleSort("seniority")}
+                            >
+                              # <SortIcon active={sortConfig.key === "seniority"} dir={sortConfig.dir} />
+                            </span>
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold cursor-pointer select-none"
+                          onClick={() => handleSort("name")}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            Name <SortIcon active={sortConfig.key === "name"} dir={sortConfig.dir} />
+                          </span>
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          {focusAreaLabel}
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          {certificationLabel}
+                        </TableHead>
+                        <TableHead className="hidden lg:table-cell text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          Roles
+                        </TableHead>
+                        <TableHead className="hidden lg:table-cell text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          Account
+                        </TableHead>
+                        <TableHead className="pr-6 w-[40px]" />
+                      </UITableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedList.map((emp, i) => {
+                        const globalIdx = (page - 1) * PAGE_SIZE + i;
+                        const isExpanded = !isReordering && emp.id === expandedEmpId;
+                        const isDragging = isReordering && draggedIdx !== null && baseList[draggedIdx]?.id === emp.id;
+                        const isDropTarget = isReordering && dragOverIdx === globalIdx && draggedIdx !== null && draggedIdx !== globalIdx;
+                        return (
+                          <StaffTableRow
+                            key={emp.id}
+                            emp={emp}
+                            globalIndex={globalIdx}
+                            isExpanded={isExpanded}
+                            isReordering={isReordering}
+                            isDragging={isDragging}
+                            isDropTarget={isDropTarget}
+                            canManageEmployees={canManageEmployees}
+                            isSelected={selectedIds.has(emp.id)}
+                            focusAreas={focusAreas}
+                            certifications={certifications}
+                            roles={roles}
+                            pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+                            onToggleSelect={toggleSelect}
+                            onRowClick={(empId) => setExpandedEmpId(isExpanded ? null : empId)}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onDragEnd={handleDragEnd}
+                          />
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {!isReordering && (
+                  <StaffPagination
+                    page={page}
+                    totalPages={totalPages}
+                    totalCount={totalCount}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setPage}
                   />
                 )}
-                {h}
-              </div>
-            ))}
-          </div>
-
-          {/* Employee rows */}
-          {paginatedList.map((emp, i) => {
-            const globalIdx = (page - 1) * PAGE_SIZE + i;
-            const isExpanded = !isReordering && emp.id === expandedEmpId;
-            const isDragging = isReordering && draggedIdx !== null && baseList[draggedIdx]?.id === emp.id;
-            const isDropTarget = isReordering && dragOverIdx === globalIdx && draggedIdx !== null && draggedIdx !== globalIdx;
-            return (
-              <StaffTableRow
-                key={emp.id}
-                emp={emp}
-                index={i}
-                globalIndex={globalIdx}
-                isExpanded={isExpanded}
-                isReordering={isReordering}
-                isDragging={isDragging}
-                isDropTarget={isDropTarget}
-                canManageEmployees={canManageEmployees}
-                isSelected={selectedIds.has(emp.id)}
-                isMobile={isMobile}
-                isTablet={isTablet}
-                gridCols={gridCols}
-                focusAreas={focusAreas}
-                certifications={certifications}
-                roles={roles}
-                pendingInviteByEmployeeId={pendingInviteByEmployeeId}
-                revokingId={revokingId}
-                onToggleSelect={toggleSelect}
-                onRowClick={(empId) => setExpandedEmpId(isExpanded ? null : empId)}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onDragEnd={handleDragEnd}
-                onRevokeInvitation={handleRevokeInvitation}
+              </>
+            ) : (
+              <StaffEmptyState
+                activeTab={activeTab}
+                hasFilters={!!(searchQuery || filterFocusArea || filterRole || showOnlyUnlinked)}
+                onClearFilters={clearFilters}
               />
-            );
-          })}
-          </div>
+            )
+          )}
 
-          {/* Pagination controls */}
-          <StaffPagination
-            page={page}
-            totalPages={totalPages}
-            totalCount={isReordering ? displayList.length : totalCount}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
-          </>
-        ) : activeTab !== "departments" ? (
-          <StaffEmptyState
-            activeTab={activeTab}
-            hasFilters={!!(searchQuery || filterFocusArea || filterRole || showOnlyUnlinked)}
-            onClearFilters={clearFilters}
-          />
-        ) : null}
+          {/* ── Management Table ── */}
+          {showManagement && (
+            filteredDeptUsers.length > 0 ? (
+              <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+                <Table>
+                  <TableHeader>
+                    <UITableRow className="hover:bg-transparent bg-[var(--color-bg)]">
+                      <TableHead className="pl-6 text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                        Name
+                      </TableHead>
+                      {!isMobile && !isTablet && (
+                        <TableHead className="text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          {departmentLabel}
+                        </TableHead>
+                      )}
+                      {!isMobile && !isTablet && (
+                        <TableHead className="text-[11px] tracking-wider uppercase text-[var(--color-text-subtle)] font-semibold">
+                          Status
+                        </TableHead>
+                      )}
+                      <TableHead className="pr-6 w-[40px]" />
+                    </UITableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDeptUsers.map((person) => {
+                      const personDepts = person.managementDepartmentIds
+                        .map(id => managementDepts.find(d => d.id === id))
+                        .filter((d): d is NonNullable<typeof d> => d != null);
+                      const isPending = person.invitationStatus !== null && !person.hasAppAccess;
+                      const isExpanded = person.personId === expandedPersonId;
+                      const statusLabel = isPending
+                        ? (person.invitationStatus === "expired" ? "Expired" : "Pending")
+                        : person.employeeStatus === "terminated"
+                          ? "Terminated"
+                          : person.employeeStatus === "benched"
+                            ? "Benched"
+                            : "Active";
+                      const statusColors = isPending
+                        ? { background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }
+                        : person.employeeStatus === "terminated"
+                          ? { background: "var(--color-danger-bg)", color: "var(--color-danger-text)" }
+                          : person.employeeStatus === "benched"
+                            ? { background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }
+                            : { background: "var(--color-success-bg)", color: "var(--color-success-text)" };
+                      return (
+                        <UITableRow
+                          key={person.personId}
+                          className={`transition-colors cursor-pointer ${isExpanded ? "bg-[var(--color-control-active-bg)]" : "hover:bg-[var(--color-bg)]"}`}
+                          onClick={() => setExpandedPersonId(isExpanded ? null : person.personId)}
+                          style={{ opacity: isPending ? 0.7 : 1 }}
+                        >
+                          {/* Name */}
+                          <TableCell className="pl-6 py-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                                style={{
+                                  background: isPending ? "var(--color-surface)" : "var(--color-control-active-bg)",
+                                  color: isPending ? "var(--color-text-muted)" : "var(--color-control-active-text)",
+                                }}
+                              >
+                                {(person.firstName?.[0] ?? "").toUpperCase()}{(person.lastName?.[0] ?? "").toUpperCase() || "?"}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[14px] font-medium text-[var(--color-text-primary)] truncate">
+                                    {person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}
+                                  </span>
+                                  {person.source === "employee" && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0" style={{ background: "var(--color-today-bg)", color: "var(--color-today-text)" }}>
+                                      On Schedule
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[12px] text-[var(--color-text-muted)] truncate mt-0.5">
+                                  {person.email}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
 
-        {/* Bulk Import Modal */}
-        {showImport && orgId && (
-          <BulkImportModal
-            orgId={orgId}
-            onClose={() => setShowImport(false)}
-            onImported={() => { setShowImport(false); window.location.reload(); }}
-          />
-        )}
+                          {/* Department */}
+                          {!isMobile && !isTablet && (
+                            <TableCell className="py-4">
+                              <span className="text-[13px] text-[var(--color-text-muted)]">
+                                {personDepts.length > 0 ? personDepts.map(d => d.name).join(", ") : "\u2014"}
+                              </span>
+                            </TableCell>
+                          )}
 
-        {/* Invite Employee Modal */}
-        {inviteEmployee && orgId && (
-          <InviteEmployeeModal
-            employee={inviteEmployee}
-            orgId={orgId}
-            orgName={orgName || "your organization"}
-            onClose={() => { setInviteEmployee(null); setInviteQueue([]); }}
-            onInvited={() => {
-              refreshInvitations();
-              if (orgId) {
-                void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
-              }
-              if (inviteQueue.length > 0) {
-                setInviteEmployee(inviteQueue[0]);
-                setInviteQueue((q) => q.slice(1));
-              } else {
-                setInviteEmployee(null);
-              }
-            }}
-          />
-        )}
+                          {/* Status */}
+                          {!isMobile && !isTablet && (
+                            <TableCell className="py-4">
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                                style={statusColors}
+                              >
+                                {statusLabel}
+                              </span>
+                            </TableCell>
+                          )}
 
-        {/* Invite App-Only User Modal */}
-        {showAppOnlyInvite && orgId && (
-          <InviteEmployeeModal
-            employee={null}
-            orgId={orgId}
-            orgName={orgName || "your organization"}
-            departments={departmentItems}
-            onClose={() => setShowAppOnlyInvite(false)}
-            onInvited={() => {
-              setShowAppOnlyInvite(false);
-              if (orgId) {
-                void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
-              }
-            }}
-          />
-        )}
+                          {/* Chevron */}
+                          <TableCell className="pr-6 py-4 w-[40px] text-right">
+                            <div className="flex items-center justify-center" style={{ color: isExpanded ? "var(--color-control-active-text)" : "var(--color-text-faint)" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 6 15 12 9 18" />
+                              </svg>
+                            </div>
+                          </TableCell>
+                        </UITableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <EmptyState
+                icon={
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                }
+                title={searchQuery ? "No results found" : "No management members yet"}
+                description={searchQuery ? "Try adjusting your search." : "People assigned to management will show here."}
+              />
+            )
+          )}
+        </div>
       </div>
 
-      {/* Detail panel — fixed positioned, outside content flow */}
+      {/* Bulk Import Modal */}
+      {showImport && orgId && (
+        <BulkImportModal
+          orgId={orgId}
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); window.location.reload(); }}
+        />
+      )}
+
+      {/* Invite Employee Modal */}
+      {inviteEmployee && orgId && (
+        <InviteEmployeeModal
+          employee={inviteEmployee}
+          orgId={orgId}
+          orgName={orgName || "your organization"}
+          onClose={() => { setInviteEmployee(null); setInviteQueue([]); }}
+          onInvited={() => {
+            refreshInvitations();
+            if (orgId) {
+              void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+            }
+            if (inviteQueue.length > 0) {
+              setInviteEmployee(inviteQueue[0]);
+              setInviteQueue((q) => q.slice(1));
+            } else {
+              setInviteEmployee(null);
+            }
+          }}
+        />
+      )}
+
+      {/* Invite Management User Modal */}
+      {showManagementInvite && orgId && (
+        <InviteEmployeeModal
+          employee={null}
+          orgId={orgId}
+          orgName={orgName || "your organization"}
+          departments={departmentItems}
+          onClose={() => setShowAppOnlyInvite(false)}
+          onInvited={() => {
+            setShowAppOnlyInvite(false);
+            if (orgId) {
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            }
+          }}
+        />
+      )}
+
+      {/* Detail panel — employee */}
       {selectedEmployee && canViewEmployeeDetails && (
         <StaffDetailPanel
           employee={selectedEmployee}
@@ -874,6 +853,15 @@ function MembersSection({
           onActivate={(empId) => onActivate(empId)}
           onClose={() => setExpandedEmpId(null)}
           onInvite={(e) => setInviteEmployee(e)}
+          canManageManagementAccess={canManageManagementAccess}
+          hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
+          hasPendingManagementInvite={
+            !!selectedEmployeeDirectoryPerson
+            && selectedEmployeeDirectoryPerson.managementDepartmentIds.length > 0
+            && selectedEmployeeDirectoryPerson.invitationStatus !== null
+            && !selectedEmployeeDirectoryPerson.hasAppAccess
+          }
+          onManageManagementAccess={canManageManagementAccess ? (employee) => setManagementAccessEmployee(employee) : undefined}
           onRevoke={handleRevokeInvitation}
           onRevokeAccess={isSuperAdmin && orgId ? async (userId: string) => {
             try {
@@ -884,11 +872,113 @@ function MembersSection({
               toast.error("Failed to revoke app access");
             }
           } : undefined}
-          onRemoveFromSchedule={canManageEmployees ? (empId: string) => {
-            onDelete(empId);
-            setExpandedEmpId(null);
-            if (orgId) void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+        />
+      )}
+
+      {/* Detail panel — management */}
+      {selectedPerson && (
+        <ManagementStaffPanel
+          person={selectedPerson}
+          departments={managementDepts}
+          departmentLabel={departmentLabel}
+          canManageScheduleEmployees={canManageEmployees}
+          canManageManagementAccess={canManageManagementAccess}
+          onClose={() => setExpandedPersonId(null)}
+          onSave={async (data) => {
+            if (orgId) {
+              if (selectedPerson.source === "employee" && selectedPerson.employeeId) {
+                const { error } = await supabase
+                  .from("employees")
+                  .update({ first_name: data.firstName, last_name: data.lastName, phone: data.phone })
+                  .eq("id", selectedPerson.employeeId)
+                  .eq("org_id", orgId);
+                if (error) throw error;
+                const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
+                if (selectedPerson.userId) {
+                  await updateAppOnlyUser(selectedPerson.userId, orgId, {
+                    departmentIds: data.managementDepartmentIds,
+                  });
+                } else if (pendingInvitation) {
+                  await updatePendingInvitation(pendingInvitation.id, orgId, {
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    phone: data.phone,
+                    departmentIds: data.managementDepartmentIds,
+                  });
+                }
+              } else if (selectedPerson.source === "pending_invite") {
+                await updatePendingInvitation(selectedPerson.personId.replace("inv:", ""), orgId, {
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  phone: data.phone,
+                  departmentIds: data.managementDepartmentIds,
+                });
+              } else if (selectedPerson.userId) {
+                await updateAppOnlyUser(selectedPerson.userId, orgId, {
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  phone: data.phone,
+                  departmentIds: data.managementDepartmentIds,
+                });
+              }
+              refreshInvitations();
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+              void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+              toast.success("Changes saved");
+            }
+          }}
+          onRevokeInvitation={canManageManagementAccess && orgId ? async (invitationId) => {
+            await revokeInvitation(invitationId, orgId);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            toast.success("Invitation revoked");
           } : undefined}
+          onResendInvitation={canManageManagementAccess && orgId ? async (invitationId) => {
+            await resendInvitation(invitationId, orgId);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            toast.success("Invitation resent");
+          } : undefined}
+          onAddToSchedule={canManageEmployees ? (person) => {
+            setManagementSchedulePerson(person);
+          } : undefined}
+          onBench={canManageEmployees ? onBench : undefined}
+          onActivate={canManageEmployees ? onActivate : undefined}
+          onTerminate={canManageEmployees ? onDelete : undefined}
+        />
+      )}
+
+      {managementSchedulePerson && orgId && (
+        <AddManagementUserToScheduleModal
+          orgId={orgId}
+          person={managementSchedulePerson}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={roles}
+          focusAreaLabel={focusAreaLabel}
+          certificationLabel={certificationLabel}
+          roleLabel={roleLabel}
+          onClose={() => setManagementSchedulePerson(null)}
+          onAdded={() => {
+            setManagementSchedulePerson(null);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+          }}
+        />
+      )}
+
+      {managementAccessEmployee && orgId && canManageManagementAccess && (
+        <EmployeeManagementAccessModal
+          employee={managementAccessEmployee}
+          orgId={orgId}
+          orgName={orgName || "your organization"}
+          managementDepartments={managementDepts}
+          directoryPerson={selectedEmployeeDirectoryPerson}
+          pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
+          onClose={() => setManagementAccessEmployee(null)}
+          onCompleted={() => {
+            refreshInvitations();
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+          }}
         />
       )}
     </>
@@ -1111,9 +1201,10 @@ function migrateLegacyDraftValue(v: string, shiftCodes: ShiftCode[], absenceType
 function RecurringScheduleSection({
   employees,
   orgId,
+  currentUserId,
   shiftCodes,
   shiftCodeMap,
-  canEdit,
+  canManage,
   focusAreas,
   certifications,
   absenceTypes = [],
@@ -1121,9 +1212,10 @@ function RecurringScheduleSection({
 }: {
   employees: Employee[];
   orgId: string;
+  currentUserId: string | null;
   shiftCodes: ShiftCode[];
   shiftCodeMap: Map<number, string>;
-  canEdit: boolean;
+  canManage: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   absenceTypes?: AbsenceType[];
@@ -1141,7 +1233,6 @@ function RecurringScheduleSection({
 
   // ── Edit state ──
   const [dirtySchedules, setDirtySchedules] = useState<Record<string, Record<number, string>>>({});
-  const { user: currentUser } = useAuth();
   const [activeCell, setActiveCell] = useState<{ empId: string; dayIndex: number } | null>(null);
   const [activeCellEl, setActiveCellEl] = useState<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1179,7 +1270,8 @@ function RecurringScheduleSection({
 
         // Load saved draft separately so a draft error doesn't block the main data
         try {
-          const draft = await getRecurringDraft(orgId);
+          if (!canManage || !currentUserId) return;
+          const draft = await getRecurringDraft(orgId, currentUserId);
           if (!cancelled && draft?.draftData && Object.keys(draft.draftData).length > 0) {
             // Migrate legacy draft values (plain labels / abs: prefix) to ID-based format
             const migrated: Record<string, Record<number, string>> = {};
@@ -1209,7 +1301,7 @@ function RecurringScheduleSection({
 
     load();
     return () => { cancelled = true; };
-  }, [orgId, shiftCodeMap, absenceTypeMap, shiftCodes, absenceTypes]);
+  }, [orgId, canManage, currentUserId, shiftCodeMap, absenceTypeMap, shiftCodes, absenceTypes]);
 
   // ── Derived state ──
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
@@ -1246,7 +1338,7 @@ function RecurringScheduleSection({
   }
 
   function handleCellClick(empId: string, dayIndex: number, el: HTMLElement) {
-    if (!canEdit) return;
+    if (!canManage) return;
     if (activeCell?.empId === empId && activeCell?.dayIndex === dayIndex) {
       setActiveCell(null);
       setActiveCellEl(null);
@@ -1321,7 +1413,9 @@ function RecurringScheduleSection({
         return next;
       });
       setSavedDraftTimestamp(null);
-      await deleteRecurringDraft(orgId).catch(() => {});
+      if (currentUserId) {
+        await deleteRecurringDraft(orgId, currentUserId).catch(() => {});
+      }
       toast.success("Recurring schedules saved");
     } catch (err: unknown) {
       toast.error("Failed to save recurring schedules");
@@ -1333,10 +1427,8 @@ function RecurringScheduleSection({
 
   async function handleSaveDraft() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (!userId) { toast.error("Not authenticated"); return; }
-      await saveRecurringDraft(orgId, userId, dirtySchedules);
+      if (!currentUserId) { toast.error("Not authenticated"); return; }
+      await saveRecurringDraft(orgId, currentUserId, dirtySchedules);
       setSavedDraftTimestamp(new Date().toISOString());
       toast.success("Draft saved");
     } catch (err: unknown) {
@@ -1348,7 +1440,9 @@ function RecurringScheduleSection({
   async function handleDiscardDraft() {
     setDirtySchedules({});
     setSavedDraftTimestamp(null);
-    await deleteRecurringDraft(orgId).catch(() => {});
+    if (currentUserId) {
+      await deleteRecurringDraft(orgId, currentUserId).catch(() => {});
+    }
   }
 
   // ── Filtering ──
@@ -1383,7 +1477,7 @@ function RecurringScheduleSection({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
       {/* Sticky save bar at top — shows when there are dirty changes (including restored drafts) */}
-      {hasDirtyChanges && (
+      {hasDirtyChanges && canManage && (
         <div style={{
           position: "sticky", top: 0, zIndex: 20,
           background: "var(--color-info-bg)", border: "1px solid var(--color-info-border)", borderRadius: 12,
@@ -1553,7 +1647,7 @@ function RecurringScheduleSection({
 
           {/* Employee rows */}
           {sortedEmployees.map((emp, i) => {
-            const isCurrentUser = !!(emp.userId && currentUser && emp.userId === currentUser.id);
+            const isCurrentUser = !!(emp.userId && currentUserId && emp.userId === currentUserId);
             const rowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
             const certAbbr = emp.certificationId != null ? getCertAbbr(emp.certificationId, certifications) : null;
             const dc = certAbbr ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR) : null;
@@ -1589,7 +1683,7 @@ function RecurringScheduleSection({
                       {isCurrentUser && (
                         <span style={{
                           fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-                          background: "var(--color-brand-bg)", color: "var(--color-link)", whiteSpace: "nowrap", flexShrink: 0,
+                          background: "var(--color-brand-bg)", color: "var(--color-brand)", whiteSpace: "nowrap", flexShrink: 0,
                         }}>
                           You
                         </span>
@@ -1627,13 +1721,13 @@ function RecurringScheduleSection({
                     <div
                       key={dayIdx}
                       className="dg-grid-cell"
-                      data-interactive={canEdit ? "true" : "false"}
-                      tabIndex={canEdit ? 0 : -1}
+                      data-interactive={canManage ? "true" : "false"}
+                      tabIndex={canManage ? 0 : -1}
                       role="gridcell"
                       aria-label={cellLabel ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: ${cellLabel}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: empty`}
                       onClick={(e) => handleCellClick(emp.id, dayIdx, e.currentTarget)}
                       onKeyDown={(e) => {
-                        if (canEdit && (e.key === "Enter" || e.key === " ")) {
+                        if (canManage && (e.key === "Enter" || e.key === " ")) {
                           e.preventDefault();
                           handleCellClick(emp.id, dayIdx, e.currentTarget as HTMLElement);
                         }
@@ -1645,41 +1739,51 @@ function RecurringScheduleSection({
                       }}
                     >
                       {st ? (
-                        <div title={isNameMode ? stDisplay! : undefined} style={{
-                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
-                          background: st.color,
-                          border: isDirty ? `2px dashed ${st.text}` : `1px solid ${borderColor(st.text)}`,
-                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                          color: st.text,
-                          fontSize: isNameMode ? nameModeFs : codeModeFs,
-                          fontWeight: 800,
-                          padding: "2px 4px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          transition: "box-shadow 150ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
-                        }}>
-                          {stDisplay}
-                        </div>
+                        <MaybeHint
+                          content={isNameMode ? stDisplay! : undefined}
+                          side="top"
+                        >
+                          <div style={{
+                            position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
+                            background: st.color,
+                            border: isDirty ? `2px dashed ${st.text}` : `1px solid ${borderColor(st.text)}`,
+                            borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                            color: st.text,
+                            fontSize: isNameMode ? nameModeFs : codeModeFs,
+                            fontWeight: 800,
+                            padding: "2px 4px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            transition: "box-shadow 150ms ease",
+                            boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
+                          }}>
+                            {stDisplay}
+                          </div>
+                        </MaybeHint>
                       ) : at ? (
-                        <div title={isNameMode ? atDisplay! : undefined} style={{
-                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
-                          background: at.color,
-                          border: isDirty ? `2px dashed ${at.text}` : `1px solid ${borderColor(at.text)}`,
-                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                          color: at.text,
-                          fontSize: isNameMode ? nameModeFs : codeModeFs,
-                          fontWeight: 800,
-                          padding: "2px 4px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          transition: "box-shadow 150ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
-                        }}>
-                          {atDisplay}
-                        </div>
+                        <MaybeHint
+                          content={isNameMode ? atDisplay! : undefined}
+                          side="top"
+                        >
+                          <div style={{
+                            position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
+                            background: at.color,
+                            border: isDirty ? `2px dashed ${at.text}` : `1px solid ${borderColor(at.text)}`,
+                            borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                            color: at.text,
+                            fontSize: isNameMode ? nameModeFs : codeModeFs,
+                            fontWeight: 800,
+                            padding: "2px 4px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            transition: "box-shadow 150ms ease",
+                            boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
+                          }}>
+                            {atDisplay}
+                          </div>
+                        </MaybeHint>
                       ) : (
                         <div style={{
                           position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
@@ -1762,7 +1866,8 @@ export default function StaffView({
   absenceTypes,
   departments: departmentsProp = [],
   departmentLabel: departmentLabelProp = "Department",
-  canEditShifts,
+  canViewRecurringShifts,
+  canManageRecurringShifts,
   canViewEmployeeDetails,
   canManageEmployees,
   isSuperAdmin = false,
@@ -1776,13 +1881,19 @@ export default function StaffView({
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
-  const VALID_SECTIONS: StaffSection[] = ["directory", "access", "activity", "recurring-schedule"];
+  const { user } = useAuth();
+  const allowedSections: StaffSection[] = [
+    "directory",
+    ...((isSuperAdmin || isGridmaster) ? ["access" as const] : []),
+    ...(orgId && canViewRecurringShifts ? ["recurring-schedule" as const] : []),
+    ...(isSuperAdmin ? ["activity" as const] : []),
+  ];
   const sectionParam = searchParams.get("section") as StaffSection | null;
   // Support legacy "members" and "users" section params for backwards compat
   const resolvedSection = sectionParam === ("members" as string) ? "directory" as StaffSection
     : sectionParam === ("users" as string) ? "access" as StaffSection
     : sectionParam;
-  const activeSection: StaffSection = resolvedSection && VALID_SECTIONS.includes(resolvedSection) ? resolvedSection : "directory";
+  const activeSection: StaffSection = resolvedSection && allowedSections.includes(resolvedSection) ? resolvedSection : "directory";
 
   const iconMembers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   const iconUserMgmt = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
@@ -1792,7 +1903,7 @@ export default function StaffView({
   const links: { id: StaffSection; label: string; icon: React.ReactNode }[] = [
     { id: "directory", label: "Directory", icon: iconMembers },
     ...((isSuperAdmin || isGridmaster) ? [{ id: "access" as StaffSection, label: "User Access", icon: iconUserMgmt }] : []),
-    ...(orgId ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
+    ...(orgId && canViewRecurringShifts ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
     ...(isSuperAdmin ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: iconActivity }] : []),
   ];
 
@@ -1841,7 +1952,7 @@ export default function StaffView({
                         render={<Link href={link.id === "directory" ? "/people" : `/people?section=${link.id}`} replace />}
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
+                        className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
                       >
                         <span className={activeSection === link.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
                           {link.icon}
@@ -1899,6 +2010,7 @@ export default function StaffView({
             orgId={orgId}
             orgName={orgName}
             isSuperAdmin={isSuperAdmin}
+            isGridmaster={isGridmaster}
             departments={departmentsProp}
             departmentLabel={departmentLabelProp}
             setupIncomplete={setupIncomplete}
@@ -1908,24 +2020,25 @@ export default function StaffView({
         {activeSection !== "directory" && (
           <div className="p-4 md:p-6 lg:px-12 lg:py-10">
             {activeSection === "access" && (isSuperAdmin || isGridmaster) && orgId && (
-              <div style={{ width: "100%", maxWidth: 1100 }}>
+              <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
                 <UserManagementSettings orgId={orgId} isSuperAdmin={isSuperAdmin} departments={departmentsProp as unknown as Department[]} />
               </div>
             )}
 
             {activeSection === "activity" && isSuperAdmin && orgId && (
-              <div style={{ width: "100%", maxWidth: 1100 }}>
+              <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
                 <OrgActivityLog orgId={orgId} />
               </div>
             )}
 
-            {activeSection === "recurring-schedule" && orgId && (
+            {activeSection === "recurring-schedule" && orgId && canViewRecurringShifts && (
               <RecurringScheduleSection
                 employees={employees}
                 orgId={orgId}
+                currentUserId={user?.id ?? null}
                 shiftCodes={shiftCodes ?? []}
                 shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
-                canEdit={canEditShifts ?? false}
+                canManage={canManageRecurringShifts ?? false}
                 focusAreas={focusAreas}
                 certifications={certifications}
                 absenceTypes={absenceTypes}

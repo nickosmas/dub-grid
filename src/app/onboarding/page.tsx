@@ -103,7 +103,7 @@ export default function OnboardingPage() {
             padding: "16px", 
             background: "var(--color-brand)",
             borderRadius: "20px",
-            boxShadow: "0 8px 16px rgba(0, 95, 2, 0.25)"
+            boxShadow: "0 8px 16px rgba(37, 99, 235, 0.25)"
           }}>
             <DubGridLogo size={40} color="var(--color-text-inverse)" />
           </div>
@@ -148,7 +148,7 @@ export default function OnboardingPage() {
               fontWeight: 700,
               cursor: "pointer",
               transition: "transform 150ms ease, box-shadow 150ms ease",
-              boxShadow: "0 4px 12px rgba(0, 95, 2, 0.2)",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
             }}
           >
             {checking ? "Checking..." : "I've been invited — refresh"}

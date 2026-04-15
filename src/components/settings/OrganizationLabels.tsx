@@ -66,9 +66,6 @@ export default function OrganizationLabels({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
-        Customize what your organization calls each feature. These labels appear throughout the app.
-      </p>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <div>
           <label style={labelStyle}>FOCUS AREAS LABEL</label>
@@ -128,28 +125,19 @@ export default function OrganizationLabels({
         </div>
       </div>
 
-      {!readOnly && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button
-          onClick={handleSave}
-          disabled={!isModified || saving}
-          style={{
-            background: isModified ? "var(--color-brand)" : "var(--color-border)",
-            border: "none",
-            color: "var(--color-text-inverse)",
-            borderRadius: 8,
-            padding: "9px 20px",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 700,
-            cursor: isModified ? "pointer" : "not-allowed",
-          }}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+      {!readOnly && <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
         {saved && (
-          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>
+          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-success)", fontWeight: 600 }}>
             Saved!
           </span>
         )}
+        <button
+          onClick={handleSave}
+          disabled={!isModified || saving}
+          className="dg-btn dg-btn-primary"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
       </div>}
     </div>
   );

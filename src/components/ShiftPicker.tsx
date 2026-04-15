@@ -4,7 +4,9 @@ import { useState, Fragment } from "react";
 import { Check } from "lucide-react";
 import { ShiftCode, AbsenceType, FocusArea, ShiftDisplayMode } from "@/types";
 import { isEmployeeQualified } from "@/lib/schedule-logic";
+import { borderColor } from "@/lib/colors";
 import ScrollableTabs from "@/components/ScrollableTabs";
+import { MaybeHint } from "@/components/ui/hint";
 
 interface ShiftPickerProps {
   shiftCodes: ShiftCode[];
@@ -79,6 +81,31 @@ export default function ShiftPicker({
 
   const generalNonOffShifts = shiftCodes.filter((st) => st.isGeneral && isQualified(st));
 
+  function getOptionButtonStyle(
+    color: string,
+    text: string,
+    border: string,
+    isActive: boolean,
+  ): React.CSSProperties {
+    return {
+      background: color,
+      border: isActive
+        ? `1.5px solid ${border === "transparent" ? text : border}`
+        : `1px solid ${borderColor(text)}`,
+      borderRadius: 8,
+      padding: "8px 10px 6px",
+      cursor: "pointer",
+      textAlign: "left",
+      transition:
+        "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease",
+      position: "relative",
+      boxShadow: isActive
+        ? `0 0 0 1px ${borderColor(text, 0.15)}, inset 0 1px 3px rgba(0,0,0,0.08)`
+        : "none",
+      opacity: isActive ? 1 : 0.92,
+    };
+  }
+
   function renderShiftButton(s: ShiftCode) {
     const isActive = currentShiftCodeIds.includes(s.id);
 
@@ -117,29 +144,19 @@ export default function ShiftPicker({
         onClick={handleToggle}
         aria-pressed={isActive}
         aria-label={`${s.label} - ${s.name}`}
-        style={{
-          background: isActive ? s.color : `${s.color}40`,
-          border: `1.5px solid ${isActive ? s.border : s.text}`,
-          borderRadius: 8,
-          padding: "8px 10px 6px",
-          cursor: "pointer",
-          textAlign: "left",
-          transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease",
-          position: "relative",
-          boxShadow: isActive ? "inset 0 1px 3px rgba(0,0,0,0.1)" : "none",
-        }}
+        style={getOptionButtonStyle(s.color, s.text, s.border, isActive)}
         onMouseEnter={(e) => {
           if (!isActive) {
-            e.currentTarget.style.background = `${s.color}70`;
             e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";
             e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.opacity = "1";
           }
         }}
         onMouseLeave={(e) => {
           if (!isActive) {
-            e.currentTarget.style.background = `${s.color}40`;
             e.currentTarget.style.boxShadow = "none";
             e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.opacity = "0.92";
           }
         }}
       >
@@ -163,30 +180,27 @@ export default function ShiftPicker({
         )}
 
         {isNameMode ? (
-          <div
-            title={s.name || s.label}
-            style={{
-              fontWeight: 700,
-              fontSize: "var(--dg-fs-caption)",
-              color: s.text,
-              opacity: isActive ? 1 : 0.75,
-              lineHeight: 1.3,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              paddingRight: isActive ? 20 : 0,
-            }}
-          >
-            {s.name || s.label}
-          </div>
+          <MaybeHint content={s.name || s.label} side="left">
+            <div
+              style={{
+                ...primaryTextStyle,
+                color: s.text,
+                lineHeight: 1.25,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                paddingRight: isActive ? 20 : 0,
+              }}
+            >
+              {s.name || s.label}
+            </div>
+          </MaybeHint>
         ) : (
           <>
             <div
               style={{
-                fontWeight: 800,
-                fontSize: "var(--dg-fs-caption)",
+                ...primaryTextStyle,
                 color: s.text,
-                opacity: isActive ? 1 : 0.75,
                 display: "flex",
                 alignItems: "center",
                 gap: 3,
@@ -195,20 +209,22 @@ export default function ShiftPicker({
             >
               {s.label}
             </div>
-            <div
-              title={s.name}
-              style={{
-                fontSize: "var(--dg-fs-micro)",
-                color: "var(--color-text-subtle)",
-                marginTop: 2,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                paddingRight: isActive ? 20 : 0,
-              }}
-            >
-              {s.name}
-            </div>
+            <MaybeHint content={s.name} side="left">
+              <div
+                style={{
+                  ...secondaryTextStyle,
+                  color: s.text,
+                  opacity: 0.82,
+                  marginTop: 3,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  paddingRight: isActive ? 20 : 0,
+                }}
+              >
+                {s.name}
+              </div>
+            </MaybeHint>
           </>
         )}
 
@@ -219,6 +235,19 @@ export default function ShiftPicker({
   const activeArea = allPickerAreas.find((fa) => fa.id === pickerTab);
   const areaName = activeArea?.name ?? allPickerAreas[0]?.name ?? "";
   const areaShifts = getShiftsForFocusArea(pickerTab);
+
+  const primaryTextStyle: React.CSSProperties = {
+    fontWeight: 900,
+    fontSize: "var(--dg-fs-label)",
+    letterSpacing: "0.01em",
+    textShadow: "0 1px 0 rgba(255,255,255,0.18)",
+  };
+
+  const secondaryTextStyle: React.CSSProperties = {
+    fontSize: "var(--dg-fs-footnote)",
+    fontWeight: 700,
+    letterSpacing: "0.01em",
+  };
 
   const sectionHeading: React.CSSProperties = {
     marginBottom: 10,
@@ -329,29 +358,19 @@ export default function ShiftPicker({
                     }}
                     aria-pressed={isActive}
                     aria-label={`${at.label} - ${at.name}`}
-                    style={{
-                      background: isActive ? at.color : `${at.color}40`,
-                      border: `1.5px solid ${isActive ? at.border : at.text}`,
-                      borderRadius: 8,
-                      padding: "8px 10px 6px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease",
-                      position: "relative",
-                      boxShadow: isActive ? "inset 0 1px 3px rgba(0,0,0,0.1)" : "none",
-                    }}
+                    style={getOptionButtonStyle(at.color, at.text, at.border, isActive)}
                     onMouseEnter={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.background = `${at.color}70`;
                         e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";
                         e.currentTarget.style.transform = "translateY(-1px)";
+                        e.currentTarget.style.opacity = "1";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.background = `${at.color}40`;
                         e.currentTarget.style.boxShadow = "none";
                         e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.opacity = "0.92";
                       }
                     }}
                   >
@@ -374,30 +393,27 @@ export default function ShiftPicker({
                       </div>
                     )}
                     {isNameMode ? (
-                      <div
-                        title={at.name || at.label}
-                        style={{
-                          fontWeight: 700,
-                          fontSize: "var(--dg-fs-caption)",
-                          color: at.text,
-                          opacity: isActive ? 1 : 0.75,
-                          lineHeight: 1.3,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          paddingRight: isActive ? 20 : 0,
-                        }}
-                      >
-                        {at.name || at.label}
-                      </div>
+                      <MaybeHint content={at.name || at.label} side="left">
+                        <div
+                          style={{
+                            ...primaryTextStyle,
+                            color: at.text,
+                            lineHeight: 1.25,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            paddingRight: isActive ? 20 : 0,
+                          }}
+                        >
+                          {at.name || at.label}
+                        </div>
+                      </MaybeHint>
                     ) : (
                       <>
                         <div
                           style={{
-                            fontWeight: 800,
-                            fontSize: "var(--dg-fs-caption)",
+                            ...primaryTextStyle,
                             color: at.text,
-                            opacity: isActive ? 1 : 0.75,
                             display: "flex",
                             alignItems: "center",
                             gap: 3,
@@ -406,9 +422,11 @@ export default function ShiftPicker({
                         >
                           {at.label}
                         </div>
-                        <div title={at.name} style={{ fontSize: "var(--dg-fs-micro)", color: "var(--color-text-subtle)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: isActive ? 20 : 0 }}>
-                          {at.name}
-                        </div>
+                        <MaybeHint content={at.name} side="left">
+                          <div style={{ ...secondaryTextStyle, color: at.text, opacity: 0.82, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: isActive ? 20 : 0 }}>
+                            {at.name}
+                          </div>
+                        </MaybeHint>
                       </>
                     )}
                   </button>

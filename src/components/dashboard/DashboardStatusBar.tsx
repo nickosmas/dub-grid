@@ -63,10 +63,8 @@ export default function DashboardStatusBar({
   coveragePct,
   otAlertCount,
   pendingApprovalCount,
-  draftCount,
   urgentGapCount,
   hasRequirements,
-  permissions,
   onExpandStats,
 }: DashboardStatusBarProps) {
   const { status, label } = computeOverallStatus({
@@ -77,15 +75,13 @@ export default function DashboardStatusBar({
     hasRequirements,
   });
 
-  const showOT = permissions.canEditShifts;
-
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 16,
-        padding: "10px 16px",
+        gap: "var(--dg-space-lg)",
+        padding: "var(--dg-space-sm) var(--dg-space-lg)",
         borderRadius: "var(--dg-radius-md)",
         background: "var(--color-surface)",
         border: "1px solid var(--color-border-light)",
@@ -93,7 +89,7 @@ export default function DashboardStatusBar({
       }}
     >
       {/* Status indicator */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--dg-space-sm)", marginRight: "var(--dg-space-xs)" }}>
         <span
           style={{
             width: 10,
@@ -117,39 +113,15 @@ export default function DashboardStatusBar({
       </div>
 
       {/* Divider */}
-      <div style={{ width: 1, height: 20, background: "var(--color-border-light)", flexShrink: 0 }} />
+      <div style={{ width: 1, height: "var(--dg-space-xl)", background: "var(--color-border-light)", flexShrink: 0 }} />
 
-      {/* Metric chips */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", flex: 1 }}>
+      {/* Metric chips - streamlined to only show what ActionQueueCard doesn't */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--dg-space-md)", flexWrap: "wrap", flex: 1 }}>
         {hasRequirements && (
           <MetricChip
             label="Coverage"
             value={`${Math.round(coveragePct)}%`}
             color={chipColor(coveragePct, { green: 90, amber: 70 })}
-          />
-        )}
-
-        {showOT && (
-          <MetricChip
-            label="OT"
-            value={String(otAlertCount)}
-            color={chipColor(otAlertCount, { green: 0, amber: 2 }, true)}
-          />
-        )}
-
-        {permissions.canApproveShiftRequests && pendingApprovalCount > 0 && (
-          <MetricChip
-            label="Pending"
-            value={String(pendingApprovalCount)}
-            color="var(--color-warning)"
-          />
-        )}
-
-        {draftCount > 0 && (
-          <MetricChip
-            label="Drafts"
-            value={String(draftCount)}
-            color="var(--color-info)"
           />
         )}
 
@@ -163,7 +135,7 @@ export default function DashboardStatusBar({
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--dg-space-sm)", flexShrink: 0 }}>
         <button
           onClick={onExpandStats}
           style={{
@@ -173,7 +145,7 @@ export default function DashboardStatusBar({
             background: "none",
             border: "none",
             cursor: "pointer",
-            padding: "4px 8px",
+            padding: "var(--dg-space-xs) var(--dg-space-sm)",
             borderRadius: "var(--dg-radius-sm)",
             whiteSpace: "nowrap",
           }}
@@ -185,8 +157,8 @@ export default function DashboardStatusBar({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 4,
-            padding: "6px 12px",
+            gap: "var(--dg-space-xs)",
+            padding: "var(--dg-space-xs) var(--dg-space-md)",
             borderRadius: "var(--dg-radius-sm)",
             fontSize: "var(--dg-fs-small)",
             fontWeight: 600,

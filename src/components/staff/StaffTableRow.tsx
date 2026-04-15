@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import { TableRow, TableCell } from "@/components/ui/table";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -15,7 +17,6 @@ function hashCode(s: string): number {
 
 interface StaffTableRowProps {
   emp: Employee;
-  index: number;
   globalIndex: number;
   isExpanded: boolean;
   isReordering: boolean;
@@ -23,26 +24,20 @@ interface StaffTableRowProps {
   isDropTarget: boolean;
   canManageEmployees: boolean;
   isSelected: boolean;
-  isMobile: boolean;
-  isTablet: boolean;
-  gridCols: string;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
   pendingInviteByEmployeeId: Map<string, Invitation>;
-  revokingId: string | null;
   onToggleSelect: (empId: string) => void;
   onRowClick: (empId: string) => void;
   onDragStart: (idx: number) => void;
   onDragOver: (e: React.DragEvent, idx: number) => void;
   onDrop: () => void;
   onDragEnd: () => void;
-  onRevokeInvitation: (invitationId: string) => void;
 }
 
 export function StaffTableRow({
   emp,
-  index,
   globalIndex,
   isExpanded,
   isReordering,
@@ -50,59 +45,44 @@ export function StaffTableRow({
   isDropTarget,
   canManageEmployees,
   isSelected,
-  isMobile,
-  isTablet,
-  gridCols,
   focusAreas,
   certifications,
   roles,
   pendingInviteByEmployeeId,
-  revokingId,
   onToggleSelect,
   onRowClick,
   onDragStart,
   onDragOver,
   onDrop,
   onDragEnd,
-  onRevokeInvitation,
 }: StaffTableRowProps) {
   const { user: currentUser } = useAuth();
   const hue = hashCode(emp.id) % 360;
+  const displayName = getEmployeeDisplayName(emp);
+  const initials = getInitials(displayName);
+  const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
 
   return (
-    <div key={emp.id} className="dg-row-enter">
-      <div
-        className={`dg-table-row${isExpanded ? " expanded" : ""}`}
-        draggable={isReordering}
-        onDragStart={isReordering ? () => onDragStart(globalIndex) : undefined}
-        onDragOver={isReordering ? (e) => onDragOver(e, globalIndex) : undefined}
-        onDrop={isReordering ? onDrop : undefined}
-        onDragEnd={isReordering ? onDragEnd : undefined}
-        onClick={!isReordering && canManageEmployees ? () => onRowClick(emp.id) : undefined}
-        style={{
-          display: "grid",
-          gridTemplateColumns: gridCols,
-          padding: isMobile ? "10px 12px" : "14px 24px",
-          borderTop: isDropTarget
-            ? "2px solid var(--color-brand)"
-            : index === 0
-              ? "none"
-              : "1px solid var(--color-border-light)",
-          alignItems: "center",
-          cursor: isReordering ? "grab" : canManageEmployees ? "pointer" : "default",
-          opacity: isDragging ? 0.5 : 1,
-          borderLeft: isExpanded ? "3px solid var(--color-brand)" : "3px solid transparent",
-          paddingLeft: isMobile ? "calc(12px - 3px)" : "calc(24px - 3px)",
-          position: "relative",
-          zIndex: isExpanded ? 1 : 0,
-          boxShadow: isExpanded
-            ? "inset 0 1px 0 var(--color-brand-border), inset 0 -1px 0 var(--color-brand-border)"
-            : "none",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--color-text-faint)" }}>
+    <TableRow
+      className={`transition-colors ${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${!isReordering && canManageEmployees ? "cursor-pointer" : ""} ${isReordering ? "cursor-grab" : ""} dg-row-enter`}
+      draggable={isReordering}
+      onDragStart={isReordering ? () => onDragStart(globalIndex) : undefined}
+      onDragOver={isReordering ? (e) => onDragOver(e, globalIndex) : undefined}
+      onDrop={isReordering ? onDrop : undefined}
+      onDragEnd={isReordering ? onDragEnd : undefined}
+      onClick={!isReordering && canManageEmployees ? () => onRowClick(emp.id) : undefined}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        borderTop: isDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
+        borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
+        boxShadow: isExpanded ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)" : undefined,
+      }}
+    >
+      {/* Checkbox / Drag handle / Seniority # */}
+      <TableCell className="pl-6 py-4 w-[60px]">
+        <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
           {isReordering && (
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" style={{ flexShrink: 0 }}>
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" className="shrink-0">
               <rect x="3" y="2" width="2" height="2" rx="1" />
               <rect x="9" y="2" width="2" height="2" rx="1" />
               <rect x="3" y="6" width="2" height="2" rx="1" />
@@ -117,252 +97,129 @@ export function StaffTableRow({
               checked={isSelected}
               onChange={() => onToggleSelect(emp.id)}
               onClick={(e) => e.stopPropagation()}
-              style={{ accentColor: "var(--color-today-text)", cursor: "pointer", width: 14, height: 14 }}
+              className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
             />
           )}
-          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 500 }}>{globalIndex + 1}</span>
+          <span className="text-[var(--dg-fs-footnote)] font-medium">{emp.seniority}</span>
         </div>
+      </TableCell>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: `hsl(${hue}, 70%, 92%)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 800,
-              color: `hsl(${hue}, 70%, 35%)`,
-              flexShrink: 0,
-              border: `1px solid hsl(${hue}, 70%, 85%)`,
-              boxShadow: "var(--shadow-raised)",
-            }}
-          >
-            {getInitials(getEmployeeDisplayName(emp))}
-          </div>
-          <div>
-            <div
+      {/* Name */}
+      <TableCell className="py-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar>
+            <AvatarFallback
+              className="text-[11px] font-bold"
               style={{
-                fontWeight: isExpanded ? 700 : 600,
-                fontSize: "var(--dg-fs-body-sm)",
-                color: isExpanded ? "var(--color-brand)" : "var(--color-text-secondary)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                transition: "color 150ms ease",
+                background: `hsl(${hue}, 70%, 92%)`,
+                color: `hsl(${hue}, 70%, 35%)`,
+                border: `1px solid hsl(${hue}, 70%, 85%)`,
               }}
             >
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--color-text-primary)] truncate">
               <Link
                 href={`/people/${emp.id}`}
                 onClick={(e) => e.stopPropagation()}
-                style={{
-                  color: "inherit",
-                  textDecoration: "none",
-                  borderBottom: "1px solid transparent",
-                  transition: "border-color 150ms ease",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "var(--color-text-muted)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderBottomColor = "transparent"; }}
+                className="hover:underline truncate"
+                style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
               >
-                {getEmployeeDisplayName(emp)}
+                {displayName}
               </Link>
-              {emp.userId && currentUser && emp.userId === currentUser.id && (
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 700,
-                    padding: "1px 6px",
-                    borderRadius: 10,
-                    background: "var(--color-brand-bg)",
-                    color: "var(--color-brand)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  You
-                </span>
+              {isYou && (
+                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">You</span>
               )}
             </div>
             {(emp.email || emp.phone) && (
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", marginTop: 1 }}>
+              <div className="text-[12px] text-[var(--color-text-muted)] truncate mt-0.5">
                 {emp.email || emp.phone}
               </div>
             )}
           </div>
         </div>
+      </TableCell>
 
-        {!isMobile && (
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {emp.focusAreaIds.map((faId) => {
-              const fa = focusAreas.find((f) => f.id === faId);
-              if (!fa) return null;
-              return (
-                <span
-                  key={faId}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-secondary)",
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    borderRadius: 20,
-                    padding: "2px 8px",
-                    whiteSpace: "nowrap",
-                    border: "1px solid var(--color-border-light)",
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: fa.colorBg, flexShrink: 0 }} />
-                  {fa.name}
-                </span>
-              );
-            })}
-          </div>
-        )}
-
-        {!isMobile && (
-          <div>
-            <span
-              style={{
-                background: "var(--color-border-light)",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 600,
-                borderRadius: 20,
-                padding: "3px 9px",
-              }}
-            >
-              {getCertAbbr(emp.certificationId, certifications)}
-            </span>
-          </div>
-        )}
-
-        {!isMobile && !isTablet && (
-          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
-            {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "\u2014"}
-          </div>
-        )}
-
-        {/* Account status column */}
-        {!isMobile && !isTablet && (
-          <div style={{ display: "flex", alignItems: "center" }}>
-            {emp.userId ? (
+      {/* Focus Areas */}
+      <TableCell className="hidden md:table-cell py-4">
+        <div className="flex gap-1 flex-wrap">
+          {emp.focusAreaIds.map((faId) => {
+            const fa = focusAreas.find((f) => f.id === faId);
+            if (!fa) return null;
+            return (
               <span
+                key={faId}
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                 style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: 10,
-                  background: "var(--color-success-bg)",
-                  color: "var(--color-success-text)",
-                  whiteSpace: "nowrap",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text-secondary)",
+                  border: "1px solid var(--color-border-light)",
                 }}
               >
-                Linked
+                {fa.name}
               </span>
-            ) : pendingInviteByEmployeeId.has(emp.id) ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 700,
-                    padding: "2px 8px",
-                    borderRadius: 10,
-                    background: "var(--color-warning-bg)",
-                    color: "var(--color-warning-text)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Invited
-                </span>
-                {canManageEmployees &&
-                  (() => {
-                    const inv = pendingInviteByEmployeeId.get(emp.id)!;
-                    return (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRevokeInvitation(inv.id);
-                        }}
-                        disabled={revokingId === inv.id}
-                        style={{
-                          fontSize: "var(--dg-fs-badge)",
-                          fontWeight: 600,
-                          padding: "2px 6px",
-                          borderRadius: 10,
-                          background: "none",
-                          color: "var(--color-warning-text)",
-                          border: "1px solid var(--color-warning-text)",
-                          cursor: revokingId === inv.id ? "not-allowed" : "pointer",
-                          opacity: revokingId === inv.id ? 0.5 : 1,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {revokingId === inv.id ? "..." : "Revoke"}
-                      </button>
-                    );
-                  })()}
-              </span>
-            ) : emp.email ? (
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: 10,
-                  background: "var(--color-border-light)",
-                  color: "var(--color-text-muted)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Not invited
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: 10,
-                  background: "var(--color-border-light)",
-                  color: "var(--color-text-muted)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                No email
-              </span>
-            )}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      </TableCell>
 
-        <div
+      {/* Certification */}
+      <TableCell className="hidden md:table-cell py-4">
+        <span
+          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: isExpanded ? "var(--color-brand)" : "var(--color-text-faint)",
-            transition: "color 150ms ease",
-            userSelect: "none",
+            background: "var(--color-border-light)",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          {getCertAbbr(emp.certificationId, certifications)}
+        </span>
+      </TableCell>
+
+      {/* Roles */}
+      <TableCell className="hidden lg:table-cell py-4">
+        <span className="text-[12px] text-[var(--color-text-muted)]">
+          {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "\u2014"}
+        </span>
+      </TableCell>
+
+      {/* Account status */}
+      <TableCell className="hidden lg:table-cell py-4">
+        {emp.userId ? (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap bg-[var(--color-success-bg)] text-[var(--color-success-text)]">
+            Linked
+          </span>
+        ) : pendingInviteByEmployeeId.has(emp.id) ? (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]">
+            Invited
+          </span>
+        ) : emp.email ? (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap" style={{ background: "var(--color-border-light)", color: "var(--color-text-muted)" }}>
+            Not invited
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap" style={{ background: "var(--color-border-light)", color: "var(--color-text-muted)" }}>
+            No email
+          </span>
+        )}
+      </TableCell>
+
+      {/* Chevron */}
+      <TableCell className="pr-6 py-4 w-[40px] text-right">
+        <div
+          className="flex items-center justify-center"
+          style={{
+            color: isExpanded ? "var(--color-control-active-text)" : "var(--color-text-faint)",
             visibility: isReordering ? "hidden" : "visible",
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 6 15 12 9 18" />
           </svg>
         </div>
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   );
 }

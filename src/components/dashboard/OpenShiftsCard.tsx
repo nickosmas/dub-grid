@@ -21,6 +21,7 @@ export default function OpenShiftsCard({
   onVolunteer,
 }: OpenShiftsCardProps) {
   const visible = openShifts.slice(0, maxVisible);
+  const remainingCount = Math.max(0, openShifts.length - visible.length);
 
   return (
     <div className="dg-card">
@@ -34,22 +35,12 @@ export default function OpenShiftsCard({
             {openShifts.length} unfilled this week
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {openShifts.length > maxVisible && (
-            <a
-              href="/schedule"
-              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
-            >
-              View all &rarr;
-            </a>
-          )}
-          {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
-        </div>
+        {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
       </div>
 
       <div className="dg-card-body">
         {openShifts.length === 0 ? (
-          <div style={{ fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", padding: "20px 0" }}>
+          <div style={{ fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", padding: "24px 16px", border: "1px dashed var(--color-border)", borderRadius: 14, background: "var(--color-bg)" }}>
             All shifts covered this week
           </div>
         ) : (
@@ -63,8 +54,8 @@ export default function OpenShiftsCard({
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    padding: "10px 12px",
-                    borderRadius: 8,
+                    padding: "14px 16px",
+                    borderRadius: 14,
                     background: "var(--color-bg)",
                     border: "1px solid var(--color-border)",
                   }}
@@ -120,7 +111,7 @@ export default function OpenShiftsCard({
                           fontWeight: 600,
                           padding: "3px 8px",
                           borderRadius: 5,
-                          background: "var(--color-primary)",
+                          background: "var(--color-brand)",
                           color: "#fff",
                           border: "none",
                           cursor: "pointer",
@@ -134,6 +125,18 @@ export default function OpenShiftsCard({
                 </div>
               );
             })}
+            {remainingCount > 0 && (
+              <div
+                style={{
+                  padding: "2px 2px 0",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--color-text-subtle)",
+                }}
+              >
+                {remainingCount} more
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -29,6 +29,7 @@ Object.defineProperty(window, "location", {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 // ── extractErrorMessage ──────────────────────────────────────────────────────
@@ -97,6 +98,17 @@ describe("handleApiError", () => {
 
   it("handles generic error with 'Something went wrong' toast", async () => {
     await handleApiError(new Error("some unknown error"));
-    expect(mockToastError).toHaveBeenCalledWith("Something went wrong. Please try again.", expect.any(Object));
+    expect(mockToastError).toHaveBeenCalledWith(
+      expect.stringContaining("Something went wrong"),
+      expect.any(Object),
+    );
+  });
+
+  it("includes action context when provided", async () => {
+    await handleApiError(new Error("connection refused"), "save employee");
+    expect(mockToastError).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to save employee"),
+      expect.any(Object),
+    );
   });
 });

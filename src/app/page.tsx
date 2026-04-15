@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
@@ -180,16 +181,14 @@ export default function RootPage() {
 
     const checkSession = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session) {
+        const user = await getVerifiedBrowserUser();
+        if (user) {
           const parsed = parseHost(window.location.host);
           if (isApexHost(parsed)) {
             const { data: profile } = await supabase
               .from("profiles")
               .select("organizations(slug)")
-              .eq("id", session.user.id)
+              .eq("id", user.id)
               .maybeSingle();
 
             const slug = (
@@ -291,7 +290,7 @@ export default function RootPage() {
 
       {/* ── Mobile Menu Overlay ── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-[var(--color-surface)]/95 backdrop-blur-xl flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-[var(--color-surface)]/95 flex flex-col">
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
               <DubGridLogo size={28} color="var(--color-brand)" />

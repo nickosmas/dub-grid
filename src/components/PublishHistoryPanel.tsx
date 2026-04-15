@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/lib/db";
 import type { PublishHistoryEntryWithName, PublishChange, Employee } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -296,6 +298,8 @@ export default function PublishHistoryPanel({
   const panelWidth = isMobile ? "100vw" : 440;
 
   return (
+    <>
+    <div className="dg-panel-overlay" onClick={onClose} />
     <div
       style={{
         position: "fixed",
@@ -305,7 +309,7 @@ export default function PublishHistoryPanel({
         height: "100vh",
         background: "var(--color-surface)",
         boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
-        zIndex: 100,
+        zIndex: 10001,
         display: "flex",
         flexDirection: "column",
         animation: "slideInRight 0.2s ease-out",
@@ -397,14 +401,15 @@ export default function PublishHistoryPanel({
                   >
                     {isExpanded ? "Hide" : "Details"}
                   </button>
-                  <button
-                    onClick={() => onSelectEntry(entry)}
-                    className="dg-btn dg-btn-secondary"
-                    style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
-                    title="Navigate to this date range and highlight changes on the grid"
-                  >
-                    Show on Grid
-                  </button>
+                  <Hint content={hint("Navigate to this date range and highlight changes on the grid")} side="bottom">
+                    <button
+                      onClick={() => onSelectEntry(entry)}
+                      className="dg-btn dg-btn-secondary"
+                      style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
+                    >
+                      Show on Grid
+                    </button>
+                  </Hint>
                 </div>
               </div>
 
@@ -434,5 +439,6 @@ export default function PublishHistoryPanel({
         )}
       </div>
     </div>
+    </>
   );
 }

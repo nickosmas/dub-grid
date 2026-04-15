@@ -60,7 +60,7 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
                           background: "white",
                           color: "var(--color-brand)",
                           border: "2px solid var(--color-brand)",
-                          boxShadow: "0 0 0 3px rgba(0, 95, 2, 0.15)",
+                          boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.15)",
                         }
                       : {
                           background: "var(--color-bg-secondary)",

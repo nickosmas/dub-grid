@@ -8,6 +8,14 @@ interface QuickAction {
   variant?: "primary" | "default";
 }
 
+function actionIcon(label: string) {
+  if (label.includes("schedule")) return "▦";
+  if (label.includes("requests")) return "↺";
+  if (label.includes("Publish")) return "↑";
+  if (label.includes("users")) return "◉";
+  return "•";
+}
+
 interface QuickActionsBarProps {
   permissions: Permissions;
   pendingApprovalCount: number;
@@ -54,7 +62,14 @@ export default function QuickActionsBar({
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        overflowX: "auto",
+        padding: "8px 0 4px",
+      }}
+    >
       {actions.map((action) => (
         <Link
           key={action.label}
@@ -63,17 +78,17 @@ export default function QuickActionsBar({
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            padding: "7px 14px",
-            borderRadius: 8,
+            padding: "10px 14px",
+            borderRadius: 12,
             fontSize: 12,
             fontWeight: 600,
             textDecoration: "none",
             whiteSpace: "nowrap",
             border: action.variant === "primary"
-              ? "1px solid var(--color-primary)"
+              ? "1px solid var(--color-brand)"
               : "1px solid var(--color-border)",
             background: action.variant === "primary"
-              ? "var(--color-primary)"
+              ? "var(--color-brand)"
               : "var(--color-surface)",
             color: action.variant === "primary"
               ? "#fff"
@@ -81,6 +96,26 @@ export default function QuickActionsBar({
             transition: "opacity 0.15s",
           }}
         >
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 18,
+              height: 18,
+              borderRadius: 999,
+              fontSize: 10,
+              background: action.variant === "primary"
+                ? "rgba(255,255,255,0.2)"
+                : "var(--color-bg-secondary)",
+              color: action.variant === "primary"
+                ? "#fff"
+                : "var(--color-brand)",
+              flexShrink: 0,
+            }}
+          >
+            {actionIcon(action.label)}
+          </span>
           {action.label}
           {action.badge != null && action.badge > 0 && (
             <span

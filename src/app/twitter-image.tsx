@@ -31,7 +31,7 @@ export default function TwitterImage() {
             style={{
               fontSize: 72,
               fontWeight: 700,
-              color: "#005F02",
+              color: "#2563EB",
               letterSpacing: -2,
             }}
           >

@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { ShiftCode, FocusArea, ShiftCategory, NamedItem, AbsenceType, ShiftDisplayMode } from "@/types";
-import { upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType } from "@/lib/db";
+import { upsertShiftCode, deleteShiftCode, upsertAbsenceType, deleteAbsenceType, checkShiftCodeDependencies, checkAbsenceTypeDependencies } from "@/lib/db";
+import type { DependencyInfo } from "@/lib/db";
 import { fmt12h, calcTimeDuration } from "@/lib/utils";
 import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
 import { toast } from "sonner";
@@ -12,6 +13,105 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { PresetColorPicker, TimeInput12h, labelStyle, inputStyle, normalizeTimeCompare } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
+import { SelectableTag } from "@/components/ui/selectable-tag";
+
+type ShiftCodeFormState = {
+  label: string;
+  name: string;
+  color: string;
+  border: string;
+  text: string;
+  categoryId: number | null;
+  focusAreaId: number | null;
+  requiredCertificationIds: number[];
+  defaultStartTime: string | null;
+  defaultEndTime: string | null;
+  defaultDurationHours: number | null;
+  defaultDurationMinutes: number | null;
+};
+
+type AbsenceTypeFormState = {
+  label: string;
+  name: string;
+  color: string;
+  border: string;
+  text: string;
+};
+
+function buildShiftCodeFormState(src: ShiftCode, shiftCategories: ShiftCategory[]): ShiftCodeFormState {
+  const category = src.categoryId != null ? shiftCategories.find((c) => c.id === src.categoryId) ?? null : null;
+  const timesMatchCategory = category != null
+    && normalizeTimeCompare(src.defaultStartTime) === normalizeTimeCompare(category.startTime)
+    && normalizeTimeCompare(src.defaultEndTime) === normalizeTimeCompare(category.endTime);
+
+  return {
+    label: src.label,
+    name: src.name,
+    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
+    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
+    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
+    categoryId: src.categoryId ?? null,
+    focusAreaId: src.focusAreaId ?? null,
+    requiredCertificationIds: [...(src.requiredCertificationIds ?? [])],
+    defaultStartTime: timesMatchCategory ? null : normalizeTimeCompare(src.defaultStartTime),
+    defaultEndTime: timesMatchCategory ? null : normalizeTimeCompare(src.defaultEndTime),
+    defaultDurationHours: src.defaultDurationHours ?? null,
+    defaultDurationMinutes: src.defaultDurationMinutes ?? null,
+  };
+}
+
+function serializeShiftCodeFormState(form: ShiftCodeFormState, shiftCategories: ShiftCategory[]): string {
+  const category = form.categoryId != null ? shiftCategories.find((c) => c.id === form.categoryId) ?? null : null;
+  const normalizedStartTime = normalizeTimeCompare(form.defaultStartTime);
+  const normalizedEndTime = normalizeTimeCompare(form.defaultEndTime);
+  const inheritsCategoryTime = category != null
+    && normalizedStartTime === normalizeTimeCompare(category.startTime)
+    && normalizedEndTime === normalizeTimeCompare(category.endTime);
+
+  return JSON.stringify({
+    label: form.label.trim(),
+    name: form.name.trim(),
+    color: form.color,
+    border: form.border,
+    text: form.text,
+    categoryId: form.categoryId ?? null,
+    focusAreaId: form.focusAreaId ?? null,
+    requiredCertificationIds: [...form.requiredCertificationIds].sort((a, b) => a - b),
+    defaultStartTime: inheritsCategoryTime ? null : normalizedStartTime,
+    defaultEndTime: inheritsCategoryTime ? null : normalizedEndTime,
+    defaultDurationHours: form.defaultDurationHours ?? null,
+    defaultDurationMinutes: form.defaultDurationMinutes ?? null,
+  });
+}
+
+function shouldUseCustomShiftCodeTime(src: ShiftCode, shiftCategories: ShiftCategory[]): boolean {
+  const category = src.categoryId != null ? shiftCategories.find((c) => c.id === src.categoryId) ?? null : null;
+  const timesMatchCategory = category != null
+    && normalizeTimeCompare(src.defaultStartTime) === normalizeTimeCompare(category.startTime)
+    && normalizeTimeCompare(src.defaultEndTime) === normalizeTimeCompare(category.endTime);
+
+  return !timesMatchCategory && (src.defaultStartTime != null || src.defaultEndTime != null);
+}
+
+function buildAbsenceTypeFormState(src: AbsenceType): AbsenceTypeFormState {
+  return {
+    label: src.label,
+    name: src.name,
+    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
+    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
+    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
+  };
+}
+
+function serializeAbsenceTypeFormState(form: AbsenceTypeFormState): string {
+  return JSON.stringify({
+    label: form.label.trim(),
+    name: form.name.trim(),
+    color: form.color,
+    border: form.border,
+    text: form.text,
+  });
+}
 
 // ── Shift Code row ────────────────────────────────────────────────────────────
 function ShiftCodeRow({
@@ -45,40 +145,13 @@ function ShiftCodeRow({
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
-  const [form, setForm] = useState(() => {
-    // Normalize: if custom times match the category exactly, clear them to inherit
-    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-    const timesMatchCategory = cat
-      && st.defaultStartTime != null && st.defaultEndTime != null
-      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-    return {
-      label: st.label,
-      name: st.name,
-      color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-      border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-      text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-      categoryId: st.categoryId ?? null as number | null,
-      focusAreaId: st.focusAreaId ?? null as number | null,
-      requiredCertificationIds: st.requiredCertificationIds ?? [],
-      defaultStartTime: timesMatchCategory ? null : (st.defaultStartTime ?? null as string | null),
-      defaultEndTime: timesMatchCategory ? null : (st.defaultEndTime ?? null as string | null),
-      defaultDurationHours: st.defaultDurationHours ?? null as number | null,
-      defaultDurationMinutes: st.defaultDurationMinutes ?? null as number | null,
-    };
-  });
+  const [form, setForm] = useState<ShiftCodeFormState>(() => buildShiftCodeFormState(st, shiftCategories));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(!!st.isNew);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [customizeTime, setCustomizeTime] = useState(() => {
-    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-    const timesMatchCategory = cat != null
-      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-    return !timesMatchCategory && (st.defaultStartTime != null || st.defaultEndTime != null);
-  });
+  const [customizeTime, setCustomizeTime] = useState(() => shouldUseCustomShiftCodeTime(st, shiftCategories));
 
   // Re-sync form from prop when the parent data changes (e.g. fresh fetch
   // after cert deletion trigger cleans up IDs).
@@ -89,27 +162,8 @@ function ShiftCodeRow({
     if (st.id === prevStIdRef.current && certIdsKey === prevCertIdsKeyRef.current) return;
     prevStIdRef.current = st.id;
     prevCertIdsKeyRef.current = certIdsKey;
-    // Normalize: if custom times match the category, clear to inherit
-    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-    const timesMatch = cat
-      && st.defaultStartTime != null && st.defaultEndTime != null
-      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-    setForm({
-      label: st.label,
-      name: st.name,
-      color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-      border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-      text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-      categoryId: st.categoryId ?? null,
-      focusAreaId: st.focusAreaId ?? null,
-      requiredCertificationIds: st.requiredCertificationIds ?? [],
-      defaultStartTime: timesMatch ? null : (st.defaultStartTime ?? null),
-      defaultEndTime: timesMatch ? null : (st.defaultEndTime ?? null),
-      defaultDurationHours: st.defaultDurationHours ?? null,
-      defaultDurationMinutes: st.defaultDurationMinutes ?? null,
-    });
-    setCustomizeTime(!timesMatch && (st.defaultStartTime != null || st.defaultEndTime != null));
+    setForm(buildShiftCodeFormState(st, shiftCategories));
+    setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
   }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, st.requiredCertificationIds, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
 
   // Normalize times: if they match the category exactly, treat as null (inherit)
@@ -130,19 +184,15 @@ function ShiftCodeRow({
     return form.defaultEndTime;
   })();
 
-  const isDirty = st.isNew ||
-    form.label !== st.label ||
-    form.name !== st.name ||
-    form.color !== (st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color) ||
-    form.border !== (st.border === "transparent" ? TRANSPARENT_BORDER : st.border) ||
-    form.text !== (st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text) ||
-    form.categoryId !== (st.categoryId ?? null) ||
-    form.focusAreaId !== (st.focusAreaId ?? null) ||
-    JSON.stringify(form.requiredCertificationIds) !== JSON.stringify(st.requiredCertificationIds ?? []) ||
-    effectiveStartTime !== (st.defaultStartTime ?? null) ||
-    effectiveEndTime !== (st.defaultEndTime ?? null) ||
-    form.defaultDurationHours !== (st.defaultDurationHours ?? null) ||
-    form.defaultDurationMinutes !== (st.defaultDurationMinutes ?? null);
+  const savedForm = useMemo(
+    () => buildShiftCodeFormState(st, shiftCategories),
+    [st, shiftCategories],
+  );
+  const isDirty = st.isNew || serializeShiftCodeFormState({
+    ...form,
+    defaultStartTime: effectiveStartTime,
+    defaultEndTime: effectiveEndTime,
+  }, shiftCategories) !== serializeShiftCodeFormState(savedForm, shiftCategories);
 
   const canSave = isDirty && (isNameMode || !!form.label.trim()) && !!form.name.trim();
 
@@ -205,16 +255,21 @@ function ShiftCodeRow({
     }
   }, [form, st, orgId, onSaved, shiftCategories, isNameMode, existingLabels]);
 
+  const [depInfo, setDepInfo] = useState<DependencyInfo | null>(null);
+
+  const handleDeleteClick = useCallback(async () => {
+    if (st.isNew) { onDeleted(st.id); return; }
+    const deps = await checkShiftCodeDependencies(st.id, orgId);
+    setDepInfo(deps);
+    setShowDeleteConfirm(true);
+  }, [st, orgId, onDeleted]);
+
   const handleDelete = useCallback(async () => {
-    if (st.isNew) {
-      onDeleted(st.id);
-      return;
-    }
     setDeleting(true);
     try {
       await deleteShiftCode(st.id, orgId);
       onDeleted(st.id);
-      toast.success("Shift code deleted");
+      toast.success("Shift code archived");
     } catch (err) {
       toast.error("Failed to delete shift code");
       Sentry.captureException(err);
@@ -225,15 +280,18 @@ function ShiftCodeRow({
   }, [st, orgId, onDeleted]);
 
   return (
-    <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
       {/* Collapsed row */}
       <div
+        className="dg-hover-row"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "10px 0",
+          padding: "10px 8px",
+          borderRadius: 8,
           cursor: "pointer",
+          transition: "background 0.15s",
         }}
         onClick={() => setExpanded((e) => !e)}
       >
@@ -262,7 +320,7 @@ function ShiftCodeRow({
           style={{
             fontSize: "var(--dg-fs-label)",
             color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-            fontWeight: isNameMode ? 600 : 400,
+            fontWeight: isNameMode ? 700 : 500,
             flex: 1,
           }}
         >
@@ -322,9 +380,11 @@ function ShiftCodeRow({
       {expanded && (
         <div
           style={{
-            background: "var(--color-bg)",
-            borderTop: "1px solid var(--color-border-light)",
-            padding: 16,
+            background: "var(--color-bg-secondary)",
+            borderRadius: 10,
+            border: "1px solid var(--color-border-light)",
+            margin: "0 0 8px",
+            padding: "14px 16px",
             display: "flex",
             flexDirection: "column",
             gap: 12,
@@ -471,7 +531,8 @@ function ShiftCodeRow({
                   <button
                     type="button"
                     onClick={() => setForm((p) => ({ ...p, defaultDurationHours: null, defaultDurationMinutes: null }))}
-                    style={{ marginTop: 6, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    style={{ marginTop: 6 }}
                     disabled={!canManageShiftCodes}
                   >
                     Set actual times instead
@@ -515,7 +576,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Revert to category default
                       </button>
@@ -524,7 +585,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Remove custom time
                       </button>
@@ -533,7 +594,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => { setCustomizeTime(false); setForm((p) => ({ ...p, defaultStartTime: null, defaultEndTime: null, defaultDurationHours: 0, defaultDurationMinutes: 0 })); }}
-                        style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-brand)", fontSize: "var(--dg-fs-caption)", cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Use duration instead
                       </button>
@@ -552,10 +613,11 @@ function ShiftCodeRow({
                     <span style={{
                       fontSize: "var(--dg-fs-label)",
                       color: "var(--color-text-secondary)",
+                      fontWeight: 600,
                       padding: "4px 10px",
-                      background: "var(--color-bg-subtle)",
+                      background: "var(--color-surface)",
                       borderRadius: 6,
-                      border: "1px solid var(--color-border-light)",
+                      border: "1px solid var(--color-border)",
                     }}>
                       {fmt12h(categoryStart)} – {fmt12h(categoryEnd)}
                     </span>
@@ -585,16 +647,7 @@ function ShiftCodeRow({
                           defaultEndTime: categoryEnd ?? "15:00",
                         }));
                       }}
-                      style={{
-                        background: "var(--color-bg-subtle)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 6,
-                        color: "var(--color-brand)",
-                        padding: "5px 12px",
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
                     >
                       Customize Time
                     </button>
@@ -602,14 +655,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "var(--color-brand)",
-                          padding: "5px 0",
-                          fontSize: "var(--dg-fs-caption)",
-                          cursor: "pointer",
-                        }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Set duration instead
                       </button>
@@ -634,54 +680,41 @@ function ShiftCodeRow({
           {certifications.length > 0 && (
             <div>
               <label style={labelStyle}>
-                REQUIRED {certificationLabel.toUpperCase()} (leave all unchecked = any qualification)
+                REQUIRED {certificationLabel.toUpperCase()}
               </label>
+              <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: "0 0 6px", lineHeight: 1.4 }}>
+                Leave all unchecked to accept any qualification.
+              </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
                 {certifications.map((desig) => {
                   const checked = form.requiredCertificationIds.includes(desig.id);
                   return (
-                    <label
+                    <SelectableTag
                       key={desig.id}
+                      selected={checked}
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          requiredCertificationIds: checked
+                            ? p.requiredCertificationIds.filter((id) => id !== desig.id)
+                            : [...p.requiredCertificationIds, desig.id],
+                        }))
+                      }
+                      disabled={!canManageShiftCodes}
+                      padding="4px 10px"
+                      fontSize="var(--dg-fs-label)"
+                      fontWeight={500}
+                      selectedFontWeight={700}
+                      unselectedBackground="var(--color-surface)"
+                      unselectedBorderColor="var(--color-border)"
+                      unselectedTextColor="var(--color-text-secondary)"
+                      labelStyle={{ display: "inline-flex", alignItems: "center" }}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: "var(--dg-fs-label)",
-                        cursor: canManageShiftCodes ? "pointer" : "default",
-                        padding: "4px 10px",
-                        borderRadius: 20,
-                        border: `1.5px solid ${
-                          checked ? "var(--color-brand)" : "var(--color-border)"
-                        }`,
-                        background: checked ? "var(--color-brand-bg)" : "transparent",
-                        transition: "border-color 150ms ease, background 150ms ease",
+                        minHeight: 32,
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        style={{ display: "none" }}
-                        onChange={(e) =>
-                          setForm((p) => ({
-                            ...p,
-                            requiredCertificationIds: e.target.checked
-                              ? [...p.requiredCertificationIds, desig.id]
-                              : p.requiredCertificationIds.filter((d) => d !== desig.id),
-                          }))
-                        }
-                        disabled={!canManageShiftCodes}
-                      />
-                      <span
-                        style={{
-                          fontWeight: checked ? 700 : 500,
-                          color: checked
-                            ? "var(--color-brand)"
-                            : "var(--color-text-secondary)",
-                        }}
-                      >
-                        {desig.name !== desig.abbr ? `${desig.abbr} — ${desig.name}` : desig.name}
-                      </span>
-                    </label>
+                      {desig.name !== desig.abbr ? `${desig.abbr} — ${desig.name}` : desig.name}
+                    </SelectableTag>
                   );
                 })}
               </div>
@@ -703,17 +736,7 @@ function ShiftCodeRow({
             <button
               onClick={handleSave}
               disabled={saving || !canSave || !canManageShiftCodes}
-              style={{
-                background: canSave && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border-light)",
-                border: "none",
-                color: canSave && canManageShiftCodes ? "var(--color-text-inverse)" : "var(--color-text-muted)",
-                borderRadius: 8,
-                padding: "8px 18px",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 700,
-                cursor: canSave && canManageShiftCodes ? "pointer" : "default",
-                opacity: canSave && canManageShiftCodes ? 1 : 0.6,
-              }}
+              className="dg-btn dg-btn-primary dg-btn-sm"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -722,56 +745,21 @@ function ShiftCodeRow({
                 if (st.isNew) {
                   onDeleted(st.id);
                 } else {
-                  const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-                  const timesMatchCat = cat
-                    && st.defaultStartTime != null && st.defaultEndTime != null
-                    && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-                    && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-                  setForm({
-                    label: st.label,
-                    name: st.name,
-                    color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-                    border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-                    text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-                    categoryId: st.categoryId ?? null,
-                    focusAreaId: st.focusAreaId ?? null,
-                    requiredCertificationIds: st.requiredCertificationIds ?? [],
-                    defaultStartTime: timesMatchCat ? null : (st.defaultStartTime ?? null),
-                    defaultEndTime: timesMatchCat ? null : (st.defaultEndTime ?? null),
-                    defaultDurationHours: st.defaultDurationHours ?? null,
-                    defaultDurationMinutes: st.defaultDurationMinutes ?? null,
-                  });
-                  setCustomizeTime(false);
+                  setForm(buildShiftCodeFormState(st, shiftCategories));
+                  setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
                   setExpanded(false);
                 }
               }}
-              style={{
-                background: "var(--color-border-light)",
-                border: "none",
-                borderRadius: 8,
-                color: "var(--color-text-muted)",
-                padding: "8px 14px",
-                fontSize: "var(--dg-fs-label)",
-                cursor: "pointer",
-              }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Cancel
             </button>
             <div style={{ flex: 1 }} />
             {canManageShiftCodes && !st.isNew && (
               <button
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={handleDeleteClick}
                 disabled={deleting}
-                style={{
-                  background: "none",
-                  border: "1px solid var(--color-danger-border)",
-                  borderRadius: 8,
-                  color: "var(--color-danger)",
-                  padding: "8px 14px",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="dg-btn dg-btn-danger dg-btn-sm"
               >
                 {deleting ? "…" : "Delete"}
               </button>
@@ -780,15 +768,31 @@ function ShiftCodeRow({
         </div>
       )}
       {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Shift Code?"
-          message={<>Delete <strong>{form.label}</strong>? This code will be removed from future schedules.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
+        depInfo?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${form.label}"?`}
+            message={<>
+              <strong>{form.label}</strong> is currently {depInfo.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from dropdowns and new assignments.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${form.label}"?`}
+            message={<>This will archive <strong>{form.label}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        )
       )}
     </div>
   );
@@ -814,14 +818,8 @@ function AbsenceTypeRow({
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
-  const resolveForm = useCallback((src: AbsenceType) => ({
-    label: src.label,
-    name: src.name,
-    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
-    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
-    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
-  }), []);
-  const [form, setForm] = useState(() => resolveForm(at));
+  const resolveForm = useCallback((src: AbsenceType) => buildAbsenceTypeFormState(src), []);
+  const [form, setForm] = useState<AbsenceTypeFormState>(() => resolveForm(at));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(!!at.isNew);
@@ -833,12 +831,7 @@ function AbsenceTypeRow({
     if (!at.isNew) setForm(resolveForm(at));
   }, [at, resolveForm]);
 
-  const isDirty = at.isNew ||
-    form.label !== at.label ||
-    form.name !== at.name ||
-    form.color !== (at.color === "transparent" ? PREDEFINED_COLORS[0].bg : at.color) ||
-    form.border !== (at.border === "transparent" ? TRANSPARENT_BORDER : at.border) ||
-    form.text !== (at.text === "transparent" ? PREDEFINED_COLORS[0].text : at.text);
+  const isDirty = at.isNew || serializeAbsenceTypeFormState(form) !== serializeAbsenceTypeFormState(resolveForm(at));
 
   // M2: Duplicate label check
   const trimmedLabel = form.label.trim().toUpperCase();
@@ -887,13 +880,21 @@ function AbsenceTypeRow({
     }
   }, [form, at, orgId, onSaved, isNameMode, allAbsenceTypes]);
 
-  const handleDelete = useCallback(async () => {
+  const [atDepInfo, setAtDepInfo] = useState<DependencyInfo | null>(null);
+
+  const handleDeleteClick = useCallback(async () => {
     if (at.isNew) { onDeleted(at.id); return; }
+    const deps = await checkAbsenceTypeDependencies(at.id, orgId);
+    setAtDepInfo(deps);
+    setShowDeleteConfirm(true);
+  }, [at, orgId, onDeleted]);
+
+  const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
       await deleteAbsenceType(at.id, orgId);
       onDeleted(at.id);
-      toast.success("Off day type deleted");
+      toast.success("Off day type archived");
     } catch (err) {
       toast.error("Failed to delete off day type");
       Sentry.captureException(err);
@@ -904,9 +905,10 @@ function AbsenceTypeRow({
   }, [at, orgId, onDeleted]);
 
   return (
-    <div style={{ borderBottom: "1px solid var(--color-border-light)" }}>
+    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
       <div
-        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}
+        className="dg-hover-row"
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: 8, cursor: "pointer", transition: "background 0.15s" }}
         onClick={() => setExpanded((e) => !e)}
       >
         {!isNameMode && (
@@ -917,14 +919,14 @@ function AbsenceTypeRow({
         {isNameMode && (
           <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: form.color, border: `1px solid ${borderColor(form.text)}`, flexShrink: 0 }} />
         )}
-        <span style={{ fontSize: "var(--dg-fs-label)", color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)", fontWeight: isNameMode ? 600 : 400, flex: 1 }}>
+        <span style={{ fontSize: "var(--dg-fs-label)", color: isNameMode ? "var(--color-text-primary)" : "var(--color-text-secondary)", fontWeight: isNameMode ? 700 : 500, flex: 1 }}>
           {form.name || "—"}
         </span>
         <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>▾</span>
       </div>
 
       {expanded && (
-        <div style={{ background: "var(--color-bg)", borderTop: "1px solid var(--color-border-light)", padding: 16, display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ background: "var(--color-bg-secondary)", borderRadius: 10, border: "1px solid var(--color-border-light)", margin: "0 0 8px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
           <div style={{ display: "grid", gridTemplateColumns: isNameMode ? "1fr" : (isMobile ? "1fr" : "120px 1fr"), gap: 10 }}>
             {!isNameMode && (
               <div>
@@ -952,15 +954,15 @@ function AbsenceTypeRow({
             </p>
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} style={{ background: canSave && canEdit ? "var(--color-brand)" : "var(--color-border-light)", border: "none", color: canSave && canEdit ? "var(--color-text-inverse)" : "var(--color-text-muted)", borderRadius: 8, padding: "8px 18px", fontSize: "var(--dg-fs-label)", fontWeight: 700, cursor: canSave && canEdit ? "pointer" : "default", opacity: canSave && canEdit ? 1 : 0.6 }}>
+            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary dg-btn-sm">
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} style={{ background: "var(--color-border-light)", border: "none", borderRadius: 8, color: "var(--color-text-muted)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", cursor: "pointer" }}>
+            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} className="dg-btn dg-btn-secondary dg-btn-sm">
               Cancel
             </button>
             <div style={{ flex: 1 }} />
             {canEdit && !at.isNew && (
-              <button onClick={() => setShowDeleteConfirm(true)} disabled={deleting} style={{ background: "none", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger)", padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={handleDeleteClick} disabled={deleting} className="dg-btn dg-btn-danger dg-btn-sm">
                 {deleting ? "…" : "Delete"}
               </button>
             )}
@@ -968,15 +970,31 @@ function AbsenceTypeRow({
         </div>
       )}
       {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Delete Off Day Type?"
-          message={<>Delete <strong>{form.label}</strong>? This type will be removed from future schedules.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          isLoading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
+        atDepInfo?.hasDependencies ? (
+          <ConfirmDialog
+            title={`Archive "${form.label}"?`}
+            message={<>
+              <strong>{form.label}</strong> is currently {atDepInfo.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records but remove it from dropdowns and new assignments.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${form.label}"?`}
+            message={<>This will archive <strong>{form.label}</strong>. Historical records will be preserved.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        )
       )}
     </div>
   );
@@ -1036,7 +1054,7 @@ function AbsenceTypesSettings({
 
   return (
     <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-      <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
         Off Days
       </div>
       <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0, padding: "8px 16px 4px" }}>
@@ -1053,7 +1071,7 @@ function AbsenceTypesSettings({
           compact
           title="No off day types yet"
           action={canManageShiftCodes ? (
-            <button onClick={handleAdd} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+            <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
               + Add Off Day Type
             </button>
           ) : undefined}
@@ -1062,7 +1080,7 @@ function AbsenceTypesSettings({
       )}
       {local.length > 0 && canManageShiftCodes && (
         <div style={{ padding: "8px 16px 12px" }}>
-          <button onClick={handleAdd} style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-muted)", padding: "4px 10px", fontSize: "var(--dg-fs-caption)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={handleAdd} className="dg-btn dg-btn-dashed dg-btn-sm" style={{ width: "100%" }}>
             + Add Off Day Type
           </button>
         </div>
@@ -1146,16 +1164,7 @@ function ShiftCodesSettings({
     onChange(updated);
   };
 
-  const addBtnStyle: React.CSSProperties = {
-    background: "none",
-    border: "none",
-    color: "var(--color-text-muted)",
-    padding: "6px 0",
-    fontSize: "var(--dg-fs-caption)",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  };
+  const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
   const renderRows = (codes: (ShiftCode & { isNew?: boolean })[], hideAreaSelect = false) =>
     codes.map((st) => (
@@ -1190,8 +1199,7 @@ function ShiftCodesSettings({
         );
         return (
           <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg, flexShrink: 0 }} />
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
               {focusArea.name}
             </div>
             {areaCodes.length > 0 ? (
@@ -1203,7 +1211,7 @@ function ShiftCodesSettings({
                 compact
                 title="No shift codes yet"
                 action={canManageShiftCodes ? (
-                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">
                     + Add Shift Code
                   </button>
                 ) : undefined}
@@ -1212,7 +1220,7 @@ function ShiftCodesSettings({
             )}
             {areaCodes.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                <button onClick={() => handleAdd(focusArea.id)} className={addBtnClass} style={{ width: "100%" }}>
                   + Add Shift Code
                 </button>
               </div>
@@ -1228,7 +1236,7 @@ function ShiftCodesSettings({
         );
         return (
           <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
               General / Cross-Area
             </div>
             {generalCodes.length > 0 ? (
@@ -1244,7 +1252,7 @@ function ShiftCodesSettings({
               }}>
                 <span>No general codes yet</span>
                 {canManageShiftCodes && (
-                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                  <button onClick={() => handleAdd(null)} className="dg-btn dg-btn-secondary dg-btn-sm">
                     + Add General Code
                   </button>
                 )}
@@ -1252,7 +1260,7 @@ function ShiftCodesSettings({
             )}
             {generalCodes.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(null)} style={addBtnStyle}>
+                <button onClick={() => handleAdd(null)} className={addBtnClass} style={{ width: "100%" }}>
                   + Add General Code
                 </button>
               </div>

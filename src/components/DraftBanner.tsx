@@ -3,6 +3,8 @@
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import ButtonSpinner from "@/components/ButtonSpinner";
 import { Eye, EyeOff } from "lucide-react";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 
 interface DraftBannerProps {
   onPublish: () => void;
@@ -53,9 +55,12 @@ export default function DraftBanner({
   canPublish = true,
 }: DraftBannerProps) {
   const isDisabled = isPublishing || isCanceling;
+  const publishHint = canPublish
+    ? "Save all draft changes to the live schedule"
+    : "You don't have permission to publish schedules.";
 
   return (
-    <div className="dg-draft-banner no-print">
+    <div className="dg-draft-banner no-print" data-tour="draft-banner">
       <div className="dg-draft-banner-dot" />
       {breakdown ? (
         <BreakdownChips breakdown={breakdown} />
@@ -64,53 +69,61 @@ export default function DraftBanner({
       )}
       <div className="dg-draft-banner-actions">
         {onToggleDiff && (
-          <button
-            onClick={onToggleDiff}
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-            style={{
-              background: showDiff ? "var(--color-brand-bg)" : undefined,
-              color: showDiff ? "var(--color-accent-text)" : undefined,
-            }}
-          >
-            {showDiff ? (
-              <>
-                <EyeOff size={12} style={{ marginRight: 4 }} />
-                Hide Changes
-              </>
-            ) : (
-              <>
-                <Eye size={12} style={{ marginRight: 4 }} />
-                Show Changes
-              </>
-            )}
-          </button>
+          <Hint content={hint("Highlight differences from the published schedule")} side="bottom">
+            <button
+              data-tour="draft-banner-diff"
+              onClick={onToggleDiff}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              style={{
+                background: showDiff ? "var(--color-brand-bg)" : undefined,
+                color: showDiff ? "var(--color-accent-text)" : undefined,
+              }}
+            >
+              {showDiff ? (
+                <>
+                  <EyeOff size={12} style={{ marginRight: 4 }} />
+                  Hide Changes
+                </>
+              ) : (
+                <>
+                  <Eye size={12} style={{ marginRight: 4 }} />
+                  Show Changes
+                </>
+              )}
+            </button>
+          </Hint>
         )}
-        <button
-          onClick={onCancel}
-          disabled={isDisabled}
-          className="dg-btn dg-btn-secondary dg-btn-sm"
-          style={{ color: "var(--color-danger-dark)" }}
-        >
-          {isCanceling ? (
-            <>
-              <ButtonSpinner size={12} />
-              Discarding…
-            </>
-          ) : "Discard"}
-        </button>
-        <button
-          onClick={onPublish}
-          disabled={isDisabled || !canPublish}
-          className="dg-btn dg-btn-primary dg-btn-sm"
-          title={!canPublish ? "You don't have permission to publish schedules." : undefined}
-        >
-          {isPublishing ? (
-            <>
-              <ButtonSpinner size={12} />
-              Publishing…
-            </>
-          ) : "Publish"}
-        </button>
+        <Hint content={hint("Delete all unpublished draft changes")} side="bottom">
+          <button
+            data-tour="draft-banner-discard"
+            onClick={onCancel}
+            disabled={isDisabled}
+            className="dg-btn dg-btn-secondary dg-btn-sm"
+            style={{ color: "var(--color-danger-dark)" }}
+          >
+            {isCanceling ? (
+              <>
+                <ButtonSpinner size={12} />
+                Discarding…
+              </>
+            ) : "Discard"}
+          </button>
+        </Hint>
+        <Hint content={hint(publishHint)} side="bottom">
+          <button
+            data-tour="draft-banner-publish"
+            onClick={onPublish}
+            disabled={isDisabled || !canPublish}
+            className="dg-btn dg-btn-primary dg-btn-sm"
+          >
+            {isPublishing ? (
+              <>
+                <ButtonSpinner size={12} />
+                Publishing…
+              </>
+            ) : "Publish"}
+          </button>
+        </Hint>
       </div>
     </div>
   );

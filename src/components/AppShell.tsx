@@ -7,7 +7,7 @@ import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
 import { useOrganizationData, usePermissions } from "@/hooks";
 
-const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/staff", "/settings"];
+const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/settings"];
 
 function isAppRoute(pathname: string): boolean {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));

@@ -109,7 +109,7 @@ export default function RequestDemoPage() {
         >
           <CheckCircle2
             size={48}
-            style={{ color: "#2E9930", marginBottom: "16px", margin: "0 auto 16px" }}
+            style={{ color: "var(--color-success)", marginBottom: "16px", margin: "0 auto 16px" }}
           />
           <h1
             style={{

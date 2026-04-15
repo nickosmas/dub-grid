@@ -9,7 +9,7 @@ const STATUS_COLORS = {
 };
 
 const PCT_COLORS = {
-  green: "var(--color-brand)",
+  green: "var(--color-success)",
   amber: "var(--color-warning)",
   red: "var(--color-danger)",
 };
@@ -41,17 +41,9 @@ export default function CoverageBySectionCard({
                 : "No coverage requirements configured"}
             </div>
           </div>
-          {!hasRequirements && (
-            <a
-              href="/settings/coverage"
-              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
-            >
-              Configure &rarr;
-            </a>
-          )}
         </div>
         {!hasRequirements && (
-          <div style={{ padding: "20px 18px", textAlign: "center" }}>
+          <div style={{ padding: "24px 16px", textAlign: "center" }}>
             <div style={{ fontSize: 12, color: "var(--color-text-subtle)", lineHeight: 1.6 }}>
               Set up coverage requirements in Settings to track
               <br />
@@ -71,15 +63,7 @@ export default function CoverageBySectionCard({
           <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
           <div className="dg-card-subtitle">This week &middot; required vs scheduled</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <a
-            href="/schedule"
-            style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
-          >
-            See schedule &rarr;
-          </a>
-          {onExpand && <ExpandButton onClick={onExpand} label="Expand coverage" />}
-        </div>
+        {onExpand && <ExpandButton onClick={onExpand} label="Expand coverage" />}
       </div>
 
       <div className="dg-card-body">
@@ -88,7 +72,18 @@ export default function CoverageBySectionCard({
           {sections.map((sec) => {
             const pctColor = sec.pct >= 90 ? "green" : sec.pct >= 70 ? "amber" : "red";
             return (
-              <div key={sec.focusAreaId} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <div
+                key={sec.focusAreaId}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 7,
+                  padding: "14px 16px",
+                  borderRadius: 14,
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)" }}>
                     {sec.focusAreaName}
@@ -188,11 +183,11 @@ export default function CoverageBySectionCard({
                           justifyContent: "center",
                           fontSize: 10,
                           fontWeight: 600,
-                          background: colors.bg,
-                          color: colors.text,
-                          cursor: "default",
-                        }}
-                        title={`${sec.focusAreaName} - ${day.dayLabel}: ${day.staffCount} staff`}
+                        background: colors.bg,
+                        color: colors.text,
+                        cursor: "default",
+                      }}
+                        aria-label={`${sec.focusAreaName} ${day.dayLabel}: ${day.staffCount} staff`}
                       >
                         {day.staffCount}
                       </div>

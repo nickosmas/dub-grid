@@ -2,16 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 import { Analytics } from "@vercel/analytics/next";
-import { getCookieConsent, CONSENT_CHANGED_EVENT } from "@/components/CookieConsent";
-
-function subscribeToConsent(callback: () => void) {
-  window.addEventListener(CONSENT_CHANGED_EVENT, callback);
-  return () => window.removeEventListener(CONSENT_CHANGED_EVENT, callback);
-}
-
-function getSnapshot() {
-  return getCookieConsent()?.analytics === true;
-}
+import {
+  getAnalyticsConsentSnapshot,
+  subscribeToConsentChanges,
+} from "@/components/CookieConsent";
 
 function getServerSnapshot() {
   return false;
@@ -22,7 +16,11 @@ function getServerSnapshot() {
  * Subscribes to consent changes via useSyncExternalStore to avoid hydration mismatches.
  */
 export default function ConsentGatedAnalytics() {
-  const hasConsent = useSyncExternalStore(subscribeToConsent, getSnapshot, getServerSnapshot);
+  const hasConsent = useSyncExternalStore(
+    subscribeToConsentChanges,
+    getAnalyticsConsentSnapshot,
+    getServerSnapshot,
+  );
 
   if (!hasConsent) return null;
   return <Analytics />;

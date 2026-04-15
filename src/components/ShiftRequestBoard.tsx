@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import { EmptyState } from "@/components/EmptyState";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -519,19 +521,21 @@ export default function ShiftRequestBoard({
             </div>
           </div>
           {!isMobile && (
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{
-                border: "1px solid var(--color-border)",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-body)",
-                lineHeight: 1,
-              }}
-              title="Close"
-            >
-              ×
-            </button>
+            <Hint content={hint("Close panel")} side="bottom">
+              <button
+                onClick={onClose}
+                className="dg-btn dg-btn-ghost"
+                style={{
+                  border: "1px solid var(--color-border)",
+                  padding: "4px 8px",
+                  fontSize: "var(--dg-fs-body)",
+                  lineHeight: 1,
+                }}
+                aria-label="Close panel"
+              >
+                ×
+              </button>
+            </Hint>
           )}
         </div>
 

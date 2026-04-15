@@ -1,10 +1,10 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import logger from "@/lib/logger";
 
 const hasRedisEnv =
   !!process.env.UPSTASH_REDIS_REST_URL &&
   !!process.env.UPSTASH_REDIS_REST_TOKEN;
+const isProduction = process.env.NODE_ENV === "production";
 
 function createRedis() {
   if (!hasRedisEnv) return null;
@@ -53,12 +53,28 @@ export const loginLimiter = redis
   ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(15, "15 m") })
   : null;
 
-if (!hasRedisEnv) {
-  if (process.env.NODE_ENV === "production") {
-    logger.error("UPSTASH_REDIS_REST_URL / TOKEN not set in production — requests will be blocked");
-  } else {
-    logger.warn("UPSTASH_REDIS_REST_URL / TOKEN not set — rate limiting disabled (dev)");
+export function getRateLimitConfigStatus(): {
+  configured: boolean;
+  productionReady: boolean;
+  message: string | null;
+} {
+  if (hasRedisEnv) {
+    return { configured: true, productionReady: true, message: null };
   }
+
+  if (isProduction) {
+    return {
+      configured: false,
+      productionReady: false,
+      message: "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production",
+    };
+  }
+
+  return {
+    configured: false,
+    productionReady: true,
+    message: "Rate limiting is disabled until Upstash Redis env vars are configured",
+  };
 }
 
 /**
@@ -72,7 +88,7 @@ export async function checkRateLimit(
 ): Promise<{ limited: boolean; reset?: number; misconfigured?: boolean }> {
   if (!limiter) {
     // Fail-closed in production: missing Redis = service unavailable (not "too many requests")
-    if (process.env.NODE_ENV === "production") {
+    if (isProduction) {
       return { limited: true, misconfigured: true };
     }
     return { limited: false };

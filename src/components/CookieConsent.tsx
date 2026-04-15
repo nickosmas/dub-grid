@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { initPostHog, resetPostHog } from "@/lib/posthog";
 
 const STORAGE_KEY = "dubgrid-cookie-consent";
 // IMPORTANT: Bump this version when cookies, analytics providers, or the
@@ -93,8 +92,21 @@ function syncConsentToServer(prefs: CookiePreferences) {
 
 export { CONSENT_CHANGED_EVENT };
 
-export function hasAnalyticsConsent(): boolean {
+export function subscribeToConsentChanges(callback: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener(CONSENT_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(CONSENT_CHANGED_EVENT, callback);
+}
+
+export function getAnalyticsConsentSnapshot(): boolean {
   return getCookieConsent()?.analytics === true;
+}
+
+export function hasAnalyticsConsent(): boolean {
+  return getAnalyticsConsentSnapshot();
 }
 
 export default function CookieConsent() {
@@ -110,26 +122,18 @@ export default function CookieConsent() {
   });
 
   function acceptAll() {
-    const hadAnalytics = getCookieConsent()?.analytics === true;
     const prefs = { essential: true, analytics: true };
     setStoredConsent(prefs);
     syncConsentToServer(prefs);
     setDialogOpen(false);
-    if (!hadAnalytics) {
-      initPostHog();
-    }
     window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
   }
 
   function acceptEssential() {
-    const hadAnalytics = getCookieConsent()?.analytics === true;
     const prefs = { essential: true, analytics: false };
     setStoredConsent(prefs);
     syncConsentToServer(prefs);
     setDialogOpen(false);
-    if (hadAnalytics) {
-      resetPostHog();
-    }
     window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
   }
 

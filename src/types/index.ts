@@ -78,8 +78,6 @@ export interface FocusArea {
   /** Parent scheduled department. Null if not yet assigned. */
   departmentId: number | null;
   name: string;
-  colorBg: string;
-  colorText: string;
   sortOrder: number;
   /** Non-null when the focus area has been archived (soft-deleted). */
   archivedAt?: string | null;
@@ -217,8 +215,12 @@ export interface Employee {
   archivedAt?: string | null;
   /** Linked Supabase auth user ID. Null if no account linked. */
   userId: string | null;
-  /** Management department IDs (explicit assignment for non-schedule departments). */
+  /** Scheduled department IDs for this employee record. */
   departmentIds: number[];
+  /** Subset of departmentIds where this employee is a dept admin (gets dept permission template). */
+  deptAdminIds: number[];
+  /** Optimistic concurrency control version counter. */
+  version: number;
 }
 
 export type DraftKind = 'new' | 'modified' | 'deleted' | null;
@@ -316,7 +318,9 @@ export interface ShiftSeries {
   id: string;
   empId: string;
   orgId: string;
-  shiftCodeId: number;
+  shiftCodeId: number | null;
+  /** FK to absence_types. Null when this is a shift-code series. */
+  absenceTypeId: number | null;
   shiftLabel: string;
   frequency: SeriesFrequency;
   /** Day-of-week numbers for weekly/biweekly. Null means every day. */
@@ -484,9 +488,10 @@ export interface OrganizationUser {
   createdAt: string;
   lastSignInAt: string | null;
   departmentIds: number[];
+  deptAdminIds: number[];
 }
 
-/** A unified person record for the People Directory (union of employees + app-only users + pending invites). */
+/** A unified person record for the People Directory (union of employees + management staff + pending invites). */
 export interface DirectoryPerson {
   personId: string;
   source: 'employee' | 'user_only' | 'pending_invite';
@@ -505,7 +510,20 @@ export interface DirectoryPerson {
   seniority: number | null;
   lastSignInAt: string | null;
   invitationStatus: 'pending' | 'expired' | null;
+  /** Scheduled department IDs from the employee record. */
+  scheduledDepartmentIds: number[];
+  /** Subset of scheduledDepartmentIds where this employee is a dept admin. */
+  scheduledDeptAdminIds: number[];
+  /** Management department IDs from org membership or pending invitation. */
+  managementDepartmentIds: number[];
+  /** Subset of managementDepartmentIds where this person is a dept admin. */
+  managementDeptAdminIds: number[];
+  /** Back-compat alias for managementDepartmentIds. */
   departmentIds: number[];
+  /** Back-compat alias for managementDeptAdminIds. */
+  deptAdminIds: number[];
+  /** True when the person is an active org member with at least one management department. */
+  isManagementUser: boolean;
 }
 
 export interface UserSession {
@@ -596,6 +614,11 @@ export interface Invitation {
   createdAt: string;
   /** Employee record this invitation is for. Null if not linked to an employee. */
   employeeId: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  departmentIds?: number[];
+  deptAdminIds?: number[];
 }
 
 export interface UserClaims {
@@ -641,7 +664,6 @@ export interface FocusAreaDistributionEntry {
   name: string;
   shiftCount: number;
   percentage: number;
-  colorBg: string;
 }
 
 // ── Gridmaster Portal Types ──────────────────────────────────────────────────
@@ -698,6 +720,7 @@ export interface OrganizationMembership {
   adminPermissions: AdminPermissions | null;
   joinedAt: string;
   onboardingCompletedAt: string | null;
+  tooltipToursCompleted: Record<string, string>;
   email: string | null;
   firstName: string | null;
   lastName: string | null;

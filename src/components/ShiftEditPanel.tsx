@@ -7,6 +7,8 @@ import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm from "./RepeatForm";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { Hint, MaybeHint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
@@ -44,6 +46,10 @@ interface ShiftEditPanelProps {
   publishedShiftCodeIds?: number[];
   /** Draft classification for this cell — used to show NEW badge on single-shift pills */
   draftKind?: DraftKind;
+  /** Commits the current local draft to the server. */
+  onConfirmDraft?: (seriesScope?: SeriesScope) => void;
+  /** True when the underlying cell changed externally while the panel was open. */
+  isStale?: boolean;
   /** All focus areas — used to resolve focusAreaId to names */
   focusAreas?: FocusArea[];
   /** All certifications — used to resolve certificationId to names */
@@ -396,22 +402,25 @@ function PillTimeEditor({
   // State 1: No custom time set — show "Custom time" button to add one
   if (!hasCustomTime && !editing) {
     return (
-      <button
-        onClick={() => startEditing()}
-        style={{
-          display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-subtle)", background: "none",
-          border: "1px dashed var(--color-border)", borderRadius: 8,
-          padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
-          width: "100%", justifyContent: "center", marginTop: 8,
-        }}
-      >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        Custom time
-        {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}{calcTimeDuration(defaultStart, defaultEnd) ? ` (${calcTimeDuration(defaultStart, defaultEnd)})` : ""}</span>}
-      </button>
+      <Hint content={hint("Override this shift's start and end times")} side="left">
+        <button
+          data-tour="edit-panel-custom-time"
+          onClick={() => startEditing()}
+          style={{
+            display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-subtle)", background: "none",
+            border: "1px dashed var(--color-border)", borderRadius: 8,
+            padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
+            width: "100%", justifyContent: "center", marginTop: 8,
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Custom time
+          {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}{calcTimeDuration(defaultStart, defaultEnd) ? ` (${calcTimeDuration(defaultStart, defaultEnd)})` : ""}</span>}
+        </button>
+      </Hint>
     );
   }
 
@@ -437,7 +446,7 @@ function PillTimeEditor({
           <div style={{ display: "flex", gap: 6 }}>
             <button
               onClick={() => startEditing()}
-              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-primary)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
+              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-brand)", background: "var(--color-brand-bg)", border: "1px solid var(--color-brand-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
             >Edit</button>
             <button
               onClick={() => { onRemove(); }}
@@ -535,6 +544,8 @@ export default function ShiftEditPanel({
   onCustomTimeChange,
   publishedShiftCodeIds = [],
   draftKind = null,
+  onConfirmDraft,
+  isStale = false,
   focusAreas = [],
   certifications = [],
   auditInfo,
@@ -719,6 +730,7 @@ export default function ShiftEditPanel({
   const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
   const timeSummary = hasTimeEdit ? describeTimeChange() : null;
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
+  const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
   function handleUndo() {
     // Revert absence type if it changed
@@ -868,18 +880,18 @@ export default function ShiftEditPanel({
         }}
       >
         {activeDots.map((ind) => (
-          <div
-            key={ind.name}
-            title={ind.name}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: ind.color,
-              border: "1px solid rgba(255,255,255,0.8)",
-              flexShrink: 0,
-            }}
-          />
+          <MaybeHint key={ind.name} content={ind.name} side="top">
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: ind.color,
+                border: "1px solid rgba(255,255,255,0.8)",
+                flexShrink: 0,
+              }}
+            />
+          </MaybeHint>
         ))}
       </div>
     );
@@ -936,7 +948,8 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span title={absenceLabel} style={{
+          <MaybeHint content={absenceLabel} side="top">
+            <span style={{
             fontWeight: 800,
             fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
             color: at.text,
@@ -948,9 +961,10 @@ export default function ShiftEditPanel({
             ...(isNameMode
               ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
               : { whiteSpace: "nowrap" }),
-          }}>
-            {absenceLabel}
-          </span>
+            }}>
+              {absenceLabel}
+            </span>
+          </MaybeHint>
           {!isNameMode && at.name && (
             <span style={{ fontSize: "var(--dg-fs-footnote)", color: at.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {at.name}
@@ -1009,7 +1023,8 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span title={label} style={{
+          <MaybeHint content={label} side="top">
+            <span style={{
             fontWeight: 800,
             fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
             color: s.text,
@@ -1021,13 +1036,19 @@ export default function ShiftEditPanel({
             ...(isNameMode
               ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
               : { whiteSpace: "nowrap" }),
-          }}>
-            {label}
-          </span>
-          {(fullName || faName) && (
-            <span title={[fullName, faName].filter(Boolean).join(" · ")} style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {fullName}{fullName && faName ? " · " : ""}{faName}
+            }}>
+              {label}
             </span>
+          </MaybeHint>
+          {(fullName || faName) && (
+            <MaybeHint
+              content={[fullName, faName].filter(Boolean).join(" · ")}
+              side="top"
+            >
+              <span style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {fullName}{fullName && faName ? " · " : ""}{faName}
+              </span>
+            </MaybeHint>
           )}
           {renderNoteDots(noteTypes)}
         </div>
@@ -1105,7 +1126,8 @@ export default function ShiftEditPanel({
                 }}
               >
                 <div style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}>
-                  <span title={label} style={{
+                  <MaybeHint content={label} side="top">
+                    <span style={{
                     fontWeight: 800,
                     fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
                     color: s.text,
@@ -1116,20 +1138,26 @@ export default function ShiftEditPanel({
                     ...(isNameMode
                       ? { WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
                       : { whiteSpace: "nowrap" }),
-                  }}>
-                    {label}
-                  </span>
+                    }}>
+                      {label}
+                    </span>
+                  </MaybeHint>
                   {(fullName || faName) && (
-                    <div title={[fullName, faName].filter(Boolean).join(" · ")} style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {fullName}{fullName && faName ? " · " : ""}{faName}
-                    </div>
+                    <MaybeHint
+                      content={[fullName, faName].filter(Boolean).join(" · ")}
+                      side="top"
+                    >
+                      <div style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {fullName}{fullName && faName ? " · " : ""}{faName}
+                      </div>
+                    </MaybeHint>
                   )}
                 </div>
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
                   <button
                     onClick={() => setPendingDelete({ type: "pill", index: i })}
-                    title={`Remove ${label}`}
+                    aria-label={`Remove ${label}`}
                     style={{
                       position: "absolute",
                       top: 8,
@@ -1516,7 +1544,7 @@ export default function ShiftEditPanel({
                 fontSize: "var(--dg-fs-body)",
                 lineHeight: 1,
               }}
-              title="Close"
+              aria-label="Close"
             >
               ×
             </button>
@@ -1624,36 +1652,39 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && !seriesId && onRepeatConfirm && currentLabels.length <= 1 && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={sectionLabel}>Repeating</div>
-                  <button
-                    onClick={() => setShowRepeatForm(true)}
-                    className="dg-btn dg-btn-secondary"
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      fontSize: "var(--dg-fs-caption)",
-                      padding: "9px 12px",
-                    }}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  <Hint content={hint("Create a recurring pattern (daily, weekly, biweekly)")} side="top">
+                    <button
+                      data-tour="edit-panel-repeat-btn"
+                      onClick={() => { setShowRepeatForm(true); }}
+                      className="dg-btn dg-btn-secondary"
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                      }}
                     >
-                      <polyline points="17 1 21 5 17 9" />
-                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                      <polyline points="7 23 3 19 7 15" />
-                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                    </svg>
-                    {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
-                  </button>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="17 1 21 5 17 9" />
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                        <polyline points="7 23 3 19 7 15" />
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                      </svg>
+                      {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
+                    </button>
+                  </Hint>
                 </div>
               )}
 
@@ -1795,81 +1826,90 @@ export default function ShiftEditPanel({
                     Shift requests
                   </div>
                   {onMakeAvailable && (
-                    <button
-                      onClick={onMakeAvailable}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px solid var(--color-info-border)",
-                        borderRadius: 8,
-                        color: "var(--color-link)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="8.5" cy="7" r="4" />
-                        <line x1="20" y1="8" x2="20" y2="14" />
-                        <line x1="23" y1="11" x2="17" y2="11" />
-                      </svg>
-                      Make available for pickup
-                    </button>
+                    <Hint content={hint("Post this shift for other staff to pick up")} side="top">
+                      <button
+                        data-tour="edit-panel-pickup-btn"
+                        onClick={onMakeAvailable}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                          border: "1px solid var(--color-info-border)",
+                          borderRadius: 8,
+                          color: "var(--color-link)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="8.5" cy="7" r="4" />
+                          <line x1="20" y1="8" x2="20" y2="14" />
+                          <line x1="23" y1="11" x2="17" y2="11" />
+                        </svg>
+                        Make available for pickup
+                      </button>
+                    </Hint>
                   )}
                   {onProposeSwap && (
-                    <button
-                      onClick={onProposeSwap}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px solid var(--color-info-border)",
-                        borderRadius: 8,
-                        color: "var(--color-accent-text)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="17 1 21 5 17 9" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                        <polyline points="7 23 3 19 7 15" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                      </svg>
-                      Propose a swap
-                    </button>
+                    <Hint content={hint("Request a shift exchange with another employee")} side="top">
+                      <button
+                        data-tour="edit-panel-swap-btn"
+                        onClick={onProposeSwap}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                          border: "1px solid var(--color-info-border)",
+                          borderRadius: 8,
+                          color: "var(--color-accent-text)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="17 1 21 5 17 9" />
+                          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                          <polyline points="7 23 3 19 7 15" />
+                          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                        </svg>
+                        Propose a swap
+                      </button>
+                    </Hint>
                   )}
                   {onCallOff && !showCallOffPicker && (
-                    <button
-                      onClick={() => setShowCallOffPicker(true)}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px solid var(--color-danger-border)",
-                        borderRadius: 8,
-                        color: "var(--color-danger-text)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="15" y1="9" x2="9" y2="15" />
-                        <line x1="9" y1="9" x2="15" y2="15" />
-                      </svg>
-                      Call off
-                    </button>
+                    <Hint content={hint("Submit an absence request for this shift")} side="top">
+                      <button
+                        data-tour="edit-panel-calloff-btn"
+                        onClick={() => setShowCallOffPicker(true)}
+                        className="dg-btn dg-btn-ghost"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                          border: "1px solid var(--color-danger-border)",
+                          borderRadius: 8,
+                          color: "var(--color-danger-text)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
+                        </svg>
+                        Call off
+                      </button>
+                    </Hint>
                   )}
                   {onCallOff && showCallOffPicker && (
                     <div style={{ marginTop: 4 }}>
@@ -1951,6 +1991,21 @@ export default function ShiftEditPanel({
                   }}
                 >
                   A request is already active for this shift
+                </div>
+              )}
+              {isStale && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 12px",
+                    background: "var(--color-danger-bg)",
+                    border: "1px solid var(--color-danger-border)",
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-danger-dark)",
+                  }}
+                >
+                  This shift changed in another tab or by another editor. Close and reopen it before saving.
                 </div>
               )}
               {overlapWarnings.length > 0 && (
@@ -2035,6 +2090,7 @@ export default function ShiftEditPanel({
                   No shifts start at or after {fmt12h(firstShiftEndTime)}.
                 </div>
               ) : (
+                <div data-tour="shift-picker">
                 <ShiftPicker
                   shiftCodes={pickerShiftCodes}
                   absenceTypes={pickerAbsenceTypes}
@@ -2066,13 +2122,14 @@ export default function ShiftEditPanel({
                   closeOnSelect={false}
                   shiftDisplayMode={shiftDisplayMode}
                 />
+                </div>
               )}
             </>
           )}
         </div>
 
         {/* Sticky footer — only shown when edits exist */}
-        {hasEdits && (
+        {hasEdits && !showRepeatForm && (
           <div
             style={{
               flexShrink: 0,
@@ -2105,9 +2162,10 @@ export default function ShiftEditPanel({
               Undo
             </button>
             <button
-              onClick={onClose}
+              onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
               className="dg-btn dg-btn-primary"
               style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+              disabled={confirmBlocked}
             >
               Confirm
             </button>

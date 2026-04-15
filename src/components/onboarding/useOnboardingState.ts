@@ -70,7 +70,7 @@ export function useOnboardingState(
     // that flashes the underlying route before navigation completes
     queryClient.setQueryData(
       ["onboarding-status", userId, orgId],
-      { completed: true, completedAt: new Date().toISOString() },
+      { completed: true, completedAt: new Date().toISOString(), tooltipToursCompleted: {} },
     );
   }, [userId, orgId, key, queryClient]);
 

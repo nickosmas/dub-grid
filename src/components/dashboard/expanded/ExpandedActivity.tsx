@@ -1,7 +1,5 @@
 import { useState, useMemo } from "react";
-import type { ActivityIconVariant, OTAlert } from "@/lib/dashboard-stats";
-import { buildActivityFeed } from "@/lib/dashboard-stats";
-import type { PublishHistoryEntry, ShiftRequest } from "@/types";
+import type { ActivityIconVariant, ActivityItem } from "@/lib/dashboard-stats";
 import Modal from "@/components/Modal";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
@@ -59,39 +57,31 @@ const TYPE_FILTERS = [
   { value: "all", label: "All" },
   { value: "publish", label: "Published" },
   { value: "shift_change", label: "Shift changes" },
-  { value: "ot_alert", label: "OT alerts" },
+  { value: "request", label: "Requests" },
+  { value: "user_signup", label: "User sign-ups" },
 ] as const;
 
 interface ExpandedActivityProps {
-  publishHistory: PublishHistoryEntry | null;
-  shiftRequests: ShiftRequest[];
-  otAlerts: OTAlert[];
+  items: ActivityItem[];
   onClose: () => void;
 }
 
 export default function ExpandedActivity({
-  publishHistory,
-  shiftRequests,
-  otAlerts,
+  items,
   onClose,
 }: ExpandedActivityProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  const allItems = useMemo(
-    () => buildActivityFeed(publishHistory, shiftRequests, otAlerts, 100),
-    [publishHistory, shiftRequests, otAlerts],
-  );
-
   const filtered = useMemo(
-    () => (typeFilter === "all" ? allItems : allItems.filter((item) => item.type === typeFilter)),
-    [allItems, typeFilter],
+    () => (typeFilter === "all" ? items : items.filter((item) => item.type === typeFilter)),
+    [items, typeFilter],
   );
 
   return (
     <Modal title="Recent activity" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Type filter tabs */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.value;
             return (
@@ -104,8 +94,8 @@ export default function ExpandedActivity({
                   padding: "5px 12px",
                   borderRadius: 6,
                   border: "1px solid",
-                  borderColor: active ? "var(--color-primary)" : "var(--color-border)",
-                  background: active ? "var(--color-primary)" : "transparent",
+                  borderColor: active ? "var(--color-brand)" : "var(--color-border)",
+                  background: active ? "var(--color-brand)" : "transparent",
                   color: active ? "#fff" : "var(--color-text-secondary)",
                   cursor: "pointer",
                   transition: "all 0.15s",
@@ -131,17 +121,20 @@ export default function ExpandedActivity({
                 style={{
                   display: "flex",
                   gap: 12,
-                  padding: "11px 4px",
-                  borderBottom: i < filtered.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                  padding: "12px 0",
+                  borderBottom:
+                    i < filtered.length - 1
+                      ? "1px solid var(--color-border-light)"
+                      : "none",
                 }}
               >
                 <ActivityIcon variant={item.iconVariant} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.4 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.35 }}>
                     {item.description}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 3 }}>
-                    {item.timestamp} &middot; {item.relativeTime}
+                    {item.relativeTime}
                   </div>
                 </div>
               </div>

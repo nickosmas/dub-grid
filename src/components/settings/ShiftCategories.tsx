@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ShiftCategory, FocusArea, ShiftCode } from "@/types";
-import { upsertShiftCategory, deleteShiftCategory, upsertShiftCode } from "@/lib/db";
+import { upsertShiftCategory, deleteShiftCategory, upsertShiftCode, checkShiftCategoryDependencies } from "@/lib/db";
+import type { DependencyInfo } from "@/lib/db";
 import { fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -33,6 +34,16 @@ function ShiftCategoriesSettings({
   const [deleting, setDeleting] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [catDepInfo, setCatDepInfo] = useState<DependencyInfo | null>(null);
+
+  const handleDeleteClick = async (catId: number) => {
+    const cat = local.find(c => c.id === catId);
+    if (!cat) return;
+    if ((cat as { isNew?: boolean }).isNew) { handleDelete(cat); return; }
+    const deps = await checkShiftCategoryDependencies(catId, orgId);
+    setCatDepInfo(deps);
+    setConfirmDeleteId(catId);
+  };
   const originalRef = useRef<Map<number, ShiftCategory>>(
     new Map(shiftCategories.map((c) => [c.id, c]))
   );
@@ -157,16 +168,7 @@ function ShiftCategoriesSettings({
     }
   };
 
-  const addBtnStyle: React.CSSProperties = {
-    background: "none",
-    border: "none",
-    color: "var(--color-text-muted)",
-    padding: "6px 0",
-    fontSize: "var(--dg-fs-caption)",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  };
+  const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
   const renderCategoryRow = (cat: ShiftCategory & { isNew?: boolean }) => {
     const isEditing = editingId === cat.id;
@@ -184,48 +186,45 @@ function ShiftCategoriesSettings({
       return (
         <div
           key={cat.id}
+          className="dg-hover-row"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "11px 0",
-            borderBottom: "1px solid var(--color-border-light)",
+            gap: 12,
+            padding: "10px 8px",
+            borderRadius: 8,
+            transition: "background 0.15s",
+            cursor: canManageShiftCodes ? "pointer" : undefined,
           }}
+          onClick={canManageShiftCodes ? () => setEditingId(cat.id) : undefined}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-              {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>Untitled</span>}
-            </span>
-            {(cat.startTime || cat.endTime) && (
-              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
-                {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
-                  <span style={{ marginLeft: 8, fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                    ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
-                  </span>
-                )}
-                {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
-                  <span style={{ marginLeft: 6, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-faint)" }}>
-                    incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
-                  </span>
-                )}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Untitled</span>}
               </span>
+              {(cat.startTime || cat.endTime) && (
+                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                  {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
+                  {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
+                    <span style={{ marginLeft: 8, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                      ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+            {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
+              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", marginTop: 2 }}>
+                incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
+              </div>
             )}
           </div>
           {canManageShiftCodes && (
             <button
-              onClick={() => setEditingId(cat.id)}
-              style={{
-                background: "none",
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                color: "var(--color-text-primary)",
-                padding: "6px 12px",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
+              onClick={(e) => { e.stopPropagation(); setEditingId(cat.id); }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Edit
             </button>
@@ -238,31 +237,36 @@ function ShiftCategoriesSettings({
       <div
         key={cat.id}
         style={{
-          padding: "12px 0",
-          borderBottom: "1px solid var(--color-border-light)",
+          background: "var(--color-bg-secondary)",
+          borderRadius: 10,
+          padding: "14px 16px",
+          margin: "8px 0",
+          border: "1px solid var(--color-border-light)",
         }}
       >
+        {/* NAME — full width */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>NAME</label>
+          <input
+            value={cat.name}
+            onChange={(e) => handleChange(cat.id, "name", e.target.value)}
+            placeholder="e.g. Day Shift"
+            maxLength={50}
+            style={{ ...inputStyle }}
+            autoFocus
+            disabled={!canManageShiftCodes}
+          />
+        </div>
+        {/* START / END / BREAK — single row */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto auto",
-            gap: 10,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 14,
             alignItems: "end",
-            marginBottom: 10,
+            marginBottom: 12,
           }}
         >
-          <div>
-            <label style={labelStyle}>NAME</label>
-            <input
-              value={cat.name}
-              onChange={(e) => handleChange(cat.id, "name", e.target.value)}
-              placeholder="e.g. Day Shift"
-              maxLength={50}
-              style={{ ...inputStyle }}
-              autoFocus
-              disabled={!canManageShiftCodes}
-            />
-          </div>
           <div>
             <label style={labelStyle}>START</label>
             <TimeInput12h
@@ -279,11 +283,8 @@ function ShiftCategoriesSettings({
               disabled={!canManageShiftCodes}
             />
           </div>
-        </div>
-        {/* Break Duration */}
-        <div style={{ marginBottom: 10 }}>
-          <label style={labelStyle}>BREAK (MIN)</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div>
+            <label style={labelStyle}>BREAK (MIN)</label>
             <input
               type="number"
               min={0}
@@ -293,76 +294,61 @@ function ShiftCategoriesSettings({
                 const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
                 handleChange(cat.id, "breakMinutes", val);
               }}
-              placeholder="No break"
-              style={{ ...inputStyle, width: 140 }}
+              placeholder="None"
+              style={{ ...inputStyle, width: 100 }}
               disabled={!canManageShiftCodes}
             />
           </div>
         </div>
+        {/* Duration pill */}
         {calcTimeDuration(cat.startTime, cat.endTime) && (
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginBottom: 10 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--color-text-muted)",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border-light)",
+              borderRadius: 6,
+              padding: "4px 10px",
+              marginBottom: 12,
+            }}
+          >
             {(() => {
               const effectiveBreak = resolveEffectiveBreak(cat.breakMinutes);
               const gross = calcTimeDuration(cat.startTime, cat.endTime);
               const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes);
               if (effectiveBreak > 0) {
-                return <>Gross: {gross} · Break: {effectiveBreak}m · Net: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{net}</span></>;
+                return <>Gross: {gross} · Break: {effectiveBreak}m · Net: <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>{net}</span></>;
               }
-              return <>Duration: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{gross}</span></>;
+              return <>Duration: <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>{gross}</span></>;
             })()}
           </div>
         )}
+        {/* Actions */}
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => handleSave(cat)}
             disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
-            style={{
-              background: cat.name.trim() && isDirty && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border)",
-              border: "none",
-              color: "var(--color-text-inverse)",
-              borderRadius: 8,
-              padding: "7px 14px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              cursor: cat.name.trim() && isDirty && canManageShiftCodes ? "pointer" : "not-allowed",
-              whiteSpace: "nowrap",
-            }}
+            className="dg-btn dg-btn-primary dg-btn-sm"
           >
             {isSavingThis ? "…" : "Save"}
           </button>
           <button
             onClick={() => handleCancel(cat)}
             disabled={isSavingThis}
-            style={{
-              background: "none",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              color: "var(--color-text-primary)",
-              padding: "7px 12px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
+            className="dg-btn dg-btn-secondary dg-btn-sm"
           >
             Cancel
           </button>
           {canManageShiftCodes && (
             <button
-              onClick={() => cat.isNew ? handleDelete(cat) : setConfirmDeleteId(cat.id)}
+              onClick={() => cat.isNew ? handleDelete(cat) : handleDeleteClick(cat.id)}
               disabled={isDeletingThis}
-              style={{
-                background: "none",
-                border: "1px solid var(--color-danger-border)",
-                borderRadius: 8,
-                color: "var(--color-danger)",
-                padding: "7px 12px",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                marginLeft: "auto",
-              }}
+              className="dg-btn dg-btn-danger dg-btn-sm"
+              style={{ marginLeft: "auto" }}
             >
               {isDeletingThis ? "…" : "Delete"}
             </button>
@@ -400,7 +386,7 @@ function ShiftCategoriesSettings({
           >
             <div
               style={{
-                padding: "10px 16px",
+                padding: "12px 16px",
                 borderBottom: "1px solid var(--color-border-light)",
                 display: "flex",
                 alignItems: "center",
@@ -410,19 +396,25 @@ function ShiftCategoriesSettings({
                 color: "var(--color-text-secondary)",
               }}
             >
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: focusArea.colorBg || "var(--color-border)", flexShrink: 0 }} />
               {focusArea.name}
             </div>
             {areaCats.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
-                {areaCats.map(renderCategoryRow)}
+                {areaCats.map((cat, i) => (
+                  <React.Fragment key={cat.id}>
+                    {renderCategoryRow(cat)}
+                    {i < areaCats.length - 1 && (
+                      <div style={{ height: 1, background: "var(--color-border-light)" }} />
+                    )}
+                  </React.Fragment>
+                ))}
               </div>
             ) : (
               <EmptyState
                 compact
                 title="No categories yet"
                 action={canManageShiftCodes ? (
-                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary" style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}>
+                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">
                     + Add Category
                   </button>
                 ) : undefined}
@@ -431,7 +423,7 @@ function ShiftCategoriesSettings({
             )}
             {areaCats.length > 0 && canManageShiftCodes && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(focusArea.id)} style={addBtnStyle}>
+                <button onClick={() => handleAdd(focusArea.id)} className={addBtnClass} style={{ width: "100%" }}>
                   + Add Category
                 </button>
               </div>
@@ -444,10 +436,24 @@ function ShiftCategoriesSettings({
       {confirmDeleteId !== null && (() => {
         const cat = local.find(c => c.id === confirmDeleteId);
         if (!cat) return null;
-        return (
+        return catDepInfo?.hasDependencies ? (
           <ConfirmDialog
-            title="Delete Category?"
-            message={<>Delete <strong>{cat.name || "this category"}</strong>? Shift codes in this category will become uncategorized.</>}
+            title={`Archive "${cat.name}"?`}
+            message={<>
+              <strong>{cat.name}</strong> is currently {catDepInfo.summary.toLowerCase()}.
+              <br /><br />
+              Archiving will preserve historical records. Shift codes in this category will become uncategorized.
+            </>}
+            confirmLabel="Archive"
+            variant="warning"
+            isLoading={deleting === confirmDeleteId}
+            onConfirm={() => handleDelete(cat)}
+            onCancel={() => setConfirmDeleteId(null)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`Delete "${cat.name}"?`}
+            message={<>This will archive <strong>{cat.name || "this category"}</strong>. Historical records will be preserved.</>}
             confirmLabel="Delete"
             variant="danger"
             isLoading={deleting === confirmDeleteId}

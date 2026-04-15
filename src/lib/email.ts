@@ -14,23 +14,12 @@ export function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Resolve the site URL for absolute links in emails. */
-function siteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : "http://localhost:3000")
-  );
-}
-
 /**
- * Render the branded email header: logo icon + PNG wordmark side by side.
+ * Render the branded email header using a text wordmark to keep email colors in sync.
  */
 function emailHeader(): string {
-  const url = siteUrl();
   return `<div style="padding:32px 32px 0;text-align:center;">
-      <img src="${url}/logo.png" alt="DubGrid" width="40" height="40" style="display:inline-block;vertical-align:middle;margin-right:8px;border:0;" /><img src="${url}/wordmark-dark.png" alt="dubgrid" height="22" style="display:inline-block;vertical-align:middle;border:0;" />
+      <span style="display:inline-block;font-size:24px;line-height:1;font-weight:800;letter-spacing:-0.02em;color:#2563EB;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">DubGrid</span>
     </div>`;
 }
 

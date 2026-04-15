@@ -4,7 +4,7 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail } from "@/lib/db";
+import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail, updateAdminPermissions } from "@/lib/db";
 import { queueNotification } from "@/lib/notify";
 import type { TenantStats } from "@/lib/db";
 import type {
@@ -31,7 +31,7 @@ interface InvitationRow {
   revoked_at: string | null;
 }
 import ConfirmDialog from "@/components/ConfirmDialog";
-import AdminPermissionsEditor from "@/components/gridmaster/AdminPermissionsEditor";
+import PermissionsEditor from "@/components/PermissionsEditor";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import ReadOnlyScheduleView from "@/components/gridmaster/ReadOnlyScheduleView";
@@ -75,6 +75,19 @@ function shortTz(iana: string | null): string {
   } catch {
     return iana;
   }
+}
+
+function normalizeOverviewText(value: string): string {
+  return value.trim();
+}
+
+function normalizeOverviewNullableText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function normalizeOverviewLabel(value: string, fallback: string): string {
+  return value.trim() || fallback;
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -400,6 +413,17 @@ function OverviewTab({
   const [suspendConfirm, setSuspendConfirm] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
+  const hasChanges =
+    normalizeOverviewText(editName) !== organization.name ||
+    normalizeOverviewText(editAddress) !== organization.address ||
+    normalizeOverviewText(editPhone) !== organization.phone ||
+    normalizeOverviewNullableText(editTimezone) !== (organization.timezone ?? null) ||
+    normalizeOverviewLabel(editFocusAreaLabel, "Focus Areas") !== organization.focusAreaLabel ||
+    normalizeOverviewLabel(editCertLabel, "Certifications") !== organization.certificationLabel ||
+    normalizeOverviewLabel(editRoleLabel, "Roles") !== organization.roleLabel ||
+    editShiftDisplayMode !== organization.shiftDisplayMode ||
+    editEnforceConflictPrevention !== organization.enforceConflictPrevention ||
+    editDataRetentionDays !== (organization.dataRetentionDays ?? 365);
 
   // Reset edit state when switching to a different organization
   useEffect(() => {
@@ -549,7 +573,7 @@ function OverviewTab({
                 <input className="dg-input" type="number" min={1} value={editDataRetentionDays} onChange={(e) => setEditDataRetentionDays(Number(e.target.value))} />
               </div>
               <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
-                <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
+                <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
                   {saving ? "Saving…" : "Save"}
                 </button>
                 <button className="dg-btn dg-btn-secondary" onClick={() => setEditing(false)} disabled={saving}>
@@ -1041,14 +1065,16 @@ function UsersTab({
 
       {/* Permissions editor modal */}
       {editingPerms && (
-        <AdminPermissionsEditor
-          userId={editingPerms.id}
-          orgId={orgId}
-          userName={[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}
-          userEmail={editingPerms.email ?? undefined}
-          currentPermissions={editingPerms.adminPermissions}
+        <PermissionsEditor
+          title={`Admin Permissions \u2014 ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
+          subtitle={<>Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.</>}
+          initialPermissions={editingPerms.adminPermissions}
+          onSave={async (perms) => {
+            await updateAdminPermissions(editingPerms.id, perms, orgId, editingPerms.email ?? undefined);
+            toast.success("Permissions updated");
+            onUsersChanged();
+          }}
           onClose={() => setEditingPerms(null)}
-          onSaved={() => onUsersChanged()}
         />
       )}
 
@@ -1236,8 +1262,8 @@ function ConfigTab({
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: fa.colorBg,
-                    color: fa.colorText,
+                    background: "var(--color-bg-secondary)",
+                    color: "var(--color-text-secondary)",
                   }}
                 >
                   {fa.name}

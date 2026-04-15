@@ -207,8 +207,8 @@ export default function RepeatForm({
       </div>
 
       {/* Frequency */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={sectionLabelStyle}>Frequency</div>
+      <fieldset style={{ marginBottom: 18, border: "none", padding: 0, margin: 0 }}>
+        <legend style={sectionLabelStyle}>Frequency</legend>
         <div className="dg-segment" style={{ display: "flex" }}>
           {(["daily", "weekly", "biweekly"] as SeriesFrequency[]).map(f => (
             <button
@@ -216,12 +216,13 @@ export default function RepeatForm({
               onClick={() => setFrequency(f)}
               className={`dg-segment-btn${frequency === f ? " active" : ""}`}
               style={{ flex: 1, textTransform: "capitalize" }}
+              aria-pressed={frequency === f}
             >
               {f === 'biweekly' ? 'Biweekly' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Day picker (weekly / biweekly) */}
       {showDayPicker && (
@@ -234,7 +235,6 @@ export default function RepeatForm({
                 <button
                   key={i}
                   onClick={() => toggleDay(i)}
-                  title={DAY_NAMES_FULL[i]}
                   aria-label={DAY_NAMES_FULL[i]}
                   aria-pressed={active}
                   style={{
@@ -279,8 +279,8 @@ export default function RepeatForm({
       </div>
 
       {/* End */}
-      <div style={{ marginBottom: 4 }}>
-        <div style={sectionLabelStyle}>Ends</div>
+      <fieldset style={{ marginBottom: 4, border: "none", padding: 0, margin: 0 }}>
+        <legend style={sectionLabelStyle}>Ends</legend>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {(["never", "on_date", "after_n"] as EndType[]).map(type => (
             <label
@@ -328,7 +328,7 @@ export default function RepeatForm({
             End date must be on or after start date.
           </div>
         )}
-      </div>
+      </fieldset>
 
       {/* Preview summary */}
       {preview.total > 0 && (
@@ -366,7 +366,7 @@ export default function RepeatForm({
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
         <button onClick={onBack} className="dg-btn dg-btn-secondary" style={{ padding: "8px 14px" }}>
-          Cancel
+          Back
         </button>
         <button
           onClick={handleConfirm}

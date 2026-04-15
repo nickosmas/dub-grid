@@ -114,7 +114,7 @@ export default function ShiftContextMenu({
     const firstItem = menuRef.current.querySelector<HTMLElement>(
       'button[role="menuitem"]:not([disabled])'
     );
-    firstItem?.focus();
+    firstItem?.focus({ preventScroll: true });
   }, []);
 
   if (!mounted) return null;
@@ -139,7 +139,7 @@ export default function ShiftContextMenu({
             e.key === "ArrowDown"
               ? (currentIdx + 1) % items.length
               : (currentIdx - 1 + items.length) % items.length;
-          items[nextIdx].focus();
+          items[nextIdx].focus({ preventScroll: true });
         }
       }}
       style={{ ...menuStyle, overflow: "visible" }}
@@ -173,7 +173,7 @@ export default function ShiftContextMenu({
             }}
           >
             <Copy size={14} />
-            Copy Shift
+            Copy Entry
           </button>
           <button
             role="menuitem"
@@ -185,7 +185,7 @@ export default function ShiftContextMenu({
             }}
           >
             <ClipboardPaste size={14} />
-            Paste Shift
+            Paste Entry
           </button>
           {hasShift && (
             <>
@@ -199,7 +199,7 @@ export default function ShiftContextMenu({
                 }}
               >
                 <Trash2 size={14} />
-                Remove Shift
+                Remove Entry
               </button>
             </>
           )}

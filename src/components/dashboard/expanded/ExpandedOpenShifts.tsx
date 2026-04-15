@@ -36,7 +36,7 @@ export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpen
     <Modal title="Open shifts" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Filters */}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           <span style={filterLabelStyle}>Filter:</span>
           <CustomSelect
             value={urgencyFilter}
@@ -127,8 +127,8 @@ const itemStyle = {
   display: "flex" as const,
   alignItems: "center" as const,
   gap: 12,
-  padding: "12px 14px",
-  borderRadius: 8,
+  padding: "14px 16px",
+  borderRadius: 14,
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
 };

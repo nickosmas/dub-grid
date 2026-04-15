@@ -4,7 +4,7 @@ import { useRef } from "react";
 import StepLayout from "../StepLayout";
 import StringListSettings from "@/components/settings/StringListSettings";
 import { useOrganizationData } from "@/hooks";
-import { saveCertifications } from "@/lib/db";
+import { saveCertifications, checkCertificationDependencies } from "@/lib/db";
 import type { NamedItem } from "@/types";
 
 interface CertificationsStepProps {
@@ -34,27 +34,20 @@ export default function CertificationsStep({
       nextDisabled={!hasCerts}
       wide
     >
-      <div
-        style={{
-          background: "var(--color-bg-card, white)",
-          borderRadius: 16,
-          border: "1px solid var(--color-border)",
-          padding: "20px",
+      <StringListSettings
+        label={label}
+        items={certifications}
+        onSave={async (updated) => {
+          const saved = await saveCertifications(org.id, updated, existingRef.current);
+          existingRef.current = saved;
+          handleCertificationsChange(saved);
         }}
-      >
-        <StringListSettings
-          label={label}
-          items={certifications}
-          onSave={async (updated) => {
-            const saved = await saveCertifications(org.id, updated, existingRef.current);
-            existingRef.current = saved;
-            handleCertificationsChange(saved);
-          }}
-          placeholder={`Add a ${label.toLowerCase().replace(/s$/, "")}...`}
-          canEdit={true}
-          hideAbbr
-        />
-      </div>
+        placeholder={`Add a ${label.toLowerCase().replace(/s$/, "")}...`}
+        canEdit={true}
+        initialEditing
+        hideAbbr
+        onCheckDependencies={(id) => checkCertificationDependencies(id, org.id)}
+      />
       {!hasCerts && (
         <p
           style={{

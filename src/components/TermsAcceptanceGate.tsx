@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { CURRENT_TERMS_VERSION, acceptTerms } from "@/lib/terms";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
@@ -20,13 +21,13 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
   useEffect(() => {
     let cancelled = false;
     async function check() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || cancelled) return;
+      const user = await getVerifiedBrowserUser();
+      if (!user || cancelled) return;
 
       const { data } = await supabase
         .from("profiles")
         .select("terms_version")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .single();
 
       if (!cancelled && data?.terms_version !== CURRENT_TERMS_VERSION) {
@@ -40,12 +41,12 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
   async function handleAccept() {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const user = await getVerifiedBrowserUser();
+      if (!user) {
         toast.error("Session expired. Please sign in again.");
         return;
       }
-      await acceptTerms(session.user.id);
+      await acceptTerms(user.id);
       setNeedsAcceptance(false);
     } catch (err: unknown) {
       const msg = err instanceof Error
@@ -89,8 +90,9 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
           alignItems: "center",
           justifyContent: "center",
           padding: 24,
-          background: "rgba(0, 0, 0, 0.5)",
-          backdropFilter: "blur(4px)",
+          background: "var(--dg-overlay)",
+          backdropFilter: "blur(var(--dg-overlay-blur))",
+          WebkitBackdropFilter: "blur(var(--dg-overlay-blur))",
         }}
       >
         <div style={{

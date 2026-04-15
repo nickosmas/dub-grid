@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useId } from "react";
 import Modal from "@/components/Modal";
-import { Employee, FocusArea, NamedItem, DirectoryPerson } from "@/types";
+import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import { SelectableTag } from "@/components/ui/selectable-tag";
+import { MOBILE, useMediaQuery } from "@/hooks";
 
 type RowEntry = {
   _id: string;
@@ -13,7 +15,10 @@ type RowEntry = {
   focusAreaIds: number[];
 };
 
-function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEntry {
+function makeRow(
+  certificationId: number | null,
+  focusAreaIds: number[],
+): RowEntry {
   return {
     _id: Math.random().toString(36).slice(2),
     firstName: "",
@@ -33,17 +38,24 @@ interface AddEmployeeModalProps {
   certifications: NamedItem[];
   focusAreaLabel?: string;
   certificationLabel?: string;
-  /** Directory data for matching existing app-only users by name. */
-  directory?: DirectoryPerson[];
   onAdd: (employees: NewEmployeeData[]) => void;
   onClose: () => void;
 }
 
-export default function AddEmployeeModal({ focusAreas, certifications, focusAreaLabel = "Focus Areas", certificationLabel = "Certification", directory = [], onAdd, onClose }: AddEmployeeModalProps) {
+export default function AddEmployeeModal({
+  focusAreas,
+  certifications,
+  focusAreaLabel = "Focus Areas",
+  certificationLabel = "Certification",
+  onAdd,
+  onClose,
+}: AddEmployeeModalProps) {
+  const isMobile = useMediaQuery(MOBILE);
+  const descriptionId = useId();
   const defaultCertId: number | null = null;
   const defaultFocusAreaIds = useMemo(
-    () => focusAreas.length > 0 ? [focusAreas[0].id] : [],
-    [focusAreas]
+    () => (focusAreas.length > 0 ? [focusAreas[0].id] : []),
+    [focusAreas],
   );
 
   const [rows, setRows] = useState<RowEntry[]>(() => [
@@ -52,33 +64,20 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
     makeRow(defaultCertId, defaultFocusAreaIds),
   ]);
 
-  const lastNameRef = useRef<HTMLInputElement | null>(null);
+  const newRowFirstNameRef = useRef<HTMLInputElement | null>(null);
 
-  // Build a lookup of app-only users by normalized "first last" name for matching
-  const appOnlyByName = useMemo(() => {
-    const map = new Map<string, DirectoryPerson>();
-    for (const p of directory) {
-      if (p.source !== "user_only" || !p.userId) continue;
-      const key = `${p.firstName.trim()} ${p.lastName.trim()}`.toLowerCase();
-      if (key.length > 1) map.set(key, p);
-    }
-    return map;
-  }, [directory]);
-
-  // For each row, find a matching app-only user
-  const matchForRow = useCallback(
-    (row: RowEntry): DirectoryPerson | undefined => {
-      const key = `${row.firstName.trim()} ${row.lastName.trim()}`.toLowerCase();
-      return key.length > 1 ? appOnlyByName.get(key) : undefined;
-    },
-    [appOnlyByName],
+  const validRows = rows.filter(
+    (r) => r.firstName.trim() && r.lastName.trim() && r.focusAreaIds.length > 0,
   );
 
-  const validRows = rows.filter((r) => r.firstName.trim() && r.focusAreaIds.length > 0);
-
-  const updateRow = useCallback((id: string, patch: Partial<Omit<RowEntry, "_id">>) => {
-    setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
-  }, []);
+  const updateRow = useCallback(
+    (id: string, patch: Partial<Omit<RowEntry, "_id">>) => {
+      setRows((prev) =>
+        prev.map((r) => (r._id === id ? { ...r, ...patch } : r)),
+      );
+    },
+    [],
+  );
 
   const toggleFocusArea = useCallback((id: string, focusAreaId: number) => {
     setRows((prev) =>
@@ -95,176 +94,386 @@ export default function AddEmployeeModal({ focusAreas, certifications, focusArea
   const addRow = useCallback(() => {
     setRows((prev) => {
       const last = prev[prev.length - 1];
-      return [...prev, makeRow(last?.certificationId ?? defaultCertId, last?.focusAreaIds ?? defaultFocusAreaIds)];
+      return [
+        ...prev,
+        makeRow(
+          last?.certificationId ?? defaultCertId,
+          last?.focusAreaIds ?? defaultFocusAreaIds,
+        ),
+      ];
     });
-    // Focus the new row's name input on next tick
-    setTimeout(() => lastNameRef.current?.focus(), 0);
+    // Focus the new row's first-name input on next tick.
+    setTimeout(() => newRowFirstNameRef.current?.focus(), 0);
   }, [defaultCertId, defaultFocusAreaIds]);
 
   const removeRow = useCallback((id: string) => {
-    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r._id !== id) : prev));
+    setRows((prev) =>
+      prev.length > 1 ? prev.filter((r) => r._id !== id) : prev,
+    );
   }, []);
 
   const handleSubmit = useCallback(() => {
     if (validRows.length === 0) return;
     onAdd(
-      validRows.map((r) => {
-        const match = matchForRow(r);
-        return {
-          firstName: r.firstName.trim(),
-          lastName: r.lastName.trim(),
-          certificationId: r.certificationId,
-          focusAreaIds: r.focusAreaIds,
-          roleIds: [],
-          phone: "",
-          email: "",
-          contactNotes: "",
-          status: "active" as const,
-          statusChangedAt: null,
-          statusNote: "",
-          userId: null,
-          departmentIds: match?.departmentIds ?? [],
-          _linkToUserId: match?.userId ?? undefined,
-        };
-      }),
+      validRows.map((r) => ({
+        firstName: r.firstName.trim(),
+        lastName: r.lastName.trim(),
+        certificationId: r.certificationId,
+        focusAreaIds: r.focusAreaIds,
+        roleIds: [],
+        phone: "",
+        email: "",
+        contactNotes: "",
+        status: "active" as const,
+        statusChangedAt: null,
+        statusNote: "",
+        userId: null,
+        departmentIds: [],
+        deptAdminIds: [],
+        version: 0,
+      })),
     );
-  }, [validRows, onAdd, matchForRow]);
+  }, [validRows, onAdd]);
+
+  const scrollMaxHeight = isMobile
+    ? "calc(100dvh - 300px)"
+    : "min(620px, calc(100vh - 250px))";
+
+  const fieldLabelStyle: React.CSSProperties = {
+    fontSize: "var(--dg-fs-footnote)",
+    fontWeight: 600,
+    color: "var(--color-text-muted)",
+    letterSpacing: "0.02em",
+  };
 
   return (
-    <Modal title="Add Staff Members" onClose={onClose} style={{ maxWidth: 960, width: "92vw" }}>
-      <div className="flex flex-col">
+    <Modal
+      title="Add Staff Members"
+      onClose={onClose}
+      aria-describedby={descriptionId}
+      style={{
+        maxWidth: 1080,
+        width: isMobile ? "calc(100vw - 32px)" : "min(1080px, calc(100vw - 48px))",
+        maxHeight: isMobile ? "calc(100dvh - 24px)" : "calc(100vh - 40px)",
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
+        <p
+          id={descriptionId}
+          style={{
+            margin: "-8px 0 0",
+            fontSize: "var(--dg-fs-label)",
+            lineHeight: 1.5,
+            color: "var(--color-text-muted)",
+            maxWidth: 760,
+          }}
+        >
+          Add several people at once, choose their {certificationLabel.toLowerCase()}, and
+          assign one or more {focusAreaLabel.toLowerCase()} before saving.
+        </p>
 
-        {/* Column headers */}
-        <div className="grid grid-cols-[1fr_1fr_140px_1fr_28px] gap-2 pb-1.5 border-b border-[var(--color-border-light)] mb-1">
-          {["FIRST NAME", "LAST NAME", certificationLabel.toUpperCase(), focusAreaLabel.toUpperCase(), ""].map((h, i) => (
-            <div key={`col-${i}`} className="text-[11px] font-bold text-[var(--color-text-subtle)] tracking-wider">{h}</div>
-          ))}
-        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--color-text-muted)",
+            }}
+          >
+            {rows.length} row{rows.length === 1 ? "" : "s"} total
+            {" · "}
+            {validRows.length} ready to add
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 0,
+              maxHeight: scrollMaxHeight,
+              overflowY: "auto",
+              paddingRight: isMobile ? 0 : 4,
+              border: "1px solid var(--color-border)",
+              borderRadius: 12,
+              background: "var(--color-surface)",
+            }}
+          >
+            {rows.map((row, idx) => {
+              const rowName =
+                `${row.firstName.trim()} ${row.lastName.trim()}`.trim()
+                || `Staff Member ${idx + 1}`;
+              const rowReady =
+                row.firstName.trim().length > 0
+                && row.lastName.trim().length > 0
+                && row.focusAreaIds.length > 0;
+              const rowStatus = rowReady ? "Ready to add" : null;
 
-        {/* Rows */}
-        <div className="flex flex-col gap-1.5 max-h-[380px] overflow-y-auto pr-0.5">
-          {rows.map((row, idx) => {
-            const isLast = idx === rows.length - 1;
-            const match = matchForRow(row);
-            return (
-              <div key={row._id}>
-              <div
-                className="grid grid-cols-[1fr_1fr_140px_1fr_28px] gap-2 items-center"
-              >
-                {/* First Name */}
-                <input
-                  className="dg-input"
-                  value={row.firstName}
-                  onChange={(e) => updateRow(row._id, { firstName: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      if (isLast) addRow();
-                    }
+              return (
+                <div
+                  key={row._id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    padding: isMobile ? "14px" : "16px",
+                    borderTop: idx === 0 ? "none" : "1px solid var(--color-border-light)",
                   }}
-                  placeholder="First name"
-                  autoFocus={idx === 0}
-                />
-
-                {/* Last Name */}
-                <input
-                  ref={isLast ? lastNameRef : undefined}
-                  className="dg-input"
-                  value={row.lastName}
-                  onChange={(e) => updateRow(row._id, { lastName: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      if (isLast) addRow();
-                    }
-                  }}
-                  placeholder="Last name"
-                />
-
-                {/* Certification */}
-                <CustomSelect
-                  value={row.certificationId != null ? String(row.certificationId) : ""}
-                  options={[
-                    { value: "", label: "— None —" },
-                    ...certifications.map((d) => ({ value: String(d.id), label: d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name })),
-                  ]}
-                  onChange={(v) => updateRow(row._id, { certificationId: v ? Number(v) : null })}
-                  style={{ width: "100%" }}
-                  fontSize={12}
-                />
-
-                {/* Focus Areas */}
-                <div className="flex flex-wrap gap-1.5">
-                  {focusAreas.map((focusArea) => {
-                    const active = row.focusAreaIds.includes(focusArea.id);
-                    return (
-                      <button
-                        key={focusArea.id}
-                        onClick={() => toggleFocusArea(row._id, focusArea.id)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold cursor-pointer whitespace-nowrap transition-all duration-150 border-[1.5px] border-transparent ${
-                          active
-                            ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
-                            : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
-                        }`}
-                      >
-                        <span
-                          className="w-[7px] h-[7px] rounded-full shrink-0"
-                          style={{
-                            background: focusArea.colorBg,
-                            border: active ? "1px solid rgba(255,255,255,0.3)" : "none",
-                          }}
-                        />
-                        {focusArea.name}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Remove */}
-                <button
-                  onClick={() => removeRow(row._id)}
-                  disabled={rows.length === 1}
-                  className={`flex items-center justify-center w-7 h-7 rounded-lg text-[var(--color-text-faint)] transition-colors duration-120 ${
-                    rows.length === 1
-                      ? "opacity-30 cursor-default"
-                      : "hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
-                  }`}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              {match && (
-                <div className="flex items-center gap-1.5 px-2 py-1 mt-0.5 mb-1 rounded-lg text-[11px] font-medium" style={{ background: "var(--color-brand-bg)", color: "var(--color-brand)" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                  This person already has app access. They will be linked automatically.
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 700,
+                          color: "var(--color-text-primary)",
+                        }}
+                      >
+                        {rowName}
+                      </div>
+                      {rowStatus && (
+                        <div
+                          style={{
+                            marginTop: 2,
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          {rowStatus}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeRow(row._id)}
+                      disabled={rows.length === 1}
+                      aria-label={`Remove staff member row ${idx + 1}`}
+                      className={`flex items-center justify-center rounded-lg text-[var(--color-text-faint)] transition-colors duration-120 ${
+                        rows.length === 1
+                          ? "opacity-30 cursor-default"
+                          : "hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                      }`}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: isMobile
+                        ? "1fr"
+                        : "minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 0.95fr)",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={fieldLabelStyle}>
+                        First Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                      </label>
+                      <input
+                        ref={idx === rows.length - 1 ? newRowFirstNameRef : undefined}
+                        className="dg-input"
+                        value={row.firstName}
+                        onChange={(e) =>
+                          updateRow(row._id, { firstName: e.target.value })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && idx === rows.length - 1) {
+                            e.preventDefault();
+                            addRow();
+                          }
+                        }}
+                        placeholder="First name"
+                        autoFocus={idx === 0}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={fieldLabelStyle}>
+                        Last Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                      </label>
+                      <input
+                        className="dg-input"
+                        value={row.lastName}
+                        onChange={(e) =>
+                          updateRow(row._id, { lastName: e.target.value })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && idx === rows.length - 1) {
+                            e.preventDefault();
+                            addRow();
+                          }
+                        }}
+                        placeholder="Last name"
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={fieldLabelStyle}>{certificationLabel}</label>
+                      <CustomSelect
+                        value={
+                          row.certificationId != null
+                            ? String(row.certificationId)
+                            : ""
+                        }
+                        options={[
+                          { value: "", label: "— None —" },
+                          ...certifications.map((d) => ({
+                            value: String(d.id),
+                            label:
+                              d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name,
+                          })),
+                        ]}
+                        onChange={(v) =>
+                          updateRow(row._id, {
+                            certificationId: v ? Number(v) : null,
+                          })
+                        }
+                        style={{ width: "100%" }}
+                        fontSize={12}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <label style={fieldLabelStyle}>
+                        {focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span>
+                      </label>
+                      <span
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
+                        Select one or more
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {focusAreas.map((focusArea) => {
+                        const active = row.focusAreaIds.includes(focusArea.id);
+                        return (
+                          <SelectableTag
+                            key={focusArea.id}
+                            selected={active}
+                            onClick={() => toggleFocusArea(row._id, focusArea.id)}
+                            padding="4px 12px"
+                            fontSize="var(--dg-fs-caption)"
+                            unselectedBackground="var(--color-bg-secondary)"
+                            unselectedBorderColor="transparent"
+                            unselectedTextColor="var(--color-text-faint)"
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            {focusArea.name}
+                          </SelectableTag>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--color-border-light)]">
-          <button
-            onClick={addRow}
-            className="dg-btn dg-btn-ghost text-[var(--dg-fs-caption)] flex items-center gap-1.5"
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: isMobile ? "stretch" : "center",
+            gap: 12,
+            marginTop: 4,
+            paddingTop: 16,
+            borderTop: "1px solid var(--color-border-light)",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+            {validRows.length === 0
+              ? "Complete the fields marked with * to create a profile."
+              : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.`}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              width: isMobile ? "100%" : undefined,
+              justifyContent: isMobile ? "stretch" : "flex-end",
+            }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add row
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="dg-btn dg-btn-primary px-5 py-2.5"
-            disabled={validRows.length === 0}
-          >
-            Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member{validRows.length !== 1 ? "s" : ""}
-          </button>
+            <button
+              onClick={addRow}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                flex: isMobile ? 1 : undefined,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Another Person
+            </button>
+            <button
+              onClick={onClose}
+              className="dg-btn dg-btn-ghost"
+              style={{ flex: isMobile ? 1 : undefined }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="dg-btn dg-btn-primary px-5 py-2.5"
+              disabled={validRows.length === 0}
+              style={{ flex: isMobile ? 1 : undefined }}
+            >
+              Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member
+              {validRows.length !== 1 ? "s" : ""}
+            </button>
+          </div>
         </div>
       </div>
     </Modal>

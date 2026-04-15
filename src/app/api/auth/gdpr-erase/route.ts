@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
 export const dynamic = "force-dynamic";
 
-function getUserClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {},
-      },
-    },
-  );
-}
+const GDPR_ERASE_AUDIT_ACTION = "gdpr.erased";
 
 /**
  * POST /api/auth/gdpr-erase
@@ -33,11 +20,9 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const userClient = getUserClient(req);
-    const { data: { session } } = await userClient.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-    }
+    const auth = await requireAuthenticatedUser(req);
+    if ("response" in auth) return auth.response;
+    const { user } = auth;
 
     let body: { confirmation?: string } = {};
     try {
@@ -50,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Confirmation text must be exactly: ERASE MY DATA" }, { status: 400 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const serviceClient = getServiceClient();
 
     // Prevent gridmaster self-erasure
@@ -67,16 +52,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Audit log before erasure
-    await serviceClient.from("audit_log").insert({
-      actor_id: userId,
-      actor_email: session.user.email,
-      action: "gdpr.erased",
-      resource_type: "user",
-      resource_id: userId,
-      details: { email: session.user.email, reason: "user_request" },
-    });
-
     // Call the GDPR erasure function
     const { data: result, error: rpcError } = await serviceClient.rpc("gdpr_erase_user_data", {
       p_user_id: userId,
@@ -90,7 +65,22 @@ export async function POST(req: NextRequest) {
     // Delete the auth user
     const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
     if (deleteError) {
+      Sentry.captureException(deleteError, { extra: { userId, context: "gdpr-erase-delete-auth-user" } });
       logger.error({ error: deleteError, userId }, "Failed to delete auth user after GDPR erasure");
+      return NextResponse.json({ error: "Failed to delete account after data erasure" }, { status: 500 });
+    }
+
+    try {
+      await serviceClient.from("audit_log").insert({
+        actor_id: userId,
+        actor_email: user.email,
+        action: GDPR_ERASE_AUDIT_ACTION,
+        resource_type: "user",
+        resource_id: userId,
+        details: { email: user.email, reason: "user_request" },
+      });
+    } catch (auditError) {
+      logger.error({ error: auditError, userId }, "Failed to write GDPR erasure audit log");
     }
 
     logger.info({ userId, result }, "GDPR data erasure completed");

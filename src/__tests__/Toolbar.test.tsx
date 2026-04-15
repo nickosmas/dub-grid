@@ -9,8 +9,6 @@ const defaultFocusAreas: FocusArea[] = [
     id: 1,
     orgId: "org-1",
     name: "North",
-    colorBg: "#EFF6FF",
-    colorText: "#1D4ED8",
     sortOrder: 1,
     departmentId: null,
   },
@@ -18,8 +16,6 @@ const defaultFocusAreas: FocusArea[] = [
     id: 2,
     orgId: "org-1",
     name: "South",
-    colorBg: "#F0FDF4",
-    colorText: "#166534",
     sortOrder: 2,
     departmentId: null,
   },
@@ -46,7 +42,7 @@ beforeEach(() => {
 describe("Toolbar — schedule mode rendering", () => {
   it("renders previous period button", () => {
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "Previous period" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to previous period" })).toBeInTheDocument();
   });
 
   it("renders Today button", () => {
@@ -56,7 +52,7 @@ describe("Toolbar — schedule mode rendering", () => {
 
   it("renders next period button", () => {
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "Next period" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to next period" })).toBeInTheDocument();
   });
 
   it("renders date label showing the current period", () => {
@@ -94,6 +90,38 @@ describe("Toolbar — Tools dropdown", () => {
     await user.click(screen.getByRole("menuitem", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
   });
+
+  it("shows Import Previous Schedule when shift edits are allowed without recurring apply permission", async () => {
+    const user = userEvent.setup();
+    render(
+      <Toolbar
+        {...defaultProps}
+        canImportPrevious
+        canApplyRecurringSchedule={false}
+        onImportPrevious={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    expect(
+      screen.getByRole("menuitem", { name: /Import Previous Schedule/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /Auto Fill/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows Auto Fill only when recurring apply permission is granted", async () => {
+    const user = userEvent.setup();
+    render(
+      <Toolbar
+        {...defaultProps}
+        canApplyRecurringSchedule
+        onApplyRecurring={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).toBeInTheDocument();
+  });
 });
 
 describe("Toolbar — active state styles", () => {
@@ -119,14 +147,14 @@ describe("Toolbar — callbacks", () => {
   it("clicking previous chevron calls onPrev", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "Previous period" }));
+    await user.click(screen.getByRole("button", { name: "Go to previous period" }));
     expect(defaultProps.onPrev).toHaveBeenCalledTimes(1);
   });
 
   it("clicking next chevron calls onNext", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "Next period" }));
+    await user.click(screen.getByRole("button", { name: "Go to next period" }));
     expect(defaultProps.onNext).toHaveBeenCalledTimes(1);
   });
 
@@ -145,6 +173,22 @@ describe("Toolbar — callbacks", () => {
     render(<Toolbar {...defaultProps} />);
     await user.click(screen.getByRole("button", { name: "North" }));
     expect(defaultProps.onFocusAreaChange).toHaveBeenCalledWith(1);
+  });
+
+  it("hides the 2-week option when hideTwoWeek is true", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} hideTwoWeek />);
+    await user.click(screen.getByRole("button", { name: "1 Week" }));
+    expect(screen.queryByRole("option", { name: "2 Weeks" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "1 Week" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Month" })).toBeInTheDocument();
+  });
+
+  it("shows the 2-week option when hideTwoWeek is false", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} hideTwoWeek={false} />);
+    await user.click(screen.getByRole("button", { name: "1 Week" }));
+    expect(screen.getByRole("option", { name: "2 Weeks" })).toBeInTheDocument();
   });
 });
 

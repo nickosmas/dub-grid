@@ -57,7 +57,7 @@ export const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
 
 /** Draft-mode cell border colors by change kind. */
 export const DRAFT_BORDER_COLORS: Record<string, string> = {
-  new: '#2E9930',
+  new: '#16A34A',
   modified: '#D97706',
   deleted: '#DC2626',
 };

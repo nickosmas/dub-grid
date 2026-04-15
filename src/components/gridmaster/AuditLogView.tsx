@@ -6,6 +6,7 @@ import type { FullAuditLogEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { MaybeHint } from "@/components/ui/hint";
 
 const ACTION_LABELS: Record<string, string> = {
   "org.created": "Org Created",
@@ -32,12 +33,12 @@ const ACTION_LABELS: Record<string, string> = {
   "employee.updated": "Employee Updated",
   "employee.benched": "Employee Benched",
   "employee.activated": "Employee Activated",
-  "employee.terminated": "Employee Terminated",
+  "employee.archived": "Employee Terminated",
   "shift.created": "Shift Created",
   "shift.updated": "Shift Updated",
   "shift.deleted": "Shift Deleted",
   "schedule.published": "Schedule Published",
-  "schedule.discarded": "Drafts Discarded",
+  "schedule.drafts_discarded": "Drafts Discarded",
   "billing.trial_extended": "Trial Extended",
   "billing.subscription_canceled": "Subscription Canceled",
   "billing.synced": "Billing Synced",
@@ -107,12 +108,13 @@ function DetailsSummary({ details, action }: { details: Record<string, unknown>;
   }
 
   return (
-    <span
-      style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
-      title={JSON.stringify(details, null, 2)}
-    >
-      {parts.join("; ")}
-    </span>
+    <MaybeHint content={JSON.stringify(details, null, 2)} side="bottom">
+      <span
+        style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
+      >
+        {parts.join("; ")}
+      </span>
+    </MaybeHint>
   );
 }
 

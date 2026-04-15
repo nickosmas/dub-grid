@@ -81,13 +81,6 @@ export function StaffFilterPopover({
                           : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
                       }`}
                     >
-                      <span
-                        className="w-[7px] h-[7px] rounded-full shrink-0"
-                        style={{
-                          background: fa.colorBg,
-                          border: active ? "1px solid rgba(255,255,255,0.3)" : "none",
-                        }}
-                      />
                       {fa.name}
                     </button>
                   );

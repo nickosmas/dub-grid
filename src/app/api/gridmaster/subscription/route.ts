@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { z } from "zod";
+import { requireGridmasterSession } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { cancelSubscription, extendTrial } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -15,31 +15,12 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // Auth
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return req.cookies.getAll(); }, setAll() {} } },
-  );
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
-  // Gridmaster check
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  type Claims = { platform_role?: unknown };
-  let claims: Claims | null = null;
-  if (supabaseUrl) {
-    try {
-      const jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
-      const { payload } = await jwtVerify(session.access_token, jwks);
-      claims = payload as Claims;
-    } catch {}
-  }
-  if (!claims) {
-    if (process.env.NODE_ENV === "production") return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-    try { claims = decodeJwt(session.access_token) as Claims; } catch { return NextResponse.json({ error: "Invalid session" }, { status: 401 }); }
-  }
-  if (claims!.platform_role !== "gridmaster") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const auth = await requireGridmasterSession(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   // Input
   let body: unknown;
@@ -70,7 +51,7 @@ export async function POST(req: NextRequest) {
         await admin.from("organizations").update({ trial_ends_at: newEnd.toISOString(), subscription_status: "trialing" }).eq("id", orgId);
       }
       await admin.from("audit_log").insert({
-        org_id: orgId, actor_id: session.user.id, actor_email: session.user.email ?? null,
+        org_id: orgId, actor_id: user.id, actor_email: user.email ?? null,
         action: "billing.trial_extended", resource_type: "organization", resource_id: orgId,
         details: { days, initiated_by: "gridmaster" },
       });
@@ -83,7 +64,7 @@ export async function POST(req: NextRequest) {
       }
       await admin.from("organizations").update({ subscription_status: "canceled" }).eq("id", orgId);
       await admin.from("audit_log").insert({
-        org_id: orgId, actor_id: session.user.id, actor_email: session.user.email ?? null,
+        org_id: orgId, actor_id: user.id, actor_email: user.email ?? null,
         action: "billing.subscription_canceled", resource_type: "organization", resource_id: orgId,
         details: { initiated_by: "gridmaster" },
       });
@@ -95,7 +76,7 @@ export async function POST(req: NextRequest) {
       if (!status) return NextResponse.json({ error: "Status required" }, { status: 400 });
       await admin.from("organizations").update({ subscription_status: status }).eq("id", orgId);
       await admin.from("audit_log").insert({
-        org_id: orgId, actor_id: session.user.id, actor_email: session.user.email ?? null,
+        org_id: orgId, actor_id: user.id, actor_email: user.email ?? null,
         action: "billing.status_overridden", resource_type: "organization", resource_id: orgId,
         details: { new_status: status, initiated_by: "gridmaster" },
       });

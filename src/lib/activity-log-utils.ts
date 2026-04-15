@@ -82,7 +82,7 @@ export function getActionSeverity(action: string): ActionSeverity {
 
 export function severityColor(severity: ActionSeverity): { bg: string; fg: string } {
   switch (severity) {
-    case "create": return { bg: "var(--color-success-bg, #e6f9e6)", fg: "var(--color-success, #1a8a1a)" };
+    case "create": return { bg: "var(--color-success-bg, #f0fdf4)", fg: "var(--color-success, #16a34a)" };
     case "delete": return { bg: "var(--color-danger-bg, #fde8e8)", fg: "var(--color-danger)" };
     case "warning": return { bg: "var(--color-warning-bg, #fff8e6)", fg: "var(--color-warning, #b08800)" };
     case "update": return { bg: "var(--color-bg-secondary)", fg: "var(--color-text-secondary)" };
@@ -229,6 +229,7 @@ export function describeAction(entry: FullAuditLogEntry): string {
 
     // Data export
     case "data.exported": return "Exported data";
+    case "data.portability_exported": return "Exported privacy data";
 
     default: return titleCase(action);
   }
