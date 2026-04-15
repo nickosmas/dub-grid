@@ -70,15 +70,11 @@ const employee: Employee = {
 function renderPanel(
   overrides: Partial<{
     onSave: (e: Employee) => void;
-    onDelete: (id: string) => void;
     onCancel: () => void;
   }> = {},
 ) {
   const onSave = overrides.onSave ?? vi.fn();
-  const onDelete = overrides.onDelete ?? vi.fn();
   const onCancel = overrides.onCancel ?? vi.fn();
-  const onBench = vi.fn();
-  const onActivate = vi.fn();
 
   render(
     <EditEmployeePanel
@@ -87,14 +83,11 @@ function renderPanel(
       certifications={[...DESIGNATIONS]}
       roles={[...ROLES]}
       onSave={onSave}
-      onDelete={onDelete}
-      onBench={onBench}
-      onActivate={onActivate}
       onCancel={onCancel}
     />,
   );
 
-  return { onSave, onDelete, onBench, onActivate, onCancel };
+  return { onSave, onCancel };
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +165,16 @@ describe("EditEmployeePanel", () => {
       ).toBeDisabled();
     });
 
+    it("Save Changes is disabled when last name is cleared even if other fields are modified", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+      const lastNameInput = screen.getByDisplayValue("Smith");
+      await user.clear(lastNameInput);
+      expect(
+        screen.getByRole("button", { name: "Save Changes" }),
+      ).toBeDisabled();
+    });
+
     it("Save Changes is disabled when all focus areas are deselected", async () => {
       const user = userEvent.setup();
       renderPanel();
@@ -215,6 +218,17 @@ describe("EditEmployeePanel", () => {
         }),
       );
     });
+
+    it("shows an inline error when last name is left blank", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+
+      const lastNameInput = screen.getByDisplayValue("Smith");
+      await user.clear(lastNameInput);
+      await user.tab();
+
+      expect(screen.getByText("Last name is required")).toBeInTheDocument();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -231,40 +245,14 @@ describe("EditEmployeePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Delete flow
+  // Shared status actions
   // -------------------------------------------------------------------------
-  describe("Terminate flow", () => {
-    it("clicking Terminate shows confirmation text with employee name", async () => {
-      const user = userEvent.setup();
+  describe("Shared status actions", () => {
+    it("does not render a terminate button inside the edit form", () => {
       renderPanel();
-      await user.click(screen.getByRole("button", { name: "Terminate" }));
       expect(
-        screen.getByText(/Terminate Alice Smith\?/),
-      ).toBeInTheDocument();
-    });
-
-    it("clicking Confirm Termination in confirmation calls onDelete with employee.id", async () => {
-      const user = userEvent.setup();
-      const onDelete = vi.fn();
-      renderPanel({ onDelete });
-      await user.click(screen.getByRole("button", { name: "Terminate" }));
-      await user.click(screen.getByRole("button", { name: "Confirm Termination" }));
-      expect(onDelete).toHaveBeenCalledOnce();
-      expect(onDelete).toHaveBeenCalledWith("emp-42");
-    });
-
-    it("clicking Cancel in confirmation returns to normal view without calling onDelete", async () => {
-      const user = userEvent.setup();
-      const onDelete = vi.fn();
-      renderPanel({ onDelete });
-      await user.click(screen.getByRole("button", { name: "Terminate" }));
-      // Cancel in the confirmation UI
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-      expect(onDelete).not.toHaveBeenCalled();
-      // Normal view should be restored
-      expect(
-        screen.getByRole("button", { name: "Terminate" }),
-      ).toBeInTheDocument();
+        screen.queryByRole("button", { name: "Terminate" }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -277,8 +265,8 @@ describe("EditEmployeePanel", () => {
       // Arbitrary Employee generator
       const arbEmployee = fc.record({
         id: fc.uuid(),
-        firstName: fc.string({ minLength: 1, maxLength: 20 }),
-        lastName: fc.string({ minLength: 1, maxLength: 20 }),
+        firstName: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.trim().length > 0),
+        lastName: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.trim().length > 0),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),
@@ -313,9 +301,6 @@ describe("EditEmployeePanel", () => {
               certifications={[...DESIGNATIONS]}
               roles={[...ROLES]}
               onSave={vi.fn()}
-              onDelete={vi.fn()}
-              onBench={vi.fn()}
-              onActivate={vi.fn()}
               onCancel={vi.fn()}
             />,
           );

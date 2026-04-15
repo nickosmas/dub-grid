@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { Resend } from "resend";
 import { z } from "zod";
 import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -16,34 +16,16 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // ── Auth check ──────────────────────────────────────────────────────
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Route handler — cookies are read-only here
-        },
-      },
-    },
-  );
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthenticated" },
-      { status: 401 },
-    );
-  }
+  // ── Auth check ──────────────────────────────────────────────────────
+  const auth = await requireAuthenticatedUserWithClaims(req);
+  if ("response" in auth) return auth.response;
+  const { user, claims } = auth;
 
   // ── Rate limit by user ID ────────────────────────────────────────────
-  const { limited, reset, misconfigured } = await checkRateLimit(inviteLimiter, session.user.id);
+  const { limited, reset, misconfigured } = await checkRateLimit(inviteLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json(
       { success: false, error: "Service temporarily unavailable" },
@@ -61,75 +43,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── CSRF: validate Origin header ────────────────────────────────────────
-  const origin = req.headers.get("origin");
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : null);
-  if (!origin || !siteUrl) {
-    // Fail-closed in production when Origin or site URL is absent
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
-    }
-  } else {
-    const allowedHost = new URL(
-      siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`,
-    ).host;
-    // Allow exact match or subdomains (acme.dubgrid.com → dubgrid.com)
-    const originHost = new URL(origin).host;
-    if (originHost !== allowedHost && !originHost.endsWith(`.${allowedHost}`)) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
-    }
-  }
-
   // ── Authorization check — only super_admin / gridmaster can send invites ──
-  // Use JWKS-based verification (supports ES256 asymmetric signing).
-  // Falls back to unverified decode in dev if JWKS is unavailable.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  type JwtClaims = { platform_role?: unknown; org_role?: unknown };
-  let claims: JwtClaims | null = null;
-
-  // Try verified JWT first via JWKS
-  if (supabaseUrl) {
-    try {
-      const jwks = createRemoteJWKSet(
-        new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
-      );
-      const { payload } = await jwtVerify(session.access_token, jwks);
-      claims = payload as JwtClaims;
-    } catch {
-      // jwtVerify can fail in dev (JWKS unavailable) — fall through to unverified decode
-    }
-  }
-
-  // Fallback to unverified decode (dev only; production requires verified JWT)
-  if (!claims) {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: supabaseUrl ? "Invalid session" : "Server misconfigured" },
-        { status: supabaseUrl ? 401 : 500 },
-      );
-    }
-    try {
-      claims = decodeJwt(session.access_token) as JwtClaims;
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid session" },
-        { status: 401 },
-      );
-    }
-  }
-
-  const isGridmaster = claims!.platform_role === "gridmaster";
-  const isSuperAdmin = claims!.org_role === "super_admin";
+  const isGridmaster = claims.platform_role === "gridmaster";
+  const isSuperAdmin = claims.org_role === "super_admin";
   if (!isGridmaster && !isSuperAdmin) {
     return NextResponse.json(
       { success: false, error: "Unauthorized" },
@@ -204,7 +120,7 @@ export async function POST(req: NextRequest) {
       </p>
       <div style="text-align:center;margin:0 0 32px;">
         <a href="${acceptUrl}"
-           style="display:inline-block;padding:14px 40px;background:#005F02;color:#fff;text-decoration:none;border-radius:12px;font-size:16px;font-weight:700;box-shadow:0 4px 12px rgba(0,95,2,0.2);">
+           style="display:inline-block;padding:14px 40px;background:#2563EB;color:#fff;text-decoration:none;border-radius:12px;font-size:16px;font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,0.2);">
           Accept Invitation
         </a>
       </div>

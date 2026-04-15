@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import type { Employee } from "@/types";
 import Modal from "@/components/Modal";
-import { Hint } from "@/components/ui/hint";
+import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
@@ -144,12 +144,14 @@ export default function ShiftSwapModal({
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 2 }}>
           Your shift
         </div>
-        <div title={shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {shiftLabel}
-          <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
-            {shiftDate}
-          </span>
-        </div>
+        <MaybeHint content={shiftLabel} side="bottom">
+          <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {shiftLabel}
+            <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
+              {shiftDate}
+            </span>
+          </div>
+        </MaybeHint>
       </div>
 
       {/* ── Confirmation view ── */}
@@ -168,25 +170,29 @@ export default function ShiftSwapModal({
           >
             <div>
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You give</span>
-              <div title={shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {shiftLabel}
-                <span
-                  style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
-                >
-                  on {shiftDate}
-                </span>
-              </div>
+              <MaybeHint content={shiftLabel} side="bottom">
+                <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {shiftLabel}
+                  <span
+                    style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
+                  >
+                    on {shiftDate}
+                  </span>
+                </div>
+              </MaybeHint>
             </div>
             <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You get</span>
-              <div title={selectedTarget.shiftLabel} style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {selectedTarget.shiftLabel}
-                <span
-                  style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
-                >
-                  on {viewDate}
-                </span>
-              </div>
+              <MaybeHint content={selectedTarget.shiftLabel} side="bottom">
+                <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {selectedTarget.shiftLabel}
+                  <span
+                    style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
+                  >
+                    on {viewDate}
+                  </span>
+                </div>
+              </MaybeHint>
               <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
                 from {selectedTarget.name}
               </div>

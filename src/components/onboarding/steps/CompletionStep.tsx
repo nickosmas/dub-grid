@@ -72,12 +72,12 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           width: 80,
           height: 80,
           borderRadius: "50%",
-          background: "var(--color-brand)",
+          background: "var(--color-success)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           margin: "0 auto 28px",
-          boxShadow: "0 8px 24px rgba(0, 95, 2, 0.3)",
+          boxShadow: "0 8px 24px rgba(22, 163, 74, 0.28)",
           animation: "onboarding-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
         }}
       >
@@ -127,7 +127,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           fontWeight: 700,
           cursor: loading ? "not-allowed" : "pointer",
           transition: "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: "0 4px 16px rgba(0, 95, 2, 0.25)",
+          boxShadow: "0 4px 16px rgba(37, 99, 235, 0.25)",
         }}
       >
         <ButtonLoading

@@ -9,6 +9,8 @@ import type {
   PublishHistoryEntry, PublishHistoryEntryWithName, PublishChange,
 } from "@/types";
 
+const DISCARD_DELETE_BATCH_SIZE = 50;
+
 // ── Publish ──────────────────────────────────────────────────────────────────
 
 export async function publishSchedule(
@@ -135,7 +137,7 @@ export async function discardScheduleDrafts(
   // 1. Fetch shifts — scoped to this user if userId provided, otherwise all org drafts
   let query = supabase
     .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, employees!inner(org_id)")
+    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, version, employees!inner(org_id)")
     .eq("employees.org_id", orgId);
   if (userId) query = query.eq("updated_by", userId);
   const { data: shifts, error: fetchError } = await query;
@@ -144,7 +146,7 @@ export async function discardScheduleDrafts(
   if (!shifts || shifts.length === 0) return;
 
   // 2. Identify which rows need updating or deleting
-  const toUpsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; published_shift_code_ids: number[]; draft_absence_type_id: number | null; published_absence_type_id: number | null; draft_is_delete: boolean; draft_custom_start_time: string | null; draft_custom_end_time: string | null }[] = [];
+  const toUpsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; published_shift_code_ids: number[]; draft_absence_type_id: number | null; published_absence_type_id: number | null; draft_is_delete: boolean; draft_custom_start_time: string | null; draft_custom_end_time: string | null; version: number }[] = [];
   const toDelete: { emp_id: string; date: string }[] = [];
 
   for (const shift of shifts as DbShift[]) {
@@ -175,6 +177,7 @@ export async function discardScheduleDrafts(
           draft_is_delete: false,
           draft_custom_start_time: pubStartTime,
           draft_custom_end_time: pubEndTime,
+          version: (shift.version ?? 0) + 1,
         });
       } else {
         // Was created as a draft but never published
@@ -196,12 +199,17 @@ export async function discardScheduleDrafts(
       assertSafeFilterValue(d.emp_id, "emp_id");
       assertSafeFilterValue(d.date, "date");
     }
-    const orClauses = toDelete.map(d => `and(emp_id.eq.${d.emp_id},date.eq.${d.date})`).join(",");
-    const { error: deleteError } = await supabase
-      .from("shifts")
-      .delete()
-      .or(orClauses);
-    if (deleteError) throw deleteError;
+    for (let i = 0; i < toDelete.length; i += DISCARD_DELETE_BATCH_SIZE) {
+      const batch = toDelete.slice(i, i + DISCARD_DELETE_BATCH_SIZE);
+      const orClauses = batch
+        .map((d) => `and(emp_id.eq.${d.emp_id},date.eq.${d.date})`)
+        .join(",");
+      const { error: deleteError } = await supabase
+        .from("shifts")
+        .delete()
+        .or(orClauses);
+      if (deleteError) throw deleteError;
+    }
   }
 
   // 4. Handle Schedule Notes Drafts
@@ -402,11 +410,12 @@ export async function applyRecurringSchedules(
 
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
 
-export async function getRecurringDraft(orgId: string): Promise<RecurringDraft | null> {
+export async function getRecurringDraft(orgId: string, userId: string): Promise<RecurringDraft | null> {
   const { data, error } = await supabase
     .from("recurring_shifts_draft_sessions")
     .select("id, org_id, saved_by, draft_data, saved_at")
     .eq("org_id", orgId)
+    .eq("saved_by", userId)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
@@ -428,6 +437,7 @@ export async function saveRecurringDraft(
     .from("recurring_shifts_draft_sessions")
     .select("id")
     .eq("org_id", orgId)
+    .eq("saved_by", savedBy)
     .maybeSingle();
 
   if (existing) {
@@ -453,11 +463,12 @@ export async function saveRecurringDraft(
   }
 }
 
-export async function deleteRecurringDraft(orgId: string): Promise<void> {
+export async function deleteRecurringDraft(orgId: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from("recurring_shifts_draft_sessions")
     .delete()
-    .eq("org_id", orgId);
+    .eq("org_id", orgId)
+    .eq("saved_by", userId);
   if (error) throw error;
 }
 
@@ -544,28 +555,13 @@ export async function updateSeriesAllShifts(
   orgId: string,
   newAbsenceTypeId?: number | null,
 ): Promise<void> {
-  const isAbsence = newAbsenceTypeId != null;
-  const shiftUpdate = isAbsence
-    ? { draft_shift_code_ids: [], draft_absence_type_id: newAbsenceTypeId, draft_is_delete: false }
-    : { draft_shift_code_ids: [newShiftCodeId!], draft_absence_type_id: null, draft_is_delete: false };
-
-  const { error } = await supabase
-    .from("shifts")
-    .update(shiftUpdate)
-    .eq("org_id", orgId)
-    .eq("series_id", seriesId);
+  const { error } = await supabase.rpc("update_series_all_shifts", {
+    p_series_id: seriesId,
+    p_new_shift_code_id: newShiftCodeId,
+    p_org_id: orgId,
+    p_new_absence_type_id: newAbsenceTypeId ?? null,
+  });
   if (error) throw new Error(error.message);
-
-  const seriesUpdate = isAbsence
-    ? { shift_code_id: null, absence_type_id: newAbsenceTypeId }
-    : { shift_code_id: newShiftCodeId, absence_type_id: null };
-
-  const { error: seriesError } = await supabase
-    .from("shift_series")
-    .update(seriesUpdate)
-    .eq("org_id", orgId)
-    .eq("id", seriesId);
-  if (seriesError) throw new Error(seriesError.message);
   void logAudit("shift_series.updated", "shift_series", seriesId, { newShiftCodeId, newAbsenceTypeId }, orgId);
 }
 
@@ -574,21 +570,13 @@ export async function updateSeriesAllShifts(
  * Also archives the series master record (soft-delete).
  */
 export async function deleteShiftSeries(seriesId: string, orgId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from("shifts")
-    .update({ draft_is_delete: true, draft_shift_code_ids: [], series_id: null })
-    .eq("org_id", orgId)
-    .eq("series_id", seriesId)
-    .select("emp_id");
+  const { data, error } = await supabase.rpc("delete_shift_series", {
+    p_series_id: seriesId,
+    p_org_id: orgId,
+  });
   if (error) throw new Error(error.message);
 
-  const { error: seriesError } = await supabase
-    .from("shift_series")
-    .update({ archived_at: new Date().toISOString() })
-    .eq("org_id", orgId)
-    .eq("id", seriesId);
-  if (seriesError) throw new Error(seriesError.message);
-
-  void logAudit("shift_series.archived", "shift_series", seriesId, { shiftsAffected: data?.length ?? 0 }, orgId);
-  return data?.length ?? 0;
+  const deletedCount = Number(data ?? 0);
+  void logAudit("shift_series.archived", "shift_series", seriesId, { shiftsAffected: deletedCount }, orgId);
+  return deletedCount;
 }

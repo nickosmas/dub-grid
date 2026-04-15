@@ -55,6 +55,9 @@ export default function DraftBanner({
   canPublish = true,
 }: DraftBannerProps) {
   const isDisabled = isPublishing || isCanceling;
+  const publishHint = canPublish
+    ? "Save all draft changes to the live schedule"
+    : "You don't have permission to publish schedules.";
 
   return (
     <div className="dg-draft-banner no-print" data-tour="draft-banner">
@@ -106,13 +109,12 @@ export default function DraftBanner({
             ) : "Discard"}
           </button>
         </Hint>
-        <Hint content={hint("Save all draft changes to the live schedule")} side="bottom">
+        <Hint content={hint(publishHint)} side="bottom">
           <button
             data-tour="draft-banner-publish"
             onClick={onPublish}
             disabled={isDisabled || !canPublish}
             className="dg-btn dg-btn-primary dg-btn-sm"
-            title={!canPublish ? "You don't have permission to publish schedules." : undefined}
           >
             {isPublishing ? (
               <>

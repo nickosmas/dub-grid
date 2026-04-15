@@ -94,7 +94,7 @@ src/
 ├── app/                    # Next.js App Router pages
 │   ├── dashboard/          # Organization dashboard
 │   ├── schedule/           # Schedule grid
-│   ├── staff/              # Staff roster + staff/[id] detail
+│   ├── people/             # People roster + people/[id] detail
 │   ├── settings/           # Organization configuration
 │   ├── gridmaster/         # Gridmaster portal
 │   ├── login/              # Authentication

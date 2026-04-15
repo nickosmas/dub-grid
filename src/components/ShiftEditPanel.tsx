@@ -7,9 +7,8 @@ import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm from "./RepeatForm";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import { Hint } from "@/components/ui/hint";
+import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
-import { completeTourAction } from "@/components/tooltip-tour";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
@@ -47,6 +46,10 @@ interface ShiftEditPanelProps {
   publishedShiftCodeIds?: number[];
   /** Draft classification for this cell — used to show NEW badge on single-shift pills */
   draftKind?: DraftKind;
+  /** Commits the current local draft to the server. */
+  onConfirmDraft?: (seriesScope?: SeriesScope) => void;
+  /** True when the underlying cell changed externally while the panel was open. */
+  isStale?: boolean;
   /** All focus areas — used to resolve focusAreaId to names */
   focusAreas?: FocusArea[];
   /** All certifications — used to resolve certificationId to names */
@@ -443,7 +446,7 @@ function PillTimeEditor({
           <div style={{ display: "flex", gap: 6 }}>
             <button
               onClick={() => startEditing()}
-              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-primary)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
+              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-brand)", background: "var(--color-brand-bg)", border: "1px solid var(--color-brand-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
             >Edit</button>
             <button
               onClick={() => { onRemove(); }}
@@ -541,6 +544,8 @@ export default function ShiftEditPanel({
   onCustomTimeChange,
   publishedShiftCodeIds = [],
   draftKind = null,
+  onConfirmDraft,
+  isStale = false,
   focusAreas = [],
   certifications = [],
   auditInfo,
@@ -725,6 +730,7 @@ export default function ShiftEditPanel({
   const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
   const timeSummary = hasTimeEdit ? describeTimeChange() : null;
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
+  const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
   function handleUndo() {
     // Revert absence type if it changed
@@ -874,18 +880,18 @@ export default function ShiftEditPanel({
         }}
       >
         {activeDots.map((ind) => (
-          <div
-            key={ind.name}
-            title={ind.name}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: ind.color,
-              border: "1px solid rgba(255,255,255,0.8)",
-              flexShrink: 0,
-            }}
-          />
+          <MaybeHint key={ind.name} content={ind.name} side="top">
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: ind.color,
+                border: "1px solid rgba(255,255,255,0.8)",
+                flexShrink: 0,
+              }}
+            />
+          </MaybeHint>
         ))}
       </div>
     );
@@ -942,7 +948,8 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span title={absenceLabel} style={{
+          <MaybeHint content={absenceLabel} side="top">
+            <span style={{
             fontWeight: 800,
             fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
             color: at.text,
@@ -954,9 +961,10 @@ export default function ShiftEditPanel({
             ...(isNameMode
               ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
               : { whiteSpace: "nowrap" }),
-          }}>
-            {absenceLabel}
-          </span>
+            }}>
+              {absenceLabel}
+            </span>
+          </MaybeHint>
           {!isNameMode && at.name && (
             <span style={{ fontSize: "var(--dg-fs-footnote)", color: at.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {at.name}
@@ -1015,7 +1023,8 @@ export default function ShiftEditPanel({
               {isCellNew ? "NEW" : "EDITED"}
             </span>
           )}
-          <span title={label} style={{
+          <MaybeHint content={label} side="top">
+            <span style={{
             fontWeight: 800,
             fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
             color: s.text,
@@ -1027,13 +1036,19 @@ export default function ShiftEditPanel({
             ...(isNameMode
               ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
               : { whiteSpace: "nowrap" }),
-          }}>
-            {label}
-          </span>
-          {(fullName || faName) && (
-            <span title={[fullName, faName].filter(Boolean).join(" · ")} style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {fullName}{fullName && faName ? " · " : ""}{faName}
+            }}>
+              {label}
             </span>
+          </MaybeHint>
+          {(fullName || faName) && (
+            <MaybeHint
+              content={[fullName, faName].filter(Boolean).join(" · ")}
+              side="top"
+            >
+              <span style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {fullName}{fullName && faName ? " · " : ""}{faName}
+              </span>
+            </MaybeHint>
           )}
           {renderNoteDots(noteTypes)}
         </div>
@@ -1111,7 +1126,8 @@ export default function ShiftEditPanel({
                 }}
               >
                 <div style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}>
-                  <span title={label} style={{
+                  <MaybeHint content={label} side="top">
+                    <span style={{
                     fontWeight: 800,
                     fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
                     color: s.text,
@@ -1122,20 +1138,26 @@ export default function ShiftEditPanel({
                     ...(isNameMode
                       ? { WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
                       : { whiteSpace: "nowrap" }),
-                  }}>
-                    {label}
-                  </span>
+                    }}>
+                      {label}
+                    </span>
+                  </MaybeHint>
                   {(fullName || faName) && (
-                    <div title={[fullName, faName].filter(Boolean).join(" · ")} style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {fullName}{fullName && faName ? " · " : ""}{faName}
-                    </div>
+                    <MaybeHint
+                      content={[fullName, faName].filter(Boolean).join(" · ")}
+                      side="top"
+                    >
+                      <div style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {fullName}{fullName && faName ? " · " : ""}{faName}
+                      </div>
+                    </MaybeHint>
                   )}
                 </div>
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
                   <button
                     onClick={() => setPendingDelete({ type: "pill", index: i })}
-                    title={`Remove ${label}`}
+                    aria-label={`Remove ${label}`}
                     style={{
                       position: "absolute",
                       top: 8,
@@ -1522,7 +1544,7 @@ export default function ShiftEditPanel({
                 fontSize: "var(--dg-fs-body)",
                 lineHeight: 1,
               }}
-              title="Close"
+              aria-label="Close"
             >
               ×
             </button>
@@ -1633,7 +1655,7 @@ export default function ShiftEditPanel({
                   <Hint content={hint("Create a recurring pattern (daily, weekly, biweekly)")} side="top">
                     <button
                       data-tour="edit-panel-repeat-btn"
-                      onClick={() => { setShowRepeatForm(true); completeTourAction(); }}
+                      onClick={() => { setShowRepeatForm(true); }}
                       className="dg-btn dg-btn-secondary"
                       style={{
                         width: "100%",
@@ -1971,6 +1993,21 @@ export default function ShiftEditPanel({
                   A request is already active for this shift
                 </div>
               )}
+              {isStale && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 12px",
+                    background: "var(--color-danger-bg)",
+                    border: "1px solid var(--color-danger-border)",
+                    borderRadius: 8,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-danger-dark)",
+                  }}
+                >
+                  This shift changed in another tab or by another editor. Close and reopen it before saving.
+                </div>
+              )}
               {overlapWarnings.length > 0 && (
                 <div style={{
                   marginTop: 16,
@@ -2092,7 +2129,7 @@ export default function ShiftEditPanel({
         </div>
 
         {/* Sticky footer — only shown when edits exist */}
-        {hasEdits && (
+        {hasEdits && !showRepeatForm && (
           <div
             style={{
               flexShrink: 0,
@@ -2125,9 +2162,10 @@ export default function ShiftEditPanel({
               Undo
             </button>
             <button
-              onClick={onClose}
+              onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
               className="dg-btn dg-btn-primary"
               style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+              disabled={confirmBlocked}
             >
               Confirm
             </button>

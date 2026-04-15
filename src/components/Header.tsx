@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
+import { MaybeHint } from "@/components/ui/hint";
 
 
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
@@ -188,7 +189,7 @@ export default function Header({ orgName }: HeaderProps) {
 
   const activeTab = pathname.startsWith("/dashboard")
     ? "dashboard"
-    : (pathname.startsWith("/people") || pathname.startsWith("/staff"))
+    : pathname.startsWith("/people")
       ? "people"
       : pathname.startsWith("/settings")
         ? "settings"
@@ -282,20 +283,21 @@ export default function Header({ orgName }: HeaderProps) {
                 <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-body)", fontWeight: 300, userSelect: "none", flexShrink: 0 }}>
                   |
                 </span>
-                <span
-                  style={{
-                    color: "var(--color-text-muted)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 500,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    minWidth: 0,
-                  }}
-                  title={orgName}
-                >
-                  {orgName}
-                </span>
+                <MaybeHint content={orgName} side="bottom">
+                  <span
+                    style={{
+                      color: "var(--color-text-muted)",
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      minWidth: 0,
+                    }}
+                  >
+                    {orgName}
+                  </span>
+                </MaybeHint>
               </>
             )}
           </div>
@@ -367,20 +369,21 @@ export default function Header({ orgName }: HeaderProps) {
             <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-title)", fontWeight: 300, userSelect: "none" }}>
               |
             </span>
-            <span
-              style={{
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 500,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: isTablet ? 160 : 200,
-              }}
-              title={orgName}
-            >
-              {orgName}
-            </span>
+            <MaybeHint content={orgName} side="bottom">
+              <span
+                style={{
+                  color: "var(--color-text-muted)",
+                  fontSize: "var(--dg-fs-label)",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: isTablet ? 160 : 200,
+                }}
+              >
+                {orgName}
+              </span>
+            </MaybeHint>
           </>
         )}
       </div>

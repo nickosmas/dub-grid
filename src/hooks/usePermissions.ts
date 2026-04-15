@@ -3,6 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { decodeJwt } from "jose";
 import { supabase } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
+import { getVerifiedBrowserAuth } from "@/lib/browser-auth";
 import type { Session } from "@supabase/supabase-js";
 import type { AdminPermissions } from "@/types";
 
@@ -319,7 +320,18 @@ export function usePermissions(): Permissions {
       if (mounted) setPerms(p);
     }
 
-    async function loadSession(session: Session | null) {
+    /**
+     * Preserve the last resolved permissions during same-user auth refreshes
+     * (for example TOKEN_REFRESHED after the tab has been backgrounded).
+     * This avoids remounting pages that gate rendering on perms.isLoading.
+     */
+    function shouldPreserveResolvedPerms(nextUserId: string | null): boolean {
+      if (!permsCache || permsCache.isLoading || !permsCacheUserId) return false;
+      if (!nextUserId) return true;
+      return permsCacheUserId === nextUserId;
+    }
+
+    async function loadSession(session: Session | null, verifiedUserId: string | null) {
       if (!mounted) return;
 
       if (!session?.access_token) {
@@ -327,7 +339,7 @@ export function usePermissions(): Permissions {
         return;
       }
 
-      const sessionUserId = session.user?.id ?? null;
+      const sessionUserId = verifiedUserId;
       if (permsCache && permsCacheUserId && permsCacheUserId !== sessionUserId) {
         permsCache = null;
         permsCacheTimestamp = 0;
@@ -392,11 +404,11 @@ export function usePermissions(): Permissions {
 
       // admin: fetch admin_permissions from organization_memberships.
       // Also fetch org_role to detect role changes (e.g. downgrade) since the JWT.
-      if (effectiveRole === "admin" && session.user?.id && orgId) {
+      if (effectiveRole === "admin" && verifiedUserId && orgId) {
         const { data } = await supabase
           .from("organization_memberships")
           .select("org_role, admin_permissions")
-          .eq("user_id", session.user.id)
+          .eq("user_id", verifiedUserId)
           .eq("org_id", orgId)
           .single();
 
@@ -408,11 +420,11 @@ export function usePermissions(): Permissions {
       }
 
       // user role from JWT — confirm against DB in case token is stale.
-      if (session.user?.id) {
+      if (verifiedUserId) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("org_id, platform_role")
-          .eq("id", session.user.id)
+          .eq("id", verifiedUserId)
           .single();
 
         if (mounted && profile) {
@@ -425,7 +437,7 @@ export function usePermissions(): Permissions {
             const { data: membership } = await supabase
               .from("organization_memberships")
               .select("org_role, admin_permissions")
-              .eq("user_id", session.user.id)
+              .eq("user_id", verifiedUserId)
               .eq("org_id", profile.org_id)
               .single();
 
@@ -445,18 +457,18 @@ export function usePermissions(): Permissions {
       setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }: { data: { session: Session | null } }) => {
+    getVerifiedBrowserAuth()
+      .then(({ session, user }) => {
         // Skip re-resolve if cache is fresh (< 10s old) AND belongs to the same user.
         // Still update local state from cache so every usePermissions() instance
         // gets the resolved value (multiple hooks share one module-level cache).
-        const sameUser = !session?.user?.id || permsCacheUserId === session.user.id;
+        const verifiedUserId = user?.id ?? null;
+        const sameUser = !verifiedUserId || permsCacheUserId === verifiedUserId;
         if (permsCache && sameUser && Date.now() - permsCacheTimestamp < 10_000) {
           if (mounted) setPerms(permsCache);
           return;
         }
-        loadSession(session);
+        loadSession(session, verifiedUserId);
       });
 
     const {
@@ -470,9 +482,16 @@ export function usePermissions(): Permissions {
         permsCacheTimestamp = 0;
         permsCacheUserId = null;
         setUserViewActive(false);
+        setPermsAndCache(NO_PERMS, null);
+        return;
       }
-      setPerms((prev) => ({ ...prev, isLoading: true }));
-      loadSession(session);
+      const nextUserId = session?.user?.id ?? null;
+      if (!shouldPreserveResolvedPerms(nextUserId)) {
+        setPerms((prev) => ({ ...prev, isLoading: true }));
+      }
+      void getVerifiedBrowserAuth().then(({ session: freshSession, user }) => {
+        void loadSession(session ?? freshSession, user?.id ?? null);
+      });
     });
 
     // ── Realtime: invalidate permission cache on membership/department changes ──
@@ -487,15 +506,15 @@ export function usePermissions(): Permissions {
 
     const reResolve = () => {
       clearPermsCache();
-      supabase.auth.getSession().then(({ data: { session: fresh } }: { data: { session: Session | null } }) => {
-        if (mounted) loadSession(fresh);
+      getVerifiedBrowserAuth().then(({ session: fresh, user }) => {
+        if (mounted) void loadSession(fresh, user?.id ?? null);
       });
     };
 
     if (typeof supabase.channel === "function") {
-      supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
-        if (!mounted || !s?.user?.id) return;
-        const uid = s.user.id;
+      getVerifiedBrowserAuth().then(({ session: s, user }) => {
+        if (!mounted || !s?.access_token || !user?.id) return;
+        const uid = user.id;
         membershipChannel = supabase
           .channel(channelId)
           .on(

@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 // ─── Mock supabase ───────────────────────────────────────────────────────────
 
 const mockGetSession = vi.fn();
+const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSignOut = vi.fn();
 const mockFrom = vi.fn();
@@ -16,6 +17,7 @@ vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
       getSession: (...args: unknown[]) => mockGetSession(...args),
+      getUser: (...args: unknown[]) => mockGetUser(...args),
       onAuthStateChange: (...args: unknown[]) => mockOnAuthStateChange(...args),
       signOut: (...args: unknown[]) => mockSignOut(...args),
     },
@@ -55,6 +57,9 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue({
     data: { session: null },
   });
+  mockGetUser.mockResolvedValue({
+    data: { user: null },
+  });
   // Default: subscription setup
   mockOnAuthStateChange.mockImplementation(() => ({
     data: { subscription: { unsubscribe: vi.fn() } },
@@ -92,6 +97,9 @@ describe("AuthProvider — initial session", () => {
   it("sets user from existing session on mount", async () => {
     mockGetSession.mockResolvedValue({
       data: { session: fakeSession },
+    });
+    mockGetUser.mockResolvedValue({
+      data: { user: fakeUser },
     });
 
     render(
@@ -142,6 +150,9 @@ describe("AuthProvider — initial session", () => {
 describe("AuthProvider — auth state changes", () => {
   it("updates user when onAuthStateChange fires SIGNED_IN", async () => {
     let authCallback: (event: string, session: unknown) => void = () => {};
+    mockGetUser.mockResolvedValue({
+      data: { user: fakeUser },
+    });
 
     mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
       authCallback = cb;
@@ -168,6 +179,9 @@ describe("AuthProvider — auth state changes", () => {
   it("clears user when onAuthStateChange fires SIGNED_OUT", async () => {
     mockGetSession.mockResolvedValue({
       data: { session: fakeSession },
+    });
+    mockGetUser.mockResolvedValue({
+      data: { user: fakeUser },
     });
 
     let authCallback: (event: string, session: unknown) => void = () => {};
@@ -199,6 +213,9 @@ describe("AuthProvider — signOut", () => {
   it("calls supabase.auth.signOut when signOut is invoked", async () => {
     mockGetSession.mockResolvedValue({
       data: { session: fakeSession },
+    });
+    mockGetUser.mockResolvedValue({
+      data: { user: fakeUser },
     });
 
     render(

@@ -9,8 +9,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
-import { Hint } from "@/components/ui/hint";
-import { hint } from "@/components/ui/hint.types";
+import { MaybeHint } from "@/components/ui/hint";
 import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, ShiftDisplayMode, DirectoryPerson, Department } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -26,8 +25,9 @@ import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext
 import { useStaffFilters, useStaffSelection, useStaffReorder, StaffTableRow, StaffEmptyState, StaffPagination, StaffDetailPanel, StaffFilterPopover, StaffContextBar } from "./staff";
 import { SortIcon } from "./staff/SortIcon";
 import { DirectorySummaryCards } from "./staff/DirectorySummaryCards";
-import { DirectoryLoadingSkeleton } from "./staff/DirectoryLoadingSkeleton";
 import { ManagementStaffPanel } from "./staff/ManagementStaffPanel";
+import { AddManagementUserToScheduleModal } from "./staff/AddManagementUserToScheduleModal";
+import { EmployeeManagementAccessModal } from "./staff/EmployeeManagementAccessModal";
 import { EmptyState } from "@/components/EmptyState";
 import { Table, TableHeader, TableBody, TableRow as UITableRow, TableHead, TableCell } from "@/components/ui/table";
 import UserManagementSettings from "@/components/settings/UserManagement";
@@ -69,6 +69,8 @@ interface StaffViewProps {
   departments?: Department[];
   departmentLabel?: string;
   canEditShifts?: boolean;
+  canViewRecurringShifts?: boolean;
+  canManageRecurringShifts?: boolean;
   canViewEmployeeDetails?: boolean;
   canManageEmployees?: boolean;
   isSuperAdmin?: boolean;
@@ -104,9 +106,9 @@ function MembersSection({
   orgId,
   orgName,
   isSuperAdmin,
+  isGridmaster,
   departments: departmentItems = [],
   departmentLabel = "Department",
-  setupIncomplete = false,
 }: {
   employees: Employee[];
   benchedEmployees: Employee[];
@@ -127,6 +129,7 @@ function MembersSection({
   orgId?: string;
   orgName?: string;
   isSuperAdmin?: boolean;
+  isGridmaster?: boolean;
   departments?: Department[];
   departmentLabel?: string;
   setupIncomplete?: boolean;
@@ -134,6 +137,7 @@ function MembersSection({
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
   const queryClient = useQueryClient();
+  const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
@@ -161,7 +165,7 @@ function MembersSection({
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [, setRevokingId] = useState<string | null>(null);
 
   // Fetch pending invitations for badge display
   useEffect(() => {
@@ -187,22 +191,27 @@ function MembersSection({
   }, [pendingInvitations]);
 
   // ── Management (directory) data ──
-  const { directory, loading: directoryLoading } = useDirectory(orgId ?? null);
+  const { directory } = useDirectory(orgId ?? null);
   const departmentUsers = useMemo(
-    () => directory.filter((p) => p.departmentIds.length > 0),
+    () => directory.filter((p) => p.managementDepartmentIds.length > 0),
     [directory],
+  );
+  const activeManagementUsers = useMemo(
+    () => departmentUsers.filter((person) => person.isManagementUser),
+    [departmentUsers],
   );
 
   // Management filter state
   const [showManagement, setShowManagement] = useState(false);
-  const [deptSearch, setDeptSearch] = useState("");
   const [deptFilterId, setDeptFilterId] = useState<number | null>(null);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
+  const [managementAccessEmployee, setManagementAccessEmployee] = useState<Employee | null>(null);
+  const [managementSchedulePerson, setManagementSchedulePerson] = useState<DirectoryPerson | null>(null);
 
   const filteredDeptUsers = useMemo(() => {
     let list = departmentUsers;
-    if (deptFilterId === -1) list = list.filter((u) => u.departmentIds.length === 0);
-    else if (deptFilterId !== null) list = list.filter((u) => u.departmentIds.includes(deptFilterId));
+    if (deptFilterId === -1) list = list.filter((u) => u.managementDepartmentIds.length === 0);
+    else if (deptFilterId !== null) list = list.filter((u) => u.managementDepartmentIds.includes(deptFilterId));
     if (showManagement && searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter((u) =>
@@ -217,7 +226,7 @@ function MembersSection({
   const deptCounts = useMemo(() => {
     const counts = new Map<number, number>();
     for (const u of departmentUsers) {
-      for (const dId of u.departmentIds) {
+      for (const dId of u.managementDepartmentIds) {
         counts.set(dId, (counts.get(dId) ?? 0) + 1);
       }
     }
@@ -230,7 +239,7 @@ function MembersSection({
   );
 
   // Reset management filters when toggling off
-  useEffect(() => { if (!showManagement) { setDeptSearch(""); setDeptFilterId(null); setExpandedPersonId(null); } }, [showManagement]);
+  useEffect(() => { if (!showManagement) { setDeptFilterId(null); setExpandedPersonId(null); } }, [showManagement]);
 
   // App-only invite modal state
   const [showManagementInvite, setShowAppOnlyInvite] = useState(false);
@@ -283,43 +292,6 @@ function MembersSection({
     [onDelete],
   );
 
-  const handleDeptChange = useCallback(async (person: DirectoryPerson, newDeptId: string) => {
-    if (!orgId) return;
-    const mgmtIds = new Set(managementDepts.map(d => d.id));
-    const kept = person.departmentIds.filter(id => !mgmtIds.has(id));
-    const departmentIds = newDeptId ? [...kept, Number(newDeptId)] : kept;
-    if (person.source === "employee" && person.employeeId) {
-      const { error } = await supabase
-        .from("employees")
-        .update({
-          first_name: person.firstName,
-          last_name: person.lastName,
-          phone: person.phone,
-          department_ids: departmentIds,
-        })
-        .eq("id", person.employeeId)
-        .eq("org_id", orgId);
-      if (error) throw error;
-    } else if (person.source === "pending_invite") {
-      await updatePendingInvitation(person.personId.replace("inv:", ""), orgId, {
-        firstName: person.firstName,
-        lastName: person.lastName,
-        phone: person.phone,
-        departmentIds,
-      });
-    } else if (person.userId) {
-      await updateAppOnlyUser(person.userId, orgId, {
-        firstName: person.firstName,
-        lastName: person.lastName,
-        phone: person.phone,
-        departmentIds,
-      });
-    }
-    void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
-    toast.success("Changes saved");
-  }, [orgId, managementDepts, queryClient]);
-
   // Can reorder only when: active tab, seniority sort asc, no filters/search, canManageEmployees
   const canReorder = activeTab === "active" && sortConfig.key === "seniority" && sortConfig.dir === "asc" && !searchQuery && !filterFocusArea && !filterRole && !showOnlyUnlinked && canManageEmployees && employees.length >= 2 && !showManagement;
 
@@ -334,10 +306,11 @@ function MembersSection({
   const selectedEmployee = expandedEmpId
     ? [...employees, ...benchedEmployees, ...terminatedEmployees].find((e) => e.id === expandedEmpId)
     : null;
+  const selectedEmployeeDirectoryPerson = selectedEmployee
+    ? directory.find((person) => person.employeeId === selectedEmployee.id) ?? null
+    : null;
 
   const selectedPerson = expandedPersonId ? departmentUsers.find((u) => u.personId === expandedPersonId) ?? null : null;
-
-  const totalColumns = isMobile ? 3 : isTablet ? 5 : 8;
 
   return (
     <>
@@ -355,7 +328,7 @@ function MembersSection({
             activeCount={employees.length}
             benchedCount={benchedEmployees.length}
             terminatedCount={terminatedEmployees.length}
-            managementCount={departmentUsers.length}
+            managementCount={activeManagementUsers.length}
           />
 
           {/* Search Bar */}
@@ -381,7 +354,7 @@ function MembersSection({
                 value={showManagement ? "management" : "schedule"}
                 options={[
                   { value: "schedule", label: `On Schedule (${employees.length})` },
-                  { value: "management", label: `Management (${departmentUsers.length})` },
+                  { value: "management", label: `Management (${activeManagementUsers.length})` },
                 ]}
                 onChange={(v) => { setShowManagement(v === "management"); if (v === "schedule") { setActiveTab("active"); } }}
                 style={{ minWidth: 180 }}
@@ -438,9 +411,9 @@ function MembersSection({
             )}
 
             {/* Add */}
-            {canManageEmployees && (
+            {((showManagement && canManageManagementAccess) || (!showManagement && canManageEmployees)) && (
               <button
-                onClick={showManagement && isSuperAdmin ? () => setShowAppOnlyInvite(true) : onAdd}
+                onClick={showManagement ? () => setShowAppOnlyInvite(true) : onAdd}
                 className="dg-btn dg-btn-primary dg-btn-sm"
               >
                 + Add
@@ -636,7 +609,6 @@ function MembersSection({
                           <StaffTableRow
                             key={emp.id}
                             emp={emp}
-                            index={i}
                             globalIndex={globalIdx}
                             isExpanded={isExpanded}
                             isReordering={isReordering}
@@ -644,8 +616,6 @@ function MembersSection({
                             isDropTarget={isDropTarget}
                             canManageEmployees={canManageEmployees}
                             isSelected={selectedIds.has(emp.id)}
-                            isMobile={isMobile}
-                            isTablet={isTablet}
                             focusAreas={focusAreas}
                             certifications={certifications}
                             roles={roles}
@@ -707,15 +677,29 @@ function MembersSection({
                   </TableHeader>
                   <TableBody>
                     {filteredDeptUsers.map((person) => {
-                      const personDepts = person.departmentIds
+                      const personDepts = person.managementDepartmentIds
                         .map(id => managementDepts.find(d => d.id === id))
                         .filter((d): d is NonNullable<typeof d> => d != null);
-                      const isPending = person.source === "pending_invite";
+                      const isPending = person.invitationStatus !== null && !person.hasAppAccess;
                       const isExpanded = person.personId === expandedPersonId;
+                      const statusLabel = isPending
+                        ? (person.invitationStatus === "expired" ? "Expired" : "Pending")
+                        : person.employeeStatus === "terminated"
+                          ? "Terminated"
+                          : person.employeeStatus === "benched"
+                            ? "Benched"
+                            : "Active";
+                      const statusColors = isPending
+                        ? { background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }
+                        : person.employeeStatus === "terminated"
+                          ? { background: "var(--color-danger-bg)", color: "var(--color-danger-text)" }
+                          : person.employeeStatus === "benched"
+                            ? { background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }
+                            : { background: "var(--color-success-bg)", color: "var(--color-success-text)" };
                       return (
                         <UITableRow
                           key={person.personId}
-                          className={`transition-colors cursor-pointer ${isExpanded ? "bg-[var(--color-brand-bg)]" : "hover:bg-[var(--color-bg)]"}`}
+                          className={`transition-colors cursor-pointer ${isExpanded ? "bg-[var(--color-control-active-bg)]" : "hover:bg-[var(--color-bg)]"}`}
                           onClick={() => setExpandedPersonId(isExpanded ? null : person.personId)}
                           style={{ opacity: isPending ? 0.7 : 1 }}
                         >
@@ -725,8 +709,8 @@ function MembersSection({
                               <div
                                 className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
                                 style={{
-                                  background: isPending ? "var(--color-surface)" : "var(--color-primary-bg)",
-                                  color: isPending ? "var(--color-text-muted)" : "var(--color-primary)",
+                                  background: isPending ? "var(--color-surface)" : "var(--color-control-active-bg)",
+                                  color: isPending ? "var(--color-text-muted)" : "var(--color-control-active-text)",
                                 }}
                               >
                                 {(person.firstName?.[0] ?? "").toUpperCase()}{(person.lastName?.[0] ?? "").toUpperCase() || "?"}
@@ -751,43 +735,28 @@ function MembersSection({
 
                           {/* Department */}
                           {!isMobile && !isTablet && (
-                            <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
-                              {canManageEmployees && managementDepts.length > 0 ? (
-                                <CustomSelect
-                                  value={(() => { const mgmtId = person.departmentIds.find(id => managementDepts.some(d => d.id === id)); return mgmtId ? mgmtId.toString() : ""; })()}
-                                  options={[
-                                    { value: "", label: "None" },
-                                    ...managementDepts.map(d => ({ value: d.id.toString(), label: d.name })),
-                                  ]}
-                                  onChange={(v) => handleDeptChange(person, v)}
-                                  style={{ fontSize: "var(--dg-fs-caption)" }}
-                                />
-                              ) : (
-                                <span className="text-[13px] text-[var(--color-text-muted)]">
-                                  {personDepts.length > 0 ? personDepts.map(d => d.name).join(", ") : "\u2014"}
-                                </span>
-                              )}
+                            <TableCell className="py-4">
+                              <span className="text-[13px] text-[var(--color-text-muted)]">
+                                {personDepts.length > 0 ? personDepts.map(d => d.name).join(", ") : "\u2014"}
+                              </span>
                             </TableCell>
                           )}
 
                           {/* Status */}
                           {!isMobile && !isTablet && (
                             <TableCell className="py-4">
-                              {isPending ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }}>
-                                  {person.invitationStatus === "expired" ? "Expired" : "Pending"}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--color-success-bg)", color: "var(--color-success-text)" }}>
-                                  Active
-                                </span>
-                              )}
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                                style={statusColors}
+                              >
+                                {statusLabel}
+                              </span>
                             </TableCell>
                           )}
 
                           {/* Chevron */}
                           <TableCell className="pr-6 py-4 w-[40px] text-right">
-                            <div className="flex items-center justify-center" style={{ color: isExpanded ? "var(--color-brand)" : "var(--color-text-faint)" }}>
+                            <div className="flex items-center justify-center" style={{ color: isExpanded ? "var(--color-control-active-text)" : "var(--color-text-faint)" }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="9 6 15 12 9 18" />
                               </svg>
@@ -884,6 +853,15 @@ function MembersSection({
           onActivate={(empId) => onActivate(empId)}
           onClose={() => setExpandedEmpId(null)}
           onInvite={(e) => setInviteEmployee(e)}
+          canManageManagementAccess={canManageManagementAccess}
+          hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
+          hasPendingManagementInvite={
+            !!selectedEmployeeDirectoryPerson
+            && selectedEmployeeDirectoryPerson.managementDepartmentIds.length > 0
+            && selectedEmployeeDirectoryPerson.invitationStatus !== null
+            && !selectedEmployeeDirectoryPerson.hasAppAccess
+          }
+          onManageManagementAccess={canManageManagementAccess ? (employee) => setManagementAccessEmployee(employee) : undefined}
           onRevoke={handleRevokeInvitation}
           onRevokeAccess={isSuperAdmin && orgId ? async (userId: string) => {
             try {
@@ -903,44 +881,104 @@ function MembersSection({
           person={selectedPerson}
           departments={managementDepts}
           departmentLabel={departmentLabel}
-          canManageEmployees={canManageEmployees}
+          canManageScheduleEmployees={canManageEmployees}
+          canManageManagementAccess={canManageManagementAccess}
           onClose={() => setExpandedPersonId(null)}
           onSave={async (data) => {
             if (orgId) {
               if (selectedPerson.source === "employee" && selectedPerson.employeeId) {
                 const { error } = await supabase
                   .from("employees")
-                  .update({ first_name: data.firstName, last_name: data.lastName, phone: data.phone, department_ids: data.departmentIds })
+                  .update({ first_name: data.firstName, last_name: data.lastName, phone: data.phone })
                   .eq("id", selectedPerson.employeeId)
                   .eq("org_id", orgId);
                 if (error) throw error;
+                const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
+                if (selectedPerson.userId) {
+                  await updateAppOnlyUser(selectedPerson.userId, orgId, {
+                    departmentIds: data.managementDepartmentIds,
+                  });
+                } else if (pendingInvitation) {
+                  await updatePendingInvitation(pendingInvitation.id, orgId, {
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    phone: data.phone,
+                    departmentIds: data.managementDepartmentIds,
+                  });
+                }
               } else if (selectedPerson.source === "pending_invite") {
-                await updatePendingInvitation(selectedPerson.personId.replace("inv:", ""), orgId, data);
+                await updatePendingInvitation(selectedPerson.personId.replace("inv:", ""), orgId, {
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  phone: data.phone,
+                  departmentIds: data.managementDepartmentIds,
+                });
               } else if (selectedPerson.userId) {
-                await updateAppOnlyUser(selectedPerson.userId, orgId, data);
+                await updateAppOnlyUser(selectedPerson.userId, orgId, {
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  phone: data.phone,
+                  departmentIds: data.managementDepartmentIds,
+                });
               }
+              refreshInvitations();
               void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
               void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
               toast.success("Changes saved");
             }
           }}
-          onRevokeInvitation={isSuperAdmin && orgId ? async (invitationId) => {
+          onRevokeInvitation={canManageManagementAccess && orgId ? async (invitationId) => {
             await revokeInvitation(invitationId, orgId);
             void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
             toast.success("Invitation revoked");
           } : undefined}
-          onResendInvitation={orgId ? async (invitationId) => {
+          onResendInvitation={canManageManagementAccess && orgId ? async (invitationId) => {
             await resendInvitation(invitationId, orgId);
             void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
             toast.success("Invitation resent");
           } : undefined}
           onAddToSchedule={canManageEmployees ? (person) => {
-            // Could navigate or open an add modal — for now just trigger onAdd
-            onAdd();
+            setManagementSchedulePerson(person);
           } : undefined}
           onBench={canManageEmployees ? onBench : undefined}
           onActivate={canManageEmployees ? onActivate : undefined}
           onTerminate={canManageEmployees ? onDelete : undefined}
+        />
+      )}
+
+      {managementSchedulePerson && orgId && (
+        <AddManagementUserToScheduleModal
+          orgId={orgId}
+          person={managementSchedulePerson}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={roles}
+          focusAreaLabel={focusAreaLabel}
+          certificationLabel={certificationLabel}
+          roleLabel={roleLabel}
+          onClose={() => setManagementSchedulePerson(null)}
+          onAdded={() => {
+            setManagementSchedulePerson(null);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+          }}
+        />
+      )}
+
+      {managementAccessEmployee && orgId && canManageManagementAccess && (
+        <EmployeeManagementAccessModal
+          employee={managementAccessEmployee}
+          orgId={orgId}
+          orgName={orgName || "your organization"}
+          managementDepartments={managementDepts}
+          directoryPerson={selectedEmployeeDirectoryPerson}
+          pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
+          onClose={() => setManagementAccessEmployee(null)}
+          onCompleted={() => {
+            refreshInvitations();
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+          }}
         />
       )}
     </>
@@ -1163,9 +1201,10 @@ function migrateLegacyDraftValue(v: string, shiftCodes: ShiftCode[], absenceType
 function RecurringScheduleSection({
   employees,
   orgId,
+  currentUserId,
   shiftCodes,
   shiftCodeMap,
-  canEdit,
+  canManage,
   focusAreas,
   certifications,
   absenceTypes = [],
@@ -1173,9 +1212,10 @@ function RecurringScheduleSection({
 }: {
   employees: Employee[];
   orgId: string;
+  currentUserId: string | null;
   shiftCodes: ShiftCode[];
   shiftCodeMap: Map<number, string>;
-  canEdit: boolean;
+  canManage: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   absenceTypes?: AbsenceType[];
@@ -1193,7 +1233,6 @@ function RecurringScheduleSection({
 
   // ── Edit state ──
   const [dirtySchedules, setDirtySchedules] = useState<Record<string, Record<number, string>>>({});
-  const { user: currentUser } = useAuth();
   const [activeCell, setActiveCell] = useState<{ empId: string; dayIndex: number } | null>(null);
   const [activeCellEl, setActiveCellEl] = useState<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1231,7 +1270,8 @@ function RecurringScheduleSection({
 
         // Load saved draft separately so a draft error doesn't block the main data
         try {
-          const draft = await getRecurringDraft(orgId);
+          if (!canManage || !currentUserId) return;
+          const draft = await getRecurringDraft(orgId, currentUserId);
           if (!cancelled && draft?.draftData && Object.keys(draft.draftData).length > 0) {
             // Migrate legacy draft values (plain labels / abs: prefix) to ID-based format
             const migrated: Record<string, Record<number, string>> = {};
@@ -1261,7 +1301,7 @@ function RecurringScheduleSection({
 
     load();
     return () => { cancelled = true; };
-  }, [orgId, shiftCodeMap, absenceTypeMap, shiftCodes, absenceTypes]);
+  }, [orgId, canManage, currentUserId, shiftCodeMap, absenceTypeMap, shiftCodes, absenceTypes]);
 
   // ── Derived state ──
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
@@ -1298,7 +1338,7 @@ function RecurringScheduleSection({
   }
 
   function handleCellClick(empId: string, dayIndex: number, el: HTMLElement) {
-    if (!canEdit) return;
+    if (!canManage) return;
     if (activeCell?.empId === empId && activeCell?.dayIndex === dayIndex) {
       setActiveCell(null);
       setActiveCellEl(null);
@@ -1373,7 +1413,9 @@ function RecurringScheduleSection({
         return next;
       });
       setSavedDraftTimestamp(null);
-      await deleteRecurringDraft(orgId).catch(() => {});
+      if (currentUserId) {
+        await deleteRecurringDraft(orgId, currentUserId).catch(() => {});
+      }
       toast.success("Recurring schedules saved");
     } catch (err: unknown) {
       toast.error("Failed to save recurring schedules");
@@ -1385,10 +1427,8 @@ function RecurringScheduleSection({
 
   async function handleSaveDraft() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (!userId) { toast.error("Not authenticated"); return; }
-      await saveRecurringDraft(orgId, userId, dirtySchedules);
+      if (!currentUserId) { toast.error("Not authenticated"); return; }
+      await saveRecurringDraft(orgId, currentUserId, dirtySchedules);
       setSavedDraftTimestamp(new Date().toISOString());
       toast.success("Draft saved");
     } catch (err: unknown) {
@@ -1400,7 +1440,9 @@ function RecurringScheduleSection({
   async function handleDiscardDraft() {
     setDirtySchedules({});
     setSavedDraftTimestamp(null);
-    await deleteRecurringDraft(orgId).catch(() => {});
+    if (currentUserId) {
+      await deleteRecurringDraft(orgId, currentUserId).catch(() => {});
+    }
   }
 
   // ── Filtering ──
@@ -1435,7 +1477,7 @@ function RecurringScheduleSection({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
       {/* Sticky save bar at top — shows when there are dirty changes (including restored drafts) */}
-      {hasDirtyChanges && (
+      {hasDirtyChanges && canManage && (
         <div style={{
           position: "sticky", top: 0, zIndex: 20,
           background: "var(--color-info-bg)", border: "1px solid var(--color-info-border)", borderRadius: 12,
@@ -1605,7 +1647,7 @@ function RecurringScheduleSection({
 
           {/* Employee rows */}
           {sortedEmployees.map((emp, i) => {
-            const isCurrentUser = !!(emp.userId && currentUser && emp.userId === currentUser.id);
+            const isCurrentUser = !!(emp.userId && currentUserId && emp.userId === currentUserId);
             const rowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
             const certAbbr = emp.certificationId != null ? getCertAbbr(emp.certificationId, certifications) : null;
             const dc = certAbbr ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR) : null;
@@ -1641,7 +1683,7 @@ function RecurringScheduleSection({
                       {isCurrentUser && (
                         <span style={{
                           fontSize: "var(--dg-fs-micro)", fontWeight: 700, padding: "1px 5px", borderRadius: 10,
-                          background: "var(--color-brand-bg)", color: "var(--color-link)", whiteSpace: "nowrap", flexShrink: 0,
+                          background: "var(--color-brand-bg)", color: "var(--color-brand)", whiteSpace: "nowrap", flexShrink: 0,
                         }}>
                           You
                         </span>
@@ -1679,13 +1721,13 @@ function RecurringScheduleSection({
                     <div
                       key={dayIdx}
                       className="dg-grid-cell"
-                      data-interactive={canEdit ? "true" : "false"}
-                      tabIndex={canEdit ? 0 : -1}
+                      data-interactive={canManage ? "true" : "false"}
+                      tabIndex={canManage ? 0 : -1}
                       role="gridcell"
                       aria-label={cellLabel ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: ${cellLabel}` : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[dayIdx]}: empty`}
                       onClick={(e) => handleCellClick(emp.id, dayIdx, e.currentTarget)}
                       onKeyDown={(e) => {
-                        if (canEdit && (e.key === "Enter" || e.key === " ")) {
+                        if (canManage && (e.key === "Enter" || e.key === " ")) {
                           e.preventDefault();
                           handleCellClick(emp.id, dayIdx, e.currentTarget as HTMLElement);
                         }
@@ -1697,41 +1739,51 @@ function RecurringScheduleSection({
                       }}
                     >
                       {st ? (
-                        <div title={isNameMode ? stDisplay! : undefined} style={{
-                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
-                          background: st.color,
-                          border: isDirty ? `2px dashed ${st.text}` : `1px solid ${borderColor(st.text)}`,
-                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                          color: st.text,
-                          fontSize: isNameMode ? nameModeFs : codeModeFs,
-                          fontWeight: 800,
-                          padding: "2px 4px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          transition: "box-shadow 150ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
-                        }}>
-                          {stDisplay}
-                        </div>
+                        <MaybeHint
+                          content={isNameMode ? stDisplay! : undefined}
+                          side="top"
+                        >
+                          <div style={{
+                            position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
+                            background: st.color,
+                            border: isDirty ? `2px dashed ${st.text}` : `1px solid ${borderColor(st.text)}`,
+                            borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                            color: st.text,
+                            fontSize: isNameMode ? nameModeFs : codeModeFs,
+                            fontWeight: 800,
+                            padding: "2px 4px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            transition: "box-shadow 150ms ease",
+                            boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
+                          }}>
+                            {stDisplay}
+                          </div>
+                        </MaybeHint>
                       ) : at ? (
-                        <div title={isNameMode ? atDisplay! : undefined} style={{
-                          position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
-                          background: at.color,
-                          border: isDirty ? `2px dashed ${at.text}` : `1px solid ${borderColor(at.text)}`,
-                          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                          color: at.text,
-                          fontSize: isNameMode ? nameModeFs : codeModeFs,
-                          fontWeight: 800,
-                          padding: "2px 4px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          transition: "box-shadow 150ms ease",
-                          boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
-                        }}>
-                          {atDisplay}
-                        </div>
+                        <MaybeHint
+                          content={isNameMode ? atDisplay! : undefined}
+                          side="top"
+                        >
+                          <div style={{
+                            position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
+                            background: at.color,
+                            border: isDirty ? `2px dashed ${at.text}` : `1px solid ${borderColor(at.text)}`,
+                            borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                            color: at.text,
+                            fontSize: isNameMode ? nameModeFs : codeModeFs,
+                            fontWeight: 800,
+                            padding: "2px 4px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            transition: "box-shadow 150ms ease",
+                            boxShadow: isActive ? "0 0 0 2px rgba(100,116,139,0.3)" : "none",
+                          }}>
+                            {atDisplay}
+                          </div>
+                        </MaybeHint>
                       ) : (
                         <div style={{
                           position: "absolute", top: 4, right: 4, bottom: 4, left: 4,
@@ -1814,7 +1866,8 @@ export default function StaffView({
   absenceTypes,
   departments: departmentsProp = [],
   departmentLabel: departmentLabelProp = "Department",
-  canEditShifts,
+  canViewRecurringShifts,
+  canManageRecurringShifts,
   canViewEmployeeDetails,
   canManageEmployees,
   isSuperAdmin = false,
@@ -1828,13 +1881,19 @@ export default function StaffView({
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
-  const VALID_SECTIONS: StaffSection[] = ["directory", "access", "activity", "recurring-schedule"];
+  const { user } = useAuth();
+  const allowedSections: StaffSection[] = [
+    "directory",
+    ...((isSuperAdmin || isGridmaster) ? ["access" as const] : []),
+    ...(orgId && canViewRecurringShifts ? ["recurring-schedule" as const] : []),
+    ...(isSuperAdmin ? ["activity" as const] : []),
+  ];
   const sectionParam = searchParams.get("section") as StaffSection | null;
   // Support legacy "members" and "users" section params for backwards compat
   const resolvedSection = sectionParam === ("members" as string) ? "directory" as StaffSection
     : sectionParam === ("users" as string) ? "access" as StaffSection
     : sectionParam;
-  const activeSection: StaffSection = resolvedSection && VALID_SECTIONS.includes(resolvedSection) ? resolvedSection : "directory";
+  const activeSection: StaffSection = resolvedSection && allowedSections.includes(resolvedSection) ? resolvedSection : "directory";
 
   const iconMembers = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   const iconUserMgmt = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
@@ -1844,7 +1903,7 @@ export default function StaffView({
   const links: { id: StaffSection; label: string; icon: React.ReactNode }[] = [
     { id: "directory", label: "Directory", icon: iconMembers },
     ...((isSuperAdmin || isGridmaster) ? [{ id: "access" as StaffSection, label: "User Access", icon: iconUserMgmt }] : []),
-    ...(orgId ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
+    ...(orgId && canViewRecurringShifts ? [{ id: "recurring-schedule" as StaffSection, label: "Recurring Shifts", icon: iconCalendar }] : []),
     ...(isSuperAdmin ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: iconActivity }] : []),
   ];
 
@@ -1893,7 +1952,7 @@ export default function StaffView({
                         render={<Link href={link.id === "directory" ? "/people" : `/people?section=${link.id}`} replace />}
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
+                        className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
                       >
                         <span className={activeSection === link.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
                           {link.icon}
@@ -1951,6 +2010,7 @@ export default function StaffView({
             orgId={orgId}
             orgName={orgName}
             isSuperAdmin={isSuperAdmin}
+            isGridmaster={isGridmaster}
             departments={departmentsProp}
             departmentLabel={departmentLabelProp}
             setupIncomplete={setupIncomplete}
@@ -1971,13 +2031,14 @@ export default function StaffView({
               </div>
             )}
 
-            {activeSection === "recurring-schedule" && orgId && (
+            {activeSection === "recurring-schedule" && orgId && canViewRecurringShifts && (
               <RecurringScheduleSection
                 employees={employees}
                 orgId={orgId}
+                currentUserId={user?.id ?? null}
                 shiftCodes={shiftCodes ?? []}
                 shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
-                canEdit={canEditShifts ?? false}
+                canManage={canManageRecurringShifts ?? false}
                 focusAreas={focusAreas}
                 certifications={certifications}
                 absenceTypes={absenceTypes}

@@ -1,10 +1,9 @@
 import { useMemo } from "react";
 import type { DashboardContentProps } from "./DashboardContentProps";
-import DashboardStatusBar from "./DashboardStatusBar";
-import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
+import ActivityFeed from "./ActivityFeed";
 import CoverageBySectionCard from "./CoverageBySectionCard";
 import OpenShiftsCard from "./OpenShiftsCard";
-import ActivityFeed from "./ActivityFeed";
+import StaffHoursCard from "./StaffHoursCard";
 
 export default function AdminDashboard(props: DashboardContentProps) {
   const {
@@ -13,65 +12,30 @@ export default function AdminDashboard(props: DashboardContentProps) {
     permissions,
     sectionCoverage,
     openShifts,
-    otAlerts,
-    periodStats,
     activityItems,
-    shiftRequests,
-    currentEmpId,
-    draftNewCount,
-    draftModifiedCount,
-    draftDeletedCount,
+    currentHours,
+    activeEmployees,
+    focusAreas,
     isMobile,
     onExpandPanel,
   } = props;
-
-  const showOT = permissions.canEditShifts;
-  const draftTotal = draftNewCount + draftModifiedCount + draftDeletedCount;
-
-  const actionItems = useMemo(
-    () =>
-      buildActionItems({
-        isAdmin: true,
-        pendingApproval: shiftRequests.pendingApproval,
-        swapProposals: [],
-        openPickups: [],
-        otAlerts: showOT ? otAlerts : [],
-        openShifts,
-        draftTotal,
-        currentEmpId,
-        onResolve: shiftRequests.resolve,
-      }),
-    [shiftRequests.pendingApproval, otAlerts, openShifts, draftTotal, currentEmpId, showOT, shiftRequests.resolve],
+  const overtimeHours = useMemo(
+    () => currentHours.filter((entry) => entry.isOvertime),
+    [currentHours],
   );
 
   return (
     <>
-      {/* Zone 1: Status Bar */}
-      <DashboardStatusBar
-        coveragePct={periodStats.coverage?.pct ?? 100}
-        otAlertCount={showOT ? otAlerts.length : 0}
-        pendingApprovalCount={shiftRequests.pendingApproval.length}
-        draftCount={draftTotal}
-        urgentGapCount={openShifts.filter((s) => s.urgency === "high").length}
-        hasRequirements={coverageRequirements.length > 0}
-        permissions={permissions}
-        onExpandStats={() => onExpandPanel("stats")}
-      />
-
-      {/* Zone 2: Action Queue (hero) */}
-      <ActionQueueCard items={actionItems} variant="hero" grouped />
-
-      {/* Zone 3: Context Cards */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
-          gap: 16,
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: "var(--dg-space-lg)",
         }}
       >
         {permissions.canViewSchedule && (
           <CoverageBySectionCard
-            sections={sectionCoverage}
+            sections={sectionCoverage.slice(0, 4)}
             focusAreaLabel={org.focusAreaLabel || "section"}
             isMobile={isMobile}
             hasRequirements={coverageRequirements.length > 0}
@@ -80,16 +44,34 @@ export default function AdminDashboard(props: DashboardContentProps) {
         )}
         <OpenShiftsCard
           openShifts={openShifts}
+          maxVisible={5}
           onExpand={() => onExpandPanel("openShifts")}
         />
       </div>
 
-      {/* Activity Feed (collapsible) */}
-      <ActivityFeed
-        items={activityItems}
-        defaultCollapsed
-        onExpand={() => onExpandPanel("activity")}
-      />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: "var(--dg-space-lg)",
+        }}
+      >
+        <ActivityFeed
+          items={activityItems}
+          maxVisible={5}
+          onExpand={() => onExpandPanel("activity")}
+        />
+        <StaffHoursCard
+          employeeHours={overtimeHours}
+          employees={activeEmployees}
+          focusAreas={focusAreas}
+          maxVisible={5}
+          heading="Overtime watch"
+          subtitle="Staff trending over 40h this period"
+          emptyMessage="No overtime alerts this period"
+          onExpand={() => onExpandPanel("staffHours")}
+        />
+      </div>
     </>
   );
 }

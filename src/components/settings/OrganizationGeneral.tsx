@@ -137,7 +137,7 @@ export default function OrganizationGeneral({
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
         {saved && (
-          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>
+          <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-success)", fontWeight: 600 }}>
             Saved!
           </span>
         )}

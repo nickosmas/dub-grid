@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, Fragment } from "react";
-import { Hint } from "@/components/ui/hint";
+import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import type {
   Employee,
@@ -34,6 +34,7 @@ interface ScheduleTabProps {
   auditNames: Map<string, string>;
   shiftRequests: ShiftRequest[];
   recurringShifts: RecurringShift[];
+  canViewRecurringShifts: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
 }
 
@@ -54,6 +55,7 @@ export function ScheduleTab({
   auditNames,
   shiftRequests,
   recurringShifts,
+  canViewRecurringShifts,
   shiftDisplayMode = "code",
 }: ScheduleTabProps) {
   const isNameMode = shiftDisplayMode === "name";
@@ -92,55 +94,56 @@ export function ScheduleTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Recurring Schedule */}
-      <Card className="shadow-sm">
-        <CardHeader className="border-b pb-3">
-          <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-muted-foreground" />
-            Recurring Schedule
-            <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{recurringShifts.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recurringShifts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <CalendarClock className="w-7 h-7 text-muted-foreground/30 mb-3" />
-              <p className="text-[13px] text-muted-foreground">No recurring shifts configured</p>
-            </div>
-          ) : (
-            <div>
-              <div className="grid grid-cols-7 gap-1 text-center">
-                {DAY_LABELS.map((day, i) => {
-                  const rs = recurringShifts.find(r => r.dayOfWeek === i);
-                  return (
-                    <div
-                      key={day}
-                      className={`flex flex-col items-center justify-center py-2.5 rounded-lg border ${
-                        rs ? 'bg-muted/50 border-border' : 'bg-transparent border-transparent'
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{day}</span>
-                      <span className={`text-[11px] mt-1 font-semibold truncate max-w-full px-0.5 ${
-                        rs ? 'text-foreground' : 'text-muted-foreground/30'
-                      }`}>
-                        {rs ? rs.shiftLabel : "—"}
-                      </span>
-                    </div>
-                  );
-                })}
+      {canViewRecurringShifts && (
+        <Card className="shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-muted-foreground" />
+              Recurring Schedule
+              <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{recurringShifts.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recurringShifts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <CalendarClock className="w-7 h-7 text-muted-foreground/30 mb-3" />
+                <p className="text-[13px] text-muted-foreground">No recurring shifts configured</p>
               </div>
-              {recurringShifts.some(rs => rs.effectiveUntil) && (
-                <p className="text-[10px] text-muted-foreground mt-3 text-center">
-                  {recurringShifts
-                    .filter(rs => rs.effectiveUntil)
-                    .map(rs => `${DAY_LABELS[rs.dayOfWeek]}: until ${rs.effectiveUntil}`)
-                    .join(" · ")}
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <div>
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {DAY_LABELS.map((day, i) => {
+                    const rs = recurringShifts.find(r => r.dayOfWeek === i);
+                    return (
+                      <div
+                        key={day}
+                        className={`flex flex-col items-center justify-center py-2.5 rounded-lg border ${
+                          rs ? 'bg-muted/50 border-border' : 'bg-transparent border-transparent'
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{day}</span>
+                        <span className={`text-[11px] mt-1 font-semibold truncate max-w-full px-0.5 ${
+                          rs ? 'text-foreground' : 'text-muted-foreground/30'
+                        }`}>
+                          {rs ? rs.shiftLabel : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {recurringShifts.some(rs => rs.effectiveUntil) && (
+                  <p className="text-[10px] text-muted-foreground mt-3 text-center">
+                    {recurringShifts
+                      .filter(rs => rs.effectiveUntil)
+                      .map(rs => `${DAY_LABELS[rs.dayOfWeek]}: until ${rs.effectiveUntil}`)
+                      .join(" · ")}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Shift History */}
       <Card className="shadow-sm">
@@ -325,9 +328,16 @@ export function ScheduleTab({
                                   if (!name) return "—";
                                   const timestamp = entry.updatedAt || entry.createdAt;
                                   return (
-                                    <span title={timestamp ? new Date(timestamp).toLocaleString() : undefined}>
-                                      {compactName(name)}
-                                    </span>
+                                    <MaybeHint
+                                      content={
+                                        timestamp
+                                          ? new Date(timestamp).toLocaleString()
+                                          : undefined
+                                      }
+                                      side="bottom"
+                                    >
+                                      <span>{compactName(name)}</span>
+                                    </MaybeHint>
                                   );
                                 })()}
                               </TableCell>

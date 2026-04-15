@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { setSentryUser } from "@/lib/sentry";
 
 interface AuthContextType {
@@ -37,7 +38,7 @@ async function trackSession(userId: string) {
   await fetch("/api/auth/track-session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, refreshTokenHash: hashHex, deviceLabel }),
+    body: JSON.stringify({ refreshTokenHash: hashHex, deviceLabel }),
   });
 }
 
@@ -86,17 +87,26 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (error) {
           await supabase.auth.signOut({ scope: "local" });
           setUser(null);
+          setSentryUser(null);
           return;
         }
-        setUser(session?.user ?? null);
+
+        const verifiedUser =
+          session?.access_token ? await getVerifiedBrowserUser() : null;
+        setUser(verifiedUser);
+        setSentryUser(
+          verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
+        );
+
         // Track existing session on page load (session restored from cookies)
-        if (session?.refresh_token && session.user) {
-          trackSession(session.user.id).catch(() => {});
+        if (session?.refresh_token && verifiedUser) {
+          trackSession(verifiedUser.id).catch(() => {});
         }
       } catch {
         // Timeout or network error — clear any stale cookies
         try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
         setUser(null);
+        setSentryUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -108,17 +118,31 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      setIsLoading(false);
-      setSentryUser(currentUser ? { id: currentUser.id, email: currentUser.email } : null);
-      // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
-      // and ProtectedRoute handles session-expiry redirects to /login.
-
-      // Track session on sign-in and token refresh (keeps last_active_at current)
-      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.refresh_token && currentUser) {
-        trackSession(currentUser.id).catch(() => {});
+      if (event === "SIGNED_OUT" || !session?.access_token) {
+        setUser(null);
+        setIsLoading(false);
+        setSentryUser(null);
+        return;
       }
+
+      void (async () => {
+        const verifiedUser = await getVerifiedBrowserUser().catch(() => null);
+        setUser(verifiedUser);
+        setIsLoading(false);
+        setSentryUser(
+          verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
+        );
+
+        // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
+        // and ProtectedRoute handles session-expiry redirects to /login.
+        if (
+          (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
+          session.refresh_token &&
+          verifiedUser
+        ) {
+          trackSession(verifiedUser.id).catch(() => {});
+        }
+      })();
     });
 
     return () => {

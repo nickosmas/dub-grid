@@ -107,6 +107,17 @@ describe("AddEmployeeModal", () => {
       expect(onAdd).not.toHaveBeenCalled();
     });
 
+    it("clicking submit with only a first name does NOT call onAdd", async () => {
+      const { onAdd } = renderModal();
+      const firstNameInputs = getFirstNameInputs();
+
+      await userEvent.type(firstNameInputs[0], "Alice");
+
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      await userEvent.click(submitBtn);
+      expect(onAdd).not.toHaveBeenCalled();
+    });
+
     it("clicking submit with name but no focus areas selected does NOT call onAdd", async () => {
       const onAdd = vi.fn();
       const onClose = vi.fn();
@@ -114,9 +125,10 @@ describe("AddEmployeeModal", () => {
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />,
       );
 
-      const inputs = getFirstNameInputs();
-      // Type a name in the first row
-      await userEvent.type(inputs[0], "Alice");
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+      await userEvent.type(firstNameInputs[0], "Alice");
+      await userEvent.type(lastNameInputs[0], "Smith");
 
       // Deselect North (selected by default) in the first row
       const allNorthBtns = Array.from(document.body.querySelectorAll("button")).filter(
@@ -173,8 +185,10 @@ describe("AddEmployeeModal", () => {
       render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getFirstNameInputs();
-      await userEvent.type(inputs[0], "Test");
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+      await userEvent.type(firstNameInputs[0], "Test");
+      await userEvent.type(lastNameInputs[0], "User");
 
       // Click South in the first row to add it
       const allSouthBtns = Array.from(document.body.querySelectorAll("button")).filter(
@@ -194,8 +208,10 @@ describe("AddEmployeeModal", () => {
       render(
         <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
       );
-      const inputs = getFirstNameInputs();
-      await userEvent.type(inputs[0], "Test");
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+      await userEvent.type(firstNameInputs[0], "Test");
+      await userEvent.type(lastNameInputs[0], "User");
 
       // North is selected by default in first row; click twice
       const allNorthBtns = Array.from(document.body.querySelectorAll("button")).filter(
@@ -276,12 +292,12 @@ describe("AddEmployeeModal", () => {
               return btn as HTMLElement;
             };
 
-            // Helper: read which focus area buttons are "active" in the first row by checking background style.
-            // Active buttons have colorBg (#EFF6FF = rgb(239, 246, 255)) as background.
+            // Helper: read which focus area buttons are active in the first row
+            // using the shared selectable-tag pressed semantics.
             const getActiveFocusAreasInFirstRow = () =>
               uniqueNames.filter((name) => {
                 const btn = findFocusAreaBtnInFirstRow(name);
-                return btn.style.background === "rgb(239, 246, 255)";
+                return btn.getAttribute("aria-pressed") === "true";
               });
 
             // Record initial selection

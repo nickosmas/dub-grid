@@ -230,11 +230,20 @@ export async function fetchCalloffOpenShifts(
       focus_area_ids: number[];
     } | null;
     const codeIds = (row.requester_shift_code_ids as number[]) ?? [];
+    // BUG 1.7: Determine focusAreaId, omit shifts with focusAreaId=0
+    const resolvedFocusAreaId = (row.requester_focus_area_id as number) ?? requester?.focus_area_ids?.[0];
+    if (resolvedFocusAreaId == null) {
+      // Skip this open shift if we cannot determine a valid focus area
+      console.warn(
+        `[fetchCalloffOpenShifts] Skipping open shift ${row.id}: requester has no focus_area_id and no home focus areas`,
+      );
+      return null;
+    }
     return {
       id: row.id as string,
       source: "calloff" as const,
       date: row.requester_shift_date as string,
-      focusAreaId: (row.requester_focus_area_id as number) ?? requester?.focus_area_ids?.[0] ?? 0,
+      focusAreaId: resolvedFocusAreaId,
       shiftCodeIds: codeIds,
       shiftCodeLabel: resolveCodeLabels(codeIds, shiftCodeMap),
       customStartTime: (row.requester_custom_start_time as string) ?? null,
@@ -245,7 +254,7 @@ export async function fetchCalloffOpenShifts(
       requestId: row.id as string,
       needed: 1,
     };
-  });
+  }).filter((item: GridOpenShift | null) => item !== null) as GridOpenShift[];
 }
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
@@ -279,17 +288,6 @@ export async function completeOnboarding(
 ): Promise<void> {
   const { error } = await supabase.rpc("complete_onboarding", {
     p_org_id: orgId,
-  });
-  if (error) throw error;
-}
-
-export async function completeTooltipTour(
-  orgId: string,
-  pageKey: string,
-): Promise<void> {
-  const { error } = await supabase.rpc("complete_tooltip_tour", {
-    p_org_id: orgId,
-    p_page_key: pageKey,
   });
   if (error) throw error;
 }

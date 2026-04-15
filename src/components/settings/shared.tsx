@@ -5,6 +5,7 @@ import { PREDEFINED_COLORS, getPresetByBg, PredefinedColor } from "@/lib/colors"
 import { sectionStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import { parseTo12h, to24h } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
+import { MaybeHint } from "@/components/ui/hint";
 
 // ── Re-exports for convenience ───────────────────────────────────────────────
 export const labelStyle = sharedLabelStyle;
@@ -81,28 +82,29 @@ export function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: st
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
       {PREDEFINED_COLORS.map(c => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => !disabled && onChange(c)}
-          disabled={disabled}
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            background: c.bg,
-            border: active.id === c.id ? `2px solid ${c.text}` : "1px solid var(--color-border)",
-            cursor: disabled ? "not-allowed" : "pointer",
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: disabled ? 0.5 : 1,
-          }}
-          title={c.name}
-        >
-          {active.id === c.id && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.text }} />}
-        </button>
+        <MaybeHint key={c.id} content={c.name} side="top">
+          <button
+            type="button"
+            onClick={() => !disabled && onChange(c)}
+            disabled={disabled}
+            aria-label={c.name}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              background: c.bg,
+              border: active.id === c.id ? `2px solid ${c.text}` : "1px solid var(--color-border)",
+              cursor: disabled ? "not-allowed" : "pointer",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: disabled ? 0.5 : 1,
+            }}
+          >
+            {active.id === c.id && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.text }} />}
+          </button>
+        </MaybeHint>
       ))}
     </div>
   );

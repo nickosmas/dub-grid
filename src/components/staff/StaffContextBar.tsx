@@ -99,12 +99,12 @@ export function StaffContextBar({
 
       {/* Bulk action bar */}
       {showBulk && (
-        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[var(--color-brand-border)] bg-[var(--color-brand-bg)]">
+        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[var(--color-control-active-border)] bg-[var(--color-control-active-bg)]">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: "var(--color-brand)" }}>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: "var(--color-control-primary)" }}>
               <span className="text-[12px] font-bold text-white">{selectionCount}</span>
             </div>
-            <span className="text-[13px] font-semibold text-[var(--color-brand)]">{selectionCount} selected</span>
+            <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">{selectionCount} selected</span>
           </div>
           <div className="flex-1" />
           {invitableEmployees.length > 0 && (
@@ -133,9 +133,9 @@ export function StaffContextBar({
 
       {/* Reorder bar */}
       {showReorder && (
-        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[var(--color-brand-border)] bg-[var(--color-brand-bg)]">
+        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[var(--color-control-active-border)] bg-[var(--color-control-active-bg)]">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: "var(--color-brand)" }}>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: "var(--color-control-primary)" }}>
               <svg width="16" height="16" viewBox="0 0 14 14" fill="white">
                 <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" />
                 <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" />
@@ -146,7 +146,7 @@ export function StaffContextBar({
               </svg>
             </div>
             <div>
-              <span className="text-[13px] font-semibold text-[var(--color-brand)]">Reorder Mode</span>
+              <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">Reorder Mode</span>
               <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Drag rows to change seniority order</p>
             </div>
           </div>

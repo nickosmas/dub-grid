@@ -1,7 +1,12 @@
 "use client";
 
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import type { HintContent } from "./hint.types";
+import { hint } from "./hint.types";
 
 export interface HintProps {
   /** Tooltip text. Branded to max 80 characters by convention. */
@@ -22,7 +27,12 @@ export interface HintProps {
  * Uses Base UI tooltip primitives — handles positioning, keyboard a11y,
  * aria-describedby, and role="tooltip" automatically.
  */
-export function Hint({ content, side = "top", disabled = false, children }: HintProps) {
+export function Hint({
+  content,
+  side = "top",
+  disabled = false,
+  children,
+}: HintProps) {
   if (disabled) {
     return children;
   }
@@ -32,6 +42,30 @@ export function Hint({ content, side = "top", disabled = false, children }: Hint
       <TooltipTrigger render={children} />
       <TooltipContent side={side}>{content}</TooltipContent>
     </Tooltip>
+  );
+}
+
+interface MaybeHintProps {
+  content?: string | null;
+  side?: "top" | "bottom" | "left" | "right";
+  disabled?: boolean;
+  children: React.ReactElement;
+}
+
+export function MaybeHint({
+  content,
+  side = "top",
+  disabled = false,
+  children,
+}: MaybeHintProps) {
+  if (!content || disabled) {
+    return children;
+  }
+
+  return (
+    <Hint content={hint(content)} side={side}>
+      {children}
+    </Hint>
   );
 }
 
@@ -67,3 +101,9 @@ export function HelpHint({ content, side = "top", size = 14 }: HelpHintProps) {
     </Hint>
   );
 }
+export {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./tooltip";

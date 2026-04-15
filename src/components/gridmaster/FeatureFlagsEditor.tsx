@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { updateOrganization } from "@/lib/db";
 import type { Organization } from "@/types";
@@ -15,6 +15,18 @@ const KNOWN_FLAGS: { name: string; label: string; description: string }[] = [
   { name: "disable_realtime", label: "Disable Realtime", description: "Turn off Supabase Realtime subscriptions for this org" },
 ];
 
+function normalizeFlagState(flags: Record<string, boolean>): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.keys(flags)
+      .sort()
+      .map((name) => [name, !!flags[name]]),
+  );
+}
+
+function serializeFlagState(flags: Record<string, boolean>): string {
+  return JSON.stringify(normalizeFlagState(flags));
+}
+
 export default function FeatureFlagsEditor({
   organization,
   onUpdated,
@@ -22,17 +34,30 @@ export default function FeatureFlagsEditor({
   organization: Organization;
   onUpdated?: (updated: Organization) => void;
 }) {
-  const [flags, setFlags] = useState<Record<string, boolean>>(organization.featureOverrides ?? {});
+  const propFlags = useMemo(
+    () => normalizeFlagState(organization.featureOverrides ?? {}),
+    [organization.featureOverrides],
+  );
+  const propFlagsKey = serializeFlagState(propFlags);
+  const [flags, setFlags] = useState<Record<string, boolean>>(propFlags);
+  const [savedFlags, setSavedFlags] = useState<Record<string, boolean>>(propFlags);
   const [saving, setSaving] = useState(false);
   const [newFlagName, setNewFlagName] = useState("");
+  const hasChanges = serializeFlagState(flags) !== serializeFlagState(savedFlags);
 
-  const hasChanges = JSON.stringify(flags) !== JSON.stringify(organization.featureOverrides ?? {});
+  useEffect(() => {
+    setFlags(propFlags);
+    setSavedFlags(propFlags);
+  }, [organization.id, propFlagsKey]);
 
   async function handleSave() {
     setSaving(true);
     try {
-      const updated = { ...organization, featureOverrides: flags };
+      const nextFlags = normalizeFlagState(flags);
+      const updated = { ...organization, featureOverrides: nextFlags };
       await updateOrganization(updated);
+      setFlags(nextFlags);
+      setSavedFlags(nextFlags);
       toast.success("Feature flags updated");
       onUpdated?.(updated);
     } catch (err: unknown) {
@@ -138,16 +163,14 @@ export default function FeatureFlagsEditor({
       </div>
 
       {/* Save */}
-      {hasChanges && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-          <button className="dg-btn dg-btn-secondary" onClick={() => setFlags(organization.featureOverrides ?? {})} disabled={saving}>
-            Discard
-          </button>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
+        <button className="dg-btn dg-btn-secondary" onClick={() => setFlags(savedFlags)} disabled={saving || !hasChanges}>
+          Discard
+        </button>
+      </div>
     </div>
   );
 }

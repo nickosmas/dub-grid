@@ -19,7 +19,12 @@ import type { Organization, AssignableOrganizationRole } from "@/types";
 import * as Sentry from "@/lib/sentry";
 import CustomSelect from "@/components/CustomSelect";
 import StepperBar from "@/components/StepperBar";
-import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
+import {
+  sectionStyle,
+  sectionHeaderStyle,
+  sectionBodyStyle,
+  labelStyle,
+} from "@/lib/styles";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -54,9 +59,21 @@ const STEPS = [
 type StepKey = (typeof STEPS)[number]["key"];
 
 const COLOR_PRESETS = [
-  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
-  "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1",
-  "#14B8A6", "#E11D48", "#0EA5E9", "#A855F7", "#22C55E",
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#EC4899",
+  "#06B6D4",
+  "#84CC16",
+  "#F97316",
+  "#6366F1",
+  "#14B8A6",
+  "#E11D48",
+  "#0EA5E9",
+  "#A855F7",
+  "#22C55E",
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -129,8 +146,16 @@ interface InvitationRow {
 
 // ── Stepper Bar (uses shared StepperBar component) ──────────────────────────
 
-function WizardStepper({ currentStep }: { currentStep: StepKey; orgCreated?: boolean }) {
-  const visibleSteps = STEPS.filter((s) => s.key !== "decision").map((s) => ({ id: s.key, label: s.label }));
+function WizardStepper({
+  currentStep,
+}: {
+  currentStep: StepKey;
+  orgCreated?: boolean;
+}) {
+  const visibleSteps = STEPS.filter((s) => s.key !== "decision").map((s) => ({
+    id: s.key,
+    label: s.label,
+  }));
   const currentIdx = visibleSteps.findIndex((s) => s.id === currentStep);
   const effectiveIdx = currentStep === "decision" ? 2 : currentIdx;
 
@@ -164,7 +189,8 @@ export default function OrganizationSetupWizard({
   const [timezone, setTimezone] = useState("");
   const [employeeCount, setEmployeeCount] = useState("");
   const [focusAreaLabel, setFocusAreaLabel] = useState("Focus Areas");
-  const [certificationLabel, setCertificationLabel] = useState("Certifications");
+  const [certificationLabel, setCertificationLabel] =
+    useState("Certifications");
   const [roleLabel, setRoleLabel] = useState("Roles");
   const [slugError, setSlugError] = useState<string | null>(null);
 
@@ -173,21 +199,51 @@ export default function OrganizationSetupWizard({
   const [superAdminLastName, setSuperAdminLastName] = useState("");
   const [superAdminEmail, setSuperAdminEmail] = useState("");
   const [superAdminPhone, setSuperAdminPhone] = useState("");
-  const [pendingInvite, setPendingInvite] = useState<{ token: string; email: string; name: string } | null>(null);
+  const [pendingInvite, setPendingInvite] = useState<{
+    token: string;
+    email: string;
+    name: string;
+  } | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // ── Step 3: Config ────────────────────────────────────────────────────────
-  const [shiftDisplayMode, setShiftDisplayMode] = useState<"code" | "name">("code");
-  const [departments, setDepartments] = useState<DeptRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" }]);
-  const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([{ id: crypto.randomUUID(), name: "" }]);
-  const [certifications, setCertifications] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
-  const [orgRoles, setOrgRoles] = useState<NamedItemRow[]>([{ id: crypto.randomUUID(), name: "", abbr: "" }]);
-  const [shiftCategories, setShiftCategories] = useState<ShiftCatRow[]>([{ id: crypto.randomUUID(), name: "", color: COLOR_PRESETS[0], startTime: "", endTime: "" }]);
-  const [shiftCodes, setShiftCodes] = useState<ShiftCodeRow[]>([{ id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[0] }]);
+  const [shiftDisplayMode, setShiftDisplayMode] = useState<"code" | "name">(
+    "code",
+  );
+  const [departments, setDepartments] = useState<DeptRow[]>([
+    { id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" },
+  ]);
+  const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([
+    { id: crypto.randomUUID(), name: "" },
+  ]);
+  const [certifications, setCertifications] = useState<NamedItemRow[]>([
+    { id: crypto.randomUUID(), name: "", abbr: "" },
+  ]);
+  const [orgRoles, setOrgRoles] = useState<NamedItemRow[]>([
+    { id: crypto.randomUUID(), name: "", abbr: "" },
+  ]);
+  const [shiftCategories, setShiftCategories] = useState<ShiftCatRow[]>([
+    {
+      id: crypto.randomUUID(),
+      name: "",
+      color: COLOR_PRESETS[0],
+      startTime: "",
+      endTime: "",
+    },
+  ]);
+  const [shiftCodes, setShiftCodes] = useState<ShiftCodeRow[]>([
+    { id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[0] },
+  ]);
 
   // ── Step 4: Employees ─────────────────────────────────────────────────────
   const [employeeRows, setEmployeeRows] = useState<EmployeeRow[]>(
-    Array.from({ length: 5 }, () => ({ id: crypto.randomUUID(), firstName: "", lastName: "", email: "", phone: "" })),
+    Array.from({ length: 5 }, () => ({
+      id: crypto.randomUUID(),
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+    })),
   );
   // ── Step 5: Invitations ───────────────────────────────────────────────────
   const [invitationRows, setInvitationRows] = useState<InvitationRow[]>([]);
@@ -201,9 +257,15 @@ export default function OrganizationSetupWizard({
 
   async function validateSlug(s: string): Promise<boolean> {
     if (!s) return false;
-    if (RESERVED_SUBDOMAINS.has(s) || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(s)) return false;
+    if (
+      RESERVED_SUBDOMAINS.has(s) ||
+      !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(s)
+    )
+      return false;
     try {
-      const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(s)}`);
+      const res = await fetch(
+        `/api/validate-domain?slug=${encodeURIComponent(s)}`,
+      );
       const json = await res.json();
       return json.valid === false;
     } catch {
@@ -258,7 +320,11 @@ export default function OrganizationSetupWizard({
       setCreatedOrg(org);
 
       // Assign or invite super admin
-      if (superAdminEmail.trim() && superAdminFirstName.trim() && superAdminLastName.trim()) {
+      if (
+        superAdminEmail.trim() &&
+        superAdminFirstName.trim() &&
+        superAdminLastName.trim()
+      ) {
         const email = superAdminEmail.trim();
         const firstName = superAdminFirstName.trim();
         const lastName = superAdminLastName.trim();
@@ -268,24 +334,27 @@ export default function OrganizationSetupWizard({
         // Create employee record for the super admin
         let employeeId: string | undefined;
         try {
-          const emp = await insertEmployee({
-            firstName,
-            lastName,
-            email,
-            phone: saPhone,
-            seniority: 0,
-            certificationId: null,
-            roleIds: [],
-            focusAreaIds: [],
-            contactNotes: "",
-            status: "active",
-            statusChangedAt: null,
-            statusNote: "",
-            userId: null,
-            departmentIds: [],
-            deptAdminIds: [],
-            version: 0,
-          }, org.id);
+          const emp = await insertEmployee(
+            {
+              firstName,
+              lastName,
+              email,
+              phone: saPhone,
+              seniority: 0,
+              certificationId: null,
+              roleIds: [],
+              focusAreaIds: [],
+              contactNotes: "",
+              status: "active",
+              statusChangedAt: null,
+              statusNote: "",
+              userId: null,
+              departmentIds: [],
+              deptAdminIds: [],
+              version: 0,
+            },
+            org.id,
+          );
           employeeId = emp.id;
         } catch (empErr: unknown) {
           Sentry.captureException(empErr);
@@ -298,7 +367,9 @@ export default function OrganizationSetupWizard({
         try {
           await assignOrgRoleByEmail(org.id, email, "super_admin");
           assigned = true;
-          toast.success(`Organization created & ${displayName} assigned as super admin`);
+          toast.success(
+            `Organization created & ${displayName} assigned as super admin`,
+          );
         } catch {
           // User doesn't exist yet — fall through to invitation
         }
@@ -306,13 +377,24 @@ export default function OrganizationSetupWizard({
         // If direct assignment failed, create an invitation record (email not sent yet)
         if (!assigned) {
           try {
-            const invResult = await sendInvitation(email, "super_admin", org.id, employeeId);
-            setPendingInvite({ token: invResult.token, email, name: displayName });
+            const invResult = await sendInvitation(
+              email,
+              "super_admin",
+              org.id,
+              employeeId,
+            );
+            setPendingInvite({
+              token: invResult.token,
+              email,
+              name: displayName,
+            });
             toast.success("Organization created & invitation ready");
             toast.info("Send the invitation email from the next screen.");
           } catch (invErr: unknown) {
             toast.success("Organization created");
-            toast.error(`Failed to create invitation: ${invErr instanceof Error ? invErr.message : "Unknown error"}`);
+            toast.error(
+              `Failed to create invitation: ${invErr instanceof Error ? invErr.message : "Unknown error"}`,
+            );
           }
         }
       } else {
@@ -321,11 +403,29 @@ export default function OrganizationSetupWizard({
 
       setCurrentStep("decision");
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to create organization");
+      toast.error(
+        (err instanceof Error ? err.message : null) ??
+          "Failed to create organization",
+      );
     } finally {
       setSaving(false);
     }
-  }, [name, slug, address, phone, employeeCount, focusAreaLabel, certificationLabel, roleLabel, timezone, shiftDisplayMode, superAdminFirstName, superAdminLastName, superAdminEmail, superAdminPhone]);
+  }, [
+    name,
+    slug,
+    address,
+    phone,
+    employeeCount,
+    focusAreaLabel,
+    certificationLabel,
+    roleLabel,
+    timezone,
+    shiftDisplayMode,
+    superAdminFirstName,
+    superAdminLastName,
+    superAdminEmail,
+    superAdminPhone,
+  ]);
 
   // ── Step 3: Save config ───────────────────────────────────────────────────
 
@@ -367,7 +467,6 @@ export default function OrganizationSetupWizard({
           departmentId: null,
           name: fa.name.trim(),
           sortOrder: i,
-          version: 0,
         });
       }
       savedCount += validFocusAreas.length;
@@ -424,12 +523,15 @@ export default function OrganizationSetupWizard({
       savedCount += validCats.length;
 
       // Save shift codes
-      const validCodes = shiftCodes.filter((c) => c.label.trim() || c.name.trim());
+      const validCodes = shiftCodes.filter(
+        (c) => c.label.trim() || c.name.trim(),
+      );
       for (let i = 0; i < validCodes.length; i++) {
         const code = validCodes[i];
         await upsertShiftCode({
           orgId: createdOrg.id,
-          label: code.label.trim() || code.name.trim().slice(0, 3).toUpperCase(),
+          label:
+            code.label.trim() || code.name.trim().slice(0, 3).toUpperCase(),
           name: code.name.trim() || code.label.trim(),
           color: code.color,
           border: code.color,
@@ -443,19 +545,30 @@ export default function OrganizationSetupWizard({
           defaultEndTime: null,
           defaultDurationHours: null,
           defaultDurationMinutes: null,
-          version: 0,
         });
       }
       savedCount += validCodes.length;
 
-      if (savedCount > 0) toast.success(`Saved ${savedCount} configuration items`);
+      if (savedCount > 0)
+        toast.success(`Saved ${savedCount} configuration items`);
       setCurrentStep("employees");
     } catch (err: unknown) {
-      toast.error(`Failed to save configuration: ${err instanceof Error ? err.message : "Unknown error"}`);
+      toast.error(
+        `Failed to save configuration: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     } finally {
       setSaving(false);
     }
-  }, [createdOrg, shiftDisplayMode, departments, focusAreas, certifications, orgRoles, shiftCategories, shiftCodes]);
+  }, [
+    createdOrg,
+    shiftDisplayMode,
+    departments,
+    focusAreas,
+    certifications,
+    orgRoles,
+    shiftCategories,
+    shiftCodes,
+  ]);
 
   // ── Step 4: Save employees ────────────────────────────────────────────────
 
@@ -508,7 +621,10 @@ export default function OrganizationSetupWizard({
         })),
       );
 
-      if (created.length > 0) toast.success(`Created ${created.length} employee${created.length !== 1 ? "s" : ""}`);
+      if (created.length > 0)
+        toast.success(
+          `Created ${created.length} employee${created.length !== 1 ? "s" : ""}`,
+        );
 
       if (withEmail.length > 0) {
         setCurrentStep("invitations");
@@ -518,7 +634,9 @@ export default function OrganizationSetupWizard({
         onCreated(createdOrg);
       }
     } catch (err: unknown) {
-      toast.error(`Failed to create employees: ${err instanceof Error ? err.message : "Unknown error"}`);
+      toast.error(
+        `Failed to create employees: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -541,7 +659,12 @@ export default function OrganizationSetupWizard({
     try {
       for (const inv of selected) {
         try {
-          const result = await sendInvitation(inv.email, inv.role, createdOrg.id, inv.employeeId);
+          const result = await sendInvitation(
+            inv.email,
+            inv.role,
+            createdOrg.id,
+            inv.employeeId,
+          );
           // Send email
           try {
             await fetch("/api/send-invite-email", {
@@ -562,8 +685,14 @@ export default function OrganizationSetupWizard({
         }
       }
 
-      if (sentCount > 0) toast.success(`Sent ${sentCount} invitation${sentCount !== 1 ? "s" : ""}`);
-      if (failCount > 0) toast.error(`${failCount} invitation${failCount !== 1 ? "s" : ""} failed`);
+      if (sentCount > 0)
+        toast.success(
+          `Sent ${sentCount} invitation${sentCount !== 1 ? "s" : ""}`,
+        );
+      if (failCount > 0)
+        toast.error(
+          `${failCount} invitation${failCount !== 1 ? "s" : ""} failed`,
+        );
 
       onCreated(createdOrg);
     } finally {
@@ -578,27 +707,45 @@ export default function OrganizationSetupWizard({
   }
 
   function updateFocusArea(idx: number, updates: Partial<FocusAreaRow>) {
-    setFocusAreas((prev) => prev.map((fa, i) => (i === idx ? { ...fa, ...updates } : fa)));
+    setFocusAreas((prev) =>
+      prev.map((fa, i) => (i === idx ? { ...fa, ...updates } : fa)),
+    );
   }
 
   function removeFocusArea(idx: number) {
     setFocusAreas((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function addNamedItemRow(setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>) {
-    setter((prev) => [...prev, { id: crypto.randomUUID(), name: "", abbr: "" }]);
+  function addNamedItemRow(
+    setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>,
+  ) {
+    setter((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: "", abbr: "" },
+    ]);
   }
 
-  function updateNamedItem(setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>, idx: number, updates: Partial<NamedItemRow>) {
-    setter((prev) => prev.map((item, i) => (i === idx ? { ...item, ...updates } : item)));
+  function updateNamedItem(
+    setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>,
+    idx: number,
+    updates: Partial<NamedItemRow>,
+  ) {
+    setter((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, ...updates } : item)),
+    );
   }
 
-  function removeNamedItem(setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>, idx: number) {
+  function removeNamedItem(
+    setter: React.Dispatch<React.SetStateAction<NamedItemRow[]>>,
+    idx: number,
+  ) {
     setter((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function updateEmployeeRow(idx: number, updates: Partial<EmployeeRow>) {
-    setEmployeeRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...updates } : r)));
+    setEmployeeRows((prev) =>
+      prev.map((r, i) => (i === idx ? { ...r, ...updates } : r)),
+    );
   }
 
   function removeEmployeeRow(idx: number) {
@@ -608,7 +755,13 @@ export default function OrganizationSetupWizard({
   function addEmployeeRows(count: number) {
     setEmployeeRows((prev) => [
       ...prev,
-      ...Array.from({ length: count }, () => ({ id: crypto.randomUUID(), firstName: "", lastName: "", email: "", phone: "" })),
+      ...Array.from({ length: count }, () => ({
+        id: crypto.randomUUID(),
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+      })),
     ]);
   }
 
@@ -616,7 +769,14 @@ export default function OrganizationSetupWizard({
 
   function ActionBar({ children }: { children: React.ReactNode }) {
     return (
-      <div style={{ display: "flex", gap: 8, marginTop: 24, justifyContent: "flex-end" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginTop: 24,
+          justifyContent: "flex-end",
+        }}
+      >
         {children}
       </div>
     );
@@ -630,7 +790,13 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Organization Details</div>
           <div style={sectionBodyStyle}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+              }}
+            >
               <div>
                 <label style={labelStyle}>Organization Name *</label>
                 <input
@@ -654,24 +820,44 @@ export default function OrganizationSetupWizard({
                   placeholder="acme-healthcare"
                 />
                 {slugError && (
-                  <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4, display: "block" }}>
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-danger)",
+                      marginTop: 4,
+                      display: "block",
+                    }}
+                  >
                     {slugError}
                   </span>
                 )}
               </div>
               <div>
                 <label style={labelStyle}>Address</label>
-                <input className="dg-input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City, ST" />
+                <input
+                  className="dg-input"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="123 Main St, City, ST"
+                />
               </div>
               <div>
                 <label style={labelStyle}>Phone</label>
-                <input className="dg-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" />
+                <input
+                  className="dg-input"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                />
               </div>
               <div>
                 <label style={labelStyle}>Timezone</label>
                 <CustomSelect
                   value={timezone}
-                  options={[{ value: "", label: "Select timezone…" }, ...TIMEZONES.map((tz) => ({ value: tz, label: tz }))]}
+                  options={[
+                    { value: "", label: "Select timezone…" },
+                    ...TIMEZONES.map((tz) => ({ value: tz, label: tz })),
+                  ]}
                   onChange={setTimezone}
                   style={{ width: "100%" }}
                 />
@@ -694,33 +880,65 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Custom Labels</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Customize terminology used throughout the app for this organization.
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Customize terminology used throughout the app for this
+              organization.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 16,
+              }}
+            >
               <div>
                 <label style={labelStyle}>Focus Areas Label</label>
-                <input className="dg-input" value={focusAreaLabel} onChange={(e) => setFocusAreaLabel(e.target.value)} placeholder="Focus Areas" />
+                <input
+                  className="dg-input"
+                  value={focusAreaLabel}
+                  onChange={(e) => setFocusAreaLabel(e.target.value)}
+                  placeholder="Focus Areas"
+                />
               </div>
               <div>
                 <label style={labelStyle}>Certifications Label</label>
-                <input className="dg-input" value={certificationLabel} onChange={(e) => setCertificationLabel(e.target.value)} placeholder="Certifications" />
+                <input
+                  className="dg-input"
+                  value={certificationLabel}
+                  onChange={(e) => setCertificationLabel(e.target.value)}
+                  placeholder="Certifications"
+                />
               </div>
               <div>
                 <label style={labelStyle}>Roles Label</label>
-                <input className="dg-input" value={roleLabel} onChange={(e) => setRoleLabel(e.target.value)} placeholder="Roles" />
+                <input
+                  className="dg-input"
+                  value={roleLabel}
+                  onChange={(e) => setRoleLabel(e.target.value)}
+                  placeholder="Roles"
+                />
               </div>
             </div>
           </div>
         </div>
 
         <ActionBar>
-          <button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
+          <button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            onClick={onCancel}
+          >
             Cancel
           </button>
           <button
             type="button"
-            className="dg-btn dg-btn-primary"
+            className="dg-btn dg-btn-brand"
             disabled={saving || !name.trim()}
             onClick={handleDetailsNext}
           >
@@ -739,12 +957,28 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Super Admin Setup</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Assign a super admin who will own this organization. They will have full control over settings, users, and configuration.
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Assign a super admin who will own this organization. They will
+              have full control over settings, users, and configuration.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 500 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                maxWidth: 500,
+              }}
+            >
               <div>
-                <label style={labelStyle}>First Name *</label>
+                <label style={labelStyle}>
+                  First Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                </label>
                 <input
                   className="dg-input"
                   value={superAdminFirstName}
@@ -753,7 +987,9 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Last Name *</label>
+                <label style={labelStyle}>
+                  Last Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                </label>
                 <input
                   className="dg-input"
                   value={superAdminLastName}
@@ -762,7 +998,9 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Email *</label>
+                <label style={labelStyle}>
+                  Email <span style={{ color: "var(--color-danger)" }}>*</span>
+                </label>
                 <input
                   className="dg-input"
                   type="email"
@@ -783,8 +1021,17 @@ export default function OrganizationSetupWizard({
               </div>
             </div>
             {superAdminEmail.trim() && (
-              <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", marginTop: 8, display: "block", maxWidth: 500 }}>
-                If this user doesn&apos;t have an account yet, an invitation will be created. You can send the email on the next screen.
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-label)",
+                  color: "var(--color-text-muted)",
+                  marginTop: 8,
+                  display: "block",
+                  maxWidth: 500,
+                }}
+              >
+                If this user doesn&apos;t have an account yet, an invitation
+                will be created. You can send the email on the next screen.
               </span>
             )}
           </div>
@@ -793,31 +1040,83 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Summary</div>
           <div style={sectionBodyStyle}>
-            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: "var(--dg-fs-label)" }}>
-              <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Organization</span>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "auto 1fr",
+                gap: "8px 16px",
+                fontSize: "var(--dg-fs-label)",
+              }}
+            >
+              <span
+                style={{ fontWeight: 600, color: "var(--color-text-muted)" }}
+              >
+                Organization
+              </span>
               <span style={{ color: "var(--color-text-primary)" }}>{name}</span>
               {slug && (
                 <>
-                  <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Slug</span>
-                  <span style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-dm-mono), monospace" }}>{slug}</span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    Slug
+                  </span>
+                  <span
+                    style={{
+                      color: "var(--color-text-primary)",
+                      fontFamily: "var(--font-dm-mono), monospace",
+                    }}
+                  >
+                    {slug}
+                  </span>
                 </>
               )}
               {timezone && (
                 <>
-                  <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Timezone</span>
-                  <span style={{ color: "var(--color-text-primary)" }}>{timezone}</span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    Timezone
+                  </span>
+                  <span style={{ color: "var(--color-text-primary)" }}>
+                    {timezone}
+                  </span>
                 </>
               )}
               {superAdminFirstName.trim() && superAdminLastName.trim() && (
                 <>
-                  <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Super Admin</span>
-                  <span style={{ color: "var(--color-text-primary)" }}>{superAdminFirstName.trim()} {superAdminLastName.trim()}</span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    Super Admin
+                  </span>
+                  <span style={{ color: "var(--color-text-primary)" }}>
+                    {superAdminFirstName.trim()} {superAdminLastName.trim()}
+                  </span>
                 </>
               )}
               {superAdminEmail.trim() && (
                 <>
-                  <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Email</span>
-                  <span style={{ color: "var(--color-text-primary)" }}>{superAdminEmail}</span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    Email
+                  </span>
+                  <span style={{ color: "var(--color-text-primary)" }}>
+                    {superAdminEmail}
+                  </span>
                 </>
               )}
             </div>
@@ -825,13 +1124,22 @@ export default function OrganizationSetupWizard({
         </div>
 
         <ActionBar>
-          <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setCurrentStep("details")}>
+          <button
+            type="button"
+            className="dg-btn dg-btn-ghost"
+            onClick={() => setCurrentStep("details")}
+          >
             Back
           </button>
           <button
             type="button"
-            className="dg-btn dg-btn-primary"
-            disabled={saving || !superAdminFirstName.trim() || !superAdminLastName.trim() || !superAdminEmail.trim()}
+            className="dg-btn dg-btn-brand"
+            disabled={
+              saving ||
+              !superAdminFirstName.trim() ||
+              !superAdminLastName.trim() ||
+              !superAdminEmail.trim()
+            }
             onClick={handleSuperAdminNext}
           >
             {saving ? "Creating…" : "Create Organization"}
@@ -863,7 +1171,9 @@ export default function OrganizationSetupWizard({
       toast.success(`Invitation email sent to ${pendingInvite.name}`);
       setPendingInvite(null);
     } catch (err: unknown) {
-      toast.error(`Failed to send email: ${err instanceof Error ? err.message : "Unknown error"}`);
+      toast.error(
+        `Failed to send email: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     } finally {
       setSendingEmail(false);
     }
@@ -884,14 +1194,36 @@ export default function OrganizationSetupWizard({
               margin: "0 auto 20px",
             }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#fff"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
-          <h2 style={{ margin: "0 0 8px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <h2
+            style={{
+              margin: "0 0 8px",
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             Organization Created
           </h2>
-          <p style={{ margin: "0 0 24px", fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)" }}>
+          <p
+            style={{
+              margin: "0 0 24px",
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--color-text-muted)",
+            }}
+          >
             {createdOrg?.name} is ready.
           </p>
         </div>
@@ -905,18 +1237,39 @@ export default function OrganizationSetupWizard({
               border: "1px solid var(--color-warning)",
             }}
           >
-            <div style={{ ...sectionBodyStyle, display: "flex", alignItems: "center", gap: 16 }}>
+            <div
+              style={{
+                ...sectionBodyStyle,
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
-                  Invitation ready for {pendingInvite.name} ({pendingInvite.email})
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-body-sm)",
+                    fontWeight: 600,
+                    color: "var(--color-text-primary)",
+                    marginBottom: 4,
+                  }}
+                >
+                  Invitation ready for {pendingInvite.name} (
+                  {pendingInvite.email})
                 </div>
-                <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-                  They will join as admin. You can promote them to super admin after they accept.
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
+                  They will join as admin. You can promote them to super admin
+                  after they accept.
                 </div>
               </div>
               <button
                 type="button"
-                className="dg-btn dg-btn-primary"
+                className="dg-btn dg-btn-brand"
                 disabled={sendingEmail}
                 onClick={handleSendPendingEmail}
                 style={{ whiteSpace: "nowrap" }}
@@ -928,8 +1281,15 @@ export default function OrganizationSetupWizard({
         )}
 
         <div style={{ textAlign: "center" }}>
-          <p style={{ margin: "0 0 24px", fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)" }}>
-            Would you like to continue setting up configuration, employees, and invitations?
+          <p
+            style={{
+              margin: "0 0 24px",
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--color-text-muted)",
+            }}
+          >
+            Would you like to continue setting up configuration, employees, and
+            invitations?
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
             <button
@@ -942,7 +1302,7 @@ export default function OrganizationSetupWizard({
             </button>
             <button
               type="button"
-              className="dg-btn dg-btn-primary"
+              className="dg-btn dg-btn-brand"
               style={{ padding: "12px 24px" }}
               onClick={() => setCurrentStep("config")}
             >
@@ -963,11 +1323,22 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Shift Display Mode</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
               How shift codes appear on the schedule grid.
             </p>
             <div style={{ display: "flex", gap: 16 }}>
-              {([["code", "Code", "D"], ["name", "Full Name", "Day Shift"]] as const).map(([value, label, example]) => (
+              {(
+                [
+                  ["code", "Code", "D"],
+                  ["name", "Full Name", "Day Shift"],
+                ] as const
+              ).map(([value, label, example]) => (
                 <label
                   key={value}
                   style={{
@@ -977,7 +1348,10 @@ export default function OrganizationSetupWizard({
                     padding: "10px 16px",
                     borderRadius: 8,
                     border: `2px solid ${shiftDisplayMode === value ? "var(--color-primary)" : "var(--color-border)"}`,
-                    background: shiftDisplayMode === value ? "var(--color-primary-bg)" : "transparent",
+                    background:
+                      shiftDisplayMode === value
+                        ? "var(--color-primary-bg)"
+                        : "transparent",
                     cursor: "pointer",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 500,
@@ -992,8 +1366,17 @@ export default function OrganizationSetupWizard({
                     style={{ accentColor: "var(--color-primary)" }}
                   />
                   <span>
-                    <span style={{ color: "var(--color-text-primary)" }}>{label}</span>
-                    <span style={{ color: "var(--color-text-muted)", marginLeft: 6 }}>({example})</span>
+                    <span style={{ color: "var(--color-text-primary)" }}>
+                      {label}
+                    </span>
+                    <span
+                      style={{
+                        color: "var(--color-text-muted)",
+                        marginLeft: 6,
+                      }}
+                    >
+                      ({example})
+                    </span>
                   </span>
                 </label>
               ))}
@@ -1005,22 +1388,50 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Departments</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Organizational departments. &quot;Scheduled&quot; departments appear on the scheduling grid; &quot;Management&quot; departments are for hierarchy only.
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Organizational departments. &quot;Scheduled&quot; departments
+              appear on the scheduling grid; &quot;Management&quot; departments
+              are for hierarchy only.
             </p>
             {departments.map((dept, idx) => (
-              <div key={dept.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                key={dept.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   className="dg-input"
                   value={dept.name}
-                  onChange={(e) => setDepartments((prev) => prev.map((d, i) => (i === idx ? { ...d, name: e.target.value } : d)))}
+                  onChange={(e) =>
+                    setDepartments((prev) =>
+                      prev.map((d, i) =>
+                        i === idx ? { ...d, name: e.target.value } : d,
+                      ),
+                    )
+                  }
                   placeholder="e.g. Emergency"
                   style={{ flex: 2 }}
                 />
                 <input
                   className="dg-input"
                   value={dept.abbr}
-                  onChange={(e) => setDepartments((prev) => prev.map((d, i) => (i === idx ? { ...d, abbr: e.target.value } : d)))}
+                  onChange={(e) =>
+                    setDepartments((prev) =>
+                      prev.map((d, i) =>
+                        i === idx ? { ...d, abbr: e.target.value } : d,
+                      ),
+                    )
+                  }
                   placeholder="e.g. ER"
                   style={{ flex: 1, maxWidth: 100 }}
                 />
@@ -1030,13 +1441,38 @@ export default function OrganizationSetupWizard({
                     { value: "scheduled", label: "Scheduled" },
                     { value: "management", label: "Management" },
                   ]}
-                  onChange={(val) => setDepartments((prev) => prev.map((d, i) => (i === idx ? { ...d, type: val as "scheduled" | "management" } : d)))}
+                  onChange={(val) =>
+                    setDepartments((prev) =>
+                      prev.map((d, i) =>
+                        i === idx
+                          ? { ...d, type: val as "scheduled" | "management" }
+                          : d,
+                      ),
+                    )
+                  }
                   style={{ width: 140 }}
                 />
                 {departments.length > 1 && (
-                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setDepartments((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: "6px 8px" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() =>
+                      setDepartments((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
                 )}
@@ -1045,7 +1481,17 @@ export default function OrganizationSetupWizard({
             <button
               type="button"
               className="dg-btn dg-btn-ghost"
-              onClick={() => setDepartments((prev) => [...prev, { id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" }])}
+              onClick={() =>
+                setDepartments((prev) => [
+                  ...prev,
+                  {
+                    id: crypto.randomUUID(),
+                    name: "",
+                    abbr: "",
+                    type: "scheduled",
+                  },
+                ])
+              }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add department
@@ -1057,28 +1503,64 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>{focusAreaLabel}</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
               Departments, wings, or units that employees are assigned to.
             </p>
             {focusAreas.map((fa, idx) => (
-              <div key={fa.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                key={fa.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   className="dg-input"
                   value={fa.name}
-                  onChange={(e) => updateFocusArea(idx, { name: e.target.value })}
+                  onChange={(e) =>
+                    updateFocusArea(idx, { name: e.target.value })
+                  }
                   placeholder={`${focusAreaLabel.replace(/s$/, "")} name`}
                   style={{ flex: 1 }}
                 />
                 {focusAreas.length > 1 && (
-                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => removeFocusArea(idx)} style={{ padding: "6px 8px" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() => removeFocusArea(idx)}
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
                 )}
               </div>
             ))}
-            <button type="button" className="dg-btn dg-btn-ghost" onClick={addFocusAreaRow} style={{ fontSize: "var(--dg-fs-label)" }}>
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={addFocusAreaRow}
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            >
               + Add {focusAreaLabel.replace(/s$/, "").toLowerCase()}
             </button>
           </div>
@@ -1088,35 +1570,77 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>{certificationLabel}</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
               Skill levels or designations that employees can hold.
             </p>
             {certifications.map((cert, idx) => (
-              <div key={cert.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                key={cert.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   className="dg-input"
                   value={cert.name}
-                  onChange={(e) => updateNamedItem(setCertifications, idx, { name: e.target.value })}
+                  onChange={(e) =>
+                    updateNamedItem(setCertifications, idx, {
+                      name: e.target.value,
+                    })
+                  }
                   placeholder="e.g. Registered Nurse"
                   style={{ flex: 2 }}
                 />
                 <input
                   className="dg-input"
                   value={cert.abbr}
-                  onChange={(e) => updateNamedItem(setCertifications, idx, { abbr: e.target.value })}
+                  onChange={(e) =>
+                    updateNamedItem(setCertifications, idx, {
+                      abbr: e.target.value,
+                    })
+                  }
                   placeholder="e.g. RN"
                   style={{ flex: 1, maxWidth: 100 }}
                 />
                 {certifications.length > 1 && (
-                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => removeNamedItem(setCertifications, idx)} style={{ padding: "6px 8px" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() => removeNamedItem(setCertifications, idx)}
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
                 )}
               </div>
             ))}
-            <button type="button" className="dg-btn dg-btn-ghost" onClick={() => addNamedItemRow(setCertifications)} style={{ fontSize: "var(--dg-fs-label)" }}>
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={() => addNamedItemRow(setCertifications)}
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            >
               + Add {certificationLabel.replace(/s$/, "").toLowerCase()}
             </button>
           </div>
@@ -1126,35 +1650,74 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>{roleLabel}</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Configurable display roles for employees (not to be confused with access roles).
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Configurable display roles for employees (not to be confused with
+              access roles).
             </p>
             {orgRoles.map((role, idx) => (
-              <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                key={role.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   className="dg-input"
                   value={role.name}
-                  onChange={(e) => updateNamedItem(setOrgRoles, idx, { name: e.target.value })}
+                  onChange={(e) =>
+                    updateNamedItem(setOrgRoles, idx, { name: e.target.value })
+                  }
                   placeholder="e.g. Charge Nurse"
                   style={{ flex: 2 }}
                 />
                 <input
                   className="dg-input"
                   value={role.abbr}
-                  onChange={(e) => updateNamedItem(setOrgRoles, idx, { abbr: e.target.value })}
+                  onChange={(e) =>
+                    updateNamedItem(setOrgRoles, idx, { abbr: e.target.value })
+                  }
                   placeholder="e.g. CN"
                   style={{ flex: 1, maxWidth: 100 }}
                 />
                 {orgRoles.length > 1 && (
-                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => removeNamedItem(setOrgRoles, idx)} style={{ padding: "6px 8px" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() => removeNamedItem(setOrgRoles, idx)}
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
                 )}
               </div>
             ))}
-            <button type="button" className="dg-btn dg-btn-ghost" onClick={() => addNamedItemRow(setOrgRoles)} style={{ fontSize: "var(--dg-fs-label)" }}>
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={() => addNamedItemRow(setOrgRoles)}
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            >
               + Add {roleLabel.replace(/s$/, "").toLowerCase()}
             </button>
           </div>
@@ -1164,21 +1727,55 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Shift Categories</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Time-window categories that group shift codes (e.g. Day, Evening, Night).
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Time-window categories that group shift codes (e.g. Day, Evening,
+              Night).
             </p>
             {shiftCategories.map((cat, idx) => (
-              <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                key={cat.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   type="color"
                   value={cat.color}
-                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, color: e.target.value } : c)))}
-                  style={{ width: 36, height: 36, border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: 2 }}
+                  onChange={(e) =>
+                    setShiftCategories((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, color: e.target.value } : c,
+                      ),
+                    )
+                  }
+                  style={{
+                    width: 36,
+                    height: 36,
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    padding: 2,
+                  }}
                 />
                 <input
                   className="dg-input"
                   value={cat.name}
-                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)))}
+                  onChange={(e) =>
+                    setShiftCategories((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, name: e.target.value } : c,
+                      ),
+                    )
+                  }
                   placeholder="e.g. Day Shift"
                   style={{ flex: 2 }}
                 />
@@ -1186,22 +1783,53 @@ export default function OrganizationSetupWizard({
                   className="dg-input"
                   type="time"
                   value={cat.startTime}
-                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, startTime: e.target.value } : c)))}
+                  aria-label="Start time"
+                  onChange={(e) =>
+                    setShiftCategories((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, startTime: e.target.value } : c,
+                      ),
+                    )
+                  }
                   style={{ width: 120 }}
-                  title="Start time"
                 />
                 <input
                   className="dg-input"
                   type="time"
                   value={cat.endTime}
-                  onChange={(e) => setShiftCategories((prev) => prev.map((c, i) => (i === idx ? { ...c, endTime: e.target.value } : c)))}
+                  aria-label="End time"
+                  onChange={(e) =>
+                    setShiftCategories((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, endTime: e.target.value } : c,
+                      ),
+                    )
+                  }
                   style={{ width: 120 }}
-                  title="End time"
                 />
                 {shiftCategories.length > 1 && (
-                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setShiftCategories((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: "6px 8px" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() =>
+                      setShiftCategories((prev) =>
+                        prev.filter((_, i) => i !== idx),
+                      )
+                    }
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
                 )}
@@ -1210,7 +1838,18 @@ export default function OrganizationSetupWizard({
             <button
               type="button"
               className="dg-btn dg-btn-ghost"
-              onClick={() => setShiftCategories((prev) => [...prev, { id: crypto.randomUUID(), name: "", color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length], startTime: "", endTime: "" }])}
+              onClick={() =>
+                setShiftCategories((prev) => [
+                  ...prev,
+                  {
+                    id: crypto.randomUUID(),
+                    name: "",
+                    color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length],
+                    startTime: "",
+                    endTime: "",
+                  },
+                ])
+              }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add category
@@ -1222,35 +1861,92 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Shift Codes</div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Individual shift codes that appear on the schedule (e.g. &quot;D&quot; for Day, &quot;N&quot; for Night).
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Individual shift codes that appear on the schedule (e.g.
+              &quot;D&quot; for Day, &quot;N&quot; for Night).
             </p>
             {shiftCodes.map((code, idx) => (
-              <div key={code.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                key={code.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   type="color"
                   value={code.color}
-                  onChange={(e) => setShiftCodes((prev) => prev.map((c, i) => (i === idx ? { ...c, color: e.target.value } : c)))}
-                  style={{ width: 36, height: 36, border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: 2 }}
+                  onChange={(e) =>
+                    setShiftCodes((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, color: e.target.value } : c,
+                      ),
+                    )
+                  }
+                  style={{
+                    width: 36,
+                    height: 36,
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    padding: 2,
+                  }}
                 />
                 <input
                   className="dg-input"
                   value={code.label}
-                  onChange={(e) => setShiftCodes((prev) => prev.map((c, i) => (i === idx ? { ...c, label: e.target.value } : c)))}
+                  onChange={(e) =>
+                    setShiftCodes((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, label: e.target.value } : c,
+                      ),
+                    )
+                  }
                   placeholder="e.g. D"
                   style={{ flex: 1, maxWidth: 80 }}
                 />
                 <input
                   className="dg-input"
                   value={code.name}
-                  onChange={(e) => setShiftCodes((prev) => prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)))}
+                  onChange={(e) =>
+                    setShiftCodes((prev) =>
+                      prev.map((c, i) =>
+                        i === idx ? { ...c, name: e.target.value } : c,
+                      ),
+                    )
+                  }
                   placeholder="e.g. Day Shift"
                   style={{ flex: 2 }}
                 />
                 {shiftCodes.length > 1 && (
-                  <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setShiftCodes((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: "6px 8px" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={() =>
+                      setShiftCodes((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
                 )}
@@ -1259,7 +1955,17 @@ export default function OrganizationSetupWizard({
             <button
               type="button"
               className="dg-btn dg-btn-ghost"
-              onClick={() => setShiftCodes((prev) => [...prev, { id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length] }])}
+              onClick={() =>
+                setShiftCodes((prev) => [
+                  ...prev,
+                  {
+                    id: crypto.randomUUID(),
+                    label: "",
+                    name: "",
+                    color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length],
+                  },
+                ])
+              }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add shift code
@@ -1268,10 +1974,19 @@ export default function OrganizationSetupWizard({
         </div>
 
         <ActionBar>
-          <button type="button" className="dg-btn dg-btn-ghost" onClick={() => setCurrentStep("employees")}>
+          <button
+            type="button"
+            className="dg-btn dg-btn-ghost"
+            onClick={() => setCurrentStep("employees")}
+          >
             Skip
           </button>
-          <button type="button" className="dg-btn dg-btn-primary" disabled={saving} onClick={handleConfigNext}>
+          <button
+            type="button"
+            className="dg-btn dg-btn-brand"
+            disabled={saving}
+            onClick={handleConfigNext}
+          >
             {saving ? "Saving…" : "Next"}
           </button>
         </ActionBar>
@@ -1290,19 +2005,41 @@ export default function OrganizationSetupWizard({
           <div style={sectionHeaderStyle}>
             Add Employees
             {validCount > 0 && (
-              <span style={{ fontWeight: 500, color: "var(--color-text-muted)", marginLeft: 8 }}>
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: "var(--color-text-muted)",
+                  marginLeft: 8,
+                }}
+              >
                 ({validCount} ready)
               </span>
             )}
           </div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Add your staff members. At minimum, provide a first name. Email is needed if you want to invite them in the next step.
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Add your staff members. At minimum, provide a first name. Email is
+              needed if you want to invite them in the next step.
             </p>
 
             {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 32px", gap: 8, marginBottom: 4 }}>
-              <span style={{ ...labelStyle, marginBottom: 0 }}>First Name *</span>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr 32px",
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <span style={{ ...labelStyle, marginBottom: 0 }}>
+                First Name <span style={{ color: "var(--color-danger)" }}>*</span>
+              </span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Last Name</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Email</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Phone</span>
@@ -1311,44 +2048,108 @@ export default function OrganizationSetupWizard({
 
             {/* Rows */}
             {employeeRows.map((row, idx) => (
-              <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
-                <input className="dg-input" value={row.firstName} onChange={(e) => updateEmployeeRow(idx, { firstName: e.target.value })} placeholder="John" />
-                <input className="dg-input" value={row.lastName} onChange={(e) => updateEmployeeRow(idx, { lastName: e.target.value })} placeholder="Doe" />
-                <input className="dg-input" type="email" value={row.email} onChange={(e) => updateEmployeeRow(idx, { email: e.target.value })} placeholder="john@example.com" />
-                <input className="dg-input" value={row.phone} onChange={(e) => updateEmployeeRow(idx, { phone: e.target.value })} placeholder="(555) 123-4567" />
+              <div
+                key={row.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr 1fr 32px",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <input
+                  className="dg-input"
+                  value={row.firstName}
+                  onChange={(e) =>
+                    updateEmployeeRow(idx, { firstName: e.target.value })
+                  }
+                  placeholder="John"
+                />
+                <input
+                  className="dg-input"
+                  value={row.lastName}
+                  onChange={(e) =>
+                    updateEmployeeRow(idx, { lastName: e.target.value })
+                  }
+                  placeholder="Doe"
+                />
+                <input
+                  className="dg-input"
+                  type="email"
+                  value={row.email}
+                  onChange={(e) =>
+                    updateEmployeeRow(idx, { email: e.target.value })
+                  }
+                  placeholder="john@example.com"
+                />
+                <input
+                  className="dg-input"
+                  value={row.phone}
+                  onChange={(e) =>
+                    updateEmployeeRow(idx, { phone: e.target.value })
+                  }
+                  placeholder="(555) 123-4567"
+                />
                 <button
                   type="button"
                   className="dg-btn dg-btn-ghost"
                   onClick={() => removeEmployeeRow(idx)}
-                  style={{ padding: "6px", opacity: employeeRows.length > 1 ? 1 : 0.3 }}
+                  style={{
+                    padding: "6px",
+                    opacity: employeeRows.length > 1 ? 1 : 0.3,
+                  }}
                   disabled={employeeRows.length <= 1}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>
             ))}
 
-            <button type="button" className="dg-btn dg-btn-ghost" onClick={() => addEmployeeRows(5)} style={{ fontSize: "var(--dg-fs-label)", marginTop: 8 }}>
+            <button
+              type="button"
+              className="dg-btn dg-btn-ghost"
+              onClick={() => addEmployeeRows(5)}
+              style={{ fontSize: "var(--dg-fs-label)", marginTop: 8 }}
+            >
               + Add 5 more rows
             </button>
           </div>
         </div>
 
         <ActionBar>
-          <button type="button" className="dg-btn dg-btn-ghost" onClick={() => {
-            if (createdOrg) { toast.success("Setup complete"); onCreated(createdOrg); }
-          }}>
+          <button
+            type="button"
+            className="dg-btn dg-btn-ghost"
+            onClick={() => {
+              if (createdOrg) {
+                toast.success("Setup complete");
+                onCreated(createdOrg);
+              }
+            }}
+          >
             Skip
           </button>
           <button
             type="button"
-            className="dg-btn dg-btn-primary"
+            className="dg-btn dg-btn-brand"
             disabled={saving || validCount === 0}
             onClick={handleEmployeesNext}
           >
-            {saving ? "Creating…" : `Create ${validCount} Employee${validCount !== 1 ? "s" : ""}`}
+            {saving
+              ? "Creating…"
+              : `Create ${validCount} Employee${validCount !== 1 ? "s" : ""}`}
           </button>
         </ActionBar>
       </>
@@ -1359,7 +2160,8 @@ export default function OrganizationSetupWizard({
 
   function renderInvitations() {
     const selectedCount = invitationRows.filter((r) => r.selected).length;
-    const allSelected = invitationRows.length > 0 && selectedCount === invitationRows.length;
+    const allSelected =
+      invitationRows.length > 0 && selectedCount === invitationRows.length;
 
     return (
       <>
@@ -1367,18 +2169,36 @@ export default function OrganizationSetupWizard({
           <div style={sectionHeaderStyle}>
             Send Invitations
             {selectedCount > 0 && (
-              <span style={{ fontWeight: 500, color: "var(--color-text-muted)", marginLeft: 8 }}>
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: "var(--color-text-muted)",
+                  marginLeft: 8,
+                }}
+              >
                 ({selectedCount} selected)
               </span>
             )}
           </div>
           <div style={sectionBodyStyle}>
-            <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-              Select employees to invite. They will receive an email with a link to set their password and join the organization.
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Select employees to invite. They will receive an email with a link
+              to set their password and join the organization.
             </p>
 
             {invitationRows.length === 0 ? (
-              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+              <p
+                style={{
+                  color: "var(--color-text-muted)",
+                  fontSize: "var(--dg-fs-label)",
+                }}
+              >
                 No employees with email addresses to invite.
               </p>
             ) : (
@@ -1400,7 +2220,9 @@ export default function OrganizationSetupWizard({
                     type="checkbox"
                     checked={allSelected}
                     onChange={(e) => {
-                      setInvitationRows((prev) => prev.map((r) => ({ ...r, selected: e.target.checked })));
+                      setInvitationRows((prev) =>
+                        prev.map((r) => ({ ...r, selected: e.target.checked })),
+                      );
                     }}
                     style={{ accentColor: "var(--color-primary)" }}
                   />
@@ -1408,7 +2230,14 @@ export default function OrganizationSetupWizard({
                 </label>
 
                 {/* Header */}
-                <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 1fr 120px", gap: 8, marginBottom: 4 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "32px 1fr 1fr 120px",
+                    gap: 8,
+                    marginBottom: 4,
+                  }}
+                >
                   <span />
                   <span style={{ ...labelStyle, marginBottom: 0 }}>Name</span>
                   <span style={{ ...labelStyle, marginBottom: 0 }}>Email</span>
@@ -1433,15 +2262,30 @@ export default function OrganizationSetupWizard({
                       checked={inv.selected}
                       onChange={(e) => {
                         setInvitationRows((prev) =>
-                          prev.map((r, i) => (i === idx ? { ...r, selected: e.target.checked } : r)),
+                          prev.map((r, i) =>
+                            i === idx
+                              ? { ...r, selected: e.target.checked }
+                              : r,
+                          ),
                         );
                       }}
                       style={{ accentColor: "var(--color-primary)" }}
                     />
-                    <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-primary)" }}>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 500,
+                        color: "var(--color-text-primary)",
+                      }}
+                    >
                       {inv.name}
                     </span>
-                    <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
                       {inv.email}
                     </span>
                     <CustomSelect
@@ -1452,7 +2296,14 @@ export default function OrganizationSetupWizard({
                       ]}
                       onChange={(val) => {
                         setInvitationRows((prev) =>
-                          prev.map((r, i) => (i === idx ? { ...r, role: val as AssignableOrganizationRole } : r)),
+                          prev.map((r, i) =>
+                            i === idx
+                              ? {
+                                  ...r,
+                                  role: val as AssignableOrganizationRole,
+                                }
+                              : r,
+                          ),
                         );
                       }}
                       style={{ width: "100%" }}
@@ -1474,11 +2325,13 @@ export default function OrganizationSetupWizard({
           </button>
           <button
             type="button"
-            className="dg-btn dg-btn-primary"
+            className="dg-btn dg-btn-brand"
             disabled={saving || selectedCount === 0}
             onClick={handleInvitationsFinish}
           >
-            {saving ? "Sending…" : `Send ${selectedCount} Invitation${selectedCount !== 1 ? "s" : ""} & Finish`}
+            {saving
+              ? "Sending…"
+              : `Send ${selectedCount} Invitation${selectedCount !== 1 ? "s" : ""} & Finish`}
           </button>
         </ActionBar>
       </>
@@ -1489,12 +2342,32 @@ export default function OrganizationSetupWizard({
 
   return (
     <div style={{ maxWidth: 720 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-          {currentStep === "decision" ? "Organization Created" : "Create Organization"}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 20,
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-heading)",
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          {currentStep === "decision"
+            ? "Organization Created"
+            : "Create Organization"}
         </h2>
         {currentStep !== "decision" && (
-          <button type="button" className="dg-btn dg-btn-ghost" onClick={onCancel}>
+          <button
+            type="button"
+            className="dg-btn dg-btn-ghost"
+            onClick={onCancel}
+          >
             Cancel
           </button>
         )}

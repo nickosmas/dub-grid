@@ -260,18 +260,16 @@ export default function StringListSettings({
       )}
       {isEditing && (
         <>
-          {isDirty && (
-            <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary dg-btn-sm">
-              {saving ? "Saving\u2026" : "Save All"}
-            </button>
-          )}
+          <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+            {saving ? "Saving\u2026" : "Save All"}
+          </button>
           <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">
             Cancel
           </button>
         </>
       )}
       {saved && (
-        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>Saved!</span>
+        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-success)", fontWeight: 600 }}>Saved!</span>
       )}
     </>
   );
@@ -334,7 +332,7 @@ export default function StringListSettings({
                   gridTemplateColumns: gridCols,
                   padding: isEditing ? "10px 16px" : "11px 16px",
                   gap: 16,
-                  borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
+                  borderTop: isDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
                   borderBottom: i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
                   alignItems: "center",
                   cursor: isEditing ? "grab" : "default",
@@ -417,20 +415,20 @@ export default function StringListSettings({
                         {deptMap.get(item.departmentId)?.name ?? "—"}
                       </span>
                     ) : (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: "2px 8px",
-                          borderRadius: 20,
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          background: "var(--color-brand-bg, rgba(0,95,2,0.08))",
-                          border: "1px solid var(--color-brand-border, rgba(0,95,2,0.2))",
-                          color: "var(--color-brand)",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "2px 8px",
+                            borderRadius: 20,
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontWeight: 600,
+                            background: "var(--color-brand-bg)",
+                            border: "1px solid var(--color-brand-border)",
+                            color: "var(--color-brand)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                         Org-wide
                       </span>
                     )}

@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { initPostHog, identifyUser, resetPostHog } from "@/lib/posthog";
-import { hasAnalyticsConsent } from "@/components/CookieConsent";
+import {
+  disablePostHog,
+  enablePostHog,
+  identifyUser,
+  resetPostHog,
+} from "@/lib/posthog";
+import {
+  getAnalyticsConsentSnapshot,
+  subscribeToConsentChanges,
+} from "@/components/CookieConsent";
 
 /**
  * Initializes PostHog and identifies the user.
@@ -12,20 +20,26 @@ import { hasAnalyticsConsent } from "@/components/CookieConsent";
  */
 export default function PostHogProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const hasConsent = useSyncExternalStore(
+    subscribeToConsentChanges,
+    getAnalyticsConsentSnapshot,
+    () => false,
+  );
 
   useEffect(() => {
-    if (!hasAnalyticsConsent()) return;
-    initPostHog();
-  }, []);
+    if (!hasConsent) {
+      disablePostHog();
+      return;
+    }
 
-  // Identify / reset user on auth changes
-  useEffect(() => {
+    enablePostHog();
+
     if (user) {
       identifyUser(user.id, { email: user.email });
     } else {
       resetPostHog();
     }
-  }, [user]);
+  }, [hasConsent, user]);
 
   return <>{children}</>;
 }

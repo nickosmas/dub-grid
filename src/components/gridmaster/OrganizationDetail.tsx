@@ -77,6 +77,19 @@ function shortTz(iana: string | null): string {
   }
 }
 
+function normalizeOverviewText(value: string): string {
+  return value.trim();
+}
+
+function normalizeOverviewNullableText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function normalizeOverviewLabel(value: string, fallback: string): string {
+  return value.trim() || fallback;
+}
+
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -400,6 +413,17 @@ function OverviewTab({
   const [suspendConfirm, setSuspendConfirm] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
+  const hasChanges =
+    normalizeOverviewText(editName) !== organization.name ||
+    normalizeOverviewText(editAddress) !== organization.address ||
+    normalizeOverviewText(editPhone) !== organization.phone ||
+    normalizeOverviewNullableText(editTimezone) !== (organization.timezone ?? null) ||
+    normalizeOverviewLabel(editFocusAreaLabel, "Focus Areas") !== organization.focusAreaLabel ||
+    normalizeOverviewLabel(editCertLabel, "Certifications") !== organization.certificationLabel ||
+    normalizeOverviewLabel(editRoleLabel, "Roles") !== organization.roleLabel ||
+    editShiftDisplayMode !== organization.shiftDisplayMode ||
+    editEnforceConflictPrevention !== organization.enforceConflictPrevention ||
+    editDataRetentionDays !== (organization.dataRetentionDays ?? 365);
 
   // Reset edit state when switching to a different organization
   useEffect(() => {
@@ -549,7 +573,7 @@ function OverviewTab({
                 <input className="dg-input" type="number" min={1} value={editDataRetentionDays} onChange={(e) => setEditDataRetentionDays(Number(e.target.value))} />
               </div>
               <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
-                <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
+                <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
                   {saving ? "Saving…" : "Save"}
                 </button>
                 <button className="dg-btn dg-btn-secondary" onClick={() => setEditing(false)} disabled={saving}>

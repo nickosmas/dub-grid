@@ -10,7 +10,7 @@ export const helpText = {
     recurringShifts:
       "Recurring shifts are templates that auto-fill the schedule each week. Edit them in Settings.",
     dragDrop:
-      "Drag a shift code from one cell to another to move it. Hold Shift and drag to copy instead.",
+      "Drag a shift or absence entry from one cell to another to move it. Hold Shift and drag to copy instead.",
     cellClick:
       "Click an empty cell to assign a shift, or click an existing shift to edit it.",
   },

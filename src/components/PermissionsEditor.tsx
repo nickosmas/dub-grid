@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
 import type { AdminPermissions } from "@/types";
@@ -144,6 +144,26 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canViewDashboardAnalytics: false,
 };
 
+const EMPTY_LOCKED_FALSE: (keyof AdminPermissions)[] = [];
+
+function buildInitialPermissions(
+  initialPermissions: AdminPermissions | null | undefined,
+  lockedFalse: (keyof AdminPermissions)[],
+): AdminPermissions {
+  const initial: AdminPermissions = {
+    ...DEFAULT_PERMISSIONS,
+    ...(initialPermissions ?? {}),
+    canViewSchedule: true,
+    canViewStaff: true,
+  };
+
+  for (const key of lockedFalse) {
+    (initial as unknown as Record<string, boolean>)[key] = false;
+  }
+
+  return initial;
+}
+
 // ── Icons ────────────────────────────────────────────────────────────────────
 
 const iconProps = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -282,21 +302,18 @@ export default function PermissionsEditor({
   onSave,
   onClose,
 }: PermissionsEditorProps) {
-  const lockedFalseSet = new Set(lockedFalse ?? []);
-
-  const [perms, setPerms] = useState<AdminPermissions>(() => {
-    const initial: AdminPermissions = {
-      ...DEFAULT_PERMISSIONS,
-      ...(initialPermissions ?? {}),
-      canViewSchedule: true,
-      canViewStaff: true,
-    };
-    for (const key of lockedFalseSet) {
-      (initial as unknown as Record<string, boolean>)[key] = false;
-    }
-    return initial;
-  });
+  const lockedFalseKeys = lockedFalse ?? EMPTY_LOCKED_FALSE;
+  const lockedFalseSet = useMemo(() => new Set(lockedFalseKeys), [lockedFalseKeys]);
+  const initialPerms = useMemo(
+    () => buildInitialPermissions(initialPermissions, lockedFalseKeys),
+    [initialPermissions, lockedFalseKeys],
+  );
+  const [perms, setPerms] = useState<AdminPermissions>(initialPerms);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setPerms(initialPerms);
+  }, [initialPerms]);
 
   function toggleKeys(keys: (keyof AdminPermissions)[], direction: "view" | "edit") {
     setPerms((prev) => {
@@ -327,6 +344,7 @@ export default function PermissionsEditor({
 
   const allKeys = PERMISSION_MODULES.flatMap((m) => [...m.viewKeys, ...m.editKeys])
     .filter((k) => !lockedFalseSet.has(k) && !ALWAYS_ON_KEYS.has(k));
+  const hasChanges = allKeys.some((key) => perms[key] !== initialPerms[key]);
 
   function selectAll() {
     setPerms((prev) => {
@@ -420,7 +438,7 @@ export default function PermissionsEditor({
         {/* ── Footer ──────────────────────────────────────────────────── */}
         <div className="flex gap-2 justify-end px-6 py-4 shrink-0 border-t border-[var(--color-border-light)]">
           <button className="dg-btn dg-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving}>
+          <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
             <ButtonLoading loading={saving} spinnerSize={16}>Save Permissions</ButtonLoading>
           </button>
         </div>

@@ -6,7 +6,7 @@ import { FocusArea } from "@/types";
 
 export interface PrintConfig {
   fontSize: number;
-  selectedFocusAreas: string[]; // empty = all focus areas
+  selectedFocusAreas: string[];
   spanWeeks: 1 | 2 | "month";
 }
 
@@ -50,7 +50,7 @@ export default function PrintOptionsModal({
   }
 
   function toggleAll() {
-    setSelectedFocusAreas(allSelected ? [] : focusAreas.map((w) => w.name));
+    setSelectedFocusAreas(focusAreas.map((w) => w.name));
   }
 
   function handlePrint() {
@@ -155,7 +155,7 @@ export default function PrintOptionsModal({
           </button>
           <button
             onClick={handlePrint}
-            disabled={selectedFocusAreas.length === 0}
+            disabled={focusAreas.length > 0 && selectedFocusAreas.length === 0}
             className="dg-btn dg-btn-primary"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >

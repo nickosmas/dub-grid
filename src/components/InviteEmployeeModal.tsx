@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
 import { Employee, OrganizationUser, NamedItem, Department } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
+import { validateEmail, validateRequired } from "@/components/FormField";
 import { toast } from "sonner";
-import { z } from "zod";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { SelectableTag } from "@/components/ui/selectable-tag";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -47,6 +48,7 @@ export default function InviteEmployeeModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Management departments only (filtered from all departments — only Department has .type)
   const managementDepts = useMemo(
@@ -86,8 +88,45 @@ export default function InviteEmployeeModal({
     : matchedUser
       ? "link"
       : "invite";
+  const trimmedEmail = email.trim();
+  const requiredEmailError = trimmedEmail ? validateEmail(trimmedEmail) : "Email address is required";
+  const canSend =
+    !requiredEmailError &&
+    (!isManagementInvite || (!!firstName.trim() && !!lastName.trim())) &&
+    (!isManagementInvite || managementDepts.length === 0 || departmentIds.length > 0) &&
+    !sending &&
+    !sent;
 
-  const canSend = z.string().email().safeParse(email.trim()).success && !sending && !sent;
+  const markTouched = useCallback((field: string) => {
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  }, []);
+
+  const fieldErrors = useMemo(
+    () => ({
+      firstName:
+        isManagementInvite && touched.firstName
+          ? validateRequired(firstName, "First name")
+          : null,
+      lastName:
+        isManagementInvite && touched.lastName
+          ? validateRequired(lastName, "Last name")
+          : null,
+      email: touched.email ? requiredEmailError : null,
+      departmentIds:
+        isManagementInvite && managementDepts.length > 0 && touched.departmentIds && departmentIds.length === 0
+          ? "Select at least one management department"
+          : null,
+    }),
+    [
+      departmentIds.length,
+      firstName,
+      isManagementInvite,
+      lastName,
+      managementDepts.length,
+      requiredEmailError,
+      touched,
+    ],
+  );
 
   async function handleLink() {
     if (!matchedUser || !employee) return;
@@ -108,13 +147,23 @@ export default function InviteEmployeeModal({
   }
 
   async function handleSend() {
+    if (!canSend) {
+      setTouched((prev) => ({
+        ...prev,
+        email: true,
+        ...(isManagementInvite
+          ? { firstName: true, lastName: true, departmentIds: true }
+          : {}),
+      }));
+      return;
+    }
     setSending(true);
     setError(null);
 
     try {
-      const { token } = await sendInvitation(email.trim(), role, orgId, employee?.id, isManagementInvite ? {
-        firstName: firstName.trim() || undefined,
-        lastName: lastName.trim() || undefined,
+      const { token } = await sendInvitation(trimmedEmail, role, orgId, employee?.id, isManagementInvite ? {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phone: phone.trim() || undefined,
         departmentIds: departmentIds.length > 0 ? departmentIds : undefined,
       } : undefined);
@@ -123,7 +172,7 @@ export default function InviteEmployeeModal({
       const res = await fetch("/api/send-invite-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email: email.trim(), orgName }),
+        body: JSON.stringify({ token, email: trimmedEmail, orgName }),
       });
       if (!res.ok) {
         // Invitation was saved to DB but email failed — tell the user clearly
@@ -137,7 +186,7 @@ export default function InviteEmployeeModal({
         throw new Error(data.error || "Failed to send invitation email");
       }
 
-      toast.success(`Invitation email sent to ${email.trim()}`);
+      toast.success(`Invitation email sent to ${trimmedEmail}`);
       setSent(true);
       onInvited();
       onClose();
@@ -230,24 +279,64 @@ export default function InviteEmployeeModal({
           {isManagementInvite && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={labelStyle}>First name</label>
+                <label style={labelStyle}>
+                  First name{" "}
+                  <span style={{ color: "var(--color-danger)" }}>*</span>
+                </label>
                 <input
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
+                  onBlur={() => markTouched("firstName")}
                   placeholder="Jane"
-                  style={inputStyle}
+                  style={
+                    fieldErrors.firstName
+                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      : inputStyle
+                  }
                 />
+                {fieldErrors.firstName && (
+                  <div
+                    style={{
+                      color: "var(--color-danger)",
+                      fontSize: "var(--dg-fs-footnote)",
+                      marginTop: 4,
+                    }}
+                    role="alert"
+                  >
+                    {fieldErrors.firstName}
+                  </div>
+                )}
               </div>
               <div>
-                <label style={labelStyle}>Last name</label>
+                <label style={labelStyle}>
+                  Last name{" "}
+                  <span style={{ color: "var(--color-danger)" }}>*</span>
+                </label>
                 <input
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
+                  onBlur={() => markTouched("lastName")}
                   placeholder="Smith"
-                  style={inputStyle}
+                  style={
+                    fieldErrors.lastName
+                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      : inputStyle
+                  }
                 />
+                {fieldErrors.lastName && (
+                  <div
+                    style={{
+                      color: "var(--color-danger)",
+                      fontSize: "var(--dg-fs-footnote)",
+                      marginTop: 4,
+                    }}
+                    role="alert"
+                  >
+                    {fieldErrors.lastName}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -259,9 +348,26 @@ export default function InviteEmployeeModal({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => markTouched("email")}
               placeholder="employee@example.com"
-              style={inputStyle}
+              style={
+                fieldErrors.email
+                  ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                  : inputStyle
+              }
             />
+            {fieldErrors.email && (
+              <div
+                style={{
+                  color: "var(--color-danger)",
+                  fontSize: "var(--dg-fs-footnote)",
+                  marginTop: 4,
+                }}
+                role="alert"
+              >
+                {fieldErrors.email}
+              </div>
+            )}
           </div>
 
           {/* Phone (management staff mode, optional) */}
@@ -278,18 +384,47 @@ export default function InviteEmployeeModal({
             </div>
           )}
 
-          {/* Department (single-select for management staff invites) */}
+          {/* Management departments */}
           {isManagementInvite && managementDepts.length > 0 && (
             <div>
-              <label style={labelStyle}>Department</label>
-              <CustomSelect
-                value={departmentIds.length > 0 ? departmentIds[0].toString() : ""}
-                options={[
-                  { value: "", label: "None" },
-                  ...managementDepts.map((d) => ({ value: d.id.toString(), label: d.name })),
-                ]}
-                onChange={(v) => setDepartmentIds(v ? [Number(v)] : [])}
-              />
+              <label style={labelStyle}>
+                Management departments{" "}
+                <span style={{ color: "var(--color-danger)" }}>*</span>
+              </label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {managementDepts.map((department) => (
+                  <SelectableTag
+                    key={department.id}
+                    selected={departmentIds.includes(department.id)}
+                    onClick={() => {
+                      setDepartmentIds((prev) =>
+                        prev.includes(department.id)
+                          ? prev.filter((id) => id !== department.id)
+                          : [...prev, department.id],
+                      );
+                      markTouched("departmentIds");
+                    }}
+                    padding="5px 12px"
+                    unselectedBackground="var(--color-bg-secondary)"
+                    unselectedBorderColor="transparent"
+                    unselectedTextColor="var(--color-text-faint)"
+                  >
+                    {department.name}
+                  </SelectableTag>
+                ))}
+              </div>
+              {fieldErrors.departmentIds && (
+                <div
+                  style={{
+                    color: "var(--color-danger)",
+                    fontSize: "var(--dg-fs-footnote)",
+                    marginTop: 4,
+                  }}
+                  role="alert"
+                >
+                  {fieldErrors.departmentIds}
+                </div>
+              )}
             </div>
           )}
 
@@ -354,7 +489,9 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: "1px solid var(--color-border, #C8D6EC)",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "var(--color-border, #C8D6EC)",
   borderRadius: 8,
   fontSize: "var(--dg-fs-body-sm)",
   color: "var(--color-text-primary, #0F1724)",

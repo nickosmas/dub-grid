@@ -95,7 +95,7 @@ export function EmployeeStatusActions({
         {invitationSection}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-warning-bg)", padding: "14px 16px", borderRadius: 10, border: "1px solid var(--color-warning-border)" }}>
           <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-warning-text)", lineHeight: 1.4 }}>
-            Bench {displayName}? They will be removed from the schedule but their data will be preserved.
+            Bench {displayName}? They will be hidden from active scheduling and shift requests. Existing and future shift data will be preserved, so review upcoming assignments manually.
           </span>
           <input
             className="dg-input"
@@ -131,7 +131,7 @@ export function EmployeeStatusActions({
         {invitationSection}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-danger-bg)", padding: "14px 16px", borderRadius: 10, border: "1px solid var(--color-danger-border)" }}>
           <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-danger-text)", lineHeight: 1.4 }}>
-            Terminate {displayName}? They will be permanently removed from the schedule and staff list. Historical shift data will be preserved.
+            Terminate {displayName}? They will be archived from active staff lists and scheduling. Historical and future shift data will be preserved, so review upcoming assignments manually.
           </span>
           {employee.userId && onRevokeAccess && (
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-danger-text)", cursor: "pointer" }}>

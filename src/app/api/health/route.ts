@@ -1,4 +1,5 @@
 import { getServiceClient } from "@/lib/supabase-service";
+import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,13 @@ export async function GET() {
   // Check Redis connectivity
   const redisStart = Date.now();
   try {
+    const rateLimitConfig = getRateLimitConfigStatus();
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
     const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
     if (!redisUrl || !redisToken) {
-      checks.redis = { status: "unconfigured" };
+      checks.redis = rateLimitConfig.productionReady
+        ? { status: "unconfigured" }
+        : { status: "error", error: rateLimitConfig.message ?? "Redis env vars are missing" };
     } else {
       const res = await fetch(`${redisUrl}/ping`, {
         headers: { Authorization: `Bearer ${redisToken}` },

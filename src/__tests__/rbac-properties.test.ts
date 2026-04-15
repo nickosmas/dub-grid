@@ -3170,11 +3170,6 @@ function simulateRouteProtection(
   roleLevel: number,
   pathname: string
 ): string | null {
-  // Staff page: requires admin+ (level >= 2)
-  if (pathname.startsWith("/staff") && roleLevel < 2) {
-    return "/schedule";
-  }
-
   // Settings page: requires admin+ (level >= 2)
   if (pathname.startsWith("/settings") && roleLevel < 2) {
     return "/schedule";
@@ -3188,7 +3183,7 @@ describe("Property 27: Middleware Route Protection", () => {
   /**
    * **Validates: Requirements 11.2, 11.3**
    *
-   * For any request to /staff or /settings routes, users with role level < 2 (admin)
+   * For any request to /settings routes, users with role level < 2 (admin)
    * should be redirected to /schedule.
    */
 
@@ -3209,16 +3204,17 @@ describe("Property 27: Middleware Route Protection", () => {
 
 
 
-  // Arbitrary for staff paths
-  const arbStaffPath = fc.oneof(
-    fc.constant("/staff"),
-    fc.constant("/staff/"),
-    fc.stringMatching(/^\/staff\/[a-z]+$/)
+  // Arbitrary for people paths
+  const arbPeoplePath = fc.oneof(
+    fc.constant("/people"),
+    fc.constant("/people/"),
+    fc.stringMatching(/^\/people\/[a-z0-9-]+$/)
   );
 
   // Arbitrary for non-protected paths
   const arbNonProtectedPath = fc.oneof(
     fc.constant("/schedule"),
+    arbPeoplePath,
     fc.constant("/profile"),
     fc.constant("/home"),
     fc.constant("/")
@@ -3399,77 +3395,14 @@ describe("Property 27: Middleware Route Protection", () => {
     });
   });
 
-  describe("/staff route protection", () => {
-    it("users with level < 2 are redirected from /staff to /schedule", () => {
+  describe("/people route access", () => {
+    it("all users can access /people routes", () => {
       fc.assert(
-        fc.property(
-          fc.constantFrom("user"),
-          arbStaffPath,
-          (orgRole, staffPath) => {
-            const claims = {
-              platform_role: "none" as const,
-              org_role: orgRole,
-              org_id: "test-org-id",
-            };
-
-            const effectiveRole = calculateEffectiveRole(claims);
-            const level = getRoleLevel(effectiveRole);
-
-            // Verify level is < 2
-            expect(level).toBeLessThan(2);
-
-            // Verify redirect to /schedule
-            const redirect = simulateRouteProtection(level, staffPath);
-            expect(redirect).toBe("/schedule");
-          }
-        ),
-        { numRuns: 100 }
-      );
-    });
-
-    it("users with level >= 2 can access /staff routes", () => {
-      fc.assert(
-        fc.property(
-          fc.constantFrom("admin", "super_admin", "gridmaster"),
-          arbStaffPath,
-          (role, staffPath) => {
-            const claims =
-              role === "gridmaster"
-                ? { platform_role: "gridmaster", org_role: undefined, org_id: "test-org-id" }
-                : { platform_role: "none", org_role: role, org_id: "test-org-id" };
-
-            const effectiveRole = calculateEffectiveRole(claims);
-            const level = getRoleLevel(effectiveRole);
-
-            // Verify level is >= 2
-            expect(level).toBeGreaterThanOrEqual(2);
-
-            // Verify no redirect (access allowed)
-            const redirect = simulateRouteProtection(level, staffPath);
-            expect(redirect).toBeNull();
-          }
-        ),
-        { numRuns: 100 }
-      );
-    });
-
-    it("gridmaster can always access /staff routes", () => {
-      fc.assert(
-        fc.property(arbOrgRole, arbStaffPath, (orgRole, staffPath) => {
-          const claims = {
-            platform_role: "gridmaster",
-            org_role: orgRole,
-            org_id: "test-org-id",
-          };
-
+        fc.property(arbJWTClaims, arbPeoplePath, (claims, peoplePath) => {
           const effectiveRole = calculateEffectiveRole(claims);
           const level = getRoleLevel(effectiveRole);
 
-          // Gridmaster should have level 4
-          expect(level).toBe(4);
-
-          // Verify no redirect (access allowed)
-          const redirect = simulateRouteProtection(level, staffPath);
+          const redirect = simulateRouteProtection(level, peoplePath);
           expect(redirect).toBeNull();
         }),
         { numRuns: 100 }
@@ -3494,18 +3427,18 @@ describe("Property 27: Middleware Route Protection", () => {
   });
 
   describe("role level boundaries", () => {
-    it("level 2 (admin) can access /settings, /staff, and /schedule", () => {
+    it("level 2 (admin) can access /settings, /people, and /schedule", () => {
       fc.assert(
-        fc.property(arbSettingsPath, arbStaffPath, (settingsPath, staffPath) => {
+        fc.property(arbSettingsPath, arbPeoplePath, (settingsPath, peoplePath) => {
           const level = 2; // admin level
 
           // Should be able to access /settings
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
           expect(settingsRedirect).toBeNull();
 
-          // Should be able to access /staff
-          const staffRedirect = simulateRouteProtection(level, staffPath);
-          expect(staffRedirect).toBeNull();
+          // Should be able to access /people
+          const peopleRedirect = simulateRouteProtection(level, peoplePath);
+          expect(peopleRedirect).toBeNull();
 
           // Should be able to access /schedule
           const scheduleRedirect = simulateRouteProtection(level, "/schedule");
@@ -3515,16 +3448,16 @@ describe("Property 27: Middleware Route Protection", () => {
       );
     });
 
-    it("level 3 (super_admin) can access /settings, /staff, and /schedule", () => {
+    it("level 3 (super_admin) can access /settings, /people, and /schedule", () => {
       fc.assert(
-        fc.property(arbSettingsPath, arbStaffPath, (settingsPath, staffPath) => {
+        fc.property(arbSettingsPath, arbPeoplePath, (settingsPath, peoplePath) => {
           const level = 3; // super_admin level
 
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
           expect(settingsRedirect).toBeNull();
 
-          const staffRedirect = simulateRouteProtection(level, staffPath);
-          expect(staffRedirect).toBeNull();
+          const peopleRedirect = simulateRouteProtection(level, peoplePath);
+          expect(peopleRedirect).toBeNull();
 
           const scheduleRedirect = simulateRouteProtection(level, "/schedule");
           expect(scheduleRedirect).toBeNull();
@@ -3533,18 +3466,18 @@ describe("Property 27: Middleware Route Protection", () => {
       );
     });
 
-    it("level 0 (user) cannot access /settings or /staff but can access /schedule", () => {
+    it("level 0 (user) cannot access /settings but can access /people and /schedule", () => {
       fc.assert(
-        fc.property(arbSettingsPath, arbStaffPath, (settingsPath, staffPath) => {
+        fc.property(arbSettingsPath, arbPeoplePath, (settingsPath, peoplePath) => {
           const level = 0; // user level
 
           // Should be redirected from /settings
           const settingsRedirect = simulateRouteProtection(level, settingsPath);
           expect(settingsRedirect).toBe("/schedule");
 
-          // Should be redirected from /staff
-          const staffRedirect = simulateRouteProtection(level, staffPath);
-          expect(staffRedirect).toBe("/schedule");
+          // Should be able to access /people
+          const peopleRedirect = simulateRouteProtection(level, peoplePath);
+          expect(peopleRedirect).toBeNull();
 
           // Should be able to access /schedule
           const scheduleRedirect = simulateRouteProtection(level, "/schedule");
@@ -3560,20 +3493,14 @@ describe("Property 27: Middleware Route Protection", () => {
       fc.assert(
         fc.property(
           arbJWTClaims,
-          fc.oneof(arbSettingsPath, arbStaffPath, arbNonProtectedPath),
+          fc.oneof(arbSettingsPath, arbNonProtectedPath),
           (claims, path) => {
             const effectiveRole = calculateEffectiveRole(claims);
             const level = getRoleLevel(effectiveRole);
             const redirect = simulateRouteProtection(level, path);
 
             // Verify the redirect logic is consistent
-            if (path.startsWith("/staff")) {
-              if (level < 2) {
-                expect(redirect).toBe("/schedule");
-              } else {
-                expect(redirect).toBeNull();
-              }
-            } else if (path.startsWith("/settings")) {
+            if (path.startsWith("/settings")) {
               if (level < 2) {
                 expect(redirect).toBe("/schedule");
               } else {

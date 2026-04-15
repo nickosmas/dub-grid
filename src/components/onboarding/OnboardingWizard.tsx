@@ -154,7 +154,7 @@ export default function OnboardingWizard({
         display: "flex",
         flexDirection: "column",
         background:
-          "linear-gradient(145deg, var(--color-bg) 0%, var(--color-brand-bg, #f5faf5) 100%)",
+          "linear-gradient(145deg, var(--color-bg) 0%, var(--color-brand-bg, #eff6ff) 100%)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         overflow: "auto",
       }}

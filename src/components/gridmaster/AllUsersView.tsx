@@ -9,6 +9,7 @@ import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
+import { MaybeHint } from "@/components/ui/hint";
 
 function RoleBadge({ role }: { role: string }) {
   const c = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
@@ -358,9 +359,16 @@ export default function AllUsersView({
                         )}
                       </td>
                       <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-                        <span title={u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleString() : "Never"}>
-                          {formatRelativeDate(u.lastSignInAt)}
-                        </span>
+                        <MaybeHint
+                          content={
+                            u.lastSignInAt
+                              ? new Date(u.lastSignInAt).toLocaleString()
+                              : "Never"
+                          }
+                          side="bottom"
+                        >
+                          <span>{formatRelativeDate(u.lastSignInAt)}</span>
+                        </MaybeHint>
                       </td>
                       <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
                         {new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

@@ -11,7 +11,7 @@ const STATUS_COLORS = {
 };
 
 const PCT_COLORS = {
-  green: "var(--color-brand)",
+  green: "var(--color-success)",
   amber: "var(--color-warning)",
   red: "var(--color-danger)",
 };
@@ -45,7 +45,7 @@ export default function ExpandedCoverage({
     <Modal title={`Coverage by ${focusAreaLabel.toLowerCase()}`} onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Summary + filter row */}
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           <div style={summaryBadgeStyle}>
             <span style={{ fontWeight: 700, color: PCT_COLORS[overallPct >= 90 ? "green" : overallPct >= 70 ? "amber" : "red"] }}>
               {overallPct}%
@@ -78,7 +78,7 @@ export default function ExpandedCoverage({
                 {filtered.map((sec) => {
                   const pctColor = sec.pct >= 90 ? "green" : sec.pct >= 70 ? "amber" : "red";
                   return (
-                    <div key={sec.focusAreaId} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div key={sec.focusAreaId} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 16px", borderRadius: 14, border: "1px solid var(--color-border)", background: "var(--color-bg)" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>
@@ -152,7 +152,7 @@ export default function ExpandedCoverage({
                                 background: colors.bg,
                                 color: colors.text,
                               }}
-                              title={`${sec.focusAreaName} - ${day.dayLabel}: ${day.staffCount} staff`}
+                              aria-label={`${sec.focusAreaName} ${day.dayLabel}: ${day.staffCount} staff`}
                             >
                               {day.staffCount}
                             </div>
@@ -178,9 +178,9 @@ const summaryBadgeStyle = {
   alignItems: "center" as const,
   gap: 5,
   fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: 8,
-  background: "var(--color-bg)",
+  padding: "8px 12px",
+  borderRadius: 12,
+  background: "var(--color-surface)",
   border: "1px solid var(--color-border)",
 };
 

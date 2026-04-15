@@ -6,8 +6,6 @@ import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType } from "@/types";
 import { saveCertifications, saveOrganizationRoles, checkCertificationDependencies, checkRoleDependencies } from "@/lib/db";
-import { TooltipTourRunner } from "@/components/tooltip-tour";
-import { settingsTour } from "@/components/tooltip-tour/tours/settings";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
@@ -209,7 +207,7 @@ export default function SettingsPage({
                             render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
                             isActive={activeSection === item.id}
                             tooltip={item.label}
-                            className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--color-brand)] transition-all ease-in-out duration-150"
+                            className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
                           >
                             <span className={activeSection === item.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
                               {item.icon}
@@ -476,7 +474,6 @@ export default function SettingsPage({
         )}
       </div>
     </div>
-    <TooltipTourRunner config={settingsTour} />
     </SidebarProvider>
   );
 }

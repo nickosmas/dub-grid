@@ -19,6 +19,7 @@ import type {
   EmployeeHours,
   ShiftTypeBreakdown,
   ActivityItem,
+  TrendDataPoint,
 } from "@/lib/dashboard-stats";
 import type { ViewMode } from "./DashboardView";
 
@@ -57,6 +58,7 @@ export interface DashboardContentProps {
   prevHours: EmployeeHours[];
   shiftBreakdown: ShiftTypeBreakdown;
   activityItems: ActivityItem[];
+  trendData: TrendDataPoint[];
 
   // Shift requests
   shiftRequests: ShiftRequestsData;

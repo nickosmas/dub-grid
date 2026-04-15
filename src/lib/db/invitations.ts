@@ -50,7 +50,7 @@ export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
   return cacheThrough(CacheKey.invitations(orgId), TTL.MODERATE, async () => {
     const { data, error } = await supabase
       .from("invitations")
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
       .eq("org_id", orgId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -65,6 +65,11 @@ export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
       revokedAt: (row.revoked_at as string) ?? null,
       createdAt: row.created_at as string,
       employeeId: (row.employee_id as string) ?? null,
+      firstName: (row.first_name as string | null) ?? null,
+      lastName: (row.last_name as string | null) ?? null,
+      phone: (row.phone as string | null) ?? null,
+      departmentIds: (row.department_ids as number[]) ?? [],
+      deptAdminIds: (row.dept_admin_ids as number[]) ?? [],
     }));
   });
 }
@@ -103,12 +108,14 @@ export async function linkEmployeeToUser(
   userId: string,
   orgId: string,
 ): Promise<{ status: string }> {
-  const { data, error } = await supabase.rpc("link_employee_to_user", {
-    p_employee_id: employeeId,
-    p_user_id: userId,
-    p_org_id: orgId,
+  const response = await fetch("/api/employees/link-user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ employeeId, userId, orgId }),
   });
-  if (error) throw error;
-  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(employeeId), CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
-  return { status: data.status };
+  const payload = await response.json().catch(() => null) as { error?: string; status?: string } | null;
+  if (!response.ok) {
+    throw new Error(payload?.error || "Failed to link employee to user");
+  }
+  return { status: payload?.status ?? "linked" };
 }

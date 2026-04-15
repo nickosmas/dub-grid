@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 
 export type AuditAction =
@@ -87,7 +88,8 @@ export type AuditAction =
   | "billing.subscription_canceled"
   | "billing.synced"
   // Data export
-  | "data.exported";
+  | "data.exported"
+  | "data.portability_exported";
 
 export type AuditResourceType =
   | "employee"
@@ -127,8 +129,8 @@ export async function logAudit(
   orgId?: string | null,
 ): Promise<void> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    const user = await getVerifiedBrowserUser();
+    if (!user) return;
 
     // Attach impersonation session ID if the actor is impersonating.
     // This makes actions taken during impersonation distinguishable from
@@ -141,8 +143,8 @@ export async function logAudit(
 
     const { error } = await supabase.from("audit_log").insert({
       org_id: orgId ?? null,
-      actor_id: session.user.id,
-      actor_email: session.user.email ?? null,
+      actor_id: user.id,
+      actor_email: user.email ?? null,
       action,
       resource_type: resourceType,
       resource_id: resourceId,

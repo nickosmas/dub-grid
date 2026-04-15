@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
-import { createServerClient } from "@supabase/ssr";
 import { createBillingPortalSession } from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
-
-function getUserClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return req.cookies.getAll(); }, setAll() {} } },
-  );
-}
 
 export async function POST(req: NextRequest) {
   // ── CSRF: validate Origin header ──────────────────────────────────
@@ -21,11 +13,9 @@ export async function POST(req: NextRequest) {
 
   try {
     // Auth check
-    const userClient = getUserClient(req);
-    const { data: { session } } = await userClient.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-    }
+    const auth = await requireAuthenticatedUser(req);
+    if ("response" in auth) return auth.response;
+    const { user } = auth;
 
     const { orgId, returnUrl } = await req.json();
     if (!orgId || !returnUrl) {
@@ -45,13 +35,13 @@ export async function POST(req: NextRequest) {
       supabase
         .from("organization_memberships")
         .select("org_role")
-        .eq("user_id", session.user.id)
+        .eq("user_id", user.id)
         .eq("org_id", orgId)
         .maybeSingle(),
       supabase
         .from("profiles")
         .select("platform_role")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .single(),
     ]);
 

@@ -2,7 +2,7 @@ import {
   supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit,
   EMPLOYEE_COLS, DEPARTMENT_COLS, arraysEqual, OptimisticLockError,
 } from "./shared";
-import type { DbEmployee, DbDepartment, DbShift } from "./types";
+import type { DbEmployee, DbShift } from "./types";
 import { rowToEmployee, employeeToRow, rowToDepartment } from "./mappers";
 import type {
   Employee, Department, ShiftMap, Invitation,
@@ -257,7 +257,7 @@ export async function deleteEmployee(empId: string, orgId: string): Promise<void
     .eq("org_id", orgId)
     .eq("id", empId);
   if (error) throw error;
-  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId));
+  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("employee.archived", "employee", empId, {}, orgId);
 }
 
@@ -272,7 +272,7 @@ export async function benchEmployee(empId: string, note: string | undefined, org
     .eq("org_id", orgId)
     .eq("id", empId);
   if (error) throw error;
-  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId));
+  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("employee.benched", "employee", empId, { note }, orgId);
 }
 
@@ -288,8 +288,36 @@ export async function activateEmployee(empId: string, orgId: string): Promise<vo
     .eq("org_id", orgId)
     .eq("id", empId);
   if (error) throw error;
-  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId));
+  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("employee.activated", "employee", empId, {}, orgId);
+}
+
+export interface CreateEmployeeFromOrgUserInput {
+  orgId: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  certificationId: number | null;
+  focusAreaIds: number[];
+  roleIds: number[];
+  contactNotes?: string;
+}
+
+export async function createEmployeeFromOrgUser(
+  input: CreateEmployeeFromOrgUserInput,
+): Promise<Employee> {
+  const response = await fetch("/api/employees/from-user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json().catch(() => null) as { error?: string; employee?: Employee } | null;
+  if (!response.ok || !payload?.employee) {
+    throw new Error(payload?.error || "Failed to add management user to the schedule");
+  }
+  return payload.employee;
 }
 
 // ── Single Employee Fetch ──────────────────────────────────────────────────────

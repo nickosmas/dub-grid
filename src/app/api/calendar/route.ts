@@ -1,24 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import {
+  createRequestSupabaseClient,
+  requireAuthenticatedSession,
+} from "@/lib/api-auth";
 import { generateICS } from "@/lib/ical";
+import {
+  PUBLISHED_SHIFT_COLS,
+  resolvePublishedScheduleEntry,
+  type PublishedShiftRow,
+} from "@/lib/published-shifts";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
-
-function getClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {},
-      },
-    },
-  );
-}
 
 /**
  * GET /api/calendar?weeks=4
@@ -27,17 +20,13 @@ function getClient(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getClient(req);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-    }
+    const auth = await requireAuthenticatedSession(req);
+    if ("response" in auth) return auth.response;
+    const { user } = auth;
+    const supabase = createRequestSupabaseClient(req);
 
     // Rate limit by user ID
-    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
       return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
@@ -48,7 +37,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const weeks = Math.min(
       parseInt(req.nextUrl.searchParams.get("weeks") ?? "4") || 4,
       12,
@@ -78,8 +67,8 @@ export async function GET(req: NextRequest) {
 
     const { data: shifts } = await supabase
       .from("shifts")
-      .select("id, employee_id, date, shift_code_id, start_time, end_time")
-      .eq("employee_id", employee.id)
+      .select(PUBLISHED_SHIFT_COLS)
+      .eq("emp_id", employee.id)
       .gte("date", startKey)
       .lt("date", endKey)
       .order("date");
@@ -95,12 +84,34 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Fetch shift code names for labels
-    const codeIds = [...new Set(shifts.map((s) => (s as Record<string, unknown>).shift_code_id).filter(Boolean))];
-    const { data: codes } = codeIds.length > 0
-      ? await supabase.from("shift_codes").select("id, label").in("id", codeIds)
-      : { data: [] };
-    const codeMap = new Map((codes ?? []).map((c: Record<string, unknown>) => [c.id as number, c.label as string]));
+    const [{ data: codes }, { data: absenceTypes }] = await Promise.all([
+      supabase
+        .from("shift_codes")
+        .select("id, label, default_start_time, default_end_time")
+        .eq("org_id", employee.org_id)
+        .is("archived_at", null),
+      supabase
+        .from("absence_types")
+        .select("id, label")
+        .eq("org_id", employee.org_id)
+        .is("archived_at", null),
+    ]);
+    const shiftCodeById = new Map(
+      (codes ?? []).map((code: Record<string, unknown>) => [
+        code.id as number,
+        {
+          label: code.label as string,
+          defaultStartTime: code.default_start_time as string | null,
+          defaultEndTime: code.default_end_time as string | null,
+        },
+      ]),
+    );
+    const absenceTypeById = new Map(
+      (absenceTypes ?? []).map((row: Record<string, unknown>) => [
+        row.id as number,
+        row.label as string,
+      ]),
+    );
 
     // Cache calendar for 5 minutes (private — user-specific data)
     const cacheHeaders = {
@@ -109,28 +120,46 @@ export async function GET(req: NextRequest) {
       "Cache-Control": "private, max-age=300",
     };
 
-    const events = shifts.map((s: Record<string, unknown>) => {
-      const date = s.date as string;
-      const codeLabel = codeMap.get(s.shift_code_id as number) ?? "Shift";
-      const startTime = (s.start_time as string) ?? "08:00";
-      const endTime = (s.end_time as string) ?? "16:00";
+    const events = ((shifts ?? []) as unknown as PublishedShiftRow[])
+      .map((row) =>
+        resolvePublishedScheduleEntry(row, shiftCodeById, absenceTypeById),
+      )
+      .flatMap((entry) => {
+        if (!entry) return [];
 
-      const dtstart = new Date(`${date}T${startTime}:00`);
-      const dtend = new Date(`${date}T${endTime}:00`);
+        if (entry.kind === "absence") {
+          const dtstart = new Date(`${entry.date}T00:00:00`);
+          const dtend = new Date(dtstart);
+          dtend.setDate(dtend.getDate() + 1);
 
-      // Handle overnight shifts
-      if (dtend <= dtstart) {
-        dtend.setDate(dtend.getDate() + 1);
-      }
+          return [{
+            uid: `absence-${entry.empId}-${entry.date}-${entry.absenceTypeId}@dubgrid.com`,
+            summary: `${entry.label} — DubGrid`,
+            dtstart,
+            dtend,
+            description: `${employee.first_name} ${employee.last_name} — ${entry.label}`,
+          }];
+        }
 
-      return {
-        uid: `shift-${s.id}@dubgrid.com`,
-        summary: `${codeLabel} — DubGrid`,
-        dtstart,
-        dtend,
-        description: `${employee.first_name} ${employee.last_name} — ${codeLabel}`,
-      };
-    });
+        if (!entry.startTime || !entry.endTime) {
+          return [];
+        }
+
+        const dtstart = new Date(`${entry.date}T${entry.startTime}:00`);
+        const dtend = new Date(`${entry.date}T${entry.endTime}:00`);
+
+        if (dtend <= dtstart) {
+          dtend.setDate(dtend.getDate() + 1);
+        }
+
+        return [{
+          uid: `shift-${entry.empId}-${entry.date}-${entry.shiftCodeIds.join("-")}@dubgrid.com`,
+          summary: `${entry.label} — DubGrid`,
+          dtstart,
+          dtend,
+          description: `${employee.first_name} ${employee.last_name} — ${entry.label}`,
+        }];
+      });
 
     const ics = generateICS(events, `DubGrid — ${employee.first_name} ${employee.last_name}`);
 

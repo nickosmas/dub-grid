@@ -215,7 +215,7 @@ export interface Employee {
   archivedAt?: string | null;
   /** Linked Supabase auth user ID. Null if no account linked. */
   userId: string | null;
-  /** Management department IDs (explicit assignment for non-schedule departments). */
+  /** Scheduled department IDs for this employee record. */
   departmentIds: number[];
   /** Subset of departmentIds where this employee is a dept admin (gets dept permission template). */
   deptAdminIds: number[];
@@ -510,8 +510,20 @@ export interface DirectoryPerson {
   seniority: number | null;
   lastSignInAt: string | null;
   invitationStatus: 'pending' | 'expired' | null;
+  /** Scheduled department IDs from the employee record. */
+  scheduledDepartmentIds: number[];
+  /** Subset of scheduledDepartmentIds where this employee is a dept admin. */
+  scheduledDeptAdminIds: number[];
+  /** Management department IDs from org membership or pending invitation. */
+  managementDepartmentIds: number[];
+  /** Subset of managementDepartmentIds where this person is a dept admin. */
+  managementDeptAdminIds: number[];
+  /** Back-compat alias for managementDepartmentIds. */
   departmentIds: number[];
+  /** Back-compat alias for managementDeptAdminIds. */
   deptAdminIds: number[];
+  /** True when the person is an active org member with at least one management department. */
+  isManagementUser: boolean;
 }
 
 export interface UserSession {
@@ -602,6 +614,11 @@ export interface Invitation {
   createdAt: string;
   /** Employee record this invitation is for. Null if not linked to an employee. */
   employeeId: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  departmentIds?: number[];
+  deptAdminIds?: number[];
 }
 
 export interface UserClaims {

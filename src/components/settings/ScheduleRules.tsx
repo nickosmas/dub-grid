@@ -21,7 +21,7 @@ export default function ScheduleRules({
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         {saved && (
-          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-brand)", fontWeight: 600 }}>
+          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-success)", fontWeight: 600 }}>
             Saved
           </span>
         )}
@@ -37,7 +37,7 @@ export default function ScheduleRules({
           }}
           style={{
             width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
-            background: organization.enforceConflictPrevention ? "var(--color-primary)" : "var(--color-border)",
+            background: organization.enforceConflictPrevention ? "var(--color-brand)" : "var(--color-border)",
             position: "relative", transition: "background 0.2s",
           }}
         >

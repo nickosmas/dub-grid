@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
@@ -180,16 +181,14 @@ export default function RootPage() {
 
     const checkSession = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session) {
+        const user = await getVerifiedBrowserUser();
+        if (user) {
           const parsed = parseHost(window.location.host);
           if (isApexHost(parsed)) {
             const { data: profile } = await supabase
               .from("profiles")
               .select("organizations(slug)")
-              .eq("id", session.user.id)
+              .eq("id", user.id)
               .maybeSingle();
 
             const slug = (

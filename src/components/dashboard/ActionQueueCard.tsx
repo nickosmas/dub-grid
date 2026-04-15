@@ -1,10 +1,15 @@
 import Link from "next/link";
 import type { ShiftRequest } from "@/types";
-import type { OTAlert, OpenShift } from "@/lib/dashboard-stats";
+import type { OpenShift } from "@/lib/dashboard-stats";
 
 export interface ActionItem {
   id: string;
-  type: "approval" | "swap_proposal" | "pickup" | "coverage_gap" | "ot_alert" | "draft";
+  type:
+    | "approval"
+    | "swap_proposal"
+    | "pickup"
+    | "coverage_gap"
+    | "draft";
   title: string;
   subtitle: string;
   urgency: "high" | "medium" | "low";
@@ -31,7 +36,6 @@ export function buildActionItems({
   pendingApproval,
   swapProposals,
   openPickups,
-  otAlerts,
   openShifts,
   draftTotal,
   currentEmpId,
@@ -43,7 +47,6 @@ export function buildActionItems({
   pendingApproval: ShiftRequest[];
   swapProposals: ShiftRequest[];
   openPickups: ShiftRequest[];
-  otAlerts: OTAlert[];
   openShifts: OpenShift[];
   draftTotal: number;
   currentEmpId: string | null;
@@ -62,8 +65,12 @@ export function buildActionItems({
         title: `${req.requesterName} requested ${req.type}`,
         subtitle: `${req.requesterShiftLabel} \u00B7 ${req.requesterShiftDate}`,
         urgency: "high",
-        action: onResolve ? { label: "Approve", onClick: () => onResolve(req.id, true) } : undefined,
-        secondaryAction: onResolve ? { label: "Reject", onClick: () => onResolve(req.id, false) } : undefined,
+        action: onResolve
+          ? { label: "Approve", onClick: () => onResolve(req.id, true) }
+          : undefined,
+        secondaryAction: onResolve
+          ? { label: "Reject", onClick: () => onResolve(req.id, false) }
+          : undefined,
       });
     }
 
@@ -75,18 +82,6 @@ export function buildActionItems({
         title: `${draftTotal} unpublished change${draftTotal !== 1 ? "s" : ""}`,
         subtitle: "Review and publish in schedule",
         urgency: "medium",
-        href: "/schedule",
-      });
-    }
-
-    // OT alerts
-    for (const alert of otAlerts.slice(0, 2)) {
-      items.push({
-        id: `ot-${alert.empId}`,
-        type: "ot_alert",
-        title: `${alert.empName} projected to exceed 40h`,
-        subtitle: `${alert.totalHours.toFixed(1)}h scheduled \u00B7 ${alert.focusAreaName}`,
-        urgency: "high",
         href: "/schedule",
       });
     }
@@ -112,12 +107,20 @@ export function buildActionItems({
         title: `${req.requesterName} wants to swap shifts`,
         subtitle: `${req.requesterShiftLabel} \u00B7 ${req.requesterShiftDate}`,
         urgency: "high",
-        action: onRespond && currentEmpId != null
-          ? { label: "Accept", onClick: () => onRespond(req.id, String(currentEmpId), true) }
-          : undefined,
-        secondaryAction: onRespond && currentEmpId != null
-          ? { label: "Decline", onClick: () => onRespond(req.id, String(currentEmpId), false) }
-          : undefined,
+        action:
+          onRespond && currentEmpId != null
+            ? {
+                label: "Accept",
+                onClick: () => onRespond(req.id, String(currentEmpId), true),
+              }
+            : undefined,
+        secondaryAction:
+          onRespond && currentEmpId != null
+            ? {
+                label: "Decline",
+                onClick: () => onRespond(req.id, String(currentEmpId), false),
+              }
+            : undefined,
       });
     }
 
@@ -129,9 +132,13 @@ export function buildActionItems({
         title: `Open shift: ${req.requesterShiftLabel}`,
         subtitle: `${req.requesterShiftDate}`,
         urgency: "low",
-        action: onClaim && currentEmpId != null
-          ? { label: "Claim", onClick: () => onClaim(req.id, String(currentEmpId)) }
-          : undefined,
+        action:
+          onClaim && currentEmpId != null
+            ? {
+                label: "Claim",
+                onClick: () => onClaim(req.id, String(currentEmpId)),
+              }
+            : undefined,
       });
     }
   }
@@ -148,13 +155,24 @@ const TYPE_LABELS: Record<string, string> = {
   swap_proposal: "Swap Proposals",
   pickup: "Open Pickups",
   coverage_gap: "Coverage Gaps",
-  ot_alert: "Overtime",
   draft: "Unpublished Changes",
 };
 
-const TYPE_ORDER = ["approval", "coverage_gap", "ot_alert", "draft", "swap_proposal", "pickup"];
+const TYPE_ORDER = [
+  "approval",
+  "coverage_gap",
+  "draft",
+  "swap_proposal",
+  "pickup",
+];
 
-function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boolean }) {
+function ActionItemRow({
+  item,
+  showBorder,
+}: {
+  item: ActionItem;
+  showBorder: boolean;
+}) {
   const content = (
     <div
       style={{
@@ -162,7 +180,9 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
         alignItems: "center",
         gap: 10,
         padding: "10px 18px",
-        borderBottom: showBorder ? "1px solid var(--color-border-light)" : "none",
+        borderBottom: showBorder
+          ? "1px solid var(--color-border-light)"
+          : "none",
       }}
     >
       {/* Urgency dot */}
@@ -178,10 +198,22 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
 
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-primary)" }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--color-text-primary)",
+          }}
+        >
           {item.title}
         </div>
-        <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 1 }}>
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--color-text-subtle)",
+            marginTop: 1,
+          }}
+        >
           {item.subtitle}
         </div>
       </div>
@@ -228,14 +260,26 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
 
       {/* Link arrow for href items */}
       {item.href && !item.action && (
-        <span style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 500 }}>&rarr;</span>
+        <span
+          style={{
+            fontSize: 11,
+            color: "var(--color-primary)",
+            fontWeight: 500,
+          }}
+        >
+          &rarr;
+        </span>
       )}
     </div>
   );
 
   if (item.href && !item.action) {
     return (
-      <Link key={item.id} href={item.href} style={{ textDecoration: "none", color: "inherit" }}>
+      <Link
+        key={item.id}
+        href={item.href}
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
         {content}
       </Link>
     );
@@ -244,9 +288,10 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
 }
 
 function GroupedItems({ items }: { items: ActionItem[] }) {
-  const groups = TYPE_ORDER
-    .map((type) => ({ type, items: items.filter((i) => i.type === type) }))
-    .filter((g) => g.items.length > 0);
+  const groups = TYPE_ORDER.map((type) => ({
+    type,
+    items: items.filter((i) => i.type === type),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -261,7 +306,8 @@ function GroupedItems({ items }: { items: ActionItem[] }) {
               color: "var(--color-text-subtle)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
-              borderTop: gi > 0 ? "1px solid var(--color-border-light)" : "none",
+              borderTop:
+                gi > 0 ? "1px solid var(--color-border-light)" : "none",
             }}
           >
             {TYPE_LABELS[group.type] || group.type} ({group.items.length})
@@ -293,7 +339,12 @@ function FlatItems({ items }: { items: ActionItem[] }) {
   );
 }
 
-export default function ActionQueueCard({ items, maxVisible = 6, variant = "card", grouped = false }: ActionQueueCardProps) {
+export default function ActionQueueCard({
+  items,
+  maxVisible = 6,
+  variant = "card",
+  grouped = false,
+}: ActionQueueCardProps) {
   const visible = items.slice(0, maxVisible);
   const isHero = variant === "hero";
 
@@ -342,8 +393,13 @@ export default function ActionQueueCard({ items, maxVisible = 6, variant = "card
           >
             All clear
           </div>
-          <div style={{ fontSize: "var(--dg-fs-small)", color: "var(--color-text-subtle)" }}>
-            Nothing requires your attention right now
+          <div
+            style={{
+              fontSize: "var(--dg-fs-small)",
+              color: "var(--color-text-subtle)",
+            }}
+          >
+            No action items right now
           </div>
         </div>
       </div>
@@ -351,7 +407,10 @@ export default function ActionQueueCard({ items, maxVisible = 6, variant = "card
   }
 
   const header = (
-    <div className={isHero ? undefined : "dg-card-header"} style={isHero ? { padding: "0 0 8px" } : undefined}>
+    <div
+      className={isHero ? undefined : "dg-card-header"}
+      style={isHero ? { padding: "0 0 8px" } : undefined}
+    >
       <div>
         <div
           className={isHero ? undefined : "dg-card-title"}
@@ -359,33 +418,26 @@ export default function ActionQueueCard({ items, maxVisible = 6, variant = "card
             display: "flex",
             alignItems: "center",
             gap: 8,
-            ...(isHero ? { fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" } : {}),
+            ...(isHero
+              ? {
+                  fontSize: "var(--dg-fs-body)",
+                  fontWeight: 700,
+                  color: "var(--color-text-primary)",
+                }
+              : {}),
           }}
         >
-          Needs attention
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              minWidth: 18,
-              height: 18,
-              borderRadius: 9,
-              fontSize: 10,
-              fontWeight: 700,
-              background: "var(--color-danger)",
-              color: "#fff",
-              padding: "0 5px",
-            }}
-          >
-            {items.length}
-          </span>
+          Review queue
         </div>
       </div>
     </div>
   );
 
-  const body = grouped ? <GroupedItems items={visible} /> : <FlatItems items={visible} />;
+  const body = grouped ? (
+    <GroupedItems items={visible} />
+  ) : (
+    <FlatItems items={visible} />
+  );
 
   if (isHero) {
     return (

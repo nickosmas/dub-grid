@@ -68,6 +68,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const orgId = perms.orgId ?? org?.id ?? null;
 
+  useEffect(() => {
+    if (perms.isLoading) return;
+    if (perms.canViewEmployeeDetails) return;
+    toast.info("You don't have access to employee details.");
+    router.replace("/people");
+  }, [perms.canViewEmployeeDetails, perms.isLoading, router]);
+
   const shiftCodeById = useMemo(() => {
     const map = new Map<number, (typeof shiftCodes)[number]>();
     for (const sc of shiftCodes) map.set(sc.id, sc);
@@ -94,6 +101,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   // Fetch employee data once we have orgId
   useEffect(() => {
+    if (perms.isLoading || !perms.canViewEmployeeDetails) return;
     if (!orgId || orgLoading) return;
 
     let cancelled = false;
@@ -114,7 +122,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         // Fetch the rest in parallel
         const [empShifts, recShifts, empInvitations, empRequests] = await Promise.all([
           fetchEmployeeShifts(employeeId, orgId, shiftCodeMap, absenceTypeMap),
-          fetchRecurringShifts(orgId, employeeId, shiftCodeMap, false, absenceTypeMap),
+          perms.canViewRecurringShifts
+            ? fetchRecurringShifts(orgId, employeeId, shiftCodeMap, false, absenceTypeMap)
+            : Promise.resolve([]),
           fetchEmployeeInvitations(orgId, employeeId),
           fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
         ]);
@@ -143,7 +153,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     })();
 
     return () => { cancelled = true; };
-  }, [employeeId, orgId, orgLoading, shiftCodeMap, absenceTypeMap, perms.isGridmaster]);
+  }, [
+    employeeId,
+    orgId,
+    orgLoading,
+    shiftCodeMap,
+    absenceTypeMap,
+    perms.canViewEmployeeDetails,
+    perms.canViewRecurringShifts,
+    perms.isGridmaster,
+    perms.isLoading,
+  ]);
 
   // ── Status action handlers ──────────────────────────────────────────────────
   const handleBench = useCallback(async (empId: string, note?: string) => {
@@ -238,6 +258,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const isLoading = loading || orgLoading || perms.isLoading;
 
+  if (!perms.isLoading && !perms.canViewEmployeeDetails) {
+    return <ProgressBar loading />;
+  }
+
   if (error && !employee) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -311,6 +335,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 auditNames={auditNames}
                 shiftRequests={shiftRequests}
                 recurringShifts={recurringShifts}
+                canViewRecurringShifts={perms.canViewRecurringShifts}
                 shiftDisplayMode={org?.shiftDisplayMode}
               />
             </TabsContent>

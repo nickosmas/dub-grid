@@ -147,7 +147,7 @@ PostHogProvider mounts
 - Env vars: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`
 - Exports: `initPostHog()`, `identifyUser()`, `resetPostHog()`, `captureEvent()`, `getFeatureFlag()`
 
-**Server-side:** `src/lib/feature-flags.ts` provides `getServerFeatureFlag()` and `captureServerEvent()` using `posthog-node`.
+**Server-side:** No dedicated server-side PostHog wrapper is currently used in app code. Analytics initialization and feature flag reads run through the client-side helpers in `src/lib/posthog.ts`.
 
 ### Vercel Analytics
 

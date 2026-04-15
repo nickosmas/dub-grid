@@ -43,34 +43,6 @@ const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
   { label: "Dashboard", keys: ["canViewDashboardAnalytics"] },
 ];
 
-const PERM_LABELS: Record<keyof AdminPermissions, string> = {
-  canViewSchedule: "View Schedule",
-  canEditShifts: "Edit Shifts",
-  canPublishSchedule: "Publish Schedule",
-  canApplyRecurringSchedule: "Apply Recurring Schedule",
-  canEditNotes: "Edit Notes / Indicators",
-  canViewRecurringShifts: "View Recurring Shifts",
-  canManageRecurringShifts: "Manage Recurring Shifts",
-  canManageShiftSeries: "Manage Shift Series",
-  canViewStaff: "View Staff",
-  canViewEmployeeDetails: "View Employee Details",
-  canManageEmployees: "Manage Employees",
-  canViewFocusAreas: "View Departments",
-  canManageFocusAreas: "Manage Departments",
-  canViewShiftCodes: "View Shift Codes",
-  canManageShiftCodes: "Manage Shift Codes",
-  canViewIndicatorTypes: "View Indicator Types",
-  canManageIndicatorTypes: "Manage Indicator Types",
-  canManageOrgSettings: "Manage Organization Settings",
-  canViewOrgLabels: "View Custom Labels",
-  canManageOrgLabels: "Manage Custom Labels",
-  canViewCoverageRequirements: "View Coverage Requirements",
-  canManageCoverageRequirements: "Manage Coverage Requirements",
-  canApproveShiftRequests: "Approve Shift Requests",
-  canViewDashboardAnalytics: "View Dashboard Analytics",
-};
-
-const ALWAYS_ON = new Set<keyof AdminPermissions>(["canViewSchedule", "canViewStaff"]);
 const SUPER_ADMIN_ONLY = new Set<keyof AdminPermissions>(["canManageOrgSettings"]);
 
 function emptyAdminPerms(): AdminPermissions {
@@ -112,7 +84,7 @@ const ROLE_ORDER: Record<string, number> = { super_admin: 0, admin: 1, user: 2 }
 
 const AVATAR_COLORS: Record<string, string> = {
   super_admin: "#92400E",
-  admin: "#004501",
+  admin: "#1D4ED8",
   user: "#475569",
 };
 
@@ -131,7 +103,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function UserManagementSettings({ orgId, isSuperAdmin, departments = [] }: { orgId: string; isSuperAdmin: boolean; departments?: import("@/types").Department[] }) {
+export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId: string; isSuperAdmin: boolean; departments?: import("@/types").Department[] }) {
   const { user: currentUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
   const myRole = isSuperAdmin ? "super_admin" : "user";
@@ -141,13 +113,6 @@ export default function UserManagementSettings({ orgId, isSuperAdmin, department
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<import("@/types").Invitation[]>([]);
-
-  // Department name lookup for showing department badges on user-role members
-  const deptNameById = React.useMemo(() => {
-    const map = new Map<number, string>();
-    for (const d of departments) { if (d.type === "management") map.set(d.id, d.name); }
-    return map;
-  }, [departments]);
 
   // UI state
   const [activeTab, setActiveTab] = useState("active");

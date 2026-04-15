@@ -171,7 +171,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                background: "var(--color-brand-bg, #f0f8f0)",
+                background: "var(--color-brand-bg, #eff6ff)",
                 color: "var(--color-brand)",
                 display: "flex",
                 alignItems: "center",
@@ -222,7 +222,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
           fontWeight: 700,
           cursor: "pointer",
           transition: "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: "0 4px 16px rgba(0, 95, 2, 0.25)",
+          boxShadow: "0 4px 16px rgba(37, 99, 235, 0.25)",
         }}
       >
         {isSuperAdmin && !isOrgSetup ? "Let\u2019s Get Started" : "Continue"}

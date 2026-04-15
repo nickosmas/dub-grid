@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getCookieConsent, CONSENT_CHANGED_EVENT } from "@/components/CookieConsent";
+import { useState, useSyncExternalStore } from "react";
+import {
+  getCookieConsent,
+  CONSENT_CHANGED_EVENT,
+  subscribeToConsentChanges,
+} from "@/components/CookieConsent";
 
 type ConsentState = "all" | "essential" | "none";
 
@@ -12,23 +16,15 @@ function readConsent(): ConsentState {
 }
 
 export default function CookiePreferencesManager() {
-  const [consent, setConsent] = useState<ConsentState>("none");
+  const consent = useSyncExternalStore(
+    subscribeToConsentChanges,
+    readConsent,
+    () => "none",
+  );
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setConsent(readConsent());
-    function onChange() { setConsent(readConsent()); }
-    window.addEventListener(CONSENT_CHANGED_EVENT, onChange);
-    return () => window.removeEventListener(CONSENT_CHANGED_EVENT, onChange);
-  }, []);
 
   async function updateConsent(analytics: boolean) {
     setSaving(true);
-    // Dynamic import to avoid pulling CookieConsent internals into the server bundle
-    const mod = await import("@/components/CookieConsent");
-    // getCookieConsent is already exported; we need the internal helpers.
-    // Since setStoredConsent and syncConsentToServer are not exported,
-    // we dispatch the same cookie write + event that the banner does.
     const prefs = { essential: true, analytics };
     const STORAGE_KEY = "dubgrid-cookie-consent";
     const CONSENT_VERSION = "1.0";
@@ -59,16 +55,7 @@ export default function CookiePreferencesManager() {
       body: JSON.stringify({ consent: prefs, version: CONSENT_VERSION }),
     }).catch(() => {});
 
-    // Handle PostHog
-    if (analytics) {
-      const { initPostHog } = await import("@/lib/posthog");
-      initPostHog();
-    } else {
-      const { resetPostHog } = await import("@/lib/posthog");
-      resetPostHog();
-    }
-
-    window.dispatchEvent(new Event(mod.CONSENT_CHANGED_EVENT));
+    window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
     setSaving(false);
   }
 

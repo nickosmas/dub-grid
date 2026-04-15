@@ -125,7 +125,7 @@ export default function StepLayout({
               transition: "background 150ms ease, transform 150ms ease",
               boxShadow: nextDisabled
                 ? "none"
-                : "0 2px 8px rgba(0, 95, 2, 0.2)",
+                : "0 2px 8px rgba(37, 99, 235, 0.2)",
             }}
           >
             <ButtonLoading

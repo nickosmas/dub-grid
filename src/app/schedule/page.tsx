@@ -4,8 +4,6 @@ import * as Sentry from "@/lib/sentry";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Toolbar from "@/components/Toolbar";
-import { TooltipTourRunner, completeTourAction } from "@/components/tooltip-tour";
-import { useActiveScheduleTour } from "@/components/tooltip-tour/useActiveScheduleTour";
 import ScheduleGrid from "@/components/ScheduleGrid";
 import MonthView from "@/components/MonthView";
 import PrintLegend from "@/components/PrintLegend";
@@ -15,37 +13,108 @@ import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 
-const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), { ssr: false });
-const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), { ssr: false });
-const PrintScheduleView = dynamic(() => import("@/components/PrintScheduleView"), { ssr: false });
-const ShiftRequestBoard = dynamic(() => import("@/components/ShiftRequestBoard"), { ssr: false });
-const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), { ssr: false });
-const ShiftSwapModal = dynamic(() => import("@/components/ShiftSwapModal"), { ssr: false });
+const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
+  ssr: false,
+});
+const PrintOptionsModal = dynamic(
+  () => import("@/components/PrintOptionsModal"),
+  { ssr: false },
+);
+const PrintScheduleView = dynamic(
+  () => import("@/components/PrintScheduleView"),
+  { ssr: false },
+);
+const ShiftRequestBoard = dynamic(
+  () => import("@/components/ShiftRequestBoard"),
+  { ssr: false },
+);
+const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
+  ssr: false,
+});
+const ShiftSwapModal = dynamic(() => import("@/components/ShiftSwapModal"), {
+  ssr: false,
+});
 
 import { AnimatedDubGridLogo } from "@/components/Logo";
-import { addDays, formatDate, formatDateKey, getWeekStart, getEmployeeDisplayName, iterateDateRange } from "@/lib/utils";
-import { filterAndSortEmployees, isEmployeeQualified, getDisqualificationReasons, computeCoverageGaps, buildPublishedDateSet, timesOverlap, checkCrossDateOverlap, checkSameDayOverlaps } from "@/lib/schedule-logic";
+import {
+  addDays,
+  formatDate,
+  formatDateKey,
+  getWeekStart,
+  getEmployeeDisplayName,
+  iterateDateRange,
+} from "@/lib/utils";
+import {
+  filterAndSortEmployees,
+  isEmployeeQualified,
+  getDisqualificationReasons,
+  computeCoverageGaps,
+  buildPublishedDateSet,
+  timesOverlap,
+  checkCrossDateOverlap,
+  checkSameDayOverlaps,
+} from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
-import { fetchShifts, fetchScheduleNotes, fetchRecurringShifts, fetchRecentPublishHistory, fetchPublishedDateRanges, upsertShiftTimes, deleteShift, upsertShift, updateSeriesAllShifts, deleteShiftSeries, createShiftSeries, moveShift, applyRecurringSchedules, publishSchedule, discardScheduleDrafts, upsertScheduleNote, deleteScheduleNote, OptimisticLockError, updateScheduleLastViewed, getScheduleLastViewed, fetchCalloffOpenShifts } from "@/lib/db";
+import {
+  fetchShifts,
+  fetchScheduleNotes,
+  fetchRecurringShifts,
+  fetchRecentPublishHistory,
+  fetchPublishedDateRanges,
+  upsertShiftTimes,
+  deleteShift,
+  upsertShift,
+  updateSeriesAllShifts,
+  deleteShiftSeries,
+  createShiftSeries,
+  moveShift,
+  applyRecurringSchedules,
+  publishSchedule,
+  discardScheduleDrafts,
+  upsertScheduleNote,
+  deleteScheduleNote,
+  OptimisticLockError,
+  updateScheduleLastViewed,
+  getScheduleLastViewed,
+  fetchCalloffOpenShifts,
+} from "@/lib/db";
 import { computeDraftBreakdown } from "@/lib/draft-utils";
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
+import { resolveScheduleSpan } from "@/lib/schedule-view";
 import { supabase } from "@/lib/supabase";
-import { usePermissions, useOrganizationData, useEmployees, useCellLocks, useShiftRequests } from "@/hooks";
+import {
+  usePermissions,
+  useOrganizationData,
+  useEmployees,
+  useCellLocks,
+  useShiftRequests,
+} from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import { toast } from "sonner";
-import { DndContext, DragOverlay, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
 import type { ShiftDragData } from "@/components/DraggableShift";
 import type { CellDropData } from "@/components/DroppableCell";
 import ShiftContextMenu from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import MobileDayView from "@/components/MobileDayView";
-import { useMediaQuery, MOBILE, SMALL_DESKTOP } from "@/hooks";
-import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
+import { useMediaQuery, MOBILE, AUTO_ONE_WEEK } from "@/hooks";
+import {
+  useSetMobileSubNav,
+  SubNavItem,
+} from "@/components/MobileSubNavContext";
 import {
   Employee,
   EditModalState,
@@ -61,39 +130,142 @@ import {
   GridOpenShift,
 } from "@/types";
 
+type DraftNoteState = {
+  indicatorTypeId: number;
+  status: "published" | "draft" | "draft_deleted";
+};
+
+type EditSessionDraft = {
+  cellKey: string;
+  baseShift: ShiftMap[string] | null;
+  draftShift: ShiftMap[string] | null;
+  baseNotes: Record<number, DraftNoteState[]>;
+  draftNotes: Record<number, DraftNoteState[]>;
+  baseVersion?: number;
+  baseFingerprint: string;
+  isDirty: boolean;
+  isStale: boolean;
+};
+
+type ScheduleEntryPayload = {
+  label: string;
+  shiftCodeIds: number[];
+  absenceTypeId: number | null;
+  customStartTime: string | null;
+  customEndTime: string | null;
+};
+
+function cloneShiftEntry(
+  shift: ShiftMap[string] | null | undefined,
+): ShiftMap[string] | null {
+  if (!shift) return null;
+  return {
+    ...shift,
+    shiftCodeIds: [...shift.shiftCodeIds],
+    publishedShiftCodeIds: [...shift.publishedShiftCodeIds],
+  };
+}
+
+function cloneDraftNotes(
+  notes: DraftNoteState[] | undefined,
+): DraftNoteState[] {
+  return (notes ?? []).map((note) => ({ ...note }));
+}
+
+function serializeShiftSnapshot(shift: ShiftMap[string] | null): string {
+  if (!shift) return "null";
+  return JSON.stringify({
+    label: shift.label,
+    shiftCodeIds: shift.shiftCodeIds,
+    isDelete: shift.isDelete ?? false,
+    draftKind: shift.draftKind,
+    publishedShiftCodeIds: shift.publishedShiftCodeIds,
+    publishedLabel: shift.publishedLabel,
+    customStartTime: shift.customStartTime ?? null,
+    customEndTime: shift.customEndTime ?? null,
+    publishedCustomStartTime: shift.publishedCustomStartTime ?? null,
+    publishedCustomEndTime: shift.publishedCustomEndTime ?? null,
+    absenceTypeId: shift.absenceTypeId ?? null,
+    publishedAbsenceTypeId: shift.publishedAbsenceTypeId ?? null,
+    version: shift.version,
+    seriesId: shift.seriesId ?? null,
+  });
+}
+
+function serializeNotesSnapshot(
+  notesByFocusArea: Record<number, DraftNoteState[]>,
+): string {
+  const normalized = Object.entries(notesByFocusArea)
+    .map(([focusAreaId, notes]) => [
+      Number(focusAreaId),
+      cloneDraftNotes(notes).sort((a, b) => a.indicatorTypeId - b.indicatorTypeId),
+    ] as [number, DraftNoteState[]])
+    .sort((a, b) => a[0] - b[0]);
+  return JSON.stringify(normalized);
+}
+
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
-  const isSmallDesktop = useMediaQuery(SMALL_DESKTOP);
+  const shouldAutoUseOneWeek = useMediaQuery(AUTO_ONE_WEEK);
   const { user: authUser } = useAuth();
-  const { canEditShifts, canEditNotes, canApplyRecurringSchedule, canManageShiftSeries, canPublishSchedule, canApproveShiftRequests, isSuperAdmin, isLoading: permsLoading, orgId } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, allShiftCodes, shiftCategories,
-    indicatorTypes, certifications, orgRoles, shiftCodeMap,
-    absenceTypes, allAbsenceTypes, absenceTypeMap,
-    coverageRequirements, departments,
-    loading: orgLoading, loadError,
+    canEditShifts,
+    canEditNotes,
+    canApplyRecurringSchedule,
+    canViewRecurringShifts,
+    canManageShiftSeries,
+    canPublishSchedule,
+    canApproveShiftRequests,
+    isSuperAdmin,
+    isLoading: permsLoading,
+    orgId,
+  } = usePermissions();
+  const {
+    org,
+    focusAreas,
+    shiftCodes,
+    allShiftCodes,
+    shiftCategories,
+    indicatorTypes,
+    certifications,
+    orgRoles,
+    shiftCodeMap,
+    absenceTypes,
+    allAbsenceTypes,
+    absenceTypeMap,
+    coverageRequirements,
+    departments,
+    loading: orgLoading,
+    loadError,
   } = useOrganizationData();
   // Use orgId from JWT (available immediately) so employee fetch starts
   // in parallel with org data instead of waiting for it.
-  const {
-    employees,
-    loading: empLoading,
-  } = useEmployees(orgId ?? org?.id ?? null);
+  const { employees, loading: empLoading } = useEmployees(
+    orgId ?? org?.id ?? null,
+  );
 
   const [today, setToday] = useState(() => new Date());
 
   // Refresh `today` if the app stays open past midnight
   useEffect(() => {
     const now = new Date();
-    const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    const msUntilMidnight =
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() -
+      now.getTime();
     const timer = setTimeout(() => setToday(new Date()), msUntilMidnight + 500);
     return () => clearTimeout(timer);
   }, [today]);
 
   // Date range for shift fetching: ±90 days from today.
   // Shifts outside this window are not loaded — keeps payload small for mature orgs.
-  const shiftFetchStart = useMemo(() => formatDateKey(addDays(today, -90)), [today]);
-  const shiftFetchEnd = useMemo(() => formatDateKey(addDays(today, 90)), [today]);
+  const shiftFetchStart = useMemo(
+    () => formatDateKey(addDays(today, -90)),
+    [today],
+  );
+  const shiftFetchEnd = useMemo(
+    () => formatDateKey(addDays(today, 90)),
+    [today],
+  );
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(new Date()),
@@ -107,35 +279,71 @@ function SchedulerContent() {
   // Serializes DB writes per shift key to prevent race conditions (e.g. edit → undo
   // firing before the edit's DB write completes, causing an optimistic lock conflict).
   const pendingShiftWrites = useRef<Map<string, Promise<void>>>(new Map());
-  const [notes, setNotes] = useState<Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>>({});
+  const [notes, setNotes] = useState<
+    Record<
+      string,
+      {
+        indicatorTypeId: number;
+        status: "published" | "draft" | "draft_deleted";
+      }[]
+    >
+  >({});
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
+  const [editSessionDraft, setEditSessionDraft] =
+    useState<EditSessionDraft | null>(null);
+  const editSessionDraftRef = useRef<EditSessionDraft | null>(null);
+  editSessionDraftRef.current = editSessionDraft;
+  const isApplyingEditSessionRef = useRef(false);
   const [preferredSpan, setPreferredSpan] = useState<1 | 2 | "month">(2);
-  // Auto-downgrade 2-week to 1-week on narrow screens to prevent column squeeze
-  const spanWeeks: 1 | 2 | "month" = isSmallDesktop && preferredSpan === 2 ? 1 : preferredSpan;
+  // Auto-downgrade 2-week to 1-week on cramped tablet and small-desktop widths.
+  // Wider desktops keep 2-week available and rely on the grid's readable min widths.
+  const spanWeeks: 1 | 2 | "month" = resolveScheduleSpan(
+    preferredSpan,
+    shouldAutoUseOneWeek,
+  );
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
   // My Schedule mode: for regular users, default to showing only their own shifts
   const [isPublishing, setIsPublishing] = useState(false);
-  const [cancelingMode, setCancelingMode] = useState<null | 'mine' | 'all'>(null);
+  const [cancelingMode, setCancelingMode] = useState<null | "mine" | "all">(
+    null,
+  );
   const [, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
-  const [activePrintConfig, setActivePrintConfig] = useState<PrintConfig | null>(null);
+  const [activePrintConfig, setActivePrintConfig] =
+    useState<PrintConfig | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showAutoFillConfirm, setShowAutoFillConfirm] = useState(false);
-  const [autoFillPreview, setAutoFillPreview] = useState<{ count: number; dateRange: string } | null>(null);
+  const [autoFillPreview, setAutoFillPreview] = useState<{
+    count: number;
+    dateRange: string;
+  } | null>(null);
   const [showDiffOverlay, setShowDiffOverlay] = useState(false);
-  const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{ seriesId: string; shiftCount: number } | null>(null);
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([]);
-  const [publishedDateRanges, setPublishedDateRanges] = useState<{ startDate: string; endDate: string }[]>([]);
+  const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{
+    seriesId: string;
+    shiftCount: number;
+  } | null>(null);
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>(
+    [],
+  );
+  const [publishedDateRanges, setPublishedDateRanges] = useState<
+    { startDate: string; endDate: string }[]
+  >([]);
   const [showPublishDiff, setShowPublishDiff] = useState(false);
   const [showPublishHistory, setShowPublishHistory] = useState(false);
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
   const [isImportingPrevious, setIsImportingPrevious] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [importPreview, setImportPreview] = useState<{ count: number; sourceRange: string; targetRange: string } | null>(null);
+  const [importPreview, setImportPreview] = useState<{
+    count: number;
+    sourceRange: string;
+    targetRange: string;
+  } | null>(null);
 
   // ── Coverage Panel ─────────────────────────────────────────────────────────
   const [showCoveragePanel, setShowCoveragePanel] = useState(false);
@@ -150,7 +358,10 @@ function SchedulerContent() {
   } | null>(null);
 
   const currentEmpId = useMemo(
-    () => authUser ? employees.find(e => e.userId === authUser.id)?.id ?? null : null,
+    () =>
+      authUser
+        ? (employees.find((e) => e.userId === authUser.id)?.id ?? null)
+        : null,
     [employees, authUser],
   );
 
@@ -162,14 +373,28 @@ function SchedulerContent() {
   );
 
   // ── Open shifts (calloff-spawned pickups) ──
-  const [calloffOpenShifts, setCalloffOpenShifts] = useState<GridOpenShift[]>([]);
+  const [calloffOpenShifts, setCalloffOpenShifts] = useState<GridOpenShift[]>(
+    [],
+  );
   useEffect(() => {
     const effectiveOrgId = orgId ?? org?.id;
     if (!effectiveOrgId || !shiftCodeMap.size) return;
-    fetchCalloffOpenShifts(effectiveOrgId, shiftFetchStart, shiftFetchEnd, shiftCodeMap)
+    fetchCalloffOpenShifts(
+      effectiveOrgId,
+      shiftFetchStart,
+      shiftFetchEnd,
+      shiftCodeMap,
+    )
       .then(setCalloffOpenShifts)
-      .catch(() => setCalloffOpenShifts([]));
-  }, [orgId, org?.id, shiftFetchStart, shiftFetchEnd, shiftCodeMap, shiftRequests.requests.length]);
+      .catch((err) => {
+        // BUG 1.6: Capture error to Sentry and show user feedback
+        Sentry.captureException(err, {
+          tags: { component: "calloff_open_shifts" },
+        });
+        toast.error("Failed to load available shift opportunities");
+        setCalloffOpenShifts([]);
+      });
+  }, [orgId, org?.id, shiftFetchStart, shiftFetchEnd, shiftCodeMap]);
 
   const draftBreakdown = useMemo(
     () => computeDraftBreakdown(shifts, notes),
@@ -178,51 +403,16 @@ function SchedulerContent() {
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
 
-  // ── Tour selector ─────────────────────────────────────────────────────────
-  const hasShifts = useMemo(() => Object.keys(shifts).some(k => {
-    const s = shifts[k];
-    return s && s.label && s.label !== "OFF";
-  }), [shifts]);
-
-  const hasOwnPublishedShift = useMemo(() => {
-    if (!currentEmpId) return false;
-    return Object.entries(shifts).some(([key, s]) => {
-      if (!s || !s.label || s.label === "OFF" || s.isDraft) return false;
-      return key.startsWith(`${currentEmpId}_`);
-    });
-  }, [shifts, currentEmpId]);
-
-  const activeTour = useActiveScheduleTour({
-    hasShifts,
-    hasDrafts: hasUnpublishedChanges,
-    isEmployee: !canEditShifts,
-    hasOwnPublishedShift,
-  });
-
-
-
-  // Stamp data-tour attributes on the first empty/occupied grid cells after render
-  useEffect(() => {
-    if (!activeTour) return;
-    const stamp = () => {
-      // Clear previous stamps
-      document.querySelectorAll("[data-tour='grid-empty-cell'],[data-tour='grid-occupied-cell'],[data-tour='grid-shift-pill']").forEach(el => el.removeAttribute("data-tour"));
-      // First empty cell
-      const emptyCell = document.querySelector('.dg-grid-cell[data-empty="true"][data-interactive="true"]');
-      if (emptyCell) emptyCell.setAttribute("data-tour", "grid-empty-cell");
-      // First occupied cell
-      const occupiedCell = document.querySelector('.dg-grid-cell[data-empty="false"][data-interactive="true"]');
-      if (occupiedCell) occupiedCell.setAttribute("data-tour", "grid-occupied-cell");
-      // First shift pill inside an occupied cell
-      const pill = document.querySelector('.dg-grid-cell[data-empty="false"] .dg-shift-pill');
-      if (pill) pill.setAttribute("data-tour", "grid-shift-pill");
-    };
-    // Run after grid renders
-    const timer = setTimeout(stamp, 500);
-    return () => clearTimeout(timer);
-  }, [activeTour, shifts]);
-
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const editorSessionIdRef = useRef(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `editor-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  const isScheduleEditor = canEditShifts || canEditNotes;
 
   // Audit mode: toggle to show who created each shift under grid cells
   const [showAudit, setShowAudit] = useState(false);
@@ -234,20 +424,98 @@ function SchedulerContent() {
     updatedAt: string | null;
   } | null>(null);
 
+  const collectCellNotesSnapshot = useCallback(
+    (empId: string, date: Date): Record<number, DraftNoteState[]> => {
+      const dateKey = formatDateKey(date);
+      const cellKey = `${empId}_${dateKey}`;
+      const snapshot: Record<number, DraftNoteState[]> = {};
+
+      for (const focusArea of focusAreas) {
+        const noteKey = `${cellKey}_${focusArea.id}`;
+        const noteList = notesRef.current[noteKey];
+        if (noteList?.length) {
+          snapshot[focusArea.id] = cloneDraftNotes(noteList);
+        }
+      }
+
+      const genericNotes = notesRef.current[cellKey];
+      if (genericNotes?.length) {
+        snapshot[-1] = cloneDraftNotes(genericNotes);
+      }
+
+      return snapshot;
+    },
+    [focusAreas],
+  );
+
+  const buildEditSessionFingerprint = useCallback(
+    (
+      shift: ShiftMap[string] | null,
+      notesByFocusArea: Record<number, DraftNoteState[]>,
+    ): string =>
+      JSON.stringify({
+        shift: serializeShiftSnapshot(shift),
+        notes: serializeNotesSnapshot(notesByFocusArea),
+      }),
+    [],
+  );
+
+  const computeEditSessionDirty = useCallback(
+    (
+      baseFingerprint: string,
+      draftShift: ShiftMap[string] | null,
+      draftNotes: Record<number, DraftNoteState[]>,
+    ): boolean =>
+      buildEditSessionFingerprint(draftShift, draftNotes) !== baseFingerprint,
+    [buildEditSessionFingerprint],
+  );
+
+  const startEditSession = useCallback(
+    (modal: EditModalState) => {
+      const cellKey = `${modal.empId}_${formatDateKey(modal.date)}`;
+      const baseShift = cloneShiftEntry(shiftsRef.current[cellKey]);
+      const baseNotes = collectCellNotesSnapshot(modal.empId, modal.date);
+      const baseFingerprint = buildEditSessionFingerprint(baseShift, baseNotes);
+
+      setEditPanel(modal);
+      setEditSessionDraft({
+        cellKey,
+        baseShift,
+        draftShift: cloneShiftEntry(baseShift),
+        baseNotes,
+        draftNotes: Object.fromEntries(
+          Object.entries(baseNotes).map(([focusAreaId, noteList]) => [
+            Number(focusAreaId),
+            cloneDraftNotes(noteList),
+          ]),
+        ),
+        baseVersion: baseShift?.version,
+        baseFingerprint,
+        isDirty: false,
+        isStale: false,
+      });
+    },
+    [buildEditSessionFingerprint, collectCellNotesSnapshot],
+  );
+
   // ── Drag & Drop state ──────────────────────────────────────────────────────
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    }),
     useSensor(KeyboardSensor),
   );
   const [activeDrag, setActiveDrag] = useState<ShiftDragData | null>(null);
 
   // ── Clipboard state (copy-paste shifts) ───────────────────────────────────
-  const [clipboard, setClipboard] = useState<{
-    label: string;
-    shiftCodeIds: number[];
+  const [clipboard, setClipboard] = useState<ScheduleEntryPayload | null>(null);
+  const activeDragModeRef = useRef<"move" | "copy">("move");
+  const hoveredCellRef = useRef<{
+    empId: string;
+    date: Date;
+    focusAreaName: string;
   } | null>(null);
-  const hoveredCellRef = useRef<{ empId: string; date: Date; focusAreaName: string } | null>(null);
 
   // ── Context menu state ────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{
@@ -266,13 +534,17 @@ function SchedulerContent() {
     empId: string;
     date: Date;
     existingLabel: string;
-    pasteLabel: string;
-    pasteCodeIds: number[];
+    pasteEntry: ScheduleEntryPayload;
   } | null>(null);
-  const [pendingClaimShift, setPendingClaimShift] = useState<GridOpenShift | null>(null);
+  const [pendingClaimShift, setPendingClaimShift] =
+    useState<GridOpenShift | null>(null);
 
-  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(
+    null,
+  );
+  const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Refs for values used by the realtime channel — reading from refs avoids
   // tearing down & recreating the channel when these change.
@@ -280,6 +552,8 @@ function SchedulerContent() {
   currentUserRef.current = currentUser;
   const canEditShiftsRef = useRef(canEditShifts);
   canEditShiftsRef.current = canEditShifts;
+  const canEditNotesRef = useRef(canEditNotes);
+  canEditNotesRef.current = canEditNotes;
   // Stable refs for map objects — avoids recreating callbacks when maps get new
   // references (which happens on every React Query revalidation).
   const shiftCodeMapRef = useRef(shiftCodeMap);
@@ -291,16 +565,33 @@ function SchedulerContent() {
   const refetchScheduleData = useCallback(async () => {
     if (!org) return;
     const [shiftData, noteRows] = await Promise.all([
-      fetchShifts(org.id, canEditShiftsRef.current, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd),
+      fetchShifts(
+        org.id,
+        canEditShiftsRef.current,
+        shiftCodeMapRef.current,
+        absenceTypeMapRef.current,
+        shiftFetchStart,
+        shiftFetchEnd,
+      ),
       fetchScheduleNotes(org.id, shiftFetchStart, shiftFetchEnd),
     ]);
-    const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+    const noteMap: Record<
+      string,
+      {
+        indicatorTypeId: number;
+        status: "published" | "draft" | "draft_deleted";
+      }[]
+    > = {};
     for (const note of noteRows) {
-      const key = note.focusAreaId != null
-        ? `${note.empId}_${note.date}_${note.focusAreaId}`
-        : `${note.empId}_${note.date}`;
+      const key =
+        note.focusAreaId != null
+          ? `${note.empId}_${note.date}_${note.focusAreaId}`
+          : `${note.empId}_${note.date}`;
       if (!noteMap[key]) noteMap[key] = [];
-      noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
+      noteMap[key].push({
+        indicatorTypeId: note.indicatorTypeId,
+        status: note.status,
+      });
     }
     setShifts(shiftData);
     setNotes(noteMap);
@@ -324,7 +615,10 @@ function SchedulerContent() {
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
 
-    async function fetchCurrentUser(): Promise<{ id: string; name: string } | null> {
+    async function fetchCurrentUser(): Promise<{
+      id: string;
+      name: string;
+    } | null> {
       try {
         if (!authUser) return null;
         const { data: profile } = await supabase
@@ -345,26 +639,59 @@ function SchedulerContent() {
     async function loadSchedule() {
       try {
         // Fetch per-user last-viewed timestamp + critical data in parallel
-        const [shiftData, noteRows, recShifts, lastViewed, pubDateRanges] = await Promise.all([
-          fetchShifts(orgId, canEditShifts, shiftCodeMap, absenceTypeMap, shiftFetchStart, shiftFetchEnd),
-          fetchScheduleNotes(orgId, shiftFetchStart, shiftFetchEnd),
-          fetchRecurringShifts(orgId, undefined, shiftCodeMap, false, absenceTypeMap),
-          getScheduleLastViewed(orgId).catch(() => null),
-          fetchPublishedDateRanges(orgId, shiftFetchStart, shiftFetchEnd).catch(() => []),
-        ]);
+        const [shiftData, noteRows, recShifts, lastViewed, pubDateRanges] =
+          await Promise.all([
+            fetchShifts(
+              orgId,
+              canEditShifts,
+              shiftCodeMap,
+              absenceTypeMap,
+              shiftFetchStart,
+              shiftFetchEnd,
+            ),
+            fetchScheduleNotes(orgId, shiftFetchStart, shiftFetchEnd),
+            canViewRecurringShifts
+              ? fetchRecurringShifts(
+                  orgId,
+                  undefined,
+                  shiftCodeMap,
+                  false,
+                  absenceTypeMap,
+                )
+              : Promise.resolve([] as RecurringShift[]),
+            getScheduleLastViewed(orgId).catch(() => null),
+            fetchPublishedDateRanges(
+              orgId,
+              shiftFetchStart,
+              shiftFetchEnd,
+            ).catch(() => []),
+          ]);
 
         lastViewedRef.current = lastViewed;
 
         // Fetch publish history since user's last view (falls back to 24h if null)
-        const recentPublishes = await fetchRecentPublishHistory(orgId, lastViewed).catch(() => [] as PublishHistoryEntry[]);
+        const recentPublishes = await fetchRecentPublishHistory(
+          orgId,
+          lastViewed,
+        ).catch(() => [] as PublishHistoryEntry[]);
 
-        const noteMap: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]> = {};
+        const noteMap: Record<
+          string,
+          {
+            indicatorTypeId: number;
+            status: "published" | "draft" | "draft_deleted";
+          }[]
+        > = {};
         for (const note of noteRows) {
-          const key = note.focusAreaId != null
-            ? `${note.empId}_${note.date}_${note.focusAreaId}`
-            : `${note.empId}_${note.date}`;
+          const key =
+            note.focusAreaId != null
+              ? `${note.empId}_${note.date}_${note.focusAreaId}`
+              : `${note.empId}_${note.date}`;
           if (!noteMap[key]) noteMap[key] = [];
-          noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
+          noteMap[key].push({
+            indicatorTypeId: note.indicatorTypeId,
+            status: note.status,
+          });
         }
         setShifts(shiftData);
         setNotes(noteMap);
@@ -375,17 +702,21 @@ function SchedulerContent() {
         // Show "what changed" toast once per mount
         if (recentPublishes.length > 0 && !hasShownChangeToast.current) {
           hasShownChangeToast.current = true;
-          const allChanges = recentPublishes.flatMap(e => e.changes);
-          const newCount = allChanges.filter(c => c.kind === 'new').length;
-          const modCount = allChanges.filter(c => c.kind === 'modified').length;
-          const delCount = allChanges.filter(c => c.kind === 'deleted').length;
+          const allChanges = recentPublishes.flatMap((e) => e.changes);
+          const newCount = allChanges.filter((c) => c.kind === "new").length;
+          const modCount = allChanges.filter(
+            (c) => c.kind === "modified",
+          ).length;
+          const delCount = allChanges.filter(
+            (c) => c.kind === "deleted",
+          ).length;
           const parts: string[] = [];
           if (newCount > 0) parts.push(`${newCount} new`);
           if (modCount > 0) parts.push(`${modCount} modified`);
           if (delCount > 0) parts.push(`${delCount} removed`);
           if (parts.length > 0) {
             toast.info(
-              `${allChanges.length} shift${allChanges.length !== 1 ? 's' : ''} changed since your last visit — ${parts.join(', ')}`,
+              `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit — ${parts.join(", ")}`,
               { duration: 6000 },
             );
           }
@@ -395,7 +726,11 @@ function SchedulerContent() {
         void updateScheduleLastViewed(orgId);
 
         // Fetch current user in background — not needed for grid render
-        fetchCurrentUser().then(info => { if (info) setCurrentUser(info); }).catch(() => {});
+        fetchCurrentUser()
+          .then((info) => {
+            if (info) setCurrentUser(info);
+          })
+          .catch(() => {});
       } catch (err) {
         Sentry.captureException(err);
       } finally {
@@ -407,37 +742,46 @@ function SchedulerContent() {
   }, [orgLoading, org]);
 
   // Resolve a user UUID to a display name via profiles table (cached).
-  const resolveUserName = useCallback(async (userId: string | null | undefined): Promise<string | null> => {
-    if (!userId) return null;
-    const cached = profileNameCache.current.get(userId);
-    if (cached) return cached;
-    try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("first_name, last_name")
-        .eq("id", userId)
-        .maybeSingle();
-      const first = data?.first_name?.trim() || "";
-      const last = data?.last_name?.trim() || "";
-      const name = [first, last].filter(Boolean).join(" ") || null;
-      if (name) {
-        profileNameCache.current.set(userId, name);
-        return name;
+  const resolveUserName = useCallback(
+    async (userId: string | null | undefined): Promise<string | null> => {
+      if (!userId) return null;
+      const cached = profileNameCache.current.get(userId);
+      if (cached) return cached;
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", userId)
+          .maybeSingle();
+        const first = data?.first_name?.trim() || "";
+        const last = data?.last_name?.trim() || "";
+        const name = [first, last].filter(Boolean).join(" ") || null;
+        if (name) {
+          profileNameCache.current.set(userId, name);
+          return name;
+        }
+        // Profile deleted or has no name — cache fallback to avoid re-fetching
+        profileNameCache.current.set(userId, "Deleted user");
+        return "Deleted user";
+      } catch {
+        return null;
       }
-      // Profile deleted or has no name — cache fallback to avoid re-fetching
-      profileNameCache.current.set(userId, "Deleted user");
-      return "Deleted user";
-    } catch {
-      return null;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Resolve audit metadata (created/updated by names) when the edit panel opens.
   useEffect(() => {
-    if (!editPanel) { setAuditInfo(null); return; }
+    if (!editPanel) {
+      setAuditInfo(null);
+      return;
+    }
     const key = `${editPanel.empId}_${formatDateKey(editPanel.date)}`;
     const meta = shifts[key];
-    if (!meta?.createdBy && !meta?.updatedBy) { setAuditInfo(null); return; }
+    if (!meta?.createdBy && !meta?.updatedBy) {
+      setAuditInfo(null);
+      return;
+    }
 
     let cancelled = false;
     (async () => {
@@ -458,25 +802,36 @@ function SchedulerContent() {
         });
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [editPanel, shifts, resolveUserName]);
 
   // Batch-fetch profile names for shift creators (audit mode) and publishers (publish tooltips).
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
-  const needsAuditNames = showAudit || publishHistory.length > 0;
+  const needsAuditNames =
+    showAudit ||
+    publishHistory.length > 0 ||
+    Object.values(shifts).some(
+      (entry) => entry.isDraft && (!!entry.updatedBy || !!entry.createdBy),
+    );
   useEffect(() => {
     if (!needsAuditNames) return;
     // Collect unique creator/updater UUIDs not yet in the cache
     const uncached = new Set<string>();
     for (const entry of Object.values(shifts)) {
-      if (entry.createdBy && !profileNameCache.current.has(entry.createdBy)) uncached.add(entry.createdBy);
-      if (entry.updatedBy && !profileNameCache.current.has(entry.updatedBy)) uncached.add(entry.updatedBy);
+      if (entry.createdBy && !profileNameCache.current.has(entry.createdBy))
+        uncached.add(entry.createdBy);
+      if (entry.updatedBy && !profileNameCache.current.has(entry.updatedBy))
+        uncached.add(entry.updatedBy);
     }
     // Also collect updatedBy + publishedBy UUIDs from publish history (for tooltips and deleted shifts)
     for (const entry of publishHistory) {
-      if (entry.publishedBy && !profileNameCache.current.has(entry.publishedBy)) uncached.add(entry.publishedBy);
+      if (entry.publishedBy && !profileNameCache.current.has(entry.publishedBy))
+        uncached.add(entry.publishedBy);
       for (const change of entry.changes) {
-        if (change.updatedBy && !profileNameCache.current.has(change.updatedBy)) uncached.add(change.updatedBy);
+        if (change.updatedBy && !profileNameCache.current.has(change.updatedBy))
+          uncached.add(change.updatedBy);
       }
     }
     if (uncached.size === 0) {
@@ -495,7 +850,10 @@ function SchedulerContent() {
           .in("id", ids);
         if (cancelled) return;
         if (error) {
-          console.warn("Audit names: profile query failed, will retry", error.message);
+          console.warn(
+            "Audit names: profile query failed, will retry",
+            error.message,
+          );
           // Don't cache "Deleted user" — let the next trigger retry
           return;
         }
@@ -506,7 +864,9 @@ function SchedulerContent() {
           if (name) profileNameCache.current.set(row.id, name);
         }
         // 2. Fallback: resolve remaining IDs from employees table (names are NOT NULL there)
-        const unresolvedIds = ids.filter(id => !profileNameCache.current.has(id));
+        const unresolvedIds = ids.filter(
+          (id) => !profileNameCache.current.has(id),
+        );
         if (unresolvedIds.length > 0) {
           const { data: empData } = await supabase
             .from("employees")
@@ -515,7 +875,9 @@ function SchedulerContent() {
           if (cancelled) return;
           for (const row of empData ?? []) {
             if (row.user_id) {
-              const name = [row.first_name?.trim(), row.last_name?.trim()].filter(Boolean).join(" ");
+              const name = [row.first_name?.trim(), row.last_name?.trim()]
+                .filter(Boolean)
+                .join(" ");
               if (name) profileNameCache.current.set(row.user_id, name);
             }
           }
@@ -531,19 +893,28 @@ function SchedulerContent() {
         // Silently fail — audit names are non-critical
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [needsAuditNames, shifts, publishHistory]);
 
   // Build a lookup map from all recent publish history changes for O(1) access.
   // Iterate oldest→newest so the most recent publish wins per cell key.
   const publishChangesMap = useMemo(() => {
     if (publishHistory.length === 0) return null;
-    const map = new Map<string, PublishChange & { publishedAt: string; publishedBy: string }>();
+    const map = new Map<
+      string,
+      PublishChange & { publishedAt: string; publishedBy: string }
+    >();
     // publishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
     for (let i = publishHistory.length - 1; i >= 0; i--) {
       const entry = publishHistory[i];
       for (const change of entry.changes) {
-        map.set(`${change.empId}_${change.date}`, { ...change, publishedAt: entry.publishedAt, publishedBy: entry.publishedBy });
+        map.set(`${change.empId}_${change.date}`, {
+          ...change,
+          publishedAt: entry.publishedAt,
+          publishedBy: entry.publishedBy,
+        });
       }
     }
     return map;
@@ -558,7 +929,7 @@ function SchedulerContent() {
       const entry = shifts[key];
       let userId: string | null = null;
       if (entry) {
-        userId = (entry.updatedBy || entry.createdBy) || null;
+        userId = entry.updatedBy || entry.createdBy || null;
       } else if (publishChangesMap) {
         // Shift row was deleted after publish — resolve from publish history
         const change = publishChangesMap.get(key);
@@ -580,7 +951,30 @@ function SchedulerContent() {
     [shifts, auditNames, publishChangesMap],
   );
 
-  const { lockCell, unlockCell, getCellLock, getCurrentCell, lockedCells, onlineUsers, syncPresence, handleLockBroadcast, handleUnlockBroadcast } = useCellLocks(realtimeChannelRef, currentUser, canEditShifts);
+  const {
+    lockCell,
+    unlockCell,
+    getCellLock,
+    getCellActivity,
+    getCurrentCell,
+    lockedCells,
+    onlineUsers,
+    syncPresence,
+    handleLockBroadcast,
+    handleUnlockBroadcast,
+  } = useCellLocks(
+    realtimeChannelRef,
+    currentUser,
+    editorSessionIdRef.current,
+    isScheduleEditor,
+    canEditShifts,
+  );
+
+  const closeEditPanel = useCallback(() => {
+    unlockCell();
+    setEditPanel(null);
+    setEditSessionDraft(null);
+  }, [unlockCell]);
 
   // Refs for realtime callbacks — allows the channel effect to depend only on
   // [org] while still calling the latest versions of these functions.
@@ -597,6 +991,32 @@ function SchedulerContent() {
   // Tracks when data was last fetched — used to throttle tab-visibility refetches
   const lastRefetchAtRef = useRef(0);
 
+  useEffect(() => {
+    if (!editPanel || !editSessionDraft || isApplyingEditSessionRef.current) {
+      return;
+    }
+
+    const currentShift = cloneShiftEntry(shiftsRef.current[editSessionDraft.cellKey]);
+    const currentNotes = collectCellNotesSnapshot(editPanel.empId, editPanel.date);
+    const currentFingerprint = buildEditSessionFingerprint(currentShift, currentNotes);
+
+    if (currentFingerprint !== editSessionDraft.baseFingerprint) {
+      setEditSessionDraft((prev) => {
+        if (!prev || prev.cellKey !== editSessionDraft.cellKey || prev.isStale) {
+          return prev;
+        }
+        return { ...prev, isStale: true };
+      });
+    }
+  }, [
+    buildEditSessionFingerprint,
+    collectCellNotesSnapshot,
+    editPanel,
+    editSessionDraft,
+    notes,
+    shifts,
+  ]);
+
   // Subscribe to real-time schedule broadcasts so other tabs/users see
   // published and draft changes immediately without a manual refresh.
   // Depends only on [org] — all callbacks read from refs so the channel
@@ -608,101 +1028,165 @@ function SchedulerContent() {
 
     const channel = supabase
       .channel(`schedule:${org.id}`)
-      .on('broadcast', { event: 'schedule_published' }, async () => {
+      .on("broadcast", { event: "schedule_published" }, async () => {
         try {
           await refetchScheduleDataRef.current();
-          const history = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
+          const history = await fetchRecentPublishHistory(
+            org.id,
+            lastViewedRef.current,
+          );
           setPublishHistory(history);
         } catch (err) {
           Sentry.captureException(err);
         }
       })
-      .on('broadcast', { event: 'drafts_discarded' }, async () => {
+      .on("broadcast", { event: "drafts_discarded" }, async () => {
         try {
           await refetchScheduleDataRef.current();
         } catch (err) {
           Sentry.captureException(err);
         }
       })
-      .on('broadcast', { event: 'draft_changed' }, (msg: { payload?: Record<string, unknown> }) => {
-        if (msg.payload?.senderId === currentUserRef.current?.id) return;
-
-        const p = msg.payload;
-        if (p?.shifts) {
-          const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
-          setShifts(prev => {
-            const next = { ...prev };
-            for (const [key, value] of Object.entries(shiftUpdates)) {
-              if (value === null) delete next[key];
-              else next[key] = value;
-            }
-            return next;
-          });
-        }
-        if (p?.notes) {
-          const noteUpdates = p.notes as Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>;
-          setNotes(prev => ({ ...prev, ...noteUpdates }));
-        }
-        if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
-        draftChangedDebounceRef.current = setTimeout(async () => {
-          try {
-            await refetchScheduleDataRef.current();
-          } catch (err) {
-            Sentry.captureException(err);
+      .on(
+        "broadcast",
+        { event: "draft_changed" },
+        (msg: { payload?: Record<string, unknown> }) => {
+          if (
+            msg.payload?.senderSessionId === editorSessionIdRef.current
+          ) {
+            return;
           }
-        }, p?.shifts || p?.notes ? 2000 : 150);
-      })
-      .on('broadcast', { event: 'cell_locked' }, (msg: { payload?: { cellKey: string; userId: string; userName: string } }) => {
-        if (msg.payload) handleLockBroadcastRef.current(msg.payload);
-      })
-      .on('broadcast', { event: 'cell_unlocked' }, (msg: { payload?: { userId: string } }) => {
-        if (msg.payload) handleUnlockBroadcastRef.current(msg.payload);
-      })
-      .on('presence', { event: 'sync' }, () => syncPresenceRef.current())
-      .on('presence', { event: 'join' }, () => syncPresenceRef.current())
-      .on('presence', { event: 'leave' }, () => syncPresenceRef.current())
+
+          const p = msg.payload;
+          if (p?.shifts) {
+            const shiftUpdates = p.shifts as Record<
+              string,
+              ShiftMap[string] | null
+            >;
+            setShifts((prev) => {
+              const next = { ...prev };
+              for (const [key, value] of Object.entries(shiftUpdates)) {
+                if (value === null) delete next[key];
+                else next[key] = value;
+              }
+              return next;
+            });
+          }
+          if (p?.notes) {
+            const noteUpdates = p.notes as Record<
+              string,
+              {
+                indicatorTypeId: number;
+                status: "published" | "draft" | "draft_deleted";
+              }[]
+            >;
+            setNotes((prev) => ({ ...prev, ...noteUpdates }));
+          }
+          if (draftChangedDebounceRef.current)
+            clearTimeout(draftChangedDebounceRef.current);
+          draftChangedDebounceRef.current = setTimeout(
+            async () => {
+              try {
+                await refetchScheduleDataRef.current();
+              } catch (err) {
+                Sentry.captureException(err);
+              }
+            },
+            p?.shifts || p?.notes ? 2000 : 150,
+          );
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "cell_locked" },
+        (msg: {
+          payload?: {
+            cellKey: string;
+            userId: string;
+            userName: string;
+            editorSessionId: string;
+            lockRevision: number;
+            canLockCells?: boolean;
+          };
+        }) => {
+          if (msg.payload) handleLockBroadcastRef.current(msg.payload);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "cell_unlocked" },
+        (msg: {
+          payload?: {
+            userId: string;
+            editorSessionId: string;
+            cellKey: string | null;
+            lockRevision: number;
+          };
+        }) => {
+          if (msg.payload) handleUnlockBroadcastRef.current(msg.payload);
+        },
+      )
+      .on("presence", { event: "sync" }, () => syncPresenceRef.current())
+      .on("presence", { event: "join" }, () => syncPresenceRef.current())
+      .on("presence", { event: "leave" }, () => syncPresenceRef.current())
       .subscribe(async (status: string, err?: Error) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === "SUBSCRIBED") {
           // Refetch on reconnection to catch events missed during downtime
           if (hadError) {
             hadError = false;
             refetchScheduleDataRef.current().catch(() => {});
           }
           const user = currentUserRef.current;
-          if (user && canEditShiftsRef.current) {
+          if (user && (canEditShiftsRef.current || canEditNotesRef.current)) {
             const editingCell = getCurrentCellRef.current() ?? null;
-            await channel.track({ editingCell, userId: user.id, userName: user.name, canEdit: true });
+            await channel.track({
+              editingCell,
+              userId: user.id,
+              userName: user.name,
+              editorSessionId: editorSessionIdRef.current,
+              canLockCells: canEditShiftsRef.current,
+              isScheduleEditor: true,
+              lockRevision: 0,
+            });
           }
-        } else if (status === 'CHANNEL_ERROR') {
+        } else if (status === "CHANNEL_ERROR") {
           hadError = true;
-          console.warn('[Realtime] Channel error (auto-retrying):', err ?? 'unknown');
+          console.warn(
+            "[Realtime] Channel error (auto-retrying):",
+            err ?? "unknown",
+          );
         }
       });
 
     realtimeChannelRef.current = channel;
 
     return () => {
+      unlockCell({ removePresence: true });
       realtimeChannelRef.current = null;
-      if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
+      if (draftChangedDebounceRef.current)
+        clearTimeout(draftChangedDebounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [org]);
+  }, [org, unlockCell]);
 
-  // Track presence once currentUser and canEditShifts are both available.
+  // Track presence once currentUser and schedule-editor permissions are available.
   // Handles the case where the channel subscribes before user profile loads.
   useEffect(() => {
     const channel = realtimeChannelRef.current;
-    if (!channel || !currentUser || !canEditShifts) return;
-    if (channel.state !== 'joined') return;
+    if (!channel || !currentUser || !isScheduleEditor) return;
+    if (channel.state !== "joined") return;
 
     const editingCell = getCurrentCellRef.current() ?? null;
     channel.track({
       editingCell,
       userId: currentUser.id,
       userName: currentUser.name,
-      canEdit: true,
+      editorSessionId: editorSessionIdRef.current,
+      canLockCells: canEditShifts,
+      isScheduleEditor: true,
+      lockRevision: 0,
     });
-  }, [currentUser, canEditShifts]);
+  }, [currentUser, isScheduleEditor, canEditShifts]);
 
   // Refetch when the tab regains focus — catches any missed broadcasts
   // (e.g. browser throttled WebSocket while tab was backgrounded).
@@ -710,49 +1194,77 @@ function SchedulerContent() {
   useEffect(() => {
     if (!org) return;
     const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-
       const channel = realtimeChannelRef.current;
+      const isVisible = document.visibilityState === "visible";
 
-      // Re-track presence if the channel is healthy — preserve the active
-      // cell lock so returning to the tab doesn't silently unlock it.
-      if (channel && channel.state === 'joined') {
+      if (channel && channel.state === "joined" && isVisible) {
         const user = currentUserRef.current;
-        if (user && canEditShiftsRef.current) {
+        if (user && (canEditShiftsRef.current || canEditNotesRef.current)) {
           const editingCell = getCurrentCellRef.current() ?? null;
           channel.track({
             editingCell,
             userId: user.id,
             userName: user.name,
-            canEdit: true,
+            editorSessionId: editorSessionIdRef.current,
+            canLockCells: canEditShiftsRef.current,
+            isScheduleEditor: true,
+            lockRevision: 0,
           });
         }
       }
 
-      // Refetch to catch any missed broadcasts — skip if data is fresh (<10s old)
-      if (Date.now() - lastRefetchAtRef.current > 10_000) {
+      if (!isVisible && !getCurrentCellRef.current()) {
+        unlockCell();
+        return;
+      }
+
+      if (isVisible && Date.now() - lastRefetchAtRef.current > 10_000) {
         refetchScheduleDataRef.current().catch((err) => {
           Sentry.captureException(err);
           toast.error("Failed to refresh schedule — try reloading the page");
         });
       }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [org]);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [org, unlockCell]);
+
+  useEffect(() => {
+    const releasePresence = () => {
+      unlockCell({ removePresence: true });
+    };
+    window.addEventListener("pagehide", releasePresence);
+    window.addEventListener("beforeunload", releasePresence);
+    return () => {
+      window.removeEventListener("pagehide", releasePresence);
+      window.removeEventListener("beforeunload", releasePresence);
+    };
+  }, [unlockCell]);
 
   // Re-fetch with scheduler visibility once permissions resolve, so editors
   // see draft data even if the initial load ran before permissions were ready.
   // Skip if the initial load already used canEditShifts=true (no extra fetch needed).
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
-    if (permsLoading || !org || scheduleLoading || draftCheckStarted.current) return;
-    if (!canEditShifts || initialLoadUsedEditPerms.current) { setDraftCheckComplete(true); return; }
+    if (permsLoading || !org || scheduleLoading || draftCheckStarted.current)
+      return;
+    if (!canEditShifts || initialLoadUsedEditPerms.current) {
+      setDraftCheckComplete(true);
+      return;
+    }
     draftCheckStarted.current = true;
 
     (async () => {
       try {
-        const draftShifts = await fetchShifts(org.id, true, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
+        const draftShifts = await fetchShifts(
+          org.id,
+          true,
+          shiftCodeMapRef.current,
+          absenceTypeMapRef.current,
+          shiftFetchStart,
+          shiftFetchEnd,
+        );
         setShifts(draftShifts);
       } catch (err) {
         Sentry.captureException(err);
@@ -808,7 +1320,6 @@ function SchedulerContent() {
   );
   useSetMobileSubNav(focusAreaSubNav);
 
-
   const highlightEmpIds = useMemo(() => {
     if (!staffSearch.trim()) return undefined;
     const q = staffSearch.toLowerCase();
@@ -821,14 +1332,30 @@ function SchedulerContent() {
 
   // ── Shift helpers ────────────────────────────────────────────────────────────
 
+  const buildEntryPayload = useCallback(
+    (entry: ShiftMap[string]): ScheduleEntryPayload => ({
+      label: entry.label,
+      shiftCodeIds: [...entry.shiftCodeIds],
+      absenceTypeId: entry.absenceTypeId ?? null,
+      customStartTime:
+        entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
+      customEndTime:
+        entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
+    }),
+    [],
+  );
+
   const shiftForKey = useCallback(
     (empId: string, date: Date): string | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return null;
-      if (entry.isDelete) return "OFF";
-      if (entry.absenceTypeId != null) return absenceTypeMap.get(entry.absenceTypeId) ?? '?';
+      if (entry.isDelete) return null;
+      if (entry.absenceTypeId != null)
+        return absenceTypeMap.get(entry.absenceTypeId) ?? "?";
       if (entry.shiftCodeIds.length > 0)
-        return entry.shiftCodeIds.map(id => shiftCodeMap.get(id) ?? '?').join('/');
+        return entry.shiftCodeIds
+          .map((id) => shiftCodeMap.get(id) ?? "?")
+          .join("/");
       return entry.label ?? null;
     },
     [shifts, shiftCodeMap, absenceTypeMap],
@@ -840,11 +1367,35 @@ function SchedulerContent() {
     [shifts],
   );
 
+  const editSessionCellKey = editPanel
+    ? `${editPanel.empId}_${formatDateKey(editPanel.date)}`
+    : null;
+  const panelShiftEntry = useMemo(() => {
+    if (!editSessionCellKey) return null;
+    if (editSessionDraft?.cellKey === editSessionCellKey) {
+      return editSessionDraft.draftShift;
+    }
+    return shifts[editSessionCellKey] ?? null;
+  }, [editSessionCellKey, editSessionDraft, shifts]);
+  const panelCurrentShift = panelShiftEntry ? panelShiftEntry.label : null;
+  const panelCurrentShiftCodeIds = panelShiftEntry?.shiftCodeIds ?? [];
+  const panelCurrentAbsenceTypeId =
+    editSessionDraft?.cellKey === editSessionCellKey
+      ? panelShiftEntry?.absenceTypeId ?? null
+      : (panelShiftEntry?.absenceTypeId ??
+          panelShiftEntry?.publishedAbsenceTypeId ??
+          null);
+  const panelCustomStartTime = panelShiftEntry?.customStartTime ?? null;
+  const panelCustomEndTime = panelShiftEntry?.customEndTime ?? null;
+  const panelDraftKind = panelShiftEntry?.draftKind ?? null;
+
   const isAbsenceForKey = useCallback(
     (empId: string, date: Date): boolean => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return false;
-      return entry.absenceTypeId != null || entry.publishedAbsenceTypeId != null;
+      return (
+        entry.absenceTypeId != null || entry.publishedAbsenceTypeId != null
+      );
     },
     [shifts],
   );
@@ -879,13 +1430,13 @@ function SchedulerContent() {
           ranges.push({ start: customStart, end: customEnd });
           continue;
         }
-        const sc = shiftCodes.find(c => c.id === entry.shiftCodeIds[i]);
+        const sc = shiftCodes.find((c) => c.id === entry.shiftCodeIds[i]);
         if (sc?.defaultStartTime && sc?.defaultEndTime) {
           ranges.push({ start: sc.defaultStartTime, end: sc.defaultEndTime });
           continue;
         }
         if (sc?.categoryId != null) {
-          const cat = shiftCategories.find(c => c.id === sc.categoryId);
+          const cat = shiftCategories.find((c) => c.id === sc.categoryId);
           if (cat?.startTime && cat?.endTime) {
             ranges.push({ start: cat.startTime, end: cat.endTime });
           }
@@ -912,8 +1463,12 @@ function SchedulerContent() {
     if (!editPanel) return [];
     const empId = editPanel.empId;
     const date = editPanel.date;
-    const entry = shifts[`${empId}_${formatDateKey(date)}`];
-    if (!entry || (entry.shiftCodeIds.length === 0 && !entry.absenceTypeId)) return [];
+    const entry =
+      editSessionDraft?.cellKey === `${empId}_${formatDateKey(date)}`
+        ? editSessionDraft.draftShift
+        : shifts[`${empId}_${formatDateKey(date)}`];
+    if (!entry || (entry.shiftCodeIds.length === 0 && !entry.absenceTypeId))
+      return [];
 
     // Resolve effective start/end: custom times → shift code defaults → category defaults
     const resolveEffective = (
@@ -924,35 +1479,56 @@ function SchedulerContent() {
       const s = customStart?.split("|")[0];
       const e = customEnd?.split("|")[0];
       if (s && e) return { start: s, end: e };
-      const code = codeIds[0] != null ? shiftCodeById.get(codeIds[0]) : undefined;
+      const code =
+        codeIds[0] != null ? shiftCodeById.get(codeIds[0]) : undefined;
       if (code?.defaultStartTime && code?.defaultEndTime) {
         return { start: code.defaultStartTime, end: code.defaultEndTime };
       }
-      const cat = code?.categoryId != null ? shiftCategories.find(c => c.id === code.categoryId) : undefined;
+      const cat =
+        code?.categoryId != null
+          ? shiftCategories.find((c) => c.id === code.categoryId)
+          : undefined;
       if (cat?.startTime && cat?.endTime) {
         return { start: cat.startTime, end: cat.endTime };
       }
       return null;
     };
 
-    const currentTimes = resolveEffective(entry.customStartTime, entry.customEndTime, entry.shiftCodeIds);
+    const currentTimes = resolveEffective(
+      entry.customStartTime,
+      entry.customEndTime,
+      entry.shiftCodeIds,
+    );
     if (!currentTimes) return [];
 
     // D-1 shift
     const prevDate = addDays(date, -1);
     const prevEntry = shifts[`${empId}_${formatDateKey(prevDate)}`];
-    const prevTimes = prevEntry && prevEntry.shiftCodeIds.length > 0
-      ? resolveEffective(prevEntry.customStartTime, prevEntry.customEndTime, prevEntry.shiftCodeIds)
-      : null;
+    const prevTimes =
+      prevEntry && prevEntry.shiftCodeIds.length > 0
+        ? resolveEffective(
+            prevEntry.customStartTime,
+            prevEntry.customEndTime,
+            prevEntry.shiftCodeIds,
+          )
+        : null;
 
     // D+1 shift
     const nextDate = addDays(date, 1);
     const nextEntry = shifts[`${empId}_${formatDateKey(nextDate)}`];
-    const nextTimes = nextEntry && nextEntry.shiftCodeIds.length > 0
-      ? resolveEffective(nextEntry.customStartTime, nextEntry.customEndTime, nextEntry.shiftCodeIds)
-      : null;
+    const nextTimes =
+      nextEntry && nextEntry.shiftCodeIds.length > 0
+        ? resolveEffective(
+            nextEntry.customStartTime,
+            nextEntry.customEndTime,
+            nextEntry.shiftCodeIds,
+          )
+        : null;
 
-    const warnings = checkCrossDateOverlap(currentTimes, { prev: prevTimes, next: nextTimes });
+    const warnings = checkCrossDateOverlap(currentTimes, {
+      prev: prevTimes,
+      next: nextTimes,
+    });
 
     // Same-day overlap check for multi-code cells
     if (entry.shiftCodeIds.length >= 2) {
@@ -962,19 +1538,31 @@ function SchedulerContent() {
       const endParts = entry.customEndTime?.split("|") ?? [];
       for (let i = 0; i < entry.shiftCodeIds.length; i++) {
         const code = shiftCodeById.get(entry.shiftCodeIds[i]);
-        const cat = code?.categoryId != null ? shiftCategories.find(c => c.id === code.categoryId) : undefined;
+        const cat =
+          code?.categoryId != null
+            ? shiftCategories.find((c) => c.id === code.categoryId)
+            : undefined;
         const s = startParts[i] || code?.defaultStartTime || cat?.startTime;
         const e = endParts[i] || code?.defaultEndTime || cat?.endTime;
         if (s && e) {
           pillRanges.push({ start: s, end: e });
-          pillLabels.push(shiftCodeMap.get(entry.shiftCodeIds[i]) ?? code?.label ?? '?');
+          pillLabels.push(
+            shiftCodeMap.get(entry.shiftCodeIds[i]) ?? code?.label ?? "?",
+          );
         }
       }
       warnings.push(...checkSameDayOverlaps(pillRanges, pillLabels));
     }
 
     return warnings;
-  }, [editPanel, shifts, shiftCodeById, shiftCategories, shiftCodeMap]);
+  }, [
+    editPanel,
+    editSessionDraft,
+    shifts,
+    shiftCodeById,
+    shiftCategories,
+    shiftCodeMap,
+  ]);
 
   const coverageGaps = useMemo(() => {
     if (!coverageRequirements.length || !focusAreas.length) return [];
@@ -991,7 +1579,11 @@ function SchedulerContent() {
     for (const fa of focusAreas) {
       shiftCodeIdsByFocusArea.set(
         fa.id,
-        new Set(shiftCodes.filter((sc) => sc.focusAreaId === fa.id).map((sc) => sc.id)),
+        new Set(
+          shiftCodes
+            .filter((sc) => sc.focusAreaId === fa.id)
+            .map((sc) => sc.id),
+        ),
       );
     }
 
@@ -1007,7 +1599,17 @@ function SchedulerContent() {
       shiftCodeIdsByFocusArea,
       shiftCodeMap,
     );
-  }, [coverageRequirements, focusAreas, employees, shiftCodes, shiftCategories, dates, shiftCodeIdsForKey, shiftCodeById, shiftCodeMap]);
+  }, [
+    coverageRequirements,
+    focusAreas,
+    employees,
+    shiftCodes,
+    shiftCategories,
+    dates,
+    shiftCodeIdsForKey,
+    shiftCodeById,
+    shiftCodeMap,
+  ]);
 
   // Dates that have been published at least once — coverage-gap open shifts
   // are only shown for these dates (prevents users picking up gaps that are
@@ -1052,9 +1654,11 @@ function SchedulerContent() {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return null;
       if (entry.publishedAbsenceTypeId != null)
-        return absenceTypeMap.get(entry.publishedAbsenceTypeId) ?? '?';
+        return absenceTypeMap.get(entry.publishedAbsenceTypeId) ?? "?";
       if (entry.publishedShiftCodeIds.length > 0)
-        return entry.publishedShiftCodeIds.map(id => shiftCodeMap.get(id) ?? '?').join('/');
+        return entry.publishedShiftCodeIds
+          .map((id) => shiftCodeMap.get(id) ?? "?")
+          .join("/");
       return null;
     },
     [shifts, shiftCodeMap, absenceTypeMap],
@@ -1066,9 +1670,24 @@ function SchedulerContent() {
     [shifts],
   );
 
+  const hasActiveRequestForShift = useCallback(
+    (empId: string, date: Date): boolean =>
+      shiftRequests.requests.some(
+        (r) =>
+          r.requesterEmpId === empId &&
+          r.requesterShiftDate === formatDateKey(date) &&
+          (r.status === "open" || r.status === "pending_approval"),
+      ),
+    [shiftRequests.requests],
+  );
 
   const publishDiffKindForKey = useCallback(
-    (empId: string, date: Date): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
+    (
+      empId: string,
+      date: Date,
+    ):
+      | (PublishChange & { publishedAt: string; publishedBy: string })
+      | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
       return publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
     },
@@ -1082,7 +1701,14 @@ function SchedulerContent() {
   }, [publishChangesMap]);
 
   const getCustomShiftTimes = useCallback(
-    (empId: string, date: Date): { start: string; end: string; perPill?: { start: string; end: string }[] } | null => {
+    (
+      empId: string,
+      date: Date,
+    ): {
+      start: string;
+      end: string;
+      perPill?: { start: string; end: string }[];
+    } | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry?.customStartTime && !entry?.customEndTime) return null;
       const rawStart = entry.customStartTime ?? "";
@@ -1092,9 +1718,13 @@ function SchedulerContent() {
       const start = startParts[0] || "";
       const end = endParts[0] || "";
       const maxLen = Math.max(startParts.length, endParts.length);
-      const perPill = maxLen > 1
-        ? Array.from({ length: maxLen }, (_, i) => ({ start: startParts[i] || "", end: endParts[i] || "" }))
-        : undefined;
+      const perPill =
+        maxLen > 1
+          ? Array.from({ length: maxLen }, (_, i) => ({
+              start: startParts[i] || "",
+              end: endParts[i] || "",
+            }))
+          : undefined;
       if (!start && !end && !perPill) return null;
       return { start, end, perPill };
     },
@@ -1105,34 +1735,54 @@ function SchedulerContent() {
     (empId: string, date: Date): boolean => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return false;
-      return (entry.customStartTime ?? null) !== (entry.publishedCustomStartTime ?? null)
-        || (entry.customEndTime ?? null) !== (entry.publishedCustomEndTime ?? null);
+      return (
+        (entry.customStartTime ?? null) !==
+          (entry.publishedCustomStartTime ?? null) ||
+        (entry.customEndTime ?? null) !== (entry.publishedCustomEndTime ?? null)
+      );
     },
     [shifts],
   );
 
-  /** True if the shift's date is in the past, or it's today and the shift has already started. */
-  const isShiftStarted = useCallback(
+  /** Returns published-state data used to decide whether request actions are valid. */
+  const getPublishedRequestShift = useCallback(
+    (empId: string, date: Date) => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) return null;
+      return {
+        publishedShiftCodeIds: entry.publishedShiftCodeIds ?? [],
+        publishedCustomStartTime: entry.publishedCustomStartTime ?? null,
+        publishedCustomEndTime: entry.publishedCustomEndTime ?? null,
+      };
+    },
+    [shifts],
+  );
+
+  /** True if the published shift date is in the past, or it's today and the published shift has already started. */
+  const isPublishedShiftStarted = useCallback(
     (empId: string, date: Date): boolean => {
       const todayStr = formatDateKey(today);
       const dateStr = formatDateKey(date);
       if (dateStr < todayStr) return true;
       if (dateStr > todayStr) return false;
-      // Today — check start time
-      const entry = shifts[`${empId}_${dateStr}`];
-      if (!entry || entry.shiftCodeIds.length === 0) return true;
+      const publishedShift = getPublishedRequestShift(empId, date);
+      if (!publishedShift || publishedShift.publishedShiftCodeIds.length === 0)
+        return true;
       // Resolve earliest start time from custom times or shift code defaults
       let earliest: string | null = null;
-      if (entry.customStartTime) {
+      if (publishedShift.publishedCustomStartTime) {
         // customStartTime can be pipe-delimited for multi-pill shifts
-        for (const t of entry.customStartTime.split("|")) {
+        for (const t of publishedShift.publishedCustomStartTime.split("|")) {
           if (t && (!earliest || t < earliest)) earliest = t;
         }
       }
       if (!earliest) {
-        for (const codeId of entry.shiftCodeIds) {
-          const sc = shiftCodes.find(c => c.id === codeId);
-          if (sc?.defaultStartTime && (!earliest || sc.defaultStartTime < earliest)) {
+        for (const codeId of publishedShift.publishedShiftCodeIds) {
+          const sc = shiftCodes.find((c) => c.id === codeId);
+          if (
+            sc?.defaultStartTime &&
+            (!earliest || sc.defaultStartTime < earliest)
+          ) {
             earliest = sc.defaultStartTime;
           }
         }
@@ -1142,69 +1792,177 @@ function SchedulerContent() {
       const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       return nowTime >= earliest;
     },
-    [shifts, shiftCodes, today],
+    [getPublishedRequestShift, shiftCodes, today],
   );
 
-  /** True if the shift has at least one categorized, non-off-day shift code (i.e. a real work shift). */
-  const isRequestableShift = useCallback(
+  /** True if the published shift has at least one categorized, non-off-day shift code. */
+  const isPublishedRequestableShift = useCallback(
     (empId: string, date: Date): boolean => {
-      const entry = shifts[`${empId}_${formatDateKey(date)}`];
-      if (!entry || entry.shiftCodeIds.length === 0) return false;
-      return entry.shiftCodeIds.some(codeId => {
-        const sc = shiftCodes.find(c => c.id === codeId);
+      const publishedShift = getPublishedRequestShift(empId, date);
+      if (!publishedShift || publishedShift.publishedShiftCodeIds.length === 0)
+        return false;
+      return publishedShift.publishedShiftCodeIds.some((codeId) => {
+        const sc = shiftCodes.find((c) => c.id === codeId);
         return sc != null && sc.categoryId != null;
       });
     },
-    [shifts, shiftCodes],
+    [getPublishedRequestShift, shiftCodes],
   );
 
-  const handleCustomTimeChange = useCallback(
-    (start: string | null, end: string | null) => {
-      if (!editPanel || !org?.id) return;
-      const dateKey = formatDateKey(editPanel.date);
-      const key = `${editPanel.empId}_${dateKey}`;
-      setShifts((prev) => {
-        const existing = prev[key];
-        if (!existing) return prev;
-        const updated = { ...existing, customStartTime: start, customEndTime: end };
-        const dk = computeDraftKind(updated);
-        return {
-          ...prev,
-          [key]: { ...updated, isDraft: dk !== null, draftKind: dk },
-        };
-      });
-      upsertShiftTimes(editPanel.empId, dateKey, start, end, org.id).catch((err) => {
-        toast.error("Failed to save shift times");
-        Sentry.captureException(err);
-      });
-    },
-    [editPanel, org?.id],
+  const canOpenOwnRequestPanel = useCallback(
+    (empId: string, date: Date): boolean =>
+      !!currentEmpId &&
+      empId === currentEmpId &&
+      (hasActiveRequestForShift(empId, date) ||
+        (!isPublishedShiftStarted(empId, date) &&
+          isPublishedRequestableShift(empId, date))),
+    [
+      currentEmpId,
+      hasActiveRequestForShift,
+      isPublishedRequestableShift,
+      isPublishedShiftStarted,
+    ],
   );
 
   const activeIndicatorIdsForKey = useCallback(
     (empId: string, date: Date, focusAreaId?: number): number[] => {
       const dateKey = formatDateKey(date);
-      const key = focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
+      const key =
+        focusAreaId != null
+          ? `${empId}_${dateKey}_${focusAreaId}`
+          : `${empId}_${dateKey}`;
       const noteList = notes[key] ?? [];
       // Only return notes that aren't marked as deleted in draft
       return noteList
-        .filter(n => n.status !== 'draft_deleted')
-        .map(n => n.indicatorTypeId);
+        .filter((n) => n.status !== "draft_deleted")
+        .map((n) => n.indicatorTypeId);
     },
     [notes],
   );
 
-  const broadcastDraftChanged = useCallback((payload?: Record<string, unknown>) => {
-    const channel = realtimeChannelRef.current;
-    if (!channel) return;
-    channel.send({
-      type: 'broadcast',
-      event: 'draft_changed',
-      payload: { ...payload, senderId: currentUserRef.current?.id },
-    }).then((status: string) => {
-      if (status !== 'ok' && process.env.NODE_ENV === 'development') console.warn('[Realtime] draft_changed send status:', status);
-    }).catch(() => {});
-  }, []);
+  const panelActiveIndicatorIds = useCallback(
+    (focusAreaId: number): number[] => {
+      if (
+        editSessionDraft &&
+        editSessionCellKey &&
+        editSessionDraft.cellKey === editSessionCellKey
+      ) {
+        return (editSessionDraft.draftNotes[focusAreaId] ?? [])
+          .filter((note) => note.status !== "draft_deleted")
+          .map((note) => note.indicatorTypeId);
+      }
+      if (!editPanel) return [];
+      return activeIndicatorIdsForKey(editPanel.empId, editPanel.date, focusAreaId);
+    },
+    [activeIndicatorIdsForKey, editPanel, editSessionCellKey, editSessionDraft],
+  );
+
+  const broadcastDraftChanged = useCallback(
+    (payload?: Record<string, unknown>) => {
+      const channel = realtimeChannelRef.current;
+      if (!channel) return;
+      channel
+        .send({
+          type: "broadcast",
+          event: "draft_changed",
+          payload: {
+            ...payload,
+            senderId: currentUserRef.current?.id,
+            senderSessionId: editorSessionIdRef.current,
+          },
+        })
+        .then((status: string) => {
+          if (status !== "ok" && process.env.NODE_ENV === "development")
+            console.warn("[Realtime] draft_changed send status:", status);
+        })
+        .catch(() => {});
+    },
+    [],
+  );
+
+  const handleShiftWriteConflict = useCallback(async () => {
+    const orgId = org?.id;
+    if (!orgId) return;
+    toast.error("Shift was modified by another editor or another tab — refreshing");
+    const freshShifts = await fetchShifts(
+      orgId,
+      canEditShifts,
+      shiftCodeMapRef.current,
+      absenceTypeMapRef.current,
+      shiftFetchStart,
+      shiftFetchEnd,
+    );
+    setShifts(freshShifts);
+  }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd]);
+
+  const enqueueShiftWrite = useCallback(
+    (key: string, write: () => Promise<void>): Promise<void> => {
+      const previous = pendingShiftWrites.current.get(key) ?? Promise.resolve();
+      const queued = previous.catch(() => {}).then(write);
+      pendingShiftWrites.current.set(key, queued);
+      void queued.finally(() => {
+        if (pendingShiftWrites.current.get(key) === queued) {
+          pendingShiftWrites.current.delete(key);
+        }
+      });
+      return queued;
+    },
+    [],
+  );
+
+  const updateEditSessionDraft = useCallback(
+    (
+      updater: (prev: EditSessionDraft) => {
+        draftShift: ShiftMap[string] | null;
+        draftNotes: Record<number, DraftNoteState[]>;
+      },
+    ) => {
+      setEditSessionDraft((prev) => {
+        if (!prev) return prev;
+        const next = updater(prev);
+        return {
+          ...prev,
+          draftShift: next.draftShift,
+          draftNotes: next.draftNotes,
+          isDirty: computeEditSessionDirty(
+            prev.baseFingerprint,
+            next.draftShift,
+            next.draftNotes,
+          ),
+        };
+      });
+    },
+    [computeEditSessionDirty],
+  );
+
+  const handleCustomTimeChange = useCallback(
+    (start: string | null, end: string | null) => {
+      updateEditSessionDraft((prev) => {
+        if (!prev.draftShift) {
+          return {
+            draftShift: prev.draftShift,
+            draftNotes: prev.draftNotes,
+          };
+        }
+
+        const updated = {
+          ...prev.draftShift,
+          customStartTime: start,
+          customEndTime: end,
+        };
+        const draftKind = computeDraftKind(updated);
+        return {
+          draftShift: {
+            ...updated,
+            isDraft: draftKind !== null,
+            draftKind,
+          },
+          draftNotes: prev.draftNotes,
+        };
+      });
+    },
+    [updateEditSessionDraft],
+  );
 
   /** Compare current shift values against published state to determine correct draftKind. */
   function computeDraftKind(entry: {
@@ -1221,22 +1979,35 @@ function SchedulerContent() {
     const hasPub = pubCodes.length > 0 || entry.publishedAbsenceTypeId != null;
 
     if (!hasPub) {
-      return (entry.shiftCodeIds.length > 0 || entry.absenceTypeId != null) ? 'new' : null;
+      return entry.shiftCodeIds.length > 0 || entry.absenceTypeId != null
+        ? "new"
+        : null;
     }
 
-    const codesMatch = entry.shiftCodeIds.length === pubCodes.length
-      && entry.shiftCodeIds.every((id, i) => id === pubCodes[i]);
-    const absMatch = (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null);
-    const startMatch = (entry.customStartTime ?? null) === (entry.publishedCustomStartTime ?? null);
-    const endMatch = (entry.customEndTime ?? null) === (entry.publishedCustomEndTime ?? null);
+    const codesMatch =
+      entry.shiftCodeIds.length === pubCodes.length &&
+      entry.shiftCodeIds.every((id, i) => id === pubCodes[i]);
+    const absMatch =
+      (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null);
+    const startMatch =
+      (entry.customStartTime ?? null) ===
+      (entry.publishedCustomStartTime ?? null);
+    const endMatch =
+      (entry.customEndTime ?? null) === (entry.publishedCustomEndTime ?? null);
 
     if (codesMatch && absMatch && startMatch && endMatch) return null;
 
-    return (entry.shiftCodeIds.length === 0 && entry.absenceTypeId == null) ? 'deleted' : 'modified';
+    return entry.shiftCodeIds.length === 0 && entry.absenceTypeId == null
+      ? "deleted"
+      : "modified";
   }
 
   const setShift = useCallback(
-    (empId: string, date: Date, label: string, shiftCodeIds: number[]) => {
+    (
+      empId: string,
+      date: Date,
+      entry: ScheduleEntryPayload | null,
+    ) => {
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
@@ -1248,104 +2019,157 @@ function SchedulerContent() {
       // Read from ref to get the latest version, not the stale closure value
       const existing = shiftsRef.current[key];
       const existingVersion = existing?.version;
+      const isDelete =
+        !entry ||
+        entry.label === "OFF" ||
+        (entry.shiftCodeIds.length === 0 && entry.absenceTypeId == null);
 
-      const handleConflict = async () => {
-        toast.error("Shift was modified by another user — refreshing");
-        const freshShifts = await fetchShifts(orgId, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
-        setShifts(freshShifts);
-      };
-
-      if (label === "OFF" || shiftCodeIds.length === 0) {
+      if (isDelete) {
         const ex = shiftsRef.current[key];
         // Nothing to delete — cell is already empty (no shift codes AND no absence type)
-        const hasContent = ex && (
-          ex.shiftCodeIds.length > 0 ||
-          ex.publishedShiftCodeIds?.length ||
-          ex.absenceTypeId != null ||
-          ex.publishedAbsenceTypeId != null
-        );
+        const hasContent =
+          ex &&
+          (ex.shiftCodeIds.length > 0 ||
+            ex.publishedShiftCodeIds?.length ||
+            ex.absenceTypeId != null ||
+            ex.publishedAbsenceTypeId != null);
         if (!hasContent) return;
 
-        if (ex.publishedShiftCodeIds?.length || ex.publishedAbsenceTypeId != null) {
+        if (
+          ex.publishedShiftCodeIds?.length ||
+          ex.publishedAbsenceTypeId != null
+        ) {
           // Published shift/absence being deleted → mark as draft-deleted
           const deleteValue = {
-            label: "OFF", shiftCodeIds: [] as number[], isDraft: true, isDelete: true,
-            draftKind: 'deleted' as const,
+            label: "OFF",
+            shiftCodeIds: [] as number[],
+            isDraft: true,
+            isDelete: true,
+            draftKind: "deleted" as const,
             absenceTypeId: null,
             publishedShiftCodeIds: ex.publishedShiftCodeIds,
             publishedAbsenceTypeId: ex.publishedAbsenceTypeId,
-            publishedLabel: ex.publishedLabel ?? '',
+            publishedLabel: ex.publishedLabel ?? "",
+            version: existingVersion != null ? existingVersion + 1 : undefined,
             createdBy: ex.createdBy ?? null,
             updatedBy: currentUserRef.current?.id ?? null,
           };
           setShifts((prev) => ({ ...prev, [key]: deleteValue }));
-          const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
-          const write = prev.then(() => deleteShift(empId, dateKey, orgId ?? undefined)).catch((err) => {
-            toast.error("Failed to delete shift");
-            Sentry.captureException(err);
+          void enqueueShiftWrite(key, async () => {
+            try {
+              await deleteShift(empId, dateKey, orgId ?? undefined, existingVersion);
+            } catch (err) {
+              if (err instanceof OptimisticLockError) {
+                await handleShiftWriteConflict();
+              } else {
+                toast.error("Failed to delete shift");
+                Sentry.captureException(err);
+              }
+            }
           });
-          pendingShiftWrites.current.set(key, write);
           broadcastDraftChanged({ shifts: { [key]: deleteValue } });
         } else {
           // Never-published draft being cleared → remove from map entirely
-          setShifts((prev) => { const next = { ...prev }; delete next[key]; return next; });
-          const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
-          const write = prev.then(() => deleteShift(empId, dateKey, orgId ?? undefined)).catch((err) => {
-            toast.error("Failed to delete shift");
-            Sentry.captureException(err);
+          setShifts((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
           });
-          pendingShiftWrites.current.set(key, write);
+          void enqueueShiftWrite(key, async () => {
+            try {
+              await deleteShift(empId, dateKey, orgId ?? undefined, existingVersion);
+            } catch (err) {
+              if (err instanceof OptimisticLockError) {
+                await handleShiftWriteConflict();
+              } else {
+                toast.error("Failed to delete shift");
+                Sentry.captureException(err);
+              }
+            }
+          });
           broadcastDraftChanged({ shifts: { [key]: null } });
         }
       } else {
         // Filter out any stale/archived shift code IDs
-        const validCodeIds = shiftCodeIds.filter((id) => shiftCodeMapRef.current.has(id));
-        if (validCodeIds.length === 0) {
+        const validCodeIds = entry.shiftCodeIds.filter((id) =>
+          shiftCodeMapRef.current.has(id),
+        );
+        if (entry.absenceTypeId == null && validCodeIds.length === 0) {
           toast.error("Selected shift code is no longer available");
           return;
         }
-        if (validCodeIds.length < shiftCodeIds.length) {
+        if (validCodeIds.length < entry.shiftCodeIds.length) {
           toast.warning("Some shift codes were removed (no longer available)");
+        }
+        if (
+          entry.absenceTypeId != null &&
+          !absenceTypeMapRef.current.has(entry.absenceTypeId)
+        ) {
+          toast.error("Selected absence type is no longer available");
+          return;
         }
         const ex = shiftsRef.current[key];
         const upsertValue: ShiftMap[string] = {
           ...ex,
-          label, shiftCodeIds: validCodeIds,
-          absenceTypeId: null,
+          label: entry.label,
+          shiftCodeIds: entry.absenceTypeId != null ? [] : validCodeIds,
+          absenceTypeId: entry.absenceTypeId ?? null,
           isDelete: false,
           publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
-          publishedLabel: ex?.publishedLabel ?? '',
+          publishedLabel: ex?.publishedLabel ?? "",
+          customStartTime:
+            entry.absenceTypeId != null ? null : entry.customStartTime,
+          customEndTime:
+            entry.absenceTypeId != null ? null : entry.customEndTime,
           isDraft: true,
           draftKind: null,
           // Optimistically bump version to match the DB write so subsequent
           // edits use the correct expectedVersion for the optimistic lock.
           version: existingVersion != null ? existingVersion + 1 : undefined,
+          updatedBy: currentUserRef.current?.id ?? null,
         };
         const dk = computeDraftKind(upsertValue);
         upsertValue.isDraft = dk !== null;
         upsertValue.draftKind = dk;
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
-        const prev = pendingShiftWrites.current.get(key) ?? Promise.resolve();
-        const write = prev.then(() =>
-          upsertShift(empId, dateKey, validCodeIds, orgId, undefined, undefined, existingVersion)
-        ).catch((err) => {
-          if (err instanceof OptimisticLockError) {
-            handleConflict();
-          } else {
-            toast.error("Failed to save shift");
-            Sentry.captureException(err);
+        void enqueueShiftWrite(key, async () => {
+          try {
+            await upsertShift(
+              empId,
+              dateKey,
+              entry.absenceTypeId != null ? [] : validCodeIds,
+              orgId,
+              entry.absenceTypeId != null ? null : entry.customStartTime,
+              entry.absenceTypeId != null ? null : entry.customEndTime,
+              existingVersion,
+              entry.absenceTypeId ?? null,
+            );
+          } catch (err) {
+            if (err instanceof OptimisticLockError) {
+              await handleShiftWriteConflict();
+            } else {
+              toast.error("Failed to save shift");
+              Sentry.captureException(err);
+            }
           }
         });
-        pendingShiftWrites.current.set(key, write);
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
       }
     },
-    [org?.id, canEditShifts, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
+    [
+      absenceTypeMapRef,
+      org?.id,
+      broadcastDraftChanged,
+      enqueueShiftWrite,
+      handleShiftWriteConflict,
+    ],
   );
 
   const getShiftStyle = useCallback(
     (type: string, focusAreaName?: string): ShiftCode => {
-      const fa = focusAreaName ? focusAreas.find((w) => w.name === focusAreaName) : null;
+      const fa = focusAreaName
+        ? focusAreas.find((w) => w.name === focusAreaName)
+        : null;
       const matchesType = (t: ShiftCode) => t.label === type || t.name === type;
 
       // 1. Code associated with this focus area → use the code's own colors
@@ -1371,7 +2195,7 @@ function SchedulerContent() {
         name: type,
         color: "var(--color-bg)",
         border: "var(--color-border)",
-        text:"var(--color-text-muted)",
+        text: "var(--color-text-muted)",
         sortOrder: 999,
       } satisfies ShiftCode;
     },
@@ -1382,19 +2206,29 @@ function SchedulerContent() {
 
   const handleCellClick = useCallback(
     (emp: Employee, date: Date, focusAreaName?: string) => {
-      // Regular users (no edit/note perms) only interact via right-click context menu
-      if (!canEditShiftsRef.current && !canEditNotes) return;
+      const canEditCell = canEditShiftsRef.current || canEditNotes;
+      const canOpenRequestPanel = canOpenOwnRequestPanel(emp.id, date);
+      if (!canEditCell && !canOpenRequestPanel) return;
       const cellKey = `${emp.id}_${formatDateKey(date)}`;
-      const lock = getCellLock(cellKey);
-      if (lock) {
-        toast.info(`Being edited by ${lock.userName}`);
-        return;
+      if (canEditCell) {
+        const activity = getCellActivity(cellKey);
+        const lock = getCellLock(cellKey);
+        if (lock) {
+          toast.info(`Being edited by ${lock.userName}`);
+          return;
+        }
+        if (activity?.isSameUser) {
+          toast.error(
+            "This cell is already open in another tab for your account",
+          );
+          return;
+        }
+        lockCell(cellKey);
       }
-      lockCell(cellKey);
       const activeFaId = focusAreaName
-        ? focusAreas.find((fa) => fa.name === focusAreaName)?.id ?? null
+        ? (focusAreas.find((fa) => fa.name === focusAreaName)?.id ?? null)
         : null;
-      setEditPanel({
+      startEditSession({
         empId: emp.id,
         empName: getEmployeeDisplayName(emp),
         date,
@@ -1402,66 +2236,367 @@ function SchedulerContent() {
         empCertificationId: emp.certificationId,
         activeFocusAreaId: activeFaId,
       });
-      // Advance tour: grid-empty-cell or grid-occupied-cell step
-      completeTourAction();
     },
-    [focusAreas, getCellLock, lockCell, canEditNotes],
+    [
+      canEditNotes,
+      canOpenOwnRequestPanel,
+      focusAreas,
+      getCellActivity,
+      getCellLock,
+      lockCell,
+      startEditSession,
+    ],
   );
 
   const handleShiftSelect = useCallback(
-    async (label: string, shiftCodeIds: number[], seriesScope?: SeriesScope) => {
-      if (!editPanel) return;
-      const key = `${editPanel.empId}_${formatDateKey(editPanel.date)}`;
-      const currentMeta = shifts[key];
+    (label: string, shiftCodeIds: number[]) => {
+      updateEditSessionDraft((prev) => {
+        const currentShift = prev.draftShift;
 
-      if (seriesScope === 'all' && currentMeta?.seriesId) {
-        const isDelete = label === 'OFF' || shiftCodeIds.length === 0;
+        if (label === "OFF" || shiftCodeIds.length === 0) {
+          const hasContent =
+            currentShift &&
+            (currentShift.shiftCodeIds.length > 0 ||
+              currentShift.publishedShiftCodeIds.length > 0 ||
+              currentShift.absenceTypeId != null ||
+              currentShift.publishedAbsenceTypeId != null);
 
-        if (isDelete) {
-          // Count shifts in the series before showing confirmation
-          const { count } = await supabase
-            .from("shifts")
-            .select("*", { count: "exact", head: true })
-            .eq("series_id", currentMeta.seriesId);
-          setPendingSeriesDelete({ seriesId: currentMeta.seriesId, shiftCount: count ?? 0 });
+          if (!hasContent) {
+            return {
+              draftShift: currentShift,
+              draftNotes: prev.draftNotes,
+            };
+          }
+
+          if (
+            currentShift?.publishedShiftCodeIds.length ||
+            currentShift?.publishedAbsenceTypeId != null
+          ) {
+            return {
+              draftShift: {
+                ...currentShift,
+                label: "OFF",
+                shiftCodeIds: [],
+                absenceTypeId: null,
+                isDraft: true,
+                isDelete: true,
+                draftKind: "deleted",
+                customStartTime: null,
+                customEndTime: null,
+              },
+              draftNotes: prev.draftNotes,
+            };
+          }
+
+          return {
+            draftShift: null,
+            draftNotes: prev.draftNotes,
+          };
+        }
+
+        const validCodeIds = shiftCodeIds.filter((id) =>
+          shiftCodeMapRef.current.has(id),
+        );
+        if (validCodeIds.length === 0) {
+          toast.error("Selected shift code is no longer available");
+          return {
+            draftShift: currentShift,
+            draftNotes: prev.draftNotes,
+          };
+        }
+        if (validCodeIds.length < shiftCodeIds.length) {
+          toast.warning("Some shift codes were removed (no longer available)");
+        }
+
+        const nextShift: ShiftMap[string] = {
+          ...(currentShift ?? {
+            publishedShiftCodeIds: [],
+            publishedLabel: "",
+            isDraft: false,
+            draftKind: null,
+          }),
+          label,
+          shiftCodeIds: validCodeIds,
+          absenceTypeId: null,
+          isDelete: false,
+        };
+        const draftKind = computeDraftKind(nextShift);
+
+        return {
+          draftShift: {
+            ...nextShift,
+            isDraft: draftKind !== null,
+            draftKind,
+          },
+          draftNotes: prev.draftNotes,
+        };
+      });
+    },
+    [
+      updateEditSessionDraft,
+    ],
+  );
+
+  const handleAbsenceSelect = useCallback(
+    (absenceType: AbsenceType) => {
+      updateEditSessionDraft((prev) => {
+        const currentShift = prev.draftShift;
+        const updated: ShiftMap[string] = {
+          ...(currentShift ?? {
+            publishedShiftCodeIds: [],
+            publishedLabel: "",
+            isDraft: false,
+            draftKind: null,
+          }),
+          label: absenceTypeMap.get(absenceType.id) ?? absenceType.label,
+          shiftCodeIds: [],
+          absenceTypeId: absenceType.id,
+          customStartTime: null,
+          customEndTime: null,
+          isDelete: false,
+        };
+        const draftKind = computeDraftKind(updated);
+        return {
+          draftShift: {
+            ...updated,
+            isDraft: draftKind !== null,
+            draftKind,
+          },
+          draftNotes: prev.draftNotes,
+        };
+      });
+    },
+    [absenceTypeMap, updateEditSessionDraft],
+  );
+
+  const handleConfirmEditPanel = useCallback(
+    async (seriesScope?: SeriesScope) => {
+      const orgId = org?.id;
+      const session = editSessionDraftRef.current;
+      const panel = editPanel;
+      if (!orgId || !session || !panel) return;
+
+      if (session.isStale) {
+        toast.error(
+          "This cell changed while you were editing. Close and reopen it.",
+        );
+        return;
+      }
+
+      const idsMatch = (a: number[], b: number[]) =>
+        a.length === b.length && a.every((id, index) => id === b[index]);
+      const shiftIsDeleted = (shift: ShiftMap[string] | null) =>
+        !shift ||
+        shift.isDelete ||
+        (shift.shiftCodeIds.length === 0 && shift.absenceTypeId == null);
+      const shiftIdentityMatches = (
+        left: ShiftMap[string] | null,
+        right: ShiftMap[string] | null,
+      ) => {
+        const leftDeleted = shiftIsDeleted(left);
+        const rightDeleted = shiftIsDeleted(right);
+        if (leftDeleted || rightDeleted) return leftDeleted === rightDeleted;
+        return (
+          idsMatch(left!.shiftCodeIds, right!.shiftCodeIds) &&
+          (left!.absenceTypeId ?? null) === (right!.absenceTypeId ?? null)
+        );
+      };
+
+      try {
+        isApplyingEditSessionRef.current = true;
+        await (pendingShiftWrites.current.get(session.cellKey) ?? Promise.resolve());
+
+        const currentShift = cloneShiftEntry(shiftsRef.current[session.cellKey]);
+        const currentNotes = collectCellNotesSnapshot(panel.empId, panel.date);
+        const currentFingerprint = buildEditSessionFingerprint(
+          currentShift,
+          currentNotes,
+        );
+        if (currentFingerprint !== session.baseFingerprint) {
+          setEditSessionDraft((prev) =>
+            prev ? { ...prev, isStale: true } : prev,
+          );
+          toast.error("This shift changed in another tab or by another editor.");
+          await refetchScheduleDataRef.current();
           return;
         }
 
-        // Bulk-update all shifts in the series
-        try {
-          await updateSeriesAllShifts(currentMeta.seriesId, shiftCodeIds[0], org!.id);
-          const prevShifts = shifts;
-          const shiftData = await fetchShifts(org!.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
-          setShifts(shiftData);
-          const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
-          for (const [k, v] of Object.entries(shiftData)) {
-            if (!prevShifts[k] || JSON.stringify(prevShifts[k]) !== JSON.stringify(v)) {
-              shiftUpdates[k] = v;
+        if (!session.isDirty) {
+          closeEditPanel();
+          return;
+        }
+
+        let workingShift = currentShift;
+        let workingBaseShift = session.baseShift;
+        const initialIdentityChanged = !shiftIdentityMatches(
+          session.baseShift,
+          session.draftShift,
+        );
+
+        if (
+          seriesScope === "all" &&
+          workingBaseShift?.seriesId &&
+          initialIdentityChanged
+        ) {
+          if (shiftIsDeleted(session.draftShift)) {
+            await deleteShiftSeries(workingBaseShift.seriesId, orgId);
+          } else if (session.draftShift) {
+            await updateSeriesAllShifts(
+              workingBaseShift.seriesId,
+              session.draftShift.shiftCodeIds[0] ?? null,
+              orgId,
+              session.draftShift.absenceTypeId ?? null,
+            );
+          }
+
+          const freshShifts = await fetchShifts(
+            orgId,
+            canEditShiftsRef.current,
+            shiftCodeMapRef.current,
+            absenceTypeMapRef.current,
+            shiftFetchStart,
+            shiftFetchEnd,
+          );
+          setShifts(freshShifts);
+          shiftsRef.current = freshShifts;
+          workingShift = cloneShiftEntry(freshShifts[session.cellKey]);
+          workingBaseShift = workingShift;
+        }
+
+        const expectedVersion = workingShift?.version;
+        const remainingIdentityChanged = !shiftIdentityMatches(
+          workingBaseShift,
+          session.draftShift,
+        );
+        const remainingTimeChanged =
+          (workingBaseShift?.customStartTime ?? null) !==
+            (session.draftShift?.customStartTime ?? null) ||
+          (workingBaseShift?.customEndTime ?? null) !==
+            (session.draftShift?.customEndTime ?? null);
+
+        if (remainingIdentityChanged) {
+          if (shiftIsDeleted(session.draftShift)) {
+            if (workingShift) {
+              await deleteShift(
+                panel.empId,
+                formatDateKey(panel.date),
+                orgId,
+                expectedVersion,
+              );
+            }
+          } else if (session.draftShift) {
+            await upsertShift(
+              panel.empId,
+              formatDateKey(panel.date),
+              session.draftShift.shiftCodeIds,
+              orgId,
+              session.draftShift.customStartTime ?? null,
+              session.draftShift.customEndTime ?? null,
+              expectedVersion,
+              session.draftShift.absenceTypeId ?? null,
+            );
+          }
+        } else if (remainingTimeChanged && session.draftShift && workingShift) {
+          await upsertShiftTimes(
+            panel.empId,
+            formatDateKey(panel.date),
+            session.draftShift.customStartTime ?? null,
+            session.draftShift.customEndTime ?? null,
+            orgId,
+            expectedVersion,
+          );
+        }
+
+        const focusAreaIds = new Set<number>([
+          ...Object.keys(session.baseNotes).map(Number),
+          ...Object.keys(session.draftNotes).map(Number),
+        ]);
+
+        for (const focusAreaId of focusAreaIds) {
+          const baseEntries = session.baseNotes[focusAreaId] ?? [];
+          const draftEntries = session.draftNotes[focusAreaId] ?? [];
+          const indicatorIds = new Set<number>([
+            ...baseEntries.map((note) => note.indicatorTypeId),
+            ...draftEntries.map((note) => note.indicatorTypeId),
+          ]);
+
+          for (const indicatorTypeId of indicatorIds) {
+            const baseStatus =
+              baseEntries.find((note) => note.indicatorTypeId === indicatorTypeId)
+                ?.status;
+            const draftStatus =
+              draftEntries.find((note) => note.indicatorTypeId === indicatorTypeId)
+                ?.status;
+            if (baseStatus === draftStatus) continue;
+
+            if (draftStatus && draftStatus !== "draft_deleted") {
+              await upsertScheduleNote(
+                orgId,
+                panel.empId,
+                formatDateKey(panel.date),
+                indicatorTypeId,
+                focusAreaId,
+                baseStatus,
+              );
+            } else if (baseStatus) {
+              await deleteScheduleNote(
+                orgId,
+                panel.empId,
+                formatDateKey(panel.date),
+                indicatorTypeId,
+                focusAreaId,
+                baseStatus,
+              );
             }
           }
-          if (Object.keys(shiftUpdates).length > 0) {
-            broadcastDraftChanged({ shifts: shiftUpdates });
-          }
-          toast.success("Series updated");
-        } catch (err) {
-          toast.error("Failed to update series");
+        }
+
+        await refetchScheduleDataRef.current();
+        broadcastDraftChanged({});
+        closeEditPanel();
+        toast.success("Shift changes saved");
+      } catch (err) {
+        if (err instanceof OptimisticLockError) {
+          setEditSessionDraft((prev) =>
+            prev ? { ...prev, isStale: true } : prev,
+          );
+          toast.error("This shift changed in another tab or by another editor.");
+          await refetchScheduleDataRef.current();
+        } else {
+          toast.error("Failed to save shift changes");
           Sentry.captureException(err);
         }
-      } else {
-        setShift(editPanel.empId, editPanel.date, label, shiftCodeIds);
-        // Advance tour: shift-picker step
-        completeTourAction();
+      } finally {
+        isApplyingEditSessionRef.current = false;
       }
     },
-    [editPanel, shifts, org, canEditShifts, setShift, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
+    [
+      buildEditSessionFingerprint,
+      closeEditPanel,
+      collectCellNotesSnapshot,
+      editPanel,
+      org?.id,
+      shiftFetchEnd,
+      shiftFetchStart,
+    ],
   );
 
   const handleConfirmSeriesDelete = useCallback(async () => {
     if (!pendingSeriesDelete || !org) return;
     try {
       const prevShifts = shifts;
-      const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
-      const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
+      const deletedCount = await deleteShiftSeries(
+        pendingSeriesDelete.seriesId,
+        org.id,
+      );
+      const shiftData = await fetchShifts(
+        org.id,
+        canEditShifts,
+        shiftCodeMapRef.current,
+        absenceTypeMapRef.current,
+        shiftFetchStart,
+        shiftFetchEnd,
+      );
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
       // Detect removed shifts
@@ -1470,23 +2605,36 @@ function SchedulerContent() {
       }
       // Detect changed shifts
       for (const [k, v] of Object.entries(shiftData)) {
-        if (!prevShifts[k] || JSON.stringify(prevShifts[k]) !== JSON.stringify(v)) {
+        if (
+          !prevShifts[k] ||
+          JSON.stringify(prevShifts[k]) !== JSON.stringify(v)
+        ) {
           shiftUpdates[k] = v;
         }
       }
       if (Object.keys(shiftUpdates).length > 0) {
         broadcastDraftChanged({ shifts: shiftUpdates });
       }
-      toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
+      toast.success(
+        `Series deleted (${deletedCount} shifts marked for removal on publish)`,
+      );
     } catch (err) {
       toast.error("Failed to delete series");
       Sentry.captureException(err);
     } finally {
       setPendingSeriesDelete(null);
-      unlockCell();
-      setEditPanel(null);
+      closeEditPanel();
     }
-  }, [pendingSeriesDelete, org, canEditShifts, shifts, broadcastDraftChanged, unlockCell, shiftFetchStart, shiftFetchEnd]);
+  }, [
+    pendingSeriesDelete,
+    org,
+    canEditShifts,
+    shifts,
+    broadcastDraftChanged,
+    closeEditPanel,
+    shiftFetchStart,
+    shiftFetchEnd,
+  ]);
 
   const handleRepeatConfirm = useCallback(
     async (
@@ -1497,29 +2645,67 @@ function SchedulerContent() {
       maxOccurrences: number | null,
     ) => {
       if (!editPanel || !org) return;
-      const currentLabel = shiftForKey(editPanel.empId, editPanel.date);
-      if (!currentLabel || currentLabel === 'OFF') return;
-      const codeIds = shiftCodeIdsForKey(editPanel.empId, editPanel.date);
-      if (!codeIds.length) return;
+      const cellKey = `${editPanel.empId}_${formatDateKey(editPanel.date)}`;
+      const draftEntry =
+        editSessionDraftRef.current?.cellKey === cellKey
+          ? editSessionDraftRef.current.draftShift
+          : null;
+      const currentLabel = draftEntry?.label ?? shiftForKey(editPanel.empId, editPanel.date);
+      if (!currentLabel || currentLabel === "OFF") return;
+      const codeIds = draftEntry?.shiftCodeIds ?? shiftCodeIdsForKey(editPanel.empId, editPanel.date);
+      const absenceTypeId =
+        draftEntry?.absenceTypeId ??
+        absenceTypeIdForKey(editPanel.empId, editPanel.date);
+      if (!codeIds.length && absenceTypeId == null) return;
       try {
+        const persistedEntry = cloneShiftEntry(shiftsRef.current[cellKey]);
+        const pendingEntry = cloneShiftEntry(draftEntry);
+        const pendingNeedsPersist =
+          pendingEntry != null &&
+          serializeShiftSnapshot(persistedEntry) !== serializeShiftSnapshot(pendingEntry);
+
+        if (pendingNeedsPersist) {
+          await upsertShift(
+            editPanel.empId,
+            formatDateKey(editPanel.date),
+            pendingEntry.shiftCodeIds,
+            org.id,
+            pendingEntry.customStartTime ?? null,
+            pendingEntry.customEndTime ?? null,
+            persistedEntry?.version,
+            pendingEntry.absenceTypeId ?? null,
+          );
+        }
+
         await createShiftSeries(
           editPanel.empId,
           org.id,
-          codeIds[0],
+          codeIds[0] ?? null,
           currentLabel,
           frequency,
           daysOfWeek,
           startDate,
           endDate,
           maxOccurrences,
+          absenceTypeId ?? null,
         );
         const prevShifts = shifts;
-        const shiftData = await fetchShifts(org.id, canEditShifts, shiftCodeMapRef.current, absenceTypeMapRef.current, shiftFetchStart, shiftFetchEnd);
+        const shiftData = await fetchShifts(
+          org.id,
+          canEditShifts,
+          shiftCodeMapRef.current,
+          absenceTypeMapRef.current,
+          shiftFetchStart,
+          shiftFetchEnd,
+        );
         setShifts(shiftData);
         // Broadcast new/changed shifts to other editors
         const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
         for (const [key, value] of Object.entries(shiftData)) {
-          if (!prevShifts[key] || JSON.stringify(prevShifts[key]) !== JSON.stringify(value)) {
+          if (
+            !prevShifts[key] ||
+            JSON.stringify(prevShifts[key]) !== JSON.stringify(value)
+          ) {
             shiftUpdates[key] = value;
           }
         }
@@ -1528,38 +2714,59 @@ function SchedulerContent() {
         }
         toast.success("Repeating shift created");
       } catch (err) {
-        toast.error("Failed to create repeating shift");
+        toast.error(
+          err instanceof Error
+            ? err.message || "Failed to create repeating shift"
+            : "Failed to create repeating shift",
+        );
         Sentry.captureException(err);
       } finally {
-        unlockCell();
-        setEditPanel(null);
+        closeEditPanel();
       }
     },
-    [editPanel, org, canEditShifts, shiftForKey, shiftCodeIdsForKey, unlockCell, shifts, broadcastDraftChanged, shiftFetchStart, shiftFetchEnd],
+    [
+      editPanel,
+      org,
+      canEditShifts,
+      shiftForKey,
+      shiftCodeIdsForKey,
+      absenceTypeIdForKey,
+      closeEditPanel,
+      shifts,
+      broadcastDraftChanged,
+      shiftFetchStart,
+      shiftFetchEnd,
+    ],
   );
 
   // ── Qualification check for drag/paste ──────────────────────────────────
   const focusAreaNameMap = useMemo(
-    () => new Map(focusAreas.map(fa => [fa.id, fa.name])),
+    () => new Map(focusAreas.map((fa) => [fa.id, fa.name])),
     [focusAreas],
   );
   const certificationNameMap = useMemo(
-    () => new Map(certifications.map(c => [c.id, c.name])),
+    () => new Map(certifications.map((c) => [c.id, c.name])),
     [certifications],
   );
 
   /** Returns null if qualified, or an error message string if not. */
   const checkQualification = useCallback(
     (empId: string, shiftCodeIds: number[]): string | null => {
-      const emp = employees.find(e => e.id === empId);
+      const emp = employees.find((e) => e.id === empId);
       if (!emp) return null; // shouldn't happen, but don't block
 
       for (const codeId of shiftCodeIds) {
-        const code = shiftCodes.find(sc => sc.id === codeId);
+        const code = shiftCodes.find((sc) => sc.id === codeId);
         if (!code) continue;
         if (!isEmployeeQualified(emp, code)) {
-          const reasons = getDisqualificationReasons(emp, code, focusAreaNameMap, certificationNameMap);
-          const displayLabel = shiftCodeMapRef.current.get(codeId) ?? code.label;
+          const reasons = getDisqualificationReasons(
+            emp,
+            code,
+            focusAreaNameMap,
+            certificationNameMap,
+          );
+          const displayLabel =
+            shiftCodeMapRef.current.get(codeId) ?? code.label;
           return `${getEmployeeDisplayName(emp)} cannot be assigned ${displayLabel}: ${reasons.join(", ")}`;
         }
       }
@@ -1572,157 +2779,280 @@ function SchedulerContent() {
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as ShiftDragData | undefined;
     if (data) {
+      const activatorEvent = event.activatorEvent;
+      const wantsCopy =
+        (activatorEvent instanceof MouseEvent ||
+          activatorEvent instanceof KeyboardEvent) &&
+        activatorEvent.shiftKey;
       setActiveDrag(data);
+      activeDragModeRef.current = wantsCopy ? "copy" : "move";
       document.documentElement.dataset.dragging = "true";
     }
   }, []);
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    setActiveDrag(null);
-    delete document.documentElement.dataset.dragging;
-    const { active, over } = event;
-    if (!over) return;
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDrag(null);
+      const dragMode = activeDragModeRef.current;
+      activeDragModeRef.current = "move";
+      delete document.documentElement.dataset.dragging;
+      const { active, over } = event;
+      if (!over) return;
 
-    const dragData = active.data.current as ShiftDragData | undefined;
-    const dropData = over.data.current as CellDropData | undefined;
-    if (!dragData || !dropData) return;
+      const dragData = active.data.current as ShiftDragData | undefined;
+      const dropData = over.data.current as CellDropData | undefined;
+      if (!dragData || !dropData) return;
 
-    // No-op if dropped on same cell
-    const sourceKey = `${dragData.empId}_${dragData.dateKey}`;
-    const targetKey = `${dropData.empId}_${dropData.dateKey}`;
-    if (sourceKey === targetKey) return;
+      // No-op if dropped on same cell
+      const sourceKey = `${dragData.empId}_${dragData.dateKey}`;
+      const targetKey = `${dropData.empId}_${dropData.dateKey}`;
+      if (sourceKey === targetKey) return;
 
-    // Check target lock
-    const targetLock = getCellLock(targetKey);
-    if (targetLock) {
-      toast.info(`Cell is being edited by ${targetLock.userName}`);
-      return;
-    }
+      // Check target lock
+      const targetLock = getCellLock(targetKey);
+      if (targetLock) {
+        toast.info(`Cell is being edited by ${targetLock.userName}`);
+        return;
+      }
 
-    // Check if target employee qualifies for the shift
-    const disqualified = checkQualification(dropData.empId, dragData.shiftCodeIds);
-    if (disqualified) {
-      toast.error(disqualified);
-      return;
-    }
+      // Check if target employee qualifies for the shift
+      if (dragData.shiftCodeIds.length > 0) {
+        const disqualified = checkQualification(
+          dropData.empId,
+          dragData.shiftCodeIds,
+        );
+        if (disqualified) {
+          toast.error(disqualified);
+          return;
+        }
+      }
 
-    // Atomic move via RPC — prevents duplication on partial failure
-    const sourceEntry = shifts[sourceKey];
-
-    // Optimistic UI update
-    setShifts(prev => {
-      const next = { ...prev };
-      next[targetKey] = {
-        label: dragData.label, shiftCodeIds: dragData.shiftCodeIds,
-        isDraft: true, draftKind: 'new' as DraftKind,
-        publishedShiftCodeIds: prev[targetKey]?.publishedShiftCodeIds ?? [],
-        publishedLabel: prev[targetKey]?.publishedLabel ?? '',
+      const sourceEntry = shifts[sourceKey];
+      const targetPublishedShiftCodeIds =
+        shifts[targetKey]?.publishedShiftCodeIds ?? [];
+      const targetPublishedAbsenceTypeId =
+        shifts[targetKey]?.publishedAbsenceTypeId ?? null;
+      const targetPublishedLabel = shifts[targetKey]?.publishedLabel ?? "";
+      const targetHasPublished =
+        targetPublishedShiftCodeIds.length > 0 ||
+        targetPublishedAbsenceTypeId != null;
+      const targetDraftKind: DraftKind = targetHasPublished
+        ? "modified"
+        : "new";
+      const movedEntry: ShiftMap[string] = {
+        ...(shifts[targetKey] ?? {}),
+        label: dragData.label,
+        shiftCodeIds: dragData.absenceTypeId != null ? [] : dragData.shiftCodeIds,
+        absenceTypeId: dragData.absenceTypeId ?? null,
+        isDraft: true,
+        isDelete: false,
+        draftKind: targetDraftKind,
+        publishedShiftCodeIds: targetPublishedShiftCodeIds,
+        publishedAbsenceTypeId: targetPublishedAbsenceTypeId,
+        publishedLabel: targetPublishedLabel,
+        customStartTime:
+          dragData.absenceTypeId != null
+            ? null
+            : (sourceEntry?.customStartTime ?? dragData.customStartTime ?? null),
+        customEndTime:
+          dragData.absenceTypeId != null
+            ? null
+            : (sourceEntry?.customEndTime ?? dragData.customEndTime ?? null),
+        updatedBy: currentUserRef.current?.id ?? null,
       };
-      if (sourceEntry?.publishedShiftCodeIds?.length) {
-        next[sourceKey] = {
-          label: "OFF", shiftCodeIds: [], isDraft: true, isDelete: true,
-          draftKind: 'deleted' as DraftKind,
-          publishedShiftCodeIds: sourceEntry.publishedShiftCodeIds,
-          publishedLabel: sourceEntry.publishedLabel ?? '',
-        };
-      } else {
-        delete next[sourceKey];
-      }
-      return next;
-    });
+      const sourceReplacement =
+        dragMode === "move"
+          ? sourceEntry?.publishedShiftCodeIds?.length ||
+            sourceEntry?.publishedAbsenceTypeId != null
+            ? {
+                label: "OFF",
+                shiftCodeIds: [],
+                absenceTypeId: null,
+                isDraft: true,
+                isDelete: true,
+                draftKind: "deleted" as DraftKind,
+                publishedShiftCodeIds: sourceEntry?.publishedShiftCodeIds ?? [],
+                publishedAbsenceTypeId:
+                  sourceEntry?.publishedAbsenceTypeId ?? null,
+                publishedLabel: sourceEntry?.publishedLabel ?? "",
+                customStartTime: null,
+                customEndTime: null,
+                updatedBy: currentUserRef.current?.id ?? null,
+              }
+            : null
+          : undefined;
 
-    broadcastDraftChanged({
-      shifts: {
-        [targetKey]: { label: dragData.label, shiftCodeIds: dragData.shiftCodeIds, isDraft: true, draftKind: 'new' },
-        [sourceKey]: sourceEntry?.publishedShiftCodeIds?.length
-          ? { label: "OFF", shiftCodeIds: [], isDraft: true, draftKind: 'deleted' }
-          : null,
-      },
-    });
+      // Optimistic UI update
+      setShifts((prev) => {
+        const next = { ...prev };
+        next[targetKey] = movedEntry;
+        if (dragMode === "move") {
+          if (sourceReplacement) {
+            next[sourceKey] = sourceReplacement;
+          } else {
+            delete next[sourceKey];
+          }
+        }
+        return next;
+      });
 
-    moveShift(
-      org!.id,
-      dragData.empId, dragData.dateKey,
-      dropData.empId, dropData.dateKey,
-      dragData.shiftCodeIds,
-      sourceEntry?.version,
-    ).then(() => {
-      toast.success("Shift moved");
-    }).catch(async (err) => {
-      if (err instanceof OptimisticLockError) {
-        toast.error("Shift was modified by another user — refreshing");
-      } else {
-        toast.error("Failed to move shift");
-        Sentry.captureException(err);
-      }
-      await refetchScheduleData();
-    });
-  }, [shifts, org, getCellLock, checkQualification, broadcastDraftChanged, refetchScheduleData]);
+      broadcastDraftChanged({
+        shifts: {
+          [targetKey]: movedEntry,
+          ...(dragMode === "move"
+            ? {
+                [sourceKey]: sourceReplacement,
+              }
+            : {}),
+        },
+      });
+
+      void Promise.all([
+        pendingShiftWrites.current.get(sourceKey) ?? Promise.resolve(),
+        pendingShiftWrites.current.get(targetKey) ?? Promise.resolve(),
+      ])
+        .then(() =>
+          moveShift(
+            org!.id,
+            dragData.empId,
+            dragData.dateKey,
+            dropData.empId,
+            dropData.dateKey,
+            dragData.shiftCodeIds,
+            dragData.absenceTypeId ?? null,
+            dragMode,
+            sourceEntry?.version,
+          ),
+        )
+        .then(() => {
+          toast.success(dragMode === "copy" ? "Entry copied" : "Entry moved");
+        })
+        .catch(async (err) => {
+          if (err instanceof OptimisticLockError) {
+            toast.error(
+              "Entry was modified by another editor or another tab — refreshing",
+            );
+          } else {
+            toast.error(
+              dragMode === "copy"
+                ? "Failed to copy entry"
+                : "Failed to move entry",
+            );
+            Sentry.captureException(err);
+          }
+          await refetchScheduleData();
+        });
+    },
+    [
+      shifts,
+      org,
+      getCellLock,
+      checkQualification,
+      broadcastDraftChanged,
+      refetchScheduleData,
+    ],
+  );
 
   // ── Copy-paste handlers ──────────────────────────────────────────────────
-  const handleCopyShift = useCallback((empId: string, date: Date) => {
-    const key = `${empId}_${formatDateKey(date)}`;
-    const shift = shifts[key];
-    if (!shift || shift.shiftCodeIds.length === 0) return;
-    setClipboard({ label: shift.label, shiftCodeIds: shift.shiftCodeIds });
-    toast.success("Shift copied");
-  }, [shifts]);
+  const handleCopyShift = useCallback(
+    (empId: string, date: Date) => {
+      const key = `${empId}_${formatDateKey(date)}`;
+      const shift = shifts[key];
+      if (
+        !shift ||
+        shift.isDelete ||
+        (shift.shiftCodeIds.length === 0 && shift.absenceTypeId == null)
+      ) {
+        return;
+      }
+      setClipboard(buildEntryPayload(shift));
+      toast.success("Entry copied");
+    },
+    [shifts, buildEntryPayload],
+  );
 
-  const handlePasteShift = useCallback((empId: string, date: Date) => {
-    if (!clipboard) return;
-    const cellKey = `${empId}_${formatDateKey(date)}`;
-    const lock = getCellLock(cellKey);
-    if (lock) {
-      toast.info(`Cell is being edited by ${lock.userName}`);
-      return;
-    }
+  const handlePasteShift = useCallback(
+    (empId: string, date: Date) => {
+      if (!clipboard) return;
+      const cellKey = `${empId}_${formatDateKey(date)}`;
+      const lock = getCellLock(cellKey);
+      if (lock) {
+        toast.info(`Cell is being edited by ${lock.userName}`);
+        return;
+      }
 
-    // Check if target employee qualifies for the pasted shift
-    const disqualified = checkQualification(empId, clipboard.shiftCodeIds);
-    if (disqualified) {
-      toast.error(disqualified);
-      return;
-    }
+      // Check if target employee qualifies for the pasted shift
+      if (clipboard.shiftCodeIds.length > 0) {
+        const disqualified = checkQualification(empId, clipboard.shiftCodeIds);
+        if (disqualified) {
+          toast.error(disqualified);
+          return;
+        }
+      }
 
-    // If the target cell already has a shift, confirm before overwriting
-    const existing = shifts[cellKey];
-    if (existing && existing.shiftCodeIds.length > 0 && !existing.isDelete && existing.label !== "OFF") {
-      setPendingPasteOver({
-        empId,
-        date,
-        existingLabel: existing.label,
-        pasteLabel: clipboard.label,
-        pasteCodeIds: clipboard.shiftCodeIds,
-      });
-      return;
-    }
+      // If the target cell already has an entry, confirm before overwriting
+      const existing = shifts[cellKey];
+      if (
+        existing &&
+        (existing.shiftCodeIds.length > 0 || existing.absenceTypeId != null) &&
+        !existing.isDelete
+      ) {
+        setPendingPasteOver({
+          empId,
+          date,
+          existingLabel: existing.label,
+          pasteEntry: clipboard,
+        });
+        return;
+      }
 
-    setShift(empId, date, clipboard.label, clipboard.shiftCodeIds);
-    toast.success("Shift pasted");
-  }, [clipboard, setShift, getCellLock, checkQualification, shifts]);
+      setShift(empId, date, clipboard);
+      toast.success("Entry pasted");
+    },
+    [clipboard, setShift, getCellLock, checkQualification, shifts],
+  );
 
-  const handleClearShift = useCallback((empId: string, date: Date) => {
-    const cellKey = `${empId}_${formatDateKey(date)}`;
-    const lock = getCellLock(cellKey);
-    if (lock) {
-      toast.info(`Cell is being edited by ${lock.userName}`);
-      return;
-    }
-    const emp = employees.find(e => e.id === empId);
-    const empName = emp ? getEmployeeDisplayName(emp) : "";
-    const label = shiftForKey(empId, date) ?? "";
-    setPendingClearShift({ empId, date, empName, shiftLabel: label });
-  }, [getCellLock, employees, shiftForKey]);
+  const handleClearShift = useCallback(
+    (empId: string, date: Date) => {
+      const cellKey = `${empId}_${formatDateKey(date)}`;
+      const lock = getCellLock(cellKey);
+      if (lock) {
+        toast.info(`Cell is being edited by ${lock.userName}`);
+        return;
+      }
+      const emp = employees.find((e) => e.id === empId);
+      const empName = emp ? getEmployeeDisplayName(emp) : "";
+      const label = shiftForKey(empId, date) ?? "";
+      setPendingClearShift({ empId, date, empName, shiftLabel: label });
+    },
+    [getCellLock, employees, shiftForKey],
+  );
 
   // Context menu handlers
-  const handleCellContextMenu = useCallback((e: React.MouseEvent | React.KeyboardEvent, empId: string, date: Date, focusAreaName: string) => {
-    e.preventDefault();
-    setContextMenu({ anchorEl: e.currentTarget as HTMLElement, empId, date, focusAreaName });
-  }, []);
+  const handleCellContextMenu = useCallback(
+    (
+      e: React.MouseEvent | React.KeyboardEvent,
+      empId: string,
+      date: Date,
+      focusAreaName: string,
+    ) => {
+      e.preventDefault();
+      setContextMenu({
+        anchorEl: e.currentTarget as HTMLElement,
+        empId,
+        date,
+        focusAreaName,
+      });
+    },
+    [],
+  );
 
-  const handleCellHover = useCallback((empId: string, date: Date, focusAreaName: string) => {
-    hoveredCellRef.current = { empId, date, focusAreaName };
-  }, []);
+  const handleCellHover = useCallback(
+    (empId: string, date: Date, focusAreaName: string) => {
+      hoveredCellRef.current = { empId, date, focusAreaName };
+    },
+    [],
+  );
 
   // Keyboard shortcuts for copy-paste (Cmd/Ctrl+C and Cmd/Ctrl+V)
   useEffect(() => {
@@ -1752,11 +3082,18 @@ function SchedulerContent() {
   }, [canEditShifts, handleCopyShift, handlePasteShift]);
 
   // Compute the auto-fill date range (reused by preview + apply)
-  const getAutoFillRange = useCallback((): { startDate: Date; endDate: Date } => {
+  const getAutoFillRange = useCallback((): {
+    startDate: Date;
+    endDate: Date;
+  } => {
     if (spanWeeks === "month") {
       return {
         startDate: new Date(monthStart),
-        endDate: new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0),
+        endDate: new Date(
+          monthStart.getFullYear(),
+          monthStart.getMonth() + 1,
+          0,
+        ),
       };
     }
     return {
@@ -1771,7 +3108,13 @@ function SchedulerContent() {
     const { startDate, endDate } = getAutoFillRange();
 
     // Fetch fresh recurring shifts to get an accurate count
-    const freshRecurringShifts = await fetchRecurringShifts(org.id, undefined, shiftCodeMapRef.current, false, absenceTypeMapRef.current);
+    const freshRecurringShifts = await fetchRecurringShifts(
+      org.id,
+      undefined,
+      shiftCodeMapRef.current,
+      false,
+      absenceTypeMapRef.current,
+    );
     setRecurringShifts(freshRecurringShifts);
 
     // Count empty slots that would be filled (matches server-side RPC logic)
@@ -1788,17 +3131,25 @@ function SchedulerContent() {
         if (shifts[`${empId}_${dateKey}`]) continue;
         // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
         const candidates = empShifts
-          .filter(rs => rs.dayOfWeek === dayOfWeek)
+          .filter((rs) => rs.dayOfWeek === dayOfWeek)
           .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
-        const match = candidates.find(rs => {
+        const match = candidates.find((rs) => {
           const from = rs.effectiveFrom;
           const until = rs.effectiveUntil;
           return from <= dateKey && (!until || until >= dateKey);
         });
         // Verify shift code or absence type is still active (not archived)
         if (match) {
-          if (match.shiftCodeId != null && shiftCodes.some(sc => sc.id === match.shiftCodeId)) count++;
-          else if (match.absenceTypeId != null && absenceTypes.some(at => at.id === match.absenceTypeId)) count++;
+          if (
+            match.shiftCodeId != null &&
+            shiftCodes.some((sc) => sc.id === match.shiftCodeId)
+          )
+            count++;
+          else if (
+            match.absenceTypeId != null &&
+            absenceTypes.some((at) => at.id === match.absenceTypeId)
+          )
+            count++;
         }
       }
     }
@@ -1822,12 +3173,18 @@ function SchedulerContent() {
       const { startDate, endDate } = getAutoFillRange();
 
       // RPC reads fresh data from DB — no stale closures for recurringShifts/shifts
-      const generated = await applyRecurringSchedules(org.id, startDate, endDate);
+      const generated = await applyRecurringSchedules(
+        org.id,
+        startDate,
+        endDate,
+      );
 
       if (generated.length > 0) {
         // Refetch to get accurate state (including from_recurring flags)
         await refetchScheduleData();
-        toast.success(`Recurring schedule applied (${generated.length} shifts)`);
+        toast.success(
+          `Recurring schedule applied (${generated.length} shifts)`,
+        );
         broadcastDraftChanged({});
       } else {
         toast.info("No empty slots to fill");
@@ -1864,7 +3221,8 @@ function SchedulerContent() {
         const sourceShift = shifts[sourceKey];
         if (
           sourceShift &&
-          (sourceShift.shiftCodeIds.length > 0 || sourceShift.absenceTypeId != null) &&
+          (sourceShift.shiftCodeIds.length > 0 ||
+            sourceShift.absenceTypeId != null) &&
           !sourceShift.isDelete &&
           !shifts[targetKey]
         ) {
@@ -1874,7 +3232,9 @@ function SchedulerContent() {
     }
 
     if (count === 0) {
-      toast.info("No shifts to import — either the previous period is empty or all slots are already filled");
+      toast.info(
+        "No shifts to import — either the previous period is empty or all slots are already filled",
+      );
       return;
     }
 
@@ -1895,6 +3255,12 @@ function SchedulerContent() {
       const sourceStart = addDays(weekStart, -days);
       const shiftUpdates: Record<string, ShiftMap[string]> = {};
       const upsertPromises: Promise<void>[] = [];
+      // BUG 1.11: Track disqualified shifts to show warning
+      const disqualifiedShifts: Array<{
+        empName: string;
+        date: string;
+        reason: string;
+      }> = [];
 
       for (let i = 0; i < days; i++) {
         const sourceDate = addDays(sourceStart, i);
@@ -1909,19 +3275,37 @@ function SchedulerContent() {
 
           if (
             sourceShift &&
-            (sourceShift.shiftCodeIds.length > 0 || sourceShift.absenceTypeId != null) &&
+            (sourceShift.shiftCodeIds.length > 0 ||
+              sourceShift.absenceTypeId != null) &&
             !sourceShift.isDelete &&
             !shifts[targetKey]
           ) {
+            // BUG 1.11: Check qualification for shift codes (ignore absence types)
+            if (sourceShift.shiftCodeIds.length > 0) {
+              const disqualifyReason = checkQualification(
+                emp.id,
+                sourceShift.shiftCodeIds,
+              );
+              if (disqualifyReason) {
+                disqualifiedShifts.push({
+                  empName: getEmployeeDisplayName(emp),
+                  date: formatDate(targetDate),
+                  reason: disqualifyReason,
+                });
+                continue; // Skip this shift
+              }
+            }
+
             // Build optimistic state entry
             shiftUpdates[targetKey] = {
               label: sourceShift.label,
               shiftCodeIds: sourceShift.shiftCodeIds,
               absenceTypeId: sourceShift.absenceTypeId,
               isDraft: true,
-              draftKind: 'new',
+              draftKind: "new",
               publishedShiftCodeIds: [],
-              publishedLabel: '',
+              publishedLabel: "",
+              updatedBy: currentUserRef.current?.id ?? null,
             };
 
             // Queue DB upsert
@@ -1935,18 +3319,35 @@ function SchedulerContent() {
                 sourceShift.customEndTime,
                 undefined,
                 sourceShift.absenceTypeId,
-              )
+              ),
             );
           }
         }
       }
 
+      // Show warning if any shifts were skipped due to disqualification
+      if (disqualifiedShifts.length > 0) {
+        const msg = disqualifiedShifts
+          .slice(0, 3)
+          .map((s) => `${s.empName} on ${s.date}`)
+          .join(", ");
+        const suffix =
+          disqualifiedShifts.length > 3
+            ? ` and ${disqualifiedShifts.length - 3} more`
+            : "";
+        toast.warning(
+          `Skipped ${disqualifiedShifts.length} shift(s) due to qualifications: ${msg}${suffix}`,
+        );
+      }
+
       // Apply optimistic state update immediately for responsive UI
-      setShifts(prev => ({ ...prev, ...shiftUpdates }));
+      setShifts((prev) => ({ ...prev, ...shiftUpdates }));
       broadcastDraftChanged({ shifts: shiftUpdates });
 
       const count = Object.keys(shiftUpdates).length;
-      toast.success(`Imported ${count} shift${count !== 1 ? 's' : ''} from previous ${spanWeeks === 1 ? 'week' : '2 weeks'}`);
+      toast.success(
+        `Imported ${count} shift${count !== 1 ? "s" : ""} from previous ${spanWeeks === 1 ? "week" : "2 weeks"}`,
+      );
 
       // Persist to DB in background
       await Promise.all(upsertPromises);
@@ -1961,61 +3362,63 @@ function SchedulerContent() {
       setIsImportingPrevious(false);
       setImportPreview(null);
     }
-  }, [org, spanWeeks, weekStart, employees, shifts, broadcastDraftChanged, refetchScheduleData]);
+  }, [
+    org,
+    spanWeeks,
+    weekStart,
+    employees,
+    shifts,
+    broadcastDraftChanged,
+    checkQualification,
+    refetchScheduleData,
+  ]);
 
   const handleNoteToggle = useCallback(
-    async (indicatorTypeId: number, active: boolean, focusAreaId: number) => {
-      if (!org || !editPanel) return;
-      const dateKey = formatDateKey(editPanel.date);
-      const key = `${editPanel.empId}_${dateKey}_${focusAreaId}`;
+    (indicatorTypeId: number, active: boolean, focusAreaId: number) => {
+      updateEditSessionDraft((prev) => {
+        const existing = prev.draftNotes[focusAreaId] ?? [];
+        const existingStatus = existing.find(
+          (note) => note.indicatorTypeId === indicatorTypeId,
+        )?.status;
 
-      const existing = notes[key] ?? [];
-      const existingStatus = existing.find(n => n.indicatorTypeId === indicatorTypeId)?.status;
-
-      let updated: { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[];
-      if (active) {
-        if (existingStatus === 'draft_deleted') {
-          updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'published' as const } : n);
-        } else {
-          updated = [...existing.filter(n => n.indicatorTypeId !== indicatorTypeId), { indicatorTypeId, status: 'draft' as const }];
-        }
-      } else {
-        if (existingStatus === 'published') {
-          updated = existing.map(n => n.indicatorTypeId === indicatorTypeId ? { ...n, status: 'draft_deleted' as const } : n);
-        } else {
-          updated = existing.filter(n => n.indicatorTypeId !== indicatorTypeId);
-        }
-      }
-      setNotes(prev => ({ ...prev, [key]: updated }));
-
-      try {
+        let updated: DraftNoteState[];
         if (active) {
-          await upsertScheduleNote(
-            org.id,
-            editPanel.empId,
-            dateKey,
-            indicatorTypeId,
-            focusAreaId,
-            existingStatus
+          if (existingStatus === "draft_deleted") {
+            updated = existing.map((note) =>
+              note.indicatorTypeId === indicatorTypeId
+                ? { ...note, status: "published" }
+                : note,
+            );
+          } else {
+            updated = [
+              ...existing.filter(
+                (note) => note.indicatorTypeId !== indicatorTypeId,
+              ),
+              { indicatorTypeId, status: "draft" },
+            ];
+          }
+        } else if (existingStatus === "published") {
+          updated = existing.map((note) =>
+            note.indicatorTypeId === indicatorTypeId
+              ? { ...note, status: "draft_deleted" }
+              : note,
           );
         } else {
-          await deleteScheduleNote(
-            org.id,
-            editPanel.empId,
-            dateKey,
-            indicatorTypeId,
-            focusAreaId,
-            existingStatus
+          updated = existing.filter(
+            (note) => note.indicatorTypeId !== indicatorTypeId,
           );
         }
-        broadcastDraftChanged({ notes: { [key]: updated } });
-      } catch (error) {
-        Sentry.captureException(error);
-        toast.error("Failed to save note");
-        setNotes(prev => ({ ...prev, [key]: existing }));
-      }
+
+        return {
+          draftShift: prev.draftShift,
+          draftNotes: {
+            ...prev.draftNotes,
+            [focusAreaId]: updated,
+          },
+        };
+      });
     },
-    [editPanel, org, notes, broadcastDraftChanged],
+    [updateEditSessionDraft],
   );
 
   const handlePrev = useCallback(() => {
@@ -2048,7 +3451,7 @@ function SchedulerContent() {
   const handleSpanChange = useCallback((next: 1 | 2 | "month") => {
     if (next !== "month") {
       // Snap weekStart to Sunday when leaving month view
-      setWeekStart(prev => getWeekStart(prev));
+      setWeekStart((prev) => getWeekStart(prev));
     }
     setPreferredSpan(next);
   }, []);
@@ -2062,10 +3465,14 @@ function SchedulerContent() {
 
       if (spanWeeks === "month") {
         startDate = new Date(monthStart);
-        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0); // Last day of month
+        endDate = new Date(
+          monthStart.getFullYear(),
+          monthStart.getMonth() + 1,
+          0,
+        ); // Last day of month
       } else {
         startDate = new Date(weekStart);
-        endDate = addDays(weekStart, (spanWeeks * 7) - 1);
+        endDate = addDays(weekStart, spanWeeks * 7 - 1);
       }
 
       await publishSchedule(org.id, startDate, endDate);
@@ -2088,13 +3495,14 @@ function SchedulerContent() {
       await refetchScheduleData();
       const [recentPublishes, pubDateRanges] = await Promise.all([
         fetchRecentPublishHistory(org.id, lastViewedRef.current),
-        fetchPublishedDateRanges(org.id, shiftFetchStart, shiftFetchEnd).catch(() => []),
+        fetchPublishedDateRanges(org.id, shiftFetchStart, shiftFetchEnd).catch(
+          () => [],
+        ),
       ]);
       setPublishHistory(recentPublishes);
       setPublishedDateRanges(pubDateRanges);
       setShowPublishDiff(false);
-      unlockCell();
-      setEditPanel(null);
+      closeEditPanel();
       setShowDiffOverlay(false);
       toast.success("Schedule published");
       // Update last-viewed so publisher doesn't see their own changes as "new" on next visit
@@ -2102,8 +3510,8 @@ function SchedulerContent() {
 
       // Notify other tabs/users to refetch the published schedule
       realtimeChannelRef.current?.send({
-        type: 'broadcast',
-        event: 'schedule_published',
+        type: "broadcast",
+        event: "schedule_published",
         payload: {},
       });
     } catch (err: unknown) {
@@ -2112,37 +3520,50 @@ function SchedulerContent() {
     } finally {
       setIsPublishing(false);
     }
-  }, [org, weekStart, monthStart, spanWeeks, refetchScheduleData, unlockCell, shiftFetchStart, shiftFetchEnd]);
+  }, [
+    org,
+    weekStart,
+    monthStart,
+    spanWeeks,
+    refetchScheduleData,
+    closeEditPanel,
+    shiftFetchStart,
+    shiftFetchEnd,
+  ]);
 
-  const handleCancelChanges = useCallback(async (discardAll = false) => {
-    const user = currentUserRef.current;
-    if (!org || !user) return;
-    setCancelingMode(discardAll ? 'all' : 'mine');
-    try {
-      await discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
+  const handleCancelChanges = useCallback(
+    async (discardAll = false) => {
+      const user = currentUserRef.current;
+      if (!org || !user) return;
+      setCancelingMode(discardAll ? "all" : "mine");
+      try {
+        await discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
 
-      await refetchScheduleDataRef.current();
-      unlockCell();
-      setEditPanel(null);
-      setShowDiffOverlay(false);
-      if (discardAll) {
-        // Dedicated event for discard-all — triggers immediate refetch on all clients
-        realtimeChannelRef.current?.send({
-          type: 'broadcast',
-          event: 'drafts_discarded',
-          payload: {},
-        });
-      } else {
-        broadcastDraftChanged();
+        await refetchScheduleDataRef.current();
+        closeEditPanel();
+        setShowDiffOverlay(false);
+        if (discardAll) {
+          // Dedicated event for discard-all — triggers immediate refetch on all clients
+          realtimeChannelRef.current?.send({
+            type: "broadcast",
+            event: "drafts_discarded",
+            payload: {},
+          });
+        } else {
+          broadcastDraftChanged();
+        }
+        toast.success(
+          discardAll ? "All changes discarded" : "Your changes discarded",
+        );
+      } catch (err: unknown) {
+        toast.error("Failed to discard changes");
+        Sentry.captureException(err);
+      } finally {
+        setCancelingMode(null);
       }
-      toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
-    } catch (err: unknown) {
-      toast.error("Failed to discard changes");
-      Sentry.captureException(err);
-    } finally {
-      setCancelingMode(null);
-    }
-  }, [org, broadcastDraftChanged, unlockCell]);
+    },
+    [org, broadcastDraftChanged, closeEditPanel],
+  );
 
   // ── Loading / error states ───────────────────────────────────────────────────
 
@@ -2150,7 +3571,17 @@ function SchedulerContent() {
 
   if (orgLoading || (scheduleLoading && !org)) {
     return (
-      <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)", zIndex: 50 }}>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--color-bg)",
+          zIndex: 50,
+        }}
+      >
         <AnimatedDubGridLogo size={160} />
       </div>
     );
@@ -2166,7 +3597,8 @@ function SchedulerContent() {
           flexDirection: "column",
           gap: 24,
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-          background: "linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-surface) 100%)",
+          background:
+            "linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-surface) 100%)",
           padding: 24,
           textAlign: "center",
         }}
@@ -2180,10 +3612,19 @@ function SchedulerContent() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            marginBottom: 8
+            marginBottom: 8,
           }}
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-danger)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -2191,12 +3632,28 @@ function SchedulerContent() {
         </div>
 
         <div style={{ maxWidth: 400 }}>
-          <h1 style={{ fontSize: "var(--dg-fs-section-title)", fontWeight: 800, color: "var(--color-text-primary)", marginBottom: 12, letterSpacing: "-0.02em" }}>
+          <h1
+            style={{
+              fontSize: "var(--dg-fs-section-title)",
+              fontWeight: 800,
+              color: "var(--color-text-primary)",
+              marginBottom: 12,
+              letterSpacing: "-0.02em",
+            }}
+          >
             Workspace Setup Required
           </h1>
-          <p style={{ fontSize: "var(--dg-fs-title)", color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 32 }}>
-            Your account is active, but it looks like your workspace hasn&apos;t been initialized yet.
-            Once your administrator completes the setup, you&apos;ll be able to access the schedule.
+          <p
+            style={{
+              fontSize: "var(--dg-fs-title)",
+              color: "var(--color-text-secondary)",
+              lineHeight: 1.6,
+              marginBottom: 32,
+            }}
+          >
+            Your account is active, but it looks like your workspace hasn&apos;t
+            been initialized yet. Once your administrator completes the setup,
+            you&apos;ll be able to access the schedule.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -2211,13 +3668,15 @@ function SchedulerContent() {
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
                 cursor: "pointer",
-                transition: "opacity 150ms ease"
+                transition: "opacity 150ms ease",
               }}
             >
               Check Again
             </button>
             <button
-              onClick={() => window.location.href = "mailto:support@dubgrid.com"}
+              onClick={() =>
+                (window.location.href = "mailto:support@dubgrid.com")
+              }
               style={{
                 padding: "12px 24px",
                 background: "var(--color-bg-secondary)",
@@ -2226,7 +3685,7 @@ function SchedulerContent() {
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
-                cursor: "pointer"
+                cursor: "pointer",
               }}
             >
               Contact Support
@@ -2235,8 +3694,15 @@ function SchedulerContent() {
         </div>
 
         {/* Technical details accessible only via hover/inspect for developers */}
-        <div style={{ marginTop: 40, opacity: 0.1, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)" }}>
-           System status: {loadError}
+        <div
+          style={{
+            marginTop: 40,
+            opacity: 0.1,
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-faint)",
+          }}
+        >
+          System status: {loadError}
         </div>
       </div>
     );
@@ -2254,7 +3720,17 @@ function SchedulerContent() {
       }}
     >
       {isLoading && employees.length > 0 && (
-        <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)", zIndex: 50 }}>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "var(--color-bg)",
+            zIndex: 50,
+          }}
+        >
           <AnimatedDubGridLogo size={160} />
         </div>
       )}
@@ -2266,6 +3742,7 @@ function SchedulerContent() {
             style={{
               position: "sticky",
               top: "var(--app-shell-header-h, 56px)",
+              display: "flow-root",
               zIndex: 99,
               background: "var(--color-bg)",
             }}
@@ -2278,81 +3755,129 @@ function SchedulerContent() {
                 isCanceling={cancelingMode !== null}
                 breakdown={draftBreakdown}
                 showDiff={showDiffOverlay}
-                onToggleDiff={() => setShowDiffOverlay(v => !v)}
+                onToggleDiff={() => setShowDiffOverlay((v) => !v)}
                 canPublish={canPublishSchedule}
               />
             )}
-            {publishHistory.length > 0 && (() => {
-              const latest = publishHistory[0];
-              const totalChanges = publishHistory.reduce((sum, e) => sum + e.changeCount, 0);
-              return (
-                <div className="dg-draft-banner no-print" style={{ background: "var(--color-info-bg)", borderColor: "var(--color-info-border)", color: "var(--color-info-text)" }}>
-                  <div className="dg-draft-banner-dot" style={{ background: "var(--color-primary)" }} />
-                  <span style={{ fontWeight: 600 }}>
-                    Published {(() => {
-                      const diff = Date.now() - new Date(latest.publishedAt).getTime();
-                      const mins = Math.floor(diff / 60000);
-                      if (mins < 1) return "just now";
-                      if (mins < 60) return `${mins} min ago`;
-                      const hrs = Math.floor(mins / 60);
-                      if (hrs < 24) return `${hrs} hr ago`;
-                      const days = Math.floor(hrs / 24);
-                      return `${days} day${days !== 1 ? "s" : ""} ago`;
-                    })()}
-                  </span>
-                  <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                    {totalChanges} change{totalChanges !== 1 ? "s" : ""}
-                    {publishHistory.length > 1 ? ` across ${publishHistory.length} publishes` : ""}
-                  </span>
-                  <div className="dg-draft-banner-actions">
-                    {isMobile ? (
-                      <span style={{ fontSize: "var(--dg-fs-footnote)", opacity: 0.6, fontStyle: "italic" }}>
-                        Use a larger screen to view details
-                      </span>
-                    ) : (
-                      <>
-                        <Hint content={hint("Highlight differences from the published schedule")} side="bottom">
+            {publishHistory.length > 0 &&
+              (() => {
+                const latest = publishHistory[0];
+                const totalChanges = publishHistory.reduce(
+                  (sum, e) => sum + e.changeCount,
+                  0,
+                );
+                return (
+                  <div
+                    className="dg-draft-banner no-print"
+                    style={{
+                      background: "var(--color-info-bg)",
+                      borderColor: "var(--color-info-border)",
+                      color: "var(--color-info-text)",
+                    }}
+                  >
+                    <div
+                      className="dg-draft-banner-dot"
+                      style={{ background: "var(--color-primary)" }}
+                    />
+                    <span style={{ fontWeight: 600 }}>
+                      Published{" "}
+                      {(() => {
+                        const diff =
+                          Date.now() - new Date(latest.publishedAt).getTime();
+                        const mins = Math.floor(diff / 60000);
+                        if (mins < 1) return "just now";
+                        if (mins < 60) return `${mins} min ago`;
+                        const hrs = Math.floor(mins / 60);
+                        if (hrs < 24) return `${hrs} hr ago`;
+                        const days = Math.floor(hrs / 24);
+                        return `${days} day${days !== 1 ? "s" : ""} ago`;
+                      })()}
+                    </span>
+                    <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                      {totalChanges} change{totalChanges !== 1 ? "s" : ""}
+                      {publishHistory.length > 1
+                        ? ` across ${publishHistory.length} publishes`
+                        : ""}
+                    </span>
+                    <div className="dg-draft-banner-actions">
+                      {isMobile ? (
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            opacity: 0.6,
+                            fontStyle: "italic",
+                          }}
+                        >
+                          Use a larger screen to view details
+                        </span>
+                      ) : (
+                        <>
+                          <Hint
+                            content={hint(
+                              "Highlight differences from the published schedule",
+                            )}
+                            side="bottom"
+                          >
+                            <button
+                              onClick={() => setShowPublishDiff((v) => !v)}
+                              className="dg-btn dg-btn-secondary"
+                              style={{
+                                fontSize: "var(--dg-fs-caption)",
+                                padding: "5px 12px",
+                                background: showPublishDiff
+                                  ? "var(--color-info-bg)"
+                                  : undefined,
+                                color: showPublishDiff
+                                  ? "var(--color-accent-text)"
+                                  : undefined,
+                              }}
+                            >
+                              {showPublishDiff
+                                ? "Hide Changes"
+                                : "Show What Changed"}
+                            </button>
+                          </Hint>
                           <button
-                            onClick={() => setShowPublishDiff(v => !v)}
+                            onClick={() => setShowPublishHistory(true)}
                             className="dg-btn dg-btn-secondary"
                             style={{
                               fontSize: "var(--dg-fs-caption)",
                               padding: "5px 12px",
-                              background: showPublishDiff ? "var(--color-info-bg)" : undefined,
-                              color: showPublishDiff ? "var(--color-accent-text)" : undefined,
                             }}
                           >
-                            {showPublishDiff ? "Hide Changes" : "Show What Changed"}
+                            View History
                           </button>
-                        </Hint>
-                        <button
-                          onClick={() => setShowPublishHistory(true)}
-                          className="dg-btn dg-btn-secondary"
-                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
-                        >
-                          View History
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (org) {
-                              void updateScheduleLastViewed(org.id);
-                              lastViewedRef.current = new Date().toISOString();
-                            }
-                            setPublishHistory([]);
-                            setShowPublishDiff(false);
-                          }}
-                          className="dg-btn dg-btn-secondary"
-                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
-                        >
-                          Mark as Seen
-                        </button>
-                      </>
-                    )}
+                          <button
+                            onClick={async () => {
+                              if (org) {
+                                void updateScheduleLastViewed(org.id);
+                                lastViewedRef.current =
+                                  new Date().toISOString();
+                              }
+                              setPublishHistory([]);
+                              setShowPublishDiff(false);
+                            }}
+                            className="dg-btn dg-btn-secondary"
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              padding: "5px 12px",
+                            }}
+                          >
+                            Mark as Seen
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
-            <div data-tour="schedule-toolbar" style={{ padding: "12px 16px 0", borderBottom: "1px solid var(--color-border)" }}>
+                );
+              })()}
+            <div
+              data-tour="schedule-toolbar"
+              style={{
+                padding: "12px 16px 0",
+                borderBottom: "1px solid var(--color-border)",
+              }}
+            >
               <Toolbar
                 weekStart={weekStart}
                 spanWeeks={spanWeeks}
@@ -2365,21 +3890,41 @@ function SchedulerContent() {
                 onSpanChange={handleSpanChange}
                 onFocusAreaChange={setActiveFocusArea}
                 onStaffSearchChange={setStaffSearch}
-                canEditShifts={canEditShifts && canApplyRecurringSchedule}
+                canApplyRecurringSchedule={
+                  canEditShifts && canApplyRecurringSchedule
+                }
                 onApplyRecurring={handleAutoFillPreview}
                 isApplyingRecurring={isApplyingRecurring}
-                onImportPrevious={spanWeeks !== "month" ? handleImportPreviousPreview : undefined}
+                canImportPrevious={canEditShifts}
+                onImportPrevious={
+                  spanWeeks !== "month"
+                    ? handleImportPreviousPreview
+                    : undefined
+                }
                 isImportingPrevious={isImportingPrevious}
                 onPrintOpen={() => setShowPrintOptions(true)}
-                onExportCSV={dates.length > 0 ? () => exportScheduleCSV(filteredEmployees, dates, shiftForKey) : undefined}
-                presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
+                onExportCSV={
+                  dates.length > 0
+                    ? () =>
+                        exportScheduleCSV(filteredEmployees, dates, shiftForKey)
+                    : undefined
+                }
+                presenceSlot={
+                  canEditShifts ? (
+                    <PresenceAvatars onlineUsers={onlineUsers} />
+                  ) : null
+                }
                 showAudit={showAudit}
-                onAuditToggle={canEditShifts && !isMobile ? () => setShowAudit(prev => !prev) : undefined}
+                onAuditToggle={
+                  canEditShifts && !isMobile
+                    ? () => setShowAudit((prev) => !prev)
+                    : undefined
+                }
                 requestsBadgeCount={shiftRequests.badgeCount}
-                onRequestsToggle={() => setShowRequestBoard(prev => !prev)}
+                onRequestsToggle={() => setShowRequestBoard((prev) => !prev)}
                 coverageGapCount={coverageGaps.length}
-                onCoverageToggle={() => setShowCoveragePanel(prev => !prev)}
-                hideTwoWeek={isSmallDesktop}
+                onCoverageToggle={() => setShowCoveragePanel((prev) => !prev)}
+                hideTwoWeek={shouldAutoUseOneWeek}
                 onPublishHistory={() => setShowPublishHistory(true)}
                 hasData={employees.length > 0}
               />
@@ -2387,7 +3932,6 @@ function SchedulerContent() {
           </div>
 
           <div style={{ padding: isMobile ? "8px 0" : "16px 16px" }}>
-
             {/* Mobile Day View */}
             {spanWeeks !== "month" && isMobile && (
               <MobileDayView
@@ -2405,7 +3949,9 @@ function SchedulerContent() {
                 indicatorTypes={indicatorTypes}
                 certifications={certifications}
                 orgRoles={orgRoles}
-                isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
+                isCellInteractive={
+                  canEditShifts || canEditNotes || !!currentEmpId
+                }
                 activeIndicatorIdsForKey={activeIndicatorIdsForKey}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
@@ -2417,565 +3963,707 @@ function SchedulerContent() {
 
             {/* Desktop/Tablet Grid */}
             {spanWeeks !== "month" && !isMobile && (
-          <div data-tour="schedule-grid">
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <ScheduleGrid
-              filteredEmployees={filteredEmployees}
-              allEmployees={employees}
-              week1={week1}
-              week2={week2}
-              spanWeeks={spanWeeks}
-              shiftForKey={shiftForKey}
-              shiftCodeIdsForKey={shiftCodeIdsForKey}
-              getShiftStyle={getShiftStyle}
-              handleCellClick={handleCellClick}
-              today={today}
-              highlightEmpIds={highlightEmpIds}
-              focusAreas={focusAreas}
-              departments={departments}
+              <div data-tour="schedule-grid">
+                <DndContext
+                  sensors={sensors}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  <ScheduleGrid
+                    filteredEmployees={filteredEmployees}
+                    allEmployees={employees}
+                    week1={week1}
+                    week2={week2}
+                    spanWeeks={spanWeeks}
+                    shiftForKey={shiftForKey}
+                    shiftCodeIdsForKey={shiftCodeIdsForKey}
+                    getShiftStyle={getShiftStyle}
+                    handleCellClick={handleCellClick}
+                    today={today}
+                    highlightEmpIds={highlightEmpIds}
+                    focusAreas={focusAreas}
+                    departments={departments}
+                    shiftCodes={shiftCodes}
+                    shiftCategories={shiftCategories}
+                    indicatorTypes={indicatorTypes}
+                    certifications={certifications}
+                    orgRoles={orgRoles}
+                    isCellInteractive={
+                      canEditShifts || canEditNotes || !!currentEmpId
+                    }
+                    canDragShifts={canEditShifts}
+                    activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                    activeFocusArea={activeFocusArea}
+                    getCustomShiftTimes={getCustomShiftTimes}
+                    draftKindForKey={draftKindForKey}
+                    showDiffOverlay={showDiffOverlay}
+                    publishedLabelForKey={publishedLabelForKey}
+                    publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+                    hasTimeChangesForKey={hasTimeChangesForKey}
+                    publishDiffForKey={publishDiffKindForKey}
+                    recentlyPublishedKeys={recentlyPublishedKeys}
+                    cellLocks={lockedCells}
+                    showAudit={showAudit}
+                    createdByNameForKey={createdByNameForKey}
+                    onCellHover={handleCellHover}
+                    onCellContextMenu={handleCellContextMenu}
+                    coverageRequirements={coverageRequirements}
+                    absenceTypeMap={absenceTypeObjectMap}
+                    absenceTypeIdForKey={absenceTypeIdForKey}
+                    shiftDisplayMode={org?.shiftDisplayMode}
+                    resolvePublisherName={(userId: string) =>
+                      auditNames.get(userId) ?? null
+                    }
+                    openShifts={openShifts}
+                    onClaimOpenShift={
+                      currentEmpId
+                        ? (openShift) => {
+                            // Check if user already has a conflicting shift at the same time
+                            const dateObj = new Date(
+                              openShift.date + "T00:00:00",
+                            );
+                            const myRanges = getShiftTimeRanges(
+                              currentEmpId,
+                              dateObj,
+                            );
+                            if (myRanges.length > 0) {
+                              // Resolve open shift time ranges
+                              const osRanges: { start: string; end: string }[] =
+                                [];
+                              if (
+                                openShift.customStartTime &&
+                                openShift.customEndTime
+                              ) {
+                                osRanges.push({
+                                  start: openShift.customStartTime,
+                                  end: openShift.customEndTime,
+                                });
+                              } else {
+                                for (const codeId of openShift.shiftCodeIds) {
+                                  const sc = shiftCodeById.get(codeId);
+                                  if (
+                                    sc?.defaultStartTime &&
+                                    sc?.defaultEndTime
+                                  ) {
+                                    osRanges.push({
+                                      start: sc.defaultStartTime,
+                                      end: sc.defaultEndTime,
+                                    });
+                                  } else if (sc?.categoryId != null) {
+                                    const cat = shiftCategories.find(
+                                      (c) => c.id === sc.categoryId,
+                                    );
+                                    if (cat?.startTime && cat?.endTime) {
+                                      osRanges.push({
+                                        start: cat.startTime,
+                                        end: cat.endTime,
+                                      });
+                                    }
+                                  }
+                                }
+                              }
+                              if (
+                                osRanges.length > 0 &&
+                                timesOverlap(myRanges, osRanges)
+                              ) {
+                                toast.error(
+                                  "You already have a shift at the same time",
+                                );
+                                return;
+                              }
+                            }
+                            setPendingClaimShift(openShift);
+                          }
+                        : undefined
+                    }
+                  />
+                  <DragOverlay dropAnimation={null}>
+                    {activeDrag && (
+                      <div
+                        style={{
+                          background: activeDrag.pillColor,
+                          color: activeDrag.pillText,
+                          border: `1px solid ${activeDrag.pillText}20`,
+                          borderRadius: 8,
+                          padding: "6px 16px",
+                          fontSize: "var(--dg-fs-title)",
+                          fontWeight: 800,
+                          boxShadow: "var(--shadow-drag)",
+                          cursor: "grabbing",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {activeDrag.label}
+                      </div>
+                    )}
+                  </DragOverlay>
+                </DndContext>
+              </div>
+            )}
+
+            {/* Context menu for copy/paste/requests */}
+            {(() => {
+              if (!contextMenu) return null;
+              const cmKey = `${contextMenu.empId}_${formatDateKey(contextMenu.date)}`;
+              const cmShiftEntry = shifts[cmKey];
+              const cmHasEntry = !!(
+                cmShiftEntry &&
+                (cmShiftEntry.shiftCodeIds.length > 0 ||
+                  cmShiftEntry.absenceTypeId != null) &&
+                !cmShiftEntry.isDelete
+              );
+              const cmCanRequestBase =
+                !cmShiftEntry?.absenceTypeId &&
+                canOpenOwnRequestPanel(contextMenu.empId, contextMenu.date);
+              const cmCanRequest =
+                cmCanRequestBase &&
+                !hasActiveRequestForShift(contextMenu.empId, contextMenu.date);
+              const cmHasActiveRequest = hasActiveRequestForShift(
+                contextMenu.empId,
+                contextMenu.date,
+              );
+              // Only show the menu when at least one action is usable
+              const hasEditActions =
+                canEditShifts && (cmHasEntry || !!clipboard);
+              const hasRequestActions = cmCanRequest && !cmHasActiveRequest;
+              if (!hasEditActions && !hasRequestActions) return null;
+              return (
+                <ShiftContextMenu
+                  anchorEl={contextMenu.anchorEl}
+                  hasShift={cmHasEntry}
+                  hasClipboard={!!clipboard}
+                  canEdit={canEditShifts}
+                  canRequest={cmCanRequest}
+                  hasActiveRequest={cmHasActiveRequest}
+                  onCopy={() =>
+                    handleCopyShift(contextMenu.empId, contextMenu.date)
+                  }
+                  onPaste={() =>
+                    handlePasteShift(contextMenu.empId, contextMenu.date)
+                  }
+                  onClear={() =>
+                    handleClearShift(contextMenu.empId, contextMenu.date)
+                  }
+                  onMakeAvailable={() => {
+                    shiftRequests.create(
+                      "pickup",
+                      contextMenu.empId,
+                      formatDateKey(contextMenu.date),
+                    );
+                  }}
+                  onProposeSwap={() => {
+                    const label =
+                      shiftForKey(contextMenu.empId, contextMenu.date) ?? "";
+                    const emp = employees.find(
+                      (e) => e.id === contextMenu.empId,
+                    );
+                    const empName = emp
+                      ? `${emp.firstName} ${emp.lastName}`
+                      : "";
+                    setSwapModalState({
+                      empId: contextMenu.empId,
+                      empName,
+                      shiftDate: formatDateKey(contextMenu.date),
+                      shiftLabel: label,
+                    });
+                  }}
+                  onCallOff={() => {
+                    const emp = employees.find(
+                      (e) => e.id === contextMenu.empId,
+                    );
+                    if (!emp) return;
+                    const cellKey = `${emp.id}_${formatDateKey(contextMenu.date)}`;
+                    const activity = getCellActivity(cellKey);
+                    const lock = getCellLock(cellKey);
+                    if (lock) {
+                      toast.info(`Being edited by ${lock.userName}`);
+                      return;
+                    }
+                    if (activity?.isSameUser) {
+                      toast.error(
+                        "This cell is already open in another tab for your account",
+                      );
+                      return;
+                    }
+                    lockCell(cellKey);
+                    const activeFaId =
+                      focusAreas.find(
+                        (fa) => fa.name === contextMenu.focusAreaName,
+                      )?.id ?? null;
+                    startEditSession({
+                      empId: emp.id,
+                      empName: getEmployeeDisplayName(emp),
+                      date: contextMenu.date,
+                      empFocusAreaIds: emp.focusAreaIds,
+                      empCertificationId: emp.certificationId,
+                      activeFocusAreaId: activeFaId,
+                      calloffMode: true,
+                    });
+                  }}
+                  onClose={() => setContextMenu(null)}
+                />
+              );
+            })()}
+
+            {/* Confirm dialog for context-menu shift removal */}
+            {pendingClearShift && (
+              <ConfirmDialog
+                title="Remove Entry?"
+                message={`Remove "${pendingClearShift.shiftLabel}" from ${pendingClearShift.empName} on ${formatDate(pendingClearShift.date)}?`}
+                confirmLabel="Remove"
+                variant="danger"
+                onConfirm={() => {
+                  setShift(
+                    pendingClearShift.empId,
+                    pendingClearShift.date,
+                    null,
+                  );
+                  setPendingClearShift(null);
+                }}
+                onCancel={() => setPendingClearShift(null)}
+              />
+            )}
+
+            {/* Confirm dialog for claiming / volunteering for an open shift */}
+            {pendingClaimShift && currentEmpId && (
+              <ConfirmDialog
+                title={
+                  pendingClaimShift.source === "calloff"
+                    ? "Claim This Shift?"
+                    : "Volunteer for This Shift?"
+                }
+                message={
+                  <>
+                    <strong>{pendingClaimShift.shiftCodeLabel}</strong> on{" "}
+                    <strong>{pendingClaimShift.date}</strong>
+                    {pendingClaimShift.calledOffBy && (
+                      <> (called off by {pendingClaimShift.calledOffBy})</>
+                    )}
+                    <br />
+                    This will be sent to your admin for approval.
+                  </>
+                }
+                confirmLabel={
+                  pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"
+                }
+                variant="info"
+                onConfirm={() => {
+                  const os = pendingClaimShift;
+                  setPendingClaimShift(null);
+                  if (os.source === "calloff" && os.requestId) {
+                    shiftRequests.claim(os.requestId, currentEmpId);
+                  } else if (os.source === "coverage_gap") {
+                    shiftRequests.volunteer(
+                      currentEmpId,
+                      os.date,
+                      os.shiftCodeIds,
+                      os.focusAreaId,
+                      os.customStartTime,
+                      os.customEndTime,
+                    );
+                  }
+                }}
+                onCancel={() => setPendingClaimShift(null)}
+              />
+            )}
+
+            {/* Confirm dialog for pasting over an existing shift */}
+            {pendingPasteOver && (
+              <ConfirmDialog
+                title="Replace Entry?"
+                message={`Replace "${pendingPasteOver.existingLabel}" with "${pendingPasteOver.pasteEntry.label}"?`}
+                confirmLabel="Replace"
+                variant="warning"
+                onConfirm={() => {
+                  setShift(
+                    pendingPasteOver.empId,
+                    pendingPasteOver.date,
+                    pendingPasteOver.pasteEntry,
+                  );
+                  setPendingPasteOver(null);
+                  toast.success("Entry pasted");
+                }}
+                onCancel={() => setPendingPasteOver(null)}
+              />
+            )}
+
+            {spanWeeks === "month" && (
+              <MonthView
+                monthStart={monthStart}
+                filteredEmployees={filteredEmployees}
+                shiftForKey={shiftForKey}
+                shiftCodeIdsForKey={shiftCodeIdsForKey}
+                isAbsenceForKey={isAbsenceForKey}
+                getShiftStyle={getShiftStyle}
+                today={today}
+                focusAreas={focusAreas}
+                shiftCodes={shiftCodes}
+                shiftCategories={shiftCategories}
+                activeFocusArea={activeFocusArea}
+                draftKindForKey={draftKindForKey}
+                shiftDisplayMode={org?.shiftDisplayMode}
+              />
+            )}
+          </div>
+
+          {editPanel && (
+            <ShiftEditPanel
+              key={`${editSessionCellKey ?? "panel"}_${editSessionDraft?.baseVersion ?? "new"}`}
+              modal={editPanel}
+              currentShift={panelCurrentShift}
+              currentShiftCodeIds={panelCurrentShiftCodeIds}
               shiftCodes={shiftCodes}
               shiftCategories={shiftCategories}
-              indicatorTypes={indicatorTypes}
+              focusAreas={focusAreas}
               certifications={certifications}
-              orgRoles={orgRoles}
-              isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
-              canDragShifts={canEditShifts}
-              activeIndicatorIdsForKey={activeIndicatorIdsForKey}
-              activeFocusArea={activeFocusArea}
-              getCustomShiftTimes={getCustomShiftTimes}
-              draftKindForKey={draftKindForKey}
-              showDiffOverlay={showDiffOverlay}
-              publishedLabelForKey={publishedLabelForKey}
-              publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
-              hasTimeChangesForKey={hasTimeChangesForKey}
-              publishDiffForKey={publishDiffKindForKey}
-              recentlyPublishedKeys={recentlyPublishedKeys}
-              cellLocks={lockedCells}
-              showAudit={showAudit}
-              createdByNameForKey={createdByNameForKey}
-              onCellHover={handleCellHover}
-              onCellContextMenu={handleCellContextMenu}
-              coverageRequirements={coverageRequirements}
-              absenceTypeMap={absenceTypeObjectMap}
-              absenceTypeIdForKey={absenceTypeIdForKey}
+              indicatorTypes={indicatorTypes}
+              onSelect={handleShiftSelect}
+              onConfirmDraft={handleConfirmEditPanel}
+              allowShiftEdits={canEditShifts}
+              canEditNotes={canEditNotes}
+              getActiveIndicatorIds={panelActiveIndicatorIds}
+              onNoteToggle={handleNoteToggle}
+              onClose={closeEditPanel}
+              seriesId={
+                panelShiftEntry?.seriesId ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.seriesId ??
+                null
+              }
+              onRepeatConfirm={
+                canEditShifts && canManageShiftSeries
+                  ? handleRepeatConfirm
+                  : undefined
+              }
+              empId={editPanel.empId}
+              customStartTime={panelCustomStartTime}
+              customEndTime={panelCustomEndTime}
+              onCustomTimeChange={
+                canEditShifts ? handleCustomTimeChange : undefined
+              }
+              publishedShiftCodeIds={
+                panelShiftEntry?.publishedShiftCodeIds ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.publishedShiftCodeIds ??
+                []
+              }
+              draftKind={panelDraftKind}
+              isStale={editSessionDraft?.isStale ?? false}
+              auditInfo={canEditShifts ? auditInfo : undefined}
+              overlapWarnings={overnightOverlapWarnings}
+              enforceConflicts={org?.enforceConflictPrevention ?? false}
+              isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
+              hasActiveRequest={hasActiveRequestForShift(
+                editPanel.empId,
+                editPanel.date,
+              )}
+              onMakeAvailable={
+                currentEmpId &&
+                editPanel.empId === currentEmpId &&
+                !isPublishedShiftStarted(editPanel.empId, editPanel.date) &&
+                isPublishedRequestableShift(editPanel.empId, editPanel.date)
+                  ? () => {
+                      shiftRequests.create(
+                        "pickup",
+                        editPanel.empId,
+                        formatDateKey(editPanel.date),
+                      );
+                      closeEditPanel();
+                    }
+                  : undefined
+              }
+              onProposeSwap={
+                currentEmpId &&
+                editPanel.empId === currentEmpId &&
+                !isPublishedShiftStarted(editPanel.empId, editPanel.date) &&
+                isPublishedRequestableShift(editPanel.empId, editPanel.date)
+                  ? () => {
+                      const label =
+                        shiftForKey(editPanel.empId, editPanel.date) ?? "";
+                      setSwapModalState({
+                        empId: editPanel.empId,
+                        empName: editPanel.empName,
+                        shiftDate: formatDateKey(editPanel.date),
+                        shiftLabel: label,
+                      });
+                      closeEditPanel();
+                    }
+                  : undefined
+              }
+              onCallOff={
+                currentEmpId &&
+                editPanel.empId === currentEmpId &&
+                !isPublishedShiftStarted(editPanel.empId, editPanel.date) &&
+                isPublishedRequestableShift(editPanel.empId, editPanel.date)
+                  ? (absenceType) => {
+                      shiftRequests.create(
+                        "calloff",
+                        editPanel.empId,
+                        formatDateKey(editPanel.date),
+                        undefined,
+                        undefined,
+                        absenceType.id,
+                      );
+                      closeEditPanel();
+                    }
+                  : undefined
+              }
               shiftDisplayMode={org?.shiftDisplayMode}
-              resolvePublisherName={(userId: string) => auditNames.get(userId) ?? null}
-              openShifts={openShifts}
-              onClaimOpenShift={currentEmpId ? (openShift) => {
-                // Check if user already has a conflicting shift at the same time
-                const dateObj = new Date(openShift.date + "T00:00:00");
+              absenceTypes={absenceTypes}
+              currentAbsenceTypeId={panelCurrentAbsenceTypeId}
+              onAbsenceSelect={canEditShifts ? handleAbsenceSelect : undefined}
+            />
+          )}
+
+          {/* ── Shift Request Board (slide-out panel) ── */}
+          {showRequestBoard && (
+            <ShiftRequestBoard
+              openPickups={shiftRequests.openPickups.filter((req) => {
+                if (!currentEmpId) return true;
+                const dateObj = new Date(req.requesterShiftDate + "T00:00:00");
                 const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
-                if (myRanges.length > 0) {
-                  // Resolve open shift time ranges
-                  const osRanges: { start: string; end: string }[] = [];
-                  if (openShift.customStartTime && openShift.customEndTime) {
-                    osRanges.push({ start: openShift.customStartTime, end: openShift.customEndTime });
-                  } else {
-                    for (const codeId of openShift.shiftCodeIds) {
-                      const sc = shiftCodeById.get(codeId);
-                      if (sc?.defaultStartTime && sc?.defaultEndTime) {
-                        osRanges.push({ start: sc.defaultStartTime, end: sc.defaultEndTime });
-                      } else if (sc?.categoryId != null) {
-                        const cat = shiftCategories.find(c => c.id === sc.categoryId);
-                        if (cat?.startTime && cat?.endTime) {
-                          osRanges.push({ start: cat.startTime, end: cat.endTime });
-                        }
+                if (myRanges.length === 0) return true;
+                const pickupRanges: TimeRange[] = [];
+                // Use request custom times as highest priority
+                if (
+                  req.requesterCustomStartTime &&
+                  req.requesterCustomEndTime
+                ) {
+                  pickupRanges.push({
+                    start: req.requesterCustomStartTime,
+                    end: req.requesterCustomEndTime,
+                  });
+                } else {
+                  for (const codeId of req.requesterShiftCodeIds) {
+                    const sc = shiftCodes.find((c) => c.id === codeId);
+                    if (sc?.defaultStartTime && sc?.defaultEndTime) {
+                      pickupRanges.push({
+                        start: sc.defaultStartTime,
+                        end: sc.defaultEndTime,
+                      });
+                    } else if (sc?.categoryId != null) {
+                      const cat = shiftCategories.find(
+                        (c) => c.id === sc.categoryId,
+                      );
+                      if (cat?.startTime && cat?.endTime) {
+                        pickupRanges.push({
+                          start: cat.startTime,
+                          end: cat.endTime,
+                        });
                       }
                     }
                   }
-                  if (osRanges.length > 0 && timesOverlap(myRanges, osRanges)) {
-                    toast.error("You already have a shift at the same time");
-                    return;
-                  }
                 }
-                setPendingClaimShift(openShift);
-              } : undefined}
-            />
-            <DragOverlay dropAnimation={null}>
-              {activeDrag && (
-                <div
-                  style={{
-                    background: activeDrag.pillColor,
-                    color: activeDrag.pillText,
-                    border: `1px solid ${activeDrag.pillText}20`,
-                    borderRadius: 8,
-                    padding: "6px 16px",
-                    fontSize: "var(--dg-fs-title)",
-                    fontWeight: 800,
-                    boxShadow: "var(--shadow-drag)",
-                    cursor: "grabbing",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {activeDrag.label}
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-          </div>
-        )}
-
-        {/* Context menu for copy/paste/requests */}
-        {(() => {
-          if (!contextMenu) return null;
-          const cmKey = `${contextMenu.empId}_${formatDateKey(contextMenu.date)}`;
-          const cmShiftEntry = shifts[cmKey];
-          const cmHasShift = !!(cmShiftEntry && cmShiftEntry.shiftCodeIds.length > 0 && !cmShiftEntry.isDelete);
-          const cmCanRequest = !!currentEmpId && contextMenu.empId === currentEmpId && !isShiftStarted(contextMenu.empId, contextMenu.date) && isRequestableShift(contextMenu.empId, contextMenu.date);
-          const cmHasActiveRequest = shiftRequests.requests.some(
-            r => r.requesterEmpId === contextMenu.empId
-              && r.requesterShiftDate === formatDateKey(contextMenu.date)
-              && (r.status === 'open' || r.status === 'pending_approval')
-          );
-          // Only show the menu when at least one action is usable
-          const hasEditActions = canEditShifts && (cmHasShift || !!clipboard);
-          const hasRequestActions = cmCanRequest && !cmHasActiveRequest;
-          if (!hasEditActions && !hasRequestActions) return null;
-          return (
-          <ShiftContextMenu
-            anchorEl={contextMenu.anchorEl}
-            hasShift={cmHasShift}
-            hasClipboard={!!clipboard}
-            canEdit={canEditShifts}
-            canRequest={cmCanRequest}
-            hasActiveRequest={cmHasActiveRequest}
-            onCopy={() => handleCopyShift(contextMenu.empId, contextMenu.date)}
-            onPaste={() => handlePasteShift(contextMenu.empId, contextMenu.date)}
-            onClear={() => handleClearShift(contextMenu.empId, contextMenu.date)}
-            onMakeAvailable={() => {
-              shiftRequests.create('pickup', contextMenu.empId, formatDateKey(contextMenu.date));
-            }}
-            onProposeSwap={() => {
-              const label = shiftForKey(contextMenu.empId, contextMenu.date) ?? '';
-              const emp = employees.find(e => e.id === contextMenu.empId);
-              const empName = emp ? `${emp.firstName} ${emp.lastName}` : '';
-              setSwapModalState({
-                empId: contextMenu.empId,
-                empName,
-                shiftDate: formatDateKey(contextMenu.date),
-                shiftLabel: label,
-              });
-            }}
-            onCallOff={() => {
-              const emp = employees.find(e => e.id === contextMenu.empId);
-              if (!emp) return;
-              const cellKey = `${emp.id}_${formatDateKey(contextMenu.date)}`;
-              lockCell(cellKey);
-              const activeFaId = focusAreas.find(fa => fa.name === contextMenu.focusAreaName)?.id ?? null;
-              setEditPanel({
-                empId: emp.id,
-                empName: getEmployeeDisplayName(emp),
-                date: contextMenu.date,
-                empFocusAreaIds: emp.focusAreaIds,
-                empCertificationId: emp.certificationId,
-                activeFocusAreaId: activeFaId,
-                calloffMode: true,
-              });
-            }}
-            onClose={() => setContextMenu(null)}
-          />
-          );
-        })()}
-
-        {/* Confirm dialog for context-menu shift removal */}
-        {pendingClearShift && (
-          <ConfirmDialog
-            title="Remove Shift?"
-            message={`Remove "${pendingClearShift.shiftLabel}" from ${pendingClearShift.empName} on ${formatDate(pendingClearShift.date)}?`}
-            confirmLabel="Remove"
-            variant="danger"
-            onConfirm={() => {
-              setShift(pendingClearShift.empId, pendingClearShift.date, "OFF", []);
-              setPendingClearShift(null);
-            }}
-            onCancel={() => setPendingClearShift(null)}
-          />
-        )}
-
-        {/* Confirm dialog for claiming / volunteering for an open shift */}
-        {pendingClaimShift && currentEmpId && (
-          <ConfirmDialog
-            title={pendingClaimShift.source === 'calloff' ? "Claim This Shift?" : "Volunteer for This Shift?"}
-            message={
-              <>
-                <strong>{pendingClaimShift.shiftCodeLabel}</strong> on{" "}
-                <strong>{pendingClaimShift.date}</strong>
-                {pendingClaimShift.calledOffBy && (
-                  <> (called off by {pendingClaimShift.calledOffBy})</>
-                )}
-                <br />
-                This will be sent to your admin for approval.
-              </>
-            }
-            confirmLabel={pendingClaimShift.source === 'calloff' ? "Claim" : "Volunteer"}
-            variant="info"
-            onConfirm={() => {
-              const os = pendingClaimShift;
-              setPendingClaimShift(null);
-              if (os.source === 'calloff' && os.requestId) {
-                shiftRequests.claim(os.requestId, currentEmpId);
-              } else if (os.source === 'coverage_gap') {
-                shiftRequests.volunteer(
-                  currentEmpId,
-                  os.date,
-                  os.shiftCodeIds,
-                  os.focusAreaId,
-                  os.customStartTime,
-                  os.customEndTime,
-                );
+                if (pickupRanges.length === 0) return true;
+                return !timesOverlap(myRanges, pickupRanges);
+              })}
+              myRequests={shiftRequests.myRequests}
+              pendingApproval={shiftRequests.pendingApproval}
+              loading={shiftRequests.loading}
+              currentEmpId={currentEmpId}
+              canApprove={canApproveShiftRequests}
+              onClaim={(id) =>
+                currentEmpId && shiftRequests.claim(id, currentEmpId)
               }
-            }}
-            onCancel={() => setPendingClaimShift(null)}
-          />
-        )}
+              onRespond={(id, accept) =>
+                currentEmpId && shiftRequests.respond(id, currentEmpId, accept)
+              }
+              onResolve={(id, approved, note) =>
+                shiftRequests.resolve(id, approved, note)
+              }
+              onCancel={(id) =>
+                currentEmpId && shiftRequests.cancel(id, currentEmpId)
+              }
+              onClose={() => setShowRequestBoard(false)}
+              absenceTypeMap={absenceTypeObjectMap}
+            />
+          )}
 
-        {/* Confirm dialog for pasting over an existing shift */}
-        {pendingPasteOver && (
-          <ConfirmDialog
-            title="Replace Shift?"
-            message={`Replace "${pendingPasteOver.existingLabel}" with "${pendingPasteOver.pasteLabel}"?`}
-            confirmLabel="Replace"
-            variant="warning"
-            onConfirm={() => {
-              setShift(pendingPasteOver.empId, pendingPasteOver.date, pendingPasteOver.pasteLabel, pendingPasteOver.pasteCodeIds);
-              setPendingPasteOver(null);
-              toast.success("Shift pasted");
-            }}
-            onCancel={() => setPendingPasteOver(null)}
-          />
-        )}
+          {/* ── Coverage Panel (slide-out) ── */}
+          {showCoveragePanel && (
+            <CoveragePanel
+              gaps={coverageGaps}
+              focusAreas={focusAreas}
+              shiftCategories={shiftCategories}
+              activeFocusArea={activeFocusArea}
+              onClose={() => setShowCoveragePanel(false)}
+            />
+          )}
 
-        {spanWeeks === "month" && (
-          <MonthView
-            monthStart={monthStart}
-            filteredEmployees={filteredEmployees}
-            shiftForKey={shiftForKey}
-            shiftCodeIdsForKey={shiftCodeIdsForKey}
-            isAbsenceForKey={isAbsenceForKey}
-            getShiftStyle={getShiftStyle}
-            today={today}
-            focusAreas={focusAreas}
+          {/* ── Shift Swap Modal ── */}
+          {swapModalState && (
+            <ShiftSwapModal
+              requesterEmpId={swapModalState.empId}
+              requesterName={swapModalState.empName}
+              shiftDate={swapModalState.shiftDate}
+              shiftLabel={swapModalState.shiftLabel}
+              employees={employees}
+              shiftForKey={shiftForKey}
+              isRequestableShift={isPublishedRequestableShift}
+              getShiftTimeRanges={getShiftTimeRanges}
+              onSubmit={(targetEmpId, targetShiftDate) => {
+                shiftRequests.create(
+                  "swap",
+                  swapModalState.empId,
+                  swapModalState.shiftDate,
+                  targetEmpId,
+                  targetShiftDate,
+                );
+                setSwapModalState(null);
+              }}
+              onClose={() => setSwapModalState(null)}
+            />
+          )}
+
+          <PrintLegend
             shiftCodes={shiftCodes}
-            shiftCategories={shiftCategories}
-            activeFocusArea={activeFocusArea}
-            draftKindForKey={draftKindForKey}
             shiftDisplayMode={org?.shiftDisplayMode}
           />
-        )}
 
-      </div>
-
-      {editPanel && (
-        <ShiftEditPanel
-          modal={editPanel}
-          currentShift={shiftForKey(editPanel.empId, editPanel.date)}
-          currentShiftCodeIds={shiftCodeIdsForKey(editPanel.empId, editPanel.date)}
-          shiftCodes={shiftCodes}
-          shiftCategories={shiftCategories}
-          focusAreas={focusAreas}
-          certifications={certifications}
-          indicatorTypes={indicatorTypes}
-          onSelect={handleShiftSelect}
-          allowShiftEdits={canEditShifts}
-          canEditNotes={canEditNotes}
-          getActiveIndicatorIds={(focusAreaId) => activeIndicatorIdsForKey(editPanel.empId, editPanel.date, focusAreaId)}
-          onNoteToggle={handleNoteToggle}
-          onClose={() => { unlockCell(); setEditPanel(null); }}
-          seriesId={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.seriesId}
-          onRepeatConfirm={canEditShifts && canManageShiftSeries ? handleRepeatConfirm : undefined}
-          empId={editPanel.empId}
-          customStartTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customStartTime}
-          customEndTime={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.customEndTime}
-          onCustomTimeChange={canEditShifts ? handleCustomTimeChange : undefined}
-          publishedShiftCodeIds={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedShiftCodeIds}
-          draftKind={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.draftKind}
-          auditInfo={canEditShifts ? auditInfo : undefined}
-          overlapWarnings={overnightOverlapWarnings}
-          enforceConflicts={org?.enforceConflictPrevention ?? false}
-          isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
-          hasActiveRequest={shiftRequests.requests.some(
-            r => r.requesterEmpId === editPanel.empId
-              && r.requesterShiftDate === formatDateKey(editPanel.date)
-              && (r.status === 'open' || r.status === 'pending_approval')
+          {showPrintOptions && (
+            <PrintOptionsModal
+              focusAreas={focusAreas}
+              currentSpanWeeks={spanWeeks}
+              onPrint={(config) => {
+                setShowPrintOptions(false);
+                setActivePrintConfig(config);
+              }}
+              onClose={() => setShowPrintOptions(false)}
+              focusAreaLabel={org?.focusAreaLabel}
+            />
           )}
-          onMakeAvailable={currentEmpId && editPanel.empId === currentEmpId && !isShiftStarted(editPanel.empId, editPanel.date) && isRequestableShift(editPanel.empId, editPanel.date) ? () => {
-            shiftRequests.create('pickup', editPanel.empId, formatDateKey(editPanel.date));
-            setEditPanel(null);
-            unlockCell();
-          } : undefined}
-          onProposeSwap={currentEmpId && editPanel.empId === currentEmpId && !isShiftStarted(editPanel.empId, editPanel.date) && isRequestableShift(editPanel.empId, editPanel.date) ? () => {
-            const label = shiftForKey(editPanel.empId, editPanel.date) ?? '';
-            setSwapModalState({
-              empId: editPanel.empId,
-              empName: editPanel.empName,
-              shiftDate: formatDateKey(editPanel.date),
-              shiftLabel: label,
-            });
-            setEditPanel(null);
-            unlockCell();
-          } : undefined}
-          onCallOff={currentEmpId && editPanel.empId === currentEmpId && !isShiftStarted(editPanel.empId, editPanel.date) && isRequestableShift(editPanel.empId, editPanel.date) ? (absenceType) => {
-            shiftRequests.create('calloff', editPanel.empId, formatDateKey(editPanel.date), undefined, undefined, absenceType.id);
-            setEditPanel(null);
-            unlockCell();
-          } : undefined}
-          shiftDisplayMode={org?.shiftDisplayMode}
-          absenceTypes={absenceTypes}
-          currentAbsenceTypeId={shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.absenceTypeId}
-          onAbsenceSelect={canEditShifts ? async (absenceType: AbsenceType) => {
-            const dateKey = formatDateKey(editPanel.date);
-            const key = `${editPanel.empId}_${dateKey}`;
-            const existing = shiftsRef.current[key];
-            const version = existing?.version;
-            try {
-              // Wait for any pending write on this key to complete before writing
-              await (pendingShiftWrites.current.get(key) ?? Promise.resolve());
-              await upsertShift(editPanel.empId, dateKey, [], org!.id, null, null, version, absenceType.id);
-              const absenceDisplayLabel = absenceTypeMap.get(absenceType.id) ?? absenceType.label;
-              setShifts((prev) => {
-                const cur = prev[key];
-                const updated = {
-                  ...cur,
-                  label: absenceDisplayLabel,
-                  shiftCodeIds: [] as number[],
-                  absenceTypeId: absenceType.id,
-                  // Clear custom times — not applicable to absence types
-                  customStartTime: null,
-                  customEndTime: null,
-                  // Use current state (not stale closure) for published fields
-                  publishedShiftCodeIds: cur?.publishedShiftCodeIds ?? [],
-                  publishedLabel: cur?.publishedLabel ?? '',
-                  publishedAbsenceTypeId: cur?.publishedAbsenceTypeId ?? null,
-                };
-                const dk = computeDraftKind(updated);
-                return { ...prev, [key]: { ...updated, isDraft: dk !== null, draftKind: dk } };
-              });
-              const cur = shiftsRef.current[key];
-              const broadcastEntry = {
-                label: absenceDisplayLabel,
-                shiftCodeIds: [] as number[],
-                absenceTypeId: absenceType.id,
-                customStartTime: null,
-                customEndTime: null,
-                publishedShiftCodeIds: cur?.publishedShiftCodeIds ?? [],
-                publishedLabel: cur?.publishedLabel ?? '',
-                publishedAbsenceTypeId: cur?.publishedAbsenceTypeId ?? null,
-              };
-              const bdk = computeDraftKind(broadcastEntry);
-              broadcastDraftChanged({ shifts: { [key]: { ...broadcastEntry, isDraft: bdk !== null, draftKind: bdk } } });
-            } catch (err) {
-              toast.error("Failed to save absence");
-              Sentry.captureException(err);
-            }
-          } : undefined}
-        />
-      )}
 
-      {/* ── Shift Request Board (slide-out panel) ── */}
-      {showRequestBoard && (
-        <ShiftRequestBoard
-          openPickups={shiftRequests.openPickups.filter(req => {
-            if (!currentEmpId) return true;
-            const dateObj = new Date(req.requesterShiftDate + "T00:00:00");
-            const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
-            if (myRanges.length === 0) return true;
-            const pickupRanges: TimeRange[] = [];
-            // Use request custom times as highest priority
-            if (req.requesterCustomStartTime && req.requesterCustomEndTime) {
-              pickupRanges.push({ start: req.requesterCustomStartTime, end: req.requesterCustomEndTime });
-            } else {
-              for (const codeId of req.requesterShiftCodeIds) {
-                const sc = shiftCodes.find(c => c.id === codeId);
-                if (sc?.defaultStartTime && sc?.defaultEndTime) {
-                  pickupRanges.push({ start: sc.defaultStartTime, end: sc.defaultEndTime });
-                } else if (sc?.categoryId != null) {
-                  const cat = shiftCategories.find(c => c.id === sc.categoryId);
-                  if (cat?.startTime && cat?.endTime) {
-                    pickupRanges.push({ start: cat.startTime, end: cat.endTime });
-                  }
-                }
+          {activePrintConfig && (
+            <PrintScheduleView
+              orgName={org?.name}
+              weekStart={spanWeeks === "month" ? monthStart : weekStart}
+              config={activePrintConfig}
+              employees={employees}
+              allEmployees={employees}
+              focusAreas={focusAreas}
+              shiftCodes={shiftCodes}
+              shiftCategories={shiftCategories}
+              certifications={certifications}
+              orgRoles={orgRoles}
+              shiftForKey={shiftForKey}
+              shiftCodeIdsForKey={shiftCodeIdsForKey}
+              getShiftStyle={getShiftStyle}
+              getCustomShiftTimes={getCustomShiftTimes}
+              onClose={() => setActivePrintConfig(null)}
+              focusAreaLabel={org?.focusAreaLabel}
+              shiftDisplayMode={org?.shiftDisplayMode}
+            />
+          )}
+
+          {showDiscardConfirm && (
+            <ConfirmDialog
+              title="Discard Changes?"
+              message="Your unpublished changes will be lost. This cannot be undone."
+              confirmLabel="Discard my edits"
+              variant="danger"
+              isLoading={cancelingMode === "mine"}
+              onConfirm={() => {
+                setShowDiscardConfirm(false);
+                handleCancelChanges();
+              }}
+              onCancel={() => setShowDiscardConfirm(false)}
+              secondaryConfirmLabel={
+                isSuperAdmin ? "Discard all edits" : undefined
               }
-            }
-            if (pickupRanges.length === 0) return true;
-            return !timesOverlap(myRanges, pickupRanges);
-          })}
-          myRequests={shiftRequests.myRequests}
-          pendingApproval={shiftRequests.pendingApproval}
-          loading={shiftRequests.loading}
-          currentEmpId={currentEmpId}
-          canApprove={canApproveShiftRequests}
-          onClaim={(id) => currentEmpId && shiftRequests.claim(id, currentEmpId)}
-          onRespond={(id, accept) => currentEmpId && shiftRequests.respond(id, currentEmpId, accept)}
-          onResolve={(id, approved, note) => shiftRequests.resolve(id, approved, note)}
-          onCancel={(id) => currentEmpId && shiftRequests.cancel(id, currentEmpId)}
-          onClose={() => setShowRequestBoard(false)}
-          absenceTypeMap={absenceTypeObjectMap}
-        />
-      )}
+              isSecondaryLoading={cancelingMode === "all"}
+              onSecondaryConfirm={
+                isSuperAdmin
+                  ? () => {
+                      setShowDiscardConfirm(false);
+                      handleCancelChanges(true);
+                    }
+                  : undefined
+              }
+            />
+          )}
 
-      {/* ── Coverage Panel (slide-out) ── */}
-      {showCoveragePanel && (
-        <CoveragePanel
-          gaps={coverageGaps}
-          focusAreas={focusAreas}
-          shiftCategories={shiftCategories}
-          activeFocusArea={activeFocusArea}
-          onClose={() => setShowCoveragePanel(false)}
-        />
-      )}
+          {showPublishConfirm && (
+            <ConfirmDialog
+              title="Publish Schedule?"
+              message={
+                coverageGaps.length > 0
+                  ? `${coverageGaps.length} coverage gap${coverageGaps.length === 1 ? "" : "s"} remain${coverageGaps.length === 1 ? "s" : ""} in this period. This will make all draft changes visible to everyone.`
+                  : "This will make all draft changes visible to everyone."
+              }
+              confirmLabel="Publish"
+              variant={coverageGaps.length > 0 ? "warning" : "info"}
+              isLoading={isPublishing}
+              onConfirm={() => {
+                setShowPublishConfirm(false);
+                handlePublish();
+              }}
+              onCancel={() => setShowPublishConfirm(false)}
+            />
+          )}
 
-      {/* ── Shift Swap Modal ── */}
-      {swapModalState && (
-        <ShiftSwapModal
-          requesterEmpId={swapModalState.empId}
-          requesterName={swapModalState.empName}
-          shiftDate={swapModalState.shiftDate}
-          shiftLabel={swapModalState.shiftLabel}
-          employees={employees}
-          shiftForKey={shiftForKey}
-          isRequestableShift={isRequestableShift}
-          getShiftTimeRanges={getShiftTimeRanges}
-          onSubmit={(targetEmpId, targetShiftDate) => {
-            shiftRequests.create('swap', swapModalState.empId, swapModalState.shiftDate, targetEmpId, targetShiftDate);
-            setSwapModalState(null);
-          }}
-          onClose={() => setSwapModalState(null)}
-        />
-      )}
+          {showAutoFillConfirm && autoFillPreview && (
+            <ConfirmDialog
+              title="Auto Fill Shifts?"
+              message={`This will fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} using recurring shift templates. Existing shifts will not be overwritten.`}
+              confirmLabel="Fill Shifts"
+              variant="info"
+              isLoading={isApplyingRecurring}
+              onConfirm={handleApplyRecurring}
+              onCancel={() => {
+                setShowAutoFillConfirm(false);
+                setAutoFillPreview(null);
+              }}
+            />
+          )}
 
-      <PrintLegend shiftCodes={shiftCodes} shiftDisplayMode={org?.shiftDisplayMode} />
+          {pendingSeriesDelete && (
+            <ConfirmDialog
+              title="Delete Shift Series?"
+              message={`This will mark ${pendingSeriesDelete.shiftCount} shift${pendingSeriesDelete.shiftCount === 1 ? "" : "s"} for deletion. They will be permanently removed when you publish.`}
+              confirmLabel="Delete Series"
+              variant="danger"
+              onConfirm={handleConfirmSeriesDelete}
+              onCancel={() => {
+                setPendingSeriesDelete(null);
+                closeEditPanel();
+              }}
+            />
+          )}
 
-      {showPrintOptions && (
-        <PrintOptionsModal
-          focusAreas={focusAreas}
-          currentSpanWeeks={spanWeeks}
-          onPrint={(config) => {
-            setShowPrintOptions(false);
-            setActivePrintConfig(config);
-          }}
-          onClose={() => setShowPrintOptions(false)}
-          focusAreaLabel={org?.focusAreaLabel}
-        />
-      )}
-
-      {activePrintConfig && (
-        <PrintScheduleView
-          orgName={org?.name}
-          weekStart={spanWeeks === "month" ? monthStart : weekStart}
-          config={activePrintConfig}
-          employees={employees}
-          allEmployees={employees}
-          focusAreas={focusAreas}
-          shiftCodes={shiftCodes}
-          shiftCategories={shiftCategories}
-          certifications={certifications}
-          orgRoles={orgRoles}
-          shiftForKey={shiftForKey}
-          shiftCodeIdsForKey={shiftCodeIdsForKey}
-          getShiftStyle={getShiftStyle}
-          getCustomShiftTimes={getCustomShiftTimes}
-          onClose={() => setActivePrintConfig(null)}
-          focusAreaLabel={org?.focusAreaLabel}
-          shiftDisplayMode={org?.shiftDisplayMode}
-        />
-      )}
-
-      {showDiscardConfirm && (
-        <ConfirmDialog
-          title="Discard Changes?"
-          message="Your unpublished changes will be lost. This cannot be undone."
-          confirmLabel="Discard my edits"
-          variant="danger"
-          isLoading={cancelingMode === 'mine'}
-          onConfirm={() => {
-            setShowDiscardConfirm(false);
-            handleCancelChanges();
-          }}
-          onCancel={() => setShowDiscardConfirm(false)}
-          secondaryConfirmLabel={isSuperAdmin ? "Discard all edits" : undefined}
-          isSecondaryLoading={cancelingMode === 'all'}
-          onSecondaryConfirm={isSuperAdmin ? () => {
-            setShowDiscardConfirm(false);
-            handleCancelChanges(true);
-          } : undefined}
-        />
-      )}
-
-      {showPublishConfirm && (
-        <ConfirmDialog
-          title="Publish Schedule?"
-          message={
-            coverageGaps.length > 0
-              ? `${coverageGaps.length} coverage gap${coverageGaps.length === 1 ? '' : 's'} remain${coverageGaps.length === 1 ? 's' : ''} in this period. This will make all draft changes visible to everyone.`
-              : "This will make all draft changes visible to everyone."
-          }
-          confirmLabel="Publish"
-          variant={coverageGaps.length > 0 ? "warning" : "info"}
-          isLoading={isPublishing}
-          onConfirm={() => {
-            setShowPublishConfirm(false);
-            handlePublish();
-          }}
-          onCancel={() => setShowPublishConfirm(false)}
-        />
-      )}
-
-      {showAutoFillConfirm && autoFillPreview && (
-        <ConfirmDialog
-          title="Auto Fill Shifts?"
-          message={`This will fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? '' : 's'} for ${autoFillPreview.dateRange} using recurring shift templates. Existing shifts will not be overwritten.`}
-          confirmLabel="Fill Shifts"
-          variant="info"
-          isLoading={isApplyingRecurring}
-          onConfirm={handleApplyRecurring}
-          onCancel={() => { setShowAutoFillConfirm(false); setAutoFillPreview(null); }}
-        />
-      )}
-
-      {pendingSeriesDelete && (
-        <ConfirmDialog
-          title="Delete Shift Series?"
-          message={`This will mark ${pendingSeriesDelete.shiftCount} shift${pendingSeriesDelete.shiftCount === 1 ? '' : 's'} for deletion. They will be permanently removed when you publish.`}
-          confirmLabel="Delete Series"
-          variant="danger"
-          onConfirm={handleConfirmSeriesDelete}
-          onCancel={() => { setPendingSeriesDelete(null); unlockCell(); setEditPanel(null); }}
-        />
-      )}
-
-      {showImportConfirm && importPreview && (
-        <ConfirmDialog
-          title="Import Previous Schedule?"
-          message={`This will copy ${importPreview.count} shift${importPreview.count !== 1 ? 's' : ''} from ${importPreview.sourceRange} into ${importPreview.targetRange}. Only empty slots will be filled — existing shifts will not be overwritten.`}
-          confirmLabel="Import Shifts"
-          variant="info"
-          isLoading={isImportingPrevious}
-          onConfirm={handleImportPrevious}
-          onCancel={() => { setShowImportConfirm(false); setImportPreview(null); }}
-        />
-      )}
-        {showPublishHistory && org && (
-          <PublishHistoryPanel
-            orgId={org.id}
-            open={showPublishHistory}
-            onClose={() => setShowPublishHistory(false)}
-            onSelectEntry={(entry) => {
-              // Navigate grid to the publish's date range
-              const publishStart = new Date(entry.startDate + "T00:00:00");
-              setWeekStart(getWeekStart(publishStart));
-              setPublishHistory([entry]);
-              setShowPublishDiff(true);
-              setShowPublishHistory(false);
-            }}
-            shiftCodeMap={shiftCodeMap}
-            employees={employees}
-            absenceTypeMap={absenceTypeMap}
-          />
-        )}
+          {showImportConfirm && importPreview && (
+            <ConfirmDialog
+              title="Import Previous Schedule?"
+              message={`This will copy ${importPreview.count} shift${importPreview.count !== 1 ? "s" : ""} from ${importPreview.sourceRange} into ${importPreview.targetRange}. Only empty slots will be filled — existing shifts will not be overwritten.`}
+              confirmLabel="Import Shifts"
+              variant="info"
+              isLoading={isImportingPrevious}
+              onConfirm={handleImportPrevious}
+              onCancel={() => {
+                setShowImportConfirm(false);
+                setImportPreview(null);
+              }}
+            />
+          )}
+          {showPublishHistory && org && (
+            <PublishHistoryPanel
+              orgId={org.id}
+              open={showPublishHistory}
+              onClose={() => setShowPublishHistory(false)}
+              onSelectEntry={(entry) => {
+                // Navigate grid to the publish's date range
+                const publishStart = new Date(entry.startDate + "T00:00:00");
+                setWeekStart(getWeekStart(publishStart));
+                setPublishHistory([entry]);
+                setShowPublishDiff(true);
+                setShowPublishHistory(false);
+              }}
+              shiftCodeMap={shiftCodeMap}
+              employees={employees}
+              absenceTypeMap={absenceTypeMap}
+            />
+          )}
         </>
       )}
-
-      {activeTour && <TooltipTourRunner config={activeTour} />}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { IndicatorType } from "@/types";
 import { upsertIndicatorType, deleteIndicatorType } from "@/lib/db";
 import { toast } from "sonner";
@@ -27,6 +27,13 @@ export default function Indicators({
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const nextTmpId = useRef(-1);
+  const originalRef = useRef<Map<number, IndicatorType>>(
+    new Map(indicatorTypes.map((indicator) => [indicator.id, indicator])),
+  );
+
+  useEffect(() => {
+    originalRef.current = new Map(indicatorTypes.map((indicator) => [indicator.id, indicator]));
+  }, [indicatorTypes]);
 
   const handleAdd = () => {
     const tmp: IndicatorType & { isNew: boolean } = {
@@ -51,6 +58,7 @@ export default function Indicators({
         color: indicator.color,
         sortOrder: indicator.sortOrder,
       });
+      originalRef.current.set(saved.id, saved);
       const updated = local.map((i) => (i.id === indicator.id ? saved : i));
       setLocal(updated);
       onChange(updated);
@@ -110,6 +118,12 @@ export default function Indicators({
       {local.map((indicator) => {
         const isSavingThis = saving === indicator.id;
         const isDeletingThis = deleting === indicator.id;
+        const original = originalRef.current.get(indicator.id);
+        const isDirty =
+          indicator.isNew ||
+          !original ||
+          indicator.name.trim() !== original.name ||
+          indicator.color !== original.color;
         return (
           <div
             key={indicator.id}
@@ -158,7 +172,7 @@ export default function Indicators({
             {canManageIndicatorTypes && (
               <button
                 onClick={() => handleSave(indicator)}
-                disabled={isSavingThis || !indicator.name.trim()}
+                disabled={isSavingThis || !indicator.name.trim() || !isDirty}
                 className="dg-btn dg-btn-primary dg-btn-sm"
               >
                 {isSavingThis ? "…" : "Save"}

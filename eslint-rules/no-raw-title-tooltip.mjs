@@ -37,6 +37,10 @@ export const noHtmlTitleAttribute = {
         const elName =
           openingEl.name?.name ?? openingEl.name?.property?.name ?? "";
 
+        // Only flag intrinsic/lowercase elements. Component `title` props are
+        // often structural labels, not browser hover tooltips.
+        if (!elName || elName[0] !== elName[0].toLowerCase()) return;
+
         // Allow known safe components (Modal title prop, SVG <title>, etc.)
         if (SAFE_TITLE_COMPONENTS.has(elName)) return;
 

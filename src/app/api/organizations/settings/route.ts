@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { getServiceClient } from "@/lib/supabase-service";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -21,23 +21,6 @@ const bodySchema = z.object({
   enforceConflictPrevention: z.boolean().optional(),
 });
 
-function getUserClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Route handler — cookies are read-only
-        },
-      },
-    },
-  );
-}
-
 /**
  * PUT /api/organizations/settings
  * Server-side organization settings update with permission validation.
@@ -48,14 +31,12 @@ export async function PUT(req: NextRequest) {
   if (csrfError) return csrfError;
 
   // ── Auth check ────────────────────────────────────────────────────
-  const userClient = getUserClient(req);
-  const { data: { session } } = await userClient.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-  }
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   // ── Rate limit by user ID ─────────────────────────────────────────
-  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, session.user.id);
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
@@ -88,13 +69,13 @@ export async function PUT(req: NextRequest) {
       serviceClient
         .from("organization_memberships")
         .select("org_role, admin_permissions")
-        .eq("user_id", session.user.id)
+        .eq("user_id", user.id)
         .eq("org_id", orgId)
         .maybeSingle(),
       serviceClient
         .from("profiles")
         .select("platform_role")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .single(),
     ]);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { fetchUserSessions, revokeUserSession } from "@/lib/db";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -43,14 +43,14 @@ export function SessionList() {
 
   const loadSessions = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const user = await getVerifiedBrowserUser();
+      if (!user) return;
 
       const rows = await fetchUserSessions() as Array<{ id: string; deviceLabel: string | null; ipAddress: string | null; lastActiveAt: string; refreshTokenHash: string }>;
 
       // Match current session using the stable per-browser session ID (same as AuthProvider)
       let currentHash = "";
-      const storageKey = `dg_session_id:${session.user.id}`;
+      const storageKey = `dg_session_id:${user.id}`;
       const sessionId = localStorage.getItem(storageKey);
       if (sessionId) {
         const encoder = new TextEncoder();

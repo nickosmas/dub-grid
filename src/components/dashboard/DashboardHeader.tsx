@@ -5,8 +5,18 @@ import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -51,7 +61,6 @@ interface DashboardHeaderProps {
   periodStart: Date;
   periodEnd: Date;
   viewMode: ViewMode;
-  orgName: string;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -62,24 +71,35 @@ export default function DashboardHeader({
   periodStart,
   periodEnd,
   viewMode,
-  orgName,
   onPrev,
   onNext,
   onToday,
   onViewModeChange,
 }: DashboardHeaderProps) {
   const isMobile = useMediaQuery(MOBILE);
-  const todayLabel = viewMode === "day" ? "Today" : viewMode === "week" ? "This week" : "Current";
+  const todayLabel =
+    viewMode === "day"
+      ? "Today"
+      : viewMode === "week"
+        ? "This week"
+        : "Current period";
 
   const dateLabel = formatDateRange(periodStart, periodEnd, viewMode);
 
   /* ── Mobile ─────────────────────────────────────────────── */
   if (isMobile) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          paddingBottom: 8,
+        }}
+      >
         {/* Row 1: Period navigation */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Hint content={hint("Go to previous period")}>
+          <Hint content={hint("Go to previous period")} side="bottom">
             <button
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
@@ -111,11 +131,8 @@ export default function DashboardHeader({
             >
               {dateLabel}
             </span>
-            <div style={{ fontSize: "var(--dg-fs-footnote, 10px)", color: "var(--color-text-subtle)", marginTop: 1 }}>
-              {orgName}
-            </div>
           </div>
-          <Hint content={hint("Go to next period")}>
+          <Hint content={hint("Go to next period")} side="bottom">
             <button
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
@@ -153,7 +170,10 @@ export default function DashboardHeader({
         </div>
 
         {/* Row 2: View mode tabs */}
-        <div className="dg-span-tabs dg-span-tabs--light" style={{ alignSelf: "flex-start" }}>
+        <div
+          className="dg-span-tabs dg-span-tabs--light"
+          style={{ alignSelf: "flex-start" }}
+        >
           {VIEW_MODES.map((m, i) => {
             const isActive = viewMode === m.value;
             const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;
@@ -161,7 +181,17 @@ export default function DashboardHeader({
             return (
               <Fragment key={m.value}>
                 {i > 0 && (
-                  <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                  <div
+                    style={{
+                      width: 1,
+                      height: 16,
+                      background: showDivider
+                        ? "var(--color-border)"
+                        : "transparent",
+                      flexShrink: 0,
+                      alignSelf: "center",
+                    }}
+                  />
                 )}
                 <button
                   onClick={() => onViewModeChange(m.value)}
@@ -189,10 +219,13 @@ export default function DashboardHeader({
         paddingBottom: 12,
       }}
     >
-      {/* NAV ZONE: Chevrons + date label + Today */}
-      <div data-tour="dashboard-period-nav" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {/* LEFT ZONE: time navigation + mode selector */}
+      <div
+        data-tour="dashboard-period-nav"
+        style={{ display: "flex", alignItems: "center", gap: 8 }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Hint content={hint("Go to previous period")}>
+          <Hint content={hint("Go to previous period")} side="bottom">
             <button
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
@@ -208,12 +241,27 @@ export default function DashboardHeader({
               }}
               aria-label="Go to previous period"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
           </Hint>
-          <div style={{ textAlign: "center", userSelect: "none", minWidth: 140 }}>
+          <div
+            style={{
+              textAlign: "center",
+              userSelect: "none",
+              minWidth: 120,
+            }}
+          >
             <span
               style={{
                 fontSize: "var(--dg-fs-label)",
@@ -225,7 +273,7 @@ export default function DashboardHeader({
               {dateLabel}
             </span>
           </div>
-          <Hint content={hint("Go to next period")}>
+          <Hint content={hint("Go to next period")} side="bottom">
             <button
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
@@ -241,7 +289,16 @@ export default function DashboardHeader({
               }}
               aria-label="Go to next period"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
@@ -264,7 +321,10 @@ export default function DashboardHeader({
         </button>
 
         {/* View mode selector */}
-        <div data-tour="dashboard-view-mode" className="dg-span-tabs dg-span-tabs--light">
+        <div
+          data-tour="dashboard-view-mode"
+          className="dg-span-tabs dg-span-tabs--light"
+        >
           {VIEW_MODES.map((m, i) => {
             const isActive = viewMode === m.value;
             const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;
@@ -272,7 +332,17 @@ export default function DashboardHeader({
             return (
               <Fragment key={m.value}>
                 {i > 0 && (
-                  <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                  <div
+                    style={{
+                      width: 1,
+                      height: 16,
+                      background: showDivider
+                        ? "var(--color-border)"
+                        : "transparent",
+                      flexShrink: 0,
+                      alignSelf: "center",
+                    }}
+                  />
                 )}
                 <button
                   onClick={() => onViewModeChange(m.value)}
@@ -286,12 +356,6 @@ export default function DashboardHeader({
         </div>
       </div>
 
-      {/* RIGHT ZONE: org name */}
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
-        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>
-          {orgName}
-        </span>
-      </div>
     </div>
   );
 }

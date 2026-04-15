@@ -98,27 +98,48 @@ export async function fetchOrgDirectory(orgId: string): Promise<DirectoryPerson[
       p_org_id: orgId,
     });
     if (error) throw error;
-    return (data ?? []).map((row: Record<string, unknown>) => ({
-      personId: row.person_id as string,
-      source: row.source as 'employee' | 'user_only' | 'pending_invite',
-      employeeId: (row.employee_id as string | null) ?? null,
-      userId: (row.user_id as string | null) ?? null,
-      firstName: (row.first_name as string) ?? "",
-      lastName: (row.last_name as string) ?? "",
-      email: (row.email as string) ?? "",
-      phone: (row.phone as string) ?? "",
-      employeeStatus: (row.employee_status as EmployeeStatus | null) ?? null,
-      orgRole: (row.org_role as OrganizationRole | null) ?? null,
-      hasAppAccess: (row.has_app_access as boolean) ?? false,
-      focusAreaIds: ((row.focus_area_ids as number[]) ?? []),
-      certificationId: (row.certification_id as number | null) ?? null,
-      roleIds: ((row.role_ids as number[]) ?? []),
-      seniority: (row.seniority as number | null) ?? null,
-      lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
-      invitationStatus: (row.invitation_status as 'pending' | 'expired' | null) ?? null,
-      departmentIds: ((row.department_ids as number[]) ?? []),
-      deptAdminIds: ((row.dept_admin_ids as number[]) ?? []),
-    }));
+    return (data ?? []).map((row: Record<string, unknown>) => {
+      const scheduledDepartmentIds = (row.scheduled_department_ids as number[] | undefined)
+        ?? (row.employee_department_ids as number[] | undefined)
+        ?? [];
+      const scheduledDeptAdminIds = (row.scheduled_dept_admin_ids as number[] | undefined)
+        ?? (row.employee_dept_admin_ids as number[] | undefined)
+        ?? [];
+      const managementDepartmentIds = (row.management_department_ids as number[] | undefined)
+        ?? (row.department_ids as number[] | undefined)
+        ?? [];
+      const managementDeptAdminIds = (row.management_dept_admin_ids as number[] | undefined)
+        ?? (row.dept_admin_ids as number[] | undefined)
+        ?? [];
+      const hasAppAccess = (row.has_app_access as boolean) ?? false;
+
+      return {
+        personId: row.person_id as string,
+        source: row.source as 'employee' | 'user_only' | 'pending_invite',
+        employeeId: (row.employee_id as string | null) ?? null,
+        userId: (row.user_id as string | null) ?? null,
+        firstName: (row.first_name as string) ?? "",
+        lastName: (row.last_name as string) ?? "",
+        email: (row.email as string) ?? "",
+        phone: (row.phone as string) ?? "",
+        employeeStatus: (row.employee_status as EmployeeStatus | null) ?? null,
+        orgRole: (row.org_role as OrganizationRole | null) ?? null,
+        hasAppAccess,
+        focusAreaIds: ((row.focus_area_ids as number[]) ?? []),
+        certificationId: (row.certification_id as number | null) ?? null,
+        roleIds: ((row.role_ids as number[]) ?? []),
+        seniority: (row.seniority as number | null) ?? null,
+        lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+        invitationStatus: (row.invitation_status as 'pending' | 'expired' | null) ?? null,
+        scheduledDepartmentIds,
+        scheduledDeptAdminIds,
+        managementDepartmentIds,
+        managementDeptAdminIds,
+        departmentIds: managementDepartmentIds,
+        deptAdminIds: managementDeptAdminIds,
+        isManagementUser: hasAppAccess && managementDepartmentIds.length > 0,
+      };
+    });
   });
 }
 
@@ -162,12 +183,22 @@ export async function updateAppOnlyUser(
 export async function updatePendingInvitation(
   invitationId: string,
   orgId: string,
-  data: { firstName?: string; lastName?: string; phone?: string; departmentIds?: number[]; deptAdminIds?: number[] },
+  data: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+    roleToAssign?: OrganizationRole;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
 ): Promise<void> {
   const update: Record<string, unknown> = {};
   if (data.firstName !== undefined) update.first_name = data.firstName;
   if (data.lastName !== undefined) update.last_name = data.lastName;
   if (data.phone !== undefined) update.phone = data.phone;
+  if (data.email !== undefined) update.email = data.email.toLowerCase();
+  if (data.roleToAssign !== undefined) update.role_to_assign = data.roleToAssign;
   if (data.departmentIds !== undefined) {
     update.department_ids = data.departmentIds;
     // Auto-prune dept_admin_ids to remain a subset of department_ids

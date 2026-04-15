@@ -863,6 +863,7 @@ BEGIN
       draft_custom_start_time = NULL,
       draft_custom_end_time = NULL,
       draft_is_delete = FALSE,
+      version = version + 1,
       updated_at = NOW(),
       updated_by = auth.uid()
   WHERE org_id = p_org_id
@@ -965,6 +966,8 @@ CREATE OR REPLACE FUNCTION public.move_shift(
   p_target_emp_id     UUID,
   p_target_date       DATE,
   p_shift_code_ids    BIGINT[],
+  p_absence_type_id   BIGINT DEFAULT NULL,
+  p_drag_mode         TEXT DEFAULT 'move',
   p_expected_version  BIGINT DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
@@ -985,6 +988,10 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
+  IF p_drag_mode NOT IN ('move', 'copy') THEN
+    RAISE EXCEPTION 'Invalid drag mode: %', p_drag_mode;
+  END IF;
+
   -- Reject no-op self-move
   IF p_source_emp_id = p_target_emp_id AND p_source_date = p_target_date THEN
     RETURN jsonb_build_object('status', 'ok');
@@ -994,7 +1001,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.employees e
     WHERE e.id = p_target_emp_id AND e.org_id = p_org_id
-      AND e.status IN ('active', 'benched') AND e.archived_at IS NULL
+      AND e.status = 'active' AND e.archived_at IS NULL
   ) THEN
     RAISE EXCEPTION 'Target employee not found, archived, or inactive';
   END IF;
@@ -1019,10 +1026,8 @@ BEGIN
     RAISE EXCEPTION 'Source shift not found';
   END IF;
 
-  -- Reject moving absence-type shifts (off days) — they are non-transferable
-  IF v_source_shift.draft_absence_type_id IS NOT NULL
-     OR v_source_shift.published_absence_type_id IS NOT NULL THEN
-    RAISE EXCEPTION 'Cannot move absence-type shifts (off days)';
+  IF p_absence_type_id IS NOT NULL AND array_length(COALESCE(p_shift_code_ids, '{}'::BIGINT[]), 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'Cannot move both shift codes and an absence type';
   END IF;
 
   -- Optimistic lock check
@@ -1033,18 +1038,33 @@ BEGIN
 
   -- Create at target (upsert) — custom times go to draft columns
   INSERT INTO public.shifts (
-    emp_id, date, org_id, draft_shift_code_ids, draft_is_delete,
+    emp_id, date, org_id, draft_shift_code_ids, draft_absence_type_id, draft_is_delete,
     draft_custom_start_time, draft_custom_end_time, focus_area_id,
     created_by, updated_by
   ) VALUES (
-    p_target_emp_id, p_target_date, p_org_id, p_shift_code_ids, false,
-    COALESCE(v_source_shift.draft_custom_start_time, v_source_shift.published_custom_start_time),
-    COALESCE(v_source_shift.draft_custom_end_time, v_source_shift.published_custom_end_time),
+    p_target_emp_id,
+    p_target_date,
+    p_org_id,
+    CASE
+      WHEN p_absence_type_id IS NOT NULL THEN '{}'::BIGINT[]
+      ELSE COALESCE(p_shift_code_ids, '{}'::BIGINT[])
+    END,
+    p_absence_type_id,
+    false,
+    CASE
+      WHEN p_absence_type_id IS NOT NULL THEN NULL
+      ELSE COALESCE(v_source_shift.draft_custom_start_time, v_source_shift.published_custom_start_time)
+    END,
+    CASE
+      WHEN p_absence_type_id IS NOT NULL THEN NULL
+      ELSE COALESCE(v_source_shift.draft_custom_end_time, v_source_shift.published_custom_end_time)
+    END,
     v_source_shift.focus_area_id,
     auth.uid(), auth.uid()
   )
   ON CONFLICT (emp_id, date) DO UPDATE SET
     draft_shift_code_ids     = EXCLUDED.draft_shift_code_ids,
+    draft_absence_type_id    = EXCLUDED.draft_absence_type_id,
     draft_is_delete          = false,
     draft_custom_start_time  = EXCLUDED.draft_custom_start_time,
     draft_custom_end_time    = EXCLUDED.draft_custom_end_time,
@@ -1052,25 +1072,130 @@ BEGIN
     updated_by               = auth.uid(),
     version                  = shifts.version + 1;
 
-  -- Delete source: soft-delete if published, hard-delete if draft-only
-  IF (v_source_shift.published_shift_code_ids IS NOT NULL
-      AND array_length(v_source_shift.published_shift_code_ids, 1) > 0)
-     OR v_source_shift.published_absence_type_id IS NOT NULL THEN
-    UPDATE public.shifts
-    SET draft_shift_code_ids = '{}', draft_absence_type_id = NULL,
-        draft_is_delete = true,
-        updated_by = auth.uid(), version = version + 1
-    WHERE emp_id = p_source_emp_id AND date = p_source_date;
-  ELSE
-    DELETE FROM public.shifts
-    WHERE emp_id = p_source_emp_id AND date = p_source_date;
+  -- Delete source only for real moves. Copies leave the origin untouched.
+  IF p_drag_mode = 'move' THEN
+    IF (v_source_shift.published_shift_code_ids IS NOT NULL
+        AND array_length(v_source_shift.published_shift_code_ids, 1) > 0)
+       OR v_source_shift.published_absence_type_id IS NOT NULL THEN
+      UPDATE public.shifts
+      SET draft_shift_code_ids = '{}', draft_absence_type_id = NULL,
+          draft_is_delete = true,
+          updated_by = auth.uid(), version = version + 1
+      WHERE emp_id = p_source_emp_id AND date = p_source_date;
+    ELSE
+      DELETE FROM public.shifts
+      WHERE emp_id = p_source_emp_id AND date = p_source_date;
+    END IF;
   END IF;
 
   RETURN jsonb_build_object('status', 'ok');
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.move_shift(UUID, UUID, DATE, UUID, DATE, BIGINT[], BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.move_shift(UUID, UUID, DATE, UUID, DATE, BIGINT[], BIGINT, TEXT, BIGINT) TO authenticated;
+
+
+-- ── series shift bulk editors ───────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.update_series_all_shifts(
+  p_series_id UUID,
+  p_new_shift_code_id BIGINT,
+  p_org_id UUID,
+  p_new_absence_type_id BIGINT DEFAULT NULL
+) RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NOT public.check_admin_permission('canEditShifts') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
+  END IF;
+
+  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+    RAISE EXCEPTION 'Unauthorized: org mismatch';
+  END IF;
+
+  IF p_new_shift_code_id IS NULL AND p_new_absence_type_id IS NULL THEN
+    RAISE EXCEPTION 'A series update must provide either a shift code or an absence type';
+  END IF;
+
+  UPDATE public.shifts
+  SET draft_shift_code_ids = CASE
+        WHEN p_new_absence_type_id IS NOT NULL THEN '{}'::BIGINT[]
+        ELSE ARRAY[p_new_shift_code_id]
+      END,
+      draft_absence_type_id = CASE
+        WHEN p_new_absence_type_id IS NOT NULL THEN p_new_absence_type_id
+        ELSE NULL
+      END,
+      draft_is_delete = FALSE,
+      version = version + 1,
+      updated_by = auth.uid(),
+      updated_at = NOW()
+  WHERE org_id = p_org_id
+    AND series_id = p_series_id;
+
+  UPDATE public.shift_series
+  SET shift_code_id = CASE
+        WHEN p_new_absence_type_id IS NOT NULL THEN NULL
+        ELSE p_new_shift_code_id
+      END,
+      absence_type_id = CASE
+        WHEN p_new_absence_type_id IS NOT NULL THEN p_new_absence_type_id
+        ELSE NULL
+      END,
+      updated_by = auth.uid(),
+      updated_at = NOW()
+  WHERE org_id = p_org_id
+    AND id = p_series_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_series_all_shifts(UUID, BIGINT, UUID, BIGINT) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.delete_shift_series(
+  p_series_id UUID,
+  p_org_id UUID
+) RETURNS INTEGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_deleted_count INTEGER := 0;
+BEGIN
+  IF NOT public.check_admin_permission('canEditShifts') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
+  END IF;
+
+  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+    RAISE EXCEPTION 'Unauthorized: org mismatch';
+  END IF;
+
+  UPDATE public.shifts
+  SET draft_is_delete = TRUE,
+      draft_shift_code_ids = '{}',
+      draft_absence_type_id = NULL,
+      series_id = NULL,
+      version = version + 1,
+      updated_by = auth.uid(),
+      updated_at = NOW()
+  WHERE org_id = p_org_id
+    AND series_id = p_series_id;
+
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+
+  UPDATE public.shift_series
+  SET archived_at = NOW(),
+      updated_by = auth.uid(),
+      updated_at = NOW()
+  WHERE org_id = p_org_id
+    AND id = p_series_id;
+
+  RETURN v_deleted_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_shift_series(UUID, UUID) TO authenticated;
 
 
 -- ── apply_recurring_schedules (server-side, DST-safe) ────────────────────────
@@ -1472,13 +1597,29 @@ LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
-  v_caller_role TEXT;
+  v_membership public.organization_memberships;
 BEGIN
-  -- Authorization: gridmaster or super_admin in this org
+  -- Authorization: gridmaster, super_admin, or admin with canManageEmployees
   IF NOT public.is_gridmaster() THEN
-    v_caller_role := public.caller_org_role()::TEXT;
-    IF public.caller_org_id() <> p_org_id OR v_caller_role <> 'super_admin' THEN
-      RAISE EXCEPTION 'Unauthorized: only super_admin can link employees';
+    SELECT *
+      INTO v_membership
+      FROM public.organization_memberships
+     WHERE user_id = auth.uid()
+       AND org_id = p_org_id
+       AND archived_at IS NULL
+     LIMIT 1;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Unauthorized: org mismatch';
+    END IF;
+
+    IF v_membership.org_role <> 'super_admin'
+       AND NOT (
+         v_membership.org_role = 'admin'
+         AND COALESCE((v_membership.admin_permissions->>'canManageEmployees')::BOOLEAN, FALSE)
+       )
+    THEN
+      RAISE EXCEPTION 'Unauthorized: missing canManageEmployees permission';
     END IF;
   END IF;
 
@@ -1489,7 +1630,7 @@ BEGIN
     RAISE EXCEPTION 'Organization not found or archived';
   END IF;
 
-  -- Validate employee belongs to org and is not already linked
+  -- Validate employee belongs to org
   IF NOT EXISTS (
     SELECT 1 FROM public.employees
     WHERE id = p_employee_id AND org_id = p_org_id AND archived_at IS NULL
@@ -1498,7 +1639,7 @@ BEGIN
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.employees
-    WHERE id = p_employee_id AND user_id IS NOT NULL
+    WHERE id = p_employee_id AND user_id IS NOT NULL AND user_id <> p_user_id
   ) THEN
     RAISE EXCEPTION 'Employee already has a linked user account';
   END IF;
@@ -1506,7 +1647,7 @@ BEGIN
   -- Validate user is a member of this org
   IF NOT EXISTS (
     SELECT 1 FROM public.organization_memberships
-    WHERE user_id = p_user_id AND org_id = p_org_id
+    WHERE user_id = p_user_id AND org_id = p_org_id AND archived_at IS NULL
   ) THEN
     RAISE EXCEPTION 'User is not a member of this organization';
   END IF;
@@ -1514,24 +1655,14 @@ BEGIN
   -- Validate user is not already linked to another employee in this org
   IF EXISTS (
     SELECT 1 FROM public.employees
-    WHERE org_id = p_org_id AND user_id = p_user_id AND archived_at IS NULL
+    WHERE org_id = p_org_id AND user_id = p_user_id AND id <> p_employee_id
   ) THEN
     RAISE EXCEPTION 'User is already linked to another employee in this organization';
   END IF;
 
-  -- Link them + carry over departments from org membership if employee has none
+  -- Link them
   UPDATE public.employees
   SET user_id = p_user_id,
-      department_ids = CASE WHEN department_ids = '{}' THEN COALESCE((
-        SELECT cm.department_ids FROM public.organization_memberships cm
-        WHERE cm.user_id = p_user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
-        LIMIT 1
-      ), '{}') ELSE department_ids END,
-      dept_admin_ids = CASE WHEN dept_admin_ids = '{}' THEN COALESCE((
-        SELECT cm.dept_admin_ids FROM public.organization_memberships cm
-        WHERE cm.user_id = p_user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
-        LIMIT 1
-      ), '{}') ELSE dept_admin_ids END,
       updated_at = NOW()
   WHERE id = p_employee_id AND org_id = p_org_id;
 
@@ -2677,6 +2808,7 @@ BEGIN
         published_custom_end_time = NULL,
         draft_shift_code_ids = '{}',
         draft_absence_type_id = v_request.absence_type_id,
+        version = version + 1,
         updated_by = v_admin_user_id,
         updated_at = now()
     WHERE emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date;
@@ -2825,6 +2957,7 @@ BEGIN
           WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
           ELSE NULL
         END,
+        version = shifts.version + 1,
         updated_by = EXCLUDED.updated_by,
         updated_at = now();
 
@@ -2886,6 +3019,7 @@ BEGIN
           WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
           ELSE NULL
         END,
+        version = shifts.version + 1,
         updated_by = EXCLUDED.updated_by,
         updated_at = now();
 
@@ -2982,6 +3116,7 @@ BEGIN
         WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
         ELSE NULL
       END,
+      version = shifts.version + 1,
       updated_by = EXCLUDED.updated_by,
       updated_at = now();
 
@@ -3021,6 +3156,7 @@ BEGIN
         WHEN shifts.focus_area_id = EXCLUDED.focus_area_id THEN shifts.focus_area_id
         ELSE NULL
       END,
+      version = shifts.version + 1,
       updated_by = EXCLUDED.updated_by,
       updated_at = now();
 
@@ -3683,31 +3819,32 @@ COMMENT ON FUNCTION public.remove_focus_area_from_employees IS 'Removes a focus 
 
 CREATE OR REPLACE FUNCTION public.get_org_directory(p_org_id UUID)
 RETURNS TABLE (
-  person_id         TEXT,
-  source            TEXT,
-  employee_id       UUID,
-  user_id           UUID,
-  first_name        TEXT,
-  last_name         TEXT,
-  email             TEXT,
-  phone             TEXT,
-  employee_status   TEXT,
-  org_role          TEXT,
-  has_app_access    BOOLEAN,
-  focus_area_ids    BIGINT[],
-  certification_id  BIGINT,
-  role_ids          BIGINT[],
-  seniority         INTEGER,
-  last_sign_in_at   TIMESTAMPTZ,
-  invitation_status TEXT,
-  department_ids    BIGINT[],
-  dept_admin_ids    BIGINT[]
+  person_id               TEXT,
+  source                  TEXT,
+  employee_id             UUID,
+  user_id                 UUID,
+  first_name              TEXT,
+  last_name               TEXT,
+  email                   TEXT,
+  phone                   TEXT,
+  employee_status         TEXT,
+  org_role                TEXT,
+  has_app_access          BOOLEAN,
+  focus_area_ids          BIGINT[],
+  certification_id        BIGINT,
+  role_ids                BIGINT[],
+  seniority               INTEGER,
+  last_sign_in_at         TIMESTAMPTZ,
+  invitation_status       TEXT,
+  scheduled_department_ids BIGINT[],
+  scheduled_dept_admin_ids BIGINT[],
+  management_department_ids BIGINT[],
+  management_dept_admin_ids BIGINT[]
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 BEGIN
-  -- Require at least admin-level access (canViewStaff is always true for admin+)
   IF NOT (
     public.is_gridmaster()
     OR (
@@ -3720,71 +3857,81 @@ BEGIN
 
   RETURN QUERY
 
-  -- Part 1: All employees (schedule people), left-joined to org memberships
+  -- All employees, enriched with management membership or pending employee-linked invite.
   SELECT
-    e.id::TEXT                              AS person_id,
-    'employee'::TEXT                        AS source,
-    e.id                                    AS employee_id,
-    e.user_id                               AS user_id,
+    e.id::TEXT AS person_id,
+    'employee'::TEXT AS source,
+    e.id AS employee_id,
+    e.user_id AS user_id,
     e.first_name,
     e.last_name,
-    e.email,
-    e.phone,
-    e.status::TEXT                          AS employee_status,
-    cm.org_role::TEXT                       AS org_role,
-    (cm.user_id IS NOT NULL)               AS has_app_access,
+    COALESCE(NULLIF(e.email, ''), au.email::TEXT, emp_inv.email, '') AS email,
+    COALESCE(NULLIF(e.phone, ''), cm.phone, emp_inv.phone, '') AS phone,
+    e.status::TEXT AS employee_status,
+    COALESCE(cm.org_role::TEXT, emp_inv.role_to_assign::TEXT, NULL) AS org_role,
+    (cm.user_id IS NOT NULL) AS has_app_access,
     e.focus_area_ids,
     e.certification_id,
     e.role_ids,
     e.seniority,
     au.last_sign_in_at,
-    (
-      SELECT CASE
-        WHEN inv.revoked_at IS NOT NULL THEN NULL
-        WHEN inv.accepted_at IS NOT NULL THEN NULL
-        WHEN inv.expires_at < NOW() THEN 'expired'
-        ELSE 'pending'
-      END
-      FROM public.invitations inv
-      WHERE inv.employee_id = e.id
-        AND inv.org_id = p_org_id
-        AND inv.accepted_at IS NULL
-        AND inv.revoked_at IS NULL
-      ORDER BY inv.created_at DESC
-      LIMIT 1
-    )                                       AS invitation_status,
-    CASE WHEN e.department_ids != '{}' THEN e.department_ids ELSE COALESCE(cm.department_ids, '{}') END AS department_ids,
-    CASE WHEN e.dept_admin_ids != '{}' THEN e.dept_admin_ids ELSE COALESCE(cm.dept_admin_ids, '{}') END AS dept_admin_ids
+    emp_inv.invitation_status,
+    COALESCE(e.department_ids, '{}'::BIGINT[]) AS scheduled_department_ids,
+    COALESCE(e.dept_admin_ids, '{}'::BIGINT[]) AS scheduled_dept_admin_ids,
+    COALESCE(cm.department_ids, emp_inv.department_ids, '{}'::BIGINT[]) AS management_department_ids,
+    COALESCE(cm.dept_admin_ids, emp_inv.dept_admin_ids, '{}'::BIGINT[]) AS management_dept_admin_ids
   FROM public.employees e
   LEFT JOIN public.organization_memberships cm
     ON cm.user_id = e.user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
-  LEFT JOIN auth.users au ON au.id = e.user_id
+  LEFT JOIN auth.users au
+    ON au.id = e.user_id
+  LEFT JOIN LATERAL (
+    SELECT
+      inv.email,
+      COALESCE(inv.phone, '') AS phone,
+      inv.role_to_assign,
+      inv.department_ids,
+      inv.dept_admin_ids,
+      CASE
+        WHEN inv.expires_at < NOW() THEN 'expired'
+        ELSE 'pending'
+      END AS invitation_status
+    FROM public.invitations inv
+    WHERE inv.employee_id = e.id
+      AND inv.org_id = p_org_id
+      AND inv.accepted_at IS NULL
+      AND inv.revoked_at IS NULL
+    ORDER BY inv.created_at DESC
+    LIMIT 1
+  ) emp_inv ON TRUE
   WHERE e.org_id = p_org_id
     AND e.archived_at IS NULL
 
   UNION ALL
 
-  -- Part 2: App-only users (accepted — org members with no linked employee)
+  -- Active org members without a linked employee.
   SELECT
-    ('u:' || cm2.user_id::TEXT)            AS person_id,
-    'user_only'::TEXT                      AS source,
-    NULL::UUID                             AS employee_id,
-    cm2.user_id                            AS user_id,
+    ('u:' || cm2.user_id::TEXT) AS person_id,
+    'user_only'::TEXT AS source,
+    NULL::UUID AS employee_id,
+    cm2.user_id AS user_id,
     p.first_name,
     p.last_name,
-    au2.email::TEXT                        AS email,
-    COALESCE(cm2.phone, '')               AS phone,
-    NULL::TEXT                             AS employee_status,
-    cm2.org_role::TEXT                     AS org_role,
-    TRUE                                   AS has_app_access,
-    '{}'::BIGINT[]                         AS focus_area_ids,
-    NULL::BIGINT                           AS certification_id,
-    '{}'::BIGINT[]                         AS role_ids,
-    NULL::INTEGER                          AS seniority,
+    au2.email::TEXT AS email,
+    COALESCE(cm2.phone, '') AS phone,
+    NULL::TEXT AS employee_status,
+    cm2.org_role::TEXT AS org_role,
+    TRUE AS has_app_access,
+    '{}'::BIGINT[] AS focus_area_ids,
+    NULL::BIGINT AS certification_id,
+    '{}'::BIGINT[] AS role_ids,
+    NULL::INTEGER AS seniority,
     au2.last_sign_in_at,
-    NULL::TEXT                             AS invitation_status,
-    cm2.department_ids,
-    cm2.dept_admin_ids
+    NULL::TEXT AS invitation_status,
+    '{}'::BIGINT[] AS scheduled_department_ids,
+    '{}'::BIGINT[] AS scheduled_dept_admin_ids,
+    cm2.department_ids AS management_department_ids,
+    cm2.dept_admin_ids AS management_dept_admin_ids
   FROM public.organization_memberships cm2
   JOIN public.profiles p ON p.id = cm2.user_id
   JOIN auth.users au2 ON au2.id = cm2.user_id
@@ -3798,27 +3945,29 @@ BEGIN
 
   UNION ALL
 
-  -- Part 3: Pending app-only invitations (no employee_id, not yet accepted)
+  -- Pending app-only invitations with management assignments.
   SELECT
-    ('inv:' || inv3.id::TEXT)              AS person_id,
-    'pending_invite'::TEXT                 AS source,
-    NULL::UUID                             AS employee_id,
-    NULL::UUID                             AS user_id,
-    COALESCE(inv3.first_name, '')          AS first_name,
-    COALESCE(inv3.last_name, '')           AS last_name,
-    inv3.email                             AS email,
-    COALESCE(inv3.phone, '')               AS phone,
-    NULL::TEXT                             AS employee_status,
-    inv3.role_to_assign::TEXT              AS org_role,
-    FALSE                                  AS has_app_access,
-    '{}'::BIGINT[]                         AS focus_area_ids,
-    NULL::BIGINT                           AS certification_id,
-    '{}'::BIGINT[]                         AS role_ids,
-    NULL::INTEGER                          AS seniority,
-    NULL::TIMESTAMPTZ                      AS last_sign_in_at,
+    ('inv:' || inv3.id::TEXT) AS person_id,
+    'pending_invite'::TEXT AS source,
+    NULL::UUID AS employee_id,
+    NULL::UUID AS user_id,
+    COALESCE(inv3.first_name, '') AS first_name,
+    COALESCE(inv3.last_name, '') AS last_name,
+    inv3.email,
+    COALESCE(inv3.phone, '') AS phone,
+    NULL::TEXT AS employee_status,
+    inv3.role_to_assign::TEXT AS org_role,
+    FALSE AS has_app_access,
+    '{}'::BIGINT[] AS focus_area_ids,
+    NULL::BIGINT AS certification_id,
+    '{}'::BIGINT[] AS role_ids,
+    NULL::INTEGER AS seniority,
+    NULL::TIMESTAMPTZ AS last_sign_in_at,
     CASE WHEN inv3.expires_at < NOW() THEN 'expired' ELSE 'pending' END AS invitation_status,
-    inv3.department_ids,
-    inv3.dept_admin_ids
+    '{}'::BIGINT[] AS scheduled_department_ids,
+    '{}'::BIGINT[] AS scheduled_dept_admin_ids,
+    inv3.department_ids AS management_department_ids,
+    inv3.dept_admin_ids AS management_dept_admin_ids
   FROM public.invitations inv3
   WHERE inv3.org_id = p_org_id
     AND inv3.employee_id IS NULL

@@ -434,11 +434,16 @@ CREATE TABLE public.shift_series (
   end_date        DATE,
   max_occurrences INTEGER,
   shift_code_id   BIGINT,
+  absence_type_id BIGINT,
   archived_at     TIMESTAMPTZ,
   created_by      UUID,
   updated_by      UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT shift_series_code_or_absence CHECK (
+    NOT (shift_code_id IS NOT NULL AND absence_type_id IS NOT NULL)
+  )
 );
 
 
@@ -637,7 +642,7 @@ CREATE TABLE public.recurring_shifts_draft_sessions (
   saved_by   UUID NOT NULL,
   draft_data JSONB NOT NULL DEFAULT '{}'::JSONB,
   saved_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (org_id)
+  UNIQUE (org_id, saved_by)
 );
 
 
@@ -840,6 +845,7 @@ ALTER TABLE public.shift_series
   ADD CONSTRAINT shift_series_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_series_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_series_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE SET NULL,
+  ADD CONSTRAINT shift_series_absence_type_id_fkey FOREIGN KEY (absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -1012,6 +1018,7 @@ CREATE INDEX idx_recurring_shifts_active ON public.recurring_shifts(org_id) WHER
 CREATE INDEX idx_shift_series_org ON public.shift_series(org_id);
 CREATE INDEX idx_shift_series_emp ON public.shift_series(emp_id);
 CREATE INDEX idx_shift_series_code_id ON public.shift_series(shift_code_id);
+CREATE INDEX idx_shift_series_absence_type_id ON public.shift_series(absence_type_id);
 CREATE INDEX idx_shift_series_active ON public.shift_series(org_id) WHERE archived_at IS NULL;
 
 -- invitations

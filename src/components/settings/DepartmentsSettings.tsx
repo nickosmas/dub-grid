@@ -460,16 +460,14 @@ function DepartmentSection({
       )}
       {isEditing && (
         <>
-          {isDirty && (
-            <button onClick={handleSave} disabled={saving} className="dg-btn dg-btn-primary dg-btn-sm">
-              {saving ? "Saving\u2026" : "Save All"}
-            </button>
-          )}
+          <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+            {saving ? "Saving\u2026" : "Save All"}
+          </button>
           <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">Cancel</button>
         </>
       )}
       {saved && (
-        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-brand)", fontWeight: 600 }}>Saved!</span>
+        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-success)", fontWeight: 600 }}>Saved!</span>
       )}
     </>
   );
@@ -534,7 +532,7 @@ function DepartmentSection({
                     alignItems: "center",
                     gap: 10,
                     padding: isEditing ? "10px 16px" : "11px 16px",
-                    borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
+                    borderTop: isDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
                     borderBottom: type === "management" && i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
                     cursor: isEditing ? "grab" : (type === "scheduled" && hasMultipleFAs ? "pointer" : "default"),
                     transition: "background 150ms ease, opacity 150ms ease",
@@ -632,7 +630,7 @@ function DepartmentSection({
                             alignItems: "center",
                             gap: isEditing ? 8 : 10,
                             padding: isLastFA && !isEditing ? "8px 16px 16px 32px" : "8px 16px 8px 32px",
-                            borderTop: faIsDropTarget ? "2px solid var(--color-brand)" : undefined,
+                            borderTop: faIsDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
                             opacity: faIsDragging ? 0.5 : 1,
                             transition: "opacity 150ms ease",
                             userSelect: isEditing ? "none" : undefined,

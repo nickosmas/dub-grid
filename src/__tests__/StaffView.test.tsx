@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Employee, FocusArea, NamedItem } from "@/types";
+
+let mockSearchParams = new URLSearchParams();
 const DESIGNATIONS: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
@@ -29,7 +31,7 @@ vi.mock("@/components/EditEmployeePanel", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/people",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
@@ -39,6 +41,21 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/components/AuthProvider", () => ({
   useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
+}));
+
+vi.mock("@/lib/db", () => ({
+  fetchInvitations: vi.fn().mockResolvedValue([]),
+  revokeInvitation: vi.fn(),
+  resendInvitation: vi.fn(),
+  fetchRecurringShifts: vi.fn().mockResolvedValue([]),
+  getRecurringDraft: vi.fn().mockResolvedValue(null),
+  upsertRecurringShift: vi.fn(),
+  deleteRecurringShift: vi.fn(),
+  saveRecurringDraft: vi.fn(),
+  deleteRecurringDraft: vi.fn(),
+  removeUserFromOrganization: vi.fn(),
+  updateAppOnlyUser: vi.fn(),
+  updatePendingInvitation: vi.fn(),
 }));
 
 vi.mock("@/components/ui/sidebar", () => {
@@ -145,6 +162,10 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
+beforeEach(() => {
+  mockSearchParams = new URLSearchParams();
+});
+
 describe("StaffView", () => {
   describe("Controls", () => {
     it("renders 'Add' button", () => {
@@ -204,6 +225,31 @@ describe("StaffView", () => {
       renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
       expect(screen.getByText("Bob Jones")).toBeInTheDocument();
+    });
+  });
+
+  describe("Recurring permissions", () => {
+    it("hides the Recurring Shifts section when recurring view permission is absent", async () => {
+      renderWithProviders(<StaffView {...defaultProps} orgId="org-1" canViewRecurringShifts={false} />);
+      expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
+    });
+
+    it("renders the recurring section read-only when recurring manage permission is absent", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          canViewRecurringShifts
+          canManageRecurringShifts={false}
+        />,
+      );
+
+      expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
+      expect(screen.getAllByRole("gridcell")[0]).toHaveAttribute("tabindex", "-1");
+      expect(screen.queryByRole("button", { name: "Save Draft" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
     });
   });
 });

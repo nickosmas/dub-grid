@@ -12,7 +12,7 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
     <Modal title="Shift breakdown" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Summary */}
-        <div style={{ fontSize: 13, color: "var(--color-text-subtle)" }}>
+        <div style={{ fontSize: 13, color: "var(--color-text-subtle)", padding: "12px 14px", borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           {breakdown.totalShifts} total shifts across {breakdown.byFocusArea.length} section{breakdown.byFocusArea.length !== 1 ? "s" : ""}
         </div>
 
@@ -95,7 +95,7 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                   }}
-                  title={c.shiftCodeLabel}
+                  aria-label={c.shiftCodeLabel}
                 >
                   {c.shiftCodeLabel}
                 </span>
@@ -118,7 +118,7 @@ const modalStyle = { maxWidth: 900, width: "90vw" };
 
 const cardStyle = {
   padding: 16,
-  borderRadius: 8,
+  borderRadius: 16,
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
 };

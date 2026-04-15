@@ -13,6 +13,105 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { PresetColorPicker, TimeInput12h, labelStyle, inputStyle, normalizeTimeCompare } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
+import { SelectableTag } from "@/components/ui/selectable-tag";
+
+type ShiftCodeFormState = {
+  label: string;
+  name: string;
+  color: string;
+  border: string;
+  text: string;
+  categoryId: number | null;
+  focusAreaId: number | null;
+  requiredCertificationIds: number[];
+  defaultStartTime: string | null;
+  defaultEndTime: string | null;
+  defaultDurationHours: number | null;
+  defaultDurationMinutes: number | null;
+};
+
+type AbsenceTypeFormState = {
+  label: string;
+  name: string;
+  color: string;
+  border: string;
+  text: string;
+};
+
+function buildShiftCodeFormState(src: ShiftCode, shiftCategories: ShiftCategory[]): ShiftCodeFormState {
+  const category = src.categoryId != null ? shiftCategories.find((c) => c.id === src.categoryId) ?? null : null;
+  const timesMatchCategory = category != null
+    && normalizeTimeCompare(src.defaultStartTime) === normalizeTimeCompare(category.startTime)
+    && normalizeTimeCompare(src.defaultEndTime) === normalizeTimeCompare(category.endTime);
+
+  return {
+    label: src.label,
+    name: src.name,
+    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
+    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
+    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
+    categoryId: src.categoryId ?? null,
+    focusAreaId: src.focusAreaId ?? null,
+    requiredCertificationIds: [...(src.requiredCertificationIds ?? [])],
+    defaultStartTime: timesMatchCategory ? null : normalizeTimeCompare(src.defaultStartTime),
+    defaultEndTime: timesMatchCategory ? null : normalizeTimeCompare(src.defaultEndTime),
+    defaultDurationHours: src.defaultDurationHours ?? null,
+    defaultDurationMinutes: src.defaultDurationMinutes ?? null,
+  };
+}
+
+function serializeShiftCodeFormState(form: ShiftCodeFormState, shiftCategories: ShiftCategory[]): string {
+  const category = form.categoryId != null ? shiftCategories.find((c) => c.id === form.categoryId) ?? null : null;
+  const normalizedStartTime = normalizeTimeCompare(form.defaultStartTime);
+  const normalizedEndTime = normalizeTimeCompare(form.defaultEndTime);
+  const inheritsCategoryTime = category != null
+    && normalizedStartTime === normalizeTimeCompare(category.startTime)
+    && normalizedEndTime === normalizeTimeCompare(category.endTime);
+
+  return JSON.stringify({
+    label: form.label.trim(),
+    name: form.name.trim(),
+    color: form.color,
+    border: form.border,
+    text: form.text,
+    categoryId: form.categoryId ?? null,
+    focusAreaId: form.focusAreaId ?? null,
+    requiredCertificationIds: [...form.requiredCertificationIds].sort((a, b) => a - b),
+    defaultStartTime: inheritsCategoryTime ? null : normalizedStartTime,
+    defaultEndTime: inheritsCategoryTime ? null : normalizedEndTime,
+    defaultDurationHours: form.defaultDurationHours ?? null,
+    defaultDurationMinutes: form.defaultDurationMinutes ?? null,
+  });
+}
+
+function shouldUseCustomShiftCodeTime(src: ShiftCode, shiftCategories: ShiftCategory[]): boolean {
+  const category = src.categoryId != null ? shiftCategories.find((c) => c.id === src.categoryId) ?? null : null;
+  const timesMatchCategory = category != null
+    && normalizeTimeCompare(src.defaultStartTime) === normalizeTimeCompare(category.startTime)
+    && normalizeTimeCompare(src.defaultEndTime) === normalizeTimeCompare(category.endTime);
+
+  return !timesMatchCategory && (src.defaultStartTime != null || src.defaultEndTime != null);
+}
+
+function buildAbsenceTypeFormState(src: AbsenceType): AbsenceTypeFormState {
+  return {
+    label: src.label,
+    name: src.name,
+    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
+    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
+    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
+  };
+}
+
+function serializeAbsenceTypeFormState(form: AbsenceTypeFormState): string {
+  return JSON.stringify({
+    label: form.label.trim(),
+    name: form.name.trim(),
+    color: form.color,
+    border: form.border,
+    text: form.text,
+  });
+}
 
 // ── Shift Code row ────────────────────────────────────────────────────────────
 function ShiftCodeRow({
@@ -46,40 +145,13 @@ function ShiftCodeRow({
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
-  const [form, setForm] = useState(() => {
-    // Normalize: if custom times match the category exactly, clear them to inherit
-    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-    const timesMatchCategory = cat
-      && st.defaultStartTime != null && st.defaultEndTime != null
-      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-    return {
-      label: st.label,
-      name: st.name,
-      color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-      border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-      text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-      categoryId: st.categoryId ?? null as number | null,
-      focusAreaId: st.focusAreaId ?? null as number | null,
-      requiredCertificationIds: st.requiredCertificationIds ?? [],
-      defaultStartTime: timesMatchCategory ? null : (st.defaultStartTime ?? null as string | null),
-      defaultEndTime: timesMatchCategory ? null : (st.defaultEndTime ?? null as string | null),
-      defaultDurationHours: st.defaultDurationHours ?? null as number | null,
-      defaultDurationMinutes: st.defaultDurationMinutes ?? null as number | null,
-    };
-  });
+  const [form, setForm] = useState<ShiftCodeFormState>(() => buildShiftCodeFormState(st, shiftCategories));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(!!st.isNew);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [customizeTime, setCustomizeTime] = useState(() => {
-    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-    const timesMatchCategory = cat != null
-      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-    return !timesMatchCategory && (st.defaultStartTime != null || st.defaultEndTime != null);
-  });
+  const [customizeTime, setCustomizeTime] = useState(() => shouldUseCustomShiftCodeTime(st, shiftCategories));
 
   // Re-sync form from prop when the parent data changes (e.g. fresh fetch
   // after cert deletion trigger cleans up IDs).
@@ -90,27 +162,8 @@ function ShiftCodeRow({
     if (st.id === prevStIdRef.current && certIdsKey === prevCertIdsKeyRef.current) return;
     prevStIdRef.current = st.id;
     prevCertIdsKeyRef.current = certIdsKey;
-    // Normalize: if custom times match the category, clear to inherit
-    const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-    const timesMatch = cat
-      && st.defaultStartTime != null && st.defaultEndTime != null
-      && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-      && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-    setForm({
-      label: st.label,
-      name: st.name,
-      color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-      border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-      text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-      categoryId: st.categoryId ?? null,
-      focusAreaId: st.focusAreaId ?? null,
-      requiredCertificationIds: st.requiredCertificationIds ?? [],
-      defaultStartTime: timesMatch ? null : (st.defaultStartTime ?? null),
-      defaultEndTime: timesMatch ? null : (st.defaultEndTime ?? null),
-      defaultDurationHours: st.defaultDurationHours ?? null,
-      defaultDurationMinutes: st.defaultDurationMinutes ?? null,
-    });
-    setCustomizeTime(!timesMatch && (st.defaultStartTime != null || st.defaultEndTime != null));
+    setForm(buildShiftCodeFormState(st, shiftCategories));
+    setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
   }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, st.requiredCertificationIds, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
 
   // Normalize times: if they match the category exactly, treat as null (inherit)
@@ -131,19 +184,15 @@ function ShiftCodeRow({
     return form.defaultEndTime;
   })();
 
-  const isDirty = st.isNew ||
-    form.label !== st.label ||
-    form.name !== st.name ||
-    form.color !== (st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color) ||
-    form.border !== (st.border === "transparent" ? TRANSPARENT_BORDER : st.border) ||
-    form.text !== (st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text) ||
-    form.categoryId !== (st.categoryId ?? null) ||
-    form.focusAreaId !== (st.focusAreaId ?? null) ||
-    JSON.stringify(form.requiredCertificationIds) !== JSON.stringify(st.requiredCertificationIds ?? []) ||
-    effectiveStartTime !== (st.defaultStartTime ?? null) ||
-    effectiveEndTime !== (st.defaultEndTime ?? null) ||
-    form.defaultDurationHours !== (st.defaultDurationHours ?? null) ||
-    form.defaultDurationMinutes !== (st.defaultDurationMinutes ?? null);
+  const savedForm = useMemo(
+    () => buildShiftCodeFormState(st, shiftCategories),
+    [st, shiftCategories],
+  );
+  const isDirty = st.isNew || serializeShiftCodeFormState({
+    ...form,
+    defaultStartTime: effectiveStartTime,
+    defaultEndTime: effectiveEndTime,
+  }, shiftCategories) !== serializeShiftCodeFormState(savedForm, shiftCategories);
 
   const canSave = isDirty && (isNameMode || !!form.label.trim()) && !!form.name.trim();
 
@@ -191,7 +240,6 @@ function ShiftCodeRow({
         defaultEndTime: saveEndTime,
         defaultDurationHours: form.defaultDurationHours,
         defaultDurationMinutes: form.defaultDurationMinutes,
-        version: 0,
       });
       onSaved(saved, st.id);
       setExpanded(false);
@@ -599,16 +647,7 @@ function ShiftCodeRow({
                           defaultEndTime: categoryEnd ?? "15:00",
                         }));
                       }}
-                      style={{
-                        background: "var(--color-surface)",
-                        border: "1px solid var(--color-brand)",
-                        borderRadius: 6,
-                        color: "var(--color-brand)",
-                        padding: "5px 12px",
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
                     >
                       Customize Time
                     </button>
@@ -616,16 +655,7 @@ function ShiftCodeRow({
                       <button
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, defaultDurationHours: 0, defaultDurationMinutes: 0 }))}
-                        style={{
-                          background: "var(--color-surface)",
-                          border: "1px solid var(--color-brand)",
-                          borderRadius: 6,
-                          color: "var(--color-brand)",
-                          padding: "5px 12px",
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                        }}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Set duration instead
                       </button>
@@ -659,48 +689,32 @@ function ShiftCodeRow({
                 {certifications.map((desig) => {
                   const checked = form.requiredCertificationIds.includes(desig.id);
                   return (
-                    <label
+                    <SelectableTag
                       key={desig.id}
+                      selected={checked}
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          requiredCertificationIds: checked
+                            ? p.requiredCertificationIds.filter((id) => id !== desig.id)
+                            : [...p.requiredCertificationIds, desig.id],
+                        }))
+                      }
+                      disabled={!canManageShiftCodes}
+                      padding="4px 10px"
+                      fontSize="var(--dg-fs-label)"
+                      fontWeight={500}
+                      selectedFontWeight={700}
+                      unselectedBackground="var(--color-surface)"
+                      unselectedBorderColor="var(--color-border)"
+                      unselectedTextColor="var(--color-text-secondary)"
+                      labelStyle={{ display: "inline-flex", alignItems: "center" }}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: "var(--dg-fs-label)",
-                        cursor: canManageShiftCodes ? "pointer" : "default",
-                        padding: "4px 10px",
-                        borderRadius: 20,
-                        border: `1.5px solid ${
-                          checked ? "var(--color-brand)" : "var(--color-border)"
-                        }`,
-                        background: checked ? "var(--color-brand-bg)" : "var(--color-surface)",
-                        transition: "border-color 150ms ease, background 150ms ease",
+                        minHeight: 32,
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        style={{ display: "none" }}
-                        onChange={(e) =>
-                          setForm((p) => ({
-                            ...p,
-                            requiredCertificationIds: e.target.checked
-                              ? [...p.requiredCertificationIds, desig.id]
-                              : p.requiredCertificationIds.filter((d) => d !== desig.id),
-                          }))
-                        }
-                        disabled={!canManageShiftCodes}
-                      />
-                      <span
-                        style={{
-                          fontWeight: checked ? 700 : 500,
-                          color: checked
-                            ? "var(--color-brand)"
-                            : "var(--color-text-secondary)",
-                        }}
-                      >
-                        {desig.name !== desig.abbr ? `${desig.abbr} — ${desig.name}` : desig.name}
-                      </span>
-                    </label>
+                      {desig.name !== desig.abbr ? `${desig.abbr} — ${desig.name}` : desig.name}
+                    </SelectableTag>
                   );
                 })}
               </div>
@@ -722,17 +736,7 @@ function ShiftCodeRow({
             <button
               onClick={handleSave}
               disabled={saving || !canSave || !canManageShiftCodes}
-              style={{
-                background: canSave && canManageShiftCodes ? "var(--color-brand)" : "var(--color-border)",
-                border: "none",
-                color: "var(--color-text-inverse)",
-                borderRadius: 8,
-                padding: "8px 18px",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 700,
-                cursor: canSave && canManageShiftCodes ? "pointer" : "not-allowed",
-                whiteSpace: "nowrap",
-              }}
+              className="dg-btn dg-btn-primary dg-btn-sm"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -741,40 +745,12 @@ function ShiftCodeRow({
                 if (st.isNew) {
                   onDeleted(st.id);
                 } else {
-                  const cat = st.categoryId != null ? shiftCategories.find(c => c.id === st.categoryId) : null;
-                  const timesMatchCat = cat
-                    && st.defaultStartTime != null && st.defaultEndTime != null
-                    && normalizeTimeCompare(st.defaultStartTime) === normalizeTimeCompare(cat.startTime)
-                    && normalizeTimeCompare(st.defaultEndTime) === normalizeTimeCompare(cat.endTime);
-                  setForm({
-                    label: st.label,
-                    name: st.name,
-                    color: st.color === "transparent" ? PREDEFINED_COLORS[0].bg : st.color,
-                    border: st.border === "transparent" ? TRANSPARENT_BORDER : st.border,
-                    text: st.text === "transparent" ? PREDEFINED_COLORS[0].text : st.text,
-                    categoryId: st.categoryId ?? null,
-                    focusAreaId: st.focusAreaId ?? null,
-                    requiredCertificationIds: st.requiredCertificationIds ?? [],
-                    defaultStartTime: timesMatchCat ? null : (st.defaultStartTime ?? null),
-                    defaultEndTime: timesMatchCat ? null : (st.defaultEndTime ?? null),
-                    defaultDurationHours: st.defaultDurationHours ?? null,
-                    defaultDurationMinutes: st.defaultDurationMinutes ?? null,
-                  });
-                  setCustomizeTime(false);
+                  setForm(buildShiftCodeFormState(st, shiftCategories));
+                  setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
                   setExpanded(false);
                 }
               }}
-              style={{
-                background: "none",
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                color: "var(--color-text-primary)",
-                padding: "8px 14px",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Cancel
             </button>
@@ -783,16 +759,7 @@ function ShiftCodeRow({
               <button
                 onClick={handleDeleteClick}
                 disabled={deleting}
-                style={{
-                  background: "none",
-                  border: "1px solid var(--color-danger-border)",
-                  borderRadius: 8,
-                  color: "var(--color-danger)",
-                  padding: "8px 14px",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="dg-btn dg-btn-danger dg-btn-sm"
               >
                 {deleting ? "…" : "Delete"}
               </button>
@@ -851,14 +818,8 @@ function AbsenceTypeRow({
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
-  const resolveForm = useCallback((src: AbsenceType) => ({
-    label: src.label,
-    name: src.name,
-    color: src.color === "transparent" ? PREDEFINED_COLORS[0].bg : src.color,
-    border: src.border === "transparent" ? TRANSPARENT_BORDER : src.border,
-    text: src.text === "transparent" ? PREDEFINED_COLORS[0].text : src.text,
-  }), []);
-  const [form, setForm] = useState(() => resolveForm(at));
+  const resolveForm = useCallback((src: AbsenceType) => buildAbsenceTypeFormState(src), []);
+  const [form, setForm] = useState<AbsenceTypeFormState>(() => resolveForm(at));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(!!at.isNew);
@@ -870,12 +831,7 @@ function AbsenceTypeRow({
     if (!at.isNew) setForm(resolveForm(at));
   }, [at, resolveForm]);
 
-  const isDirty = at.isNew ||
-    form.label !== at.label ||
-    form.name !== at.name ||
-    form.color !== (at.color === "transparent" ? PREDEFINED_COLORS[0].bg : at.color) ||
-    form.border !== (at.border === "transparent" ? TRANSPARENT_BORDER : at.border) ||
-    form.text !== (at.text === "transparent" ? PREDEFINED_COLORS[0].text : at.text);
+  const isDirty = at.isNew || serializeAbsenceTypeFormState(form) !== serializeAbsenceTypeFormState(resolveForm(at));
 
   // M2: Duplicate label check
   const trimmedLabel = form.label.trim().toUpperCase();
@@ -998,15 +954,15 @@ function AbsenceTypeRow({
             </p>
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary">
+            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary dg-btn-sm">
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} className="dg-btn dg-btn-secondary">
+            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} className="dg-btn dg-btn-secondary dg-btn-sm">
               Cancel
             </button>
             <div style={{ flex: 1 }} />
             {canEdit && !at.isNew && (
-              <button onClick={handleDeleteClick} disabled={deleting} className="dg-btn dg-btn-danger">
+              <button onClick={handleDeleteClick} disabled={deleting} className="dg-btn dg-btn-danger dg-btn-sm">
                 {deleting ? "…" : "Delete"}
               </button>
             )}
@@ -1191,7 +1147,6 @@ function ShiftCodesSettings({
       text:"#3E433B",
       focusAreaId: focusAreaId,
       sortOrder: local.filter((s) => (s.focusAreaId ?? null) === focusAreaId).length,
-      version: 0,
       isNew: true,
     };
     setLocal((prev) => [...prev, tmp]);

@@ -366,7 +366,7 @@ export default function RepeatForm({
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
         <button onClick={onBack} className="dg-btn dg-btn-secondary" style={{ padding: "8px 14px" }}>
-          Cancel
+          Back
         </button>
         <button
           onClick={handleConfirm}

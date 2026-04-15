@@ -35,6 +35,10 @@ interface StaffDetailPanelProps {
   onActivate: (empId: string) => void;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
+  canManageManagementAccess?: boolean;
+  hasManagementAccess?: boolean;
+  hasPendingManagementInvite?: boolean;
+  onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onRevokeAccess?: (userId: string) => void;
 }
@@ -58,6 +62,10 @@ export function StaffDetailPanel({
   onActivate,
   onClose,
   onInvite,
+  canManageManagementAccess,
+  hasManagementAccess,
+  hasPendingManagementInvite,
+  onManageManagementAccess,
   onRevoke,
   onRevokeAccess,
 }: StaffDetailPanelProps) {
@@ -208,19 +216,24 @@ export function StaffDetailPanel({
             departments={departments}
             departmentLabel={departmentLabel}
             onSave={onSave}
-            onDelete={onDelete}
-            onBench={(empId, note) => onBench(empId, note)}
-            onActivate={(empId) => onActivate(empId)}
             onCancel={handleClose}
             onInvite={canManageEmployees && orgId ? onInvite : undefined}
             pendingInvitation={canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined}
             onRevoke={canManageEmployees ? onRevoke : undefined}
-            onRevokeAccess={canManageEmployees ? onRevokeAccess : undefined}
           />
         </div>
 
         {/* Sticky bottom status actions */}
         <div style={{ flexShrink: 0, padding: "12px 24px", borderTop: "1px solid var(--color-border-light)" }}>
+          {canManageManagementAccess && onManageManagementAccess && employee.status !== "terminated" && (
+            <button
+              onClick={() => onManageManagementAccess(employee)}
+              className="dg-btn dg-btn-secondary"
+              style={{ width: "100%", marginBottom: 12 }}
+            >
+              {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Grant Management Access"}
+            </button>
+          )}
           <EmployeeStatusActions
             employee={employee}
             canEdit={employee.status === "active" || employee.status === "benched"}

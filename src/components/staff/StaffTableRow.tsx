@@ -17,7 +17,6 @@ function hashCode(s: string): number {
 
 interface StaffTableRowProps {
   emp: Employee;
-  index: number;
   globalIndex: number;
   isExpanded: boolean;
   isReordering: boolean;
@@ -25,8 +24,6 @@ interface StaffTableRowProps {
   isDropTarget: boolean;
   canManageEmployees: boolean;
   isSelected: boolean;
-  isMobile: boolean;
-  isTablet: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
@@ -48,8 +45,6 @@ export function StaffTableRow({
   isDropTarget,
   canManageEmployees,
   isSelected,
-  isMobile,
-  isTablet,
   focusAreas,
   certifications,
   roles,
@@ -78,9 +73,9 @@ export function StaffTableRow({
       onClick={!isReordering && canManageEmployees ? () => onRowClick(emp.id) : undefined}
       style={{
         opacity: isDragging ? 0.5 : 1,
-        borderTop: isDropTarget ? "2px solid var(--color-brand)" : undefined,
-        borderLeft: isExpanded ? "3px solid var(--color-brand)" : "3px solid transparent",
-        boxShadow: isExpanded ? "inset 0 1px 0 var(--color-brand-border), inset 0 -1px 0 var(--color-brand-border)" : undefined,
+        borderTop: isDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
+        borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
+        boxShadow: isExpanded ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)" : undefined,
       }}
     >
       {/* Checkbox / Drag handle / Seniority # */}
@@ -130,12 +125,12 @@ export function StaffTableRow({
                 href={`/people/${emp.id}`}
                 onClick={(e) => e.stopPropagation()}
                 className="hover:underline truncate"
-                style={{ color: isExpanded ? "var(--color-brand)" : "inherit" }}
+                style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
               >
                 {displayName}
               </Link>
               {isYou && (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-brand-bg)] text-[var(--color-brand)] shrink-0">You</span>
+                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">You</span>
               )}
             </div>
             {(emp.email || emp.phone) && (
@@ -216,7 +211,7 @@ export function StaffTableRow({
         <div
           className="flex items-center justify-center"
           style={{
-            color: isExpanded ? "var(--color-brand)" : "var(--color-text-faint)",
+            color: isExpanded ? "var(--color-control-active-text)" : "var(--color-text-faint)",
             visibility: isReordering ? "hidden" : "visible",
           }}
         >

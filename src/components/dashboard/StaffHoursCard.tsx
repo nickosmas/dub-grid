@@ -1,6 +1,5 @@
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import type { Employee, FocusArea } from "@/types";
-import Link from "next/link";
 import ExpandButton from "./ExpandButton";
 
 interface StaffHoursCardProps {
@@ -9,6 +8,9 @@ interface StaffHoursCardProps {
   focusAreas: FocusArea[];
   otThreshold?: number;
   maxVisible?: number;
+  heading?: string;
+  subtitle?: string;
+  emptyMessage?: string;
   onExpand?: () => void;
 }
 
@@ -17,7 +19,10 @@ export default function StaffHoursCard({
   employees,
   focusAreas,
   otThreshold = 40,
-  maxVisible = 6,
+  maxVisible = 5,
+  heading = "Staff hours",
+  subtitle,
+  emptyMessage = "No shifts scheduled",
   onExpand,
 }: StaffHoursCardProps) {
   const empMap = new Map(employees.map((e) => [e.id, e]));
@@ -29,38 +34,32 @@ export default function StaffHoursCard({
     .sort((a, b) => {
       if (a.isOvertime !== b.isOvertime) return a.isOvertime ? -1 : 1;
       return b.totalHours - a.totalHours;
-    })
-    .slice(0, maxVisible);
+    });
+  const visible = sorted.slice(0, maxVisible);
+  const remainingCount = Math.max(0, sorted.length - visible.length);
 
   return (
     <div className="dg-card">
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">
-            Staff hours
+            {heading}
           </div>
           <div className="dg-card-subtitle">
-            This week &middot; {otThreshold}h limit
+            {subtitle ?? `This week · ${otThreshold}h limit`}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Link
-            href="/people"
-            style={{ fontSize: 11, fontWeight: 500, color: "var(--color-primary)", cursor: "pointer", textDecoration: "none" }}
-          >
-            All staff &rarr;
-          </Link>
-          {onExpand && <ExpandButton onClick={onExpand} label="Expand staff hours" />}
-        </div>
+        {onExpand && <ExpandButton onClick={onExpand} label="Expand staff hours" />}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column" }}>
-        {sorted.length === 0 ? (
-          <div style={{ padding: "20px 18px", fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center" }}>
-            No shifts scheduled
+        {visible.length === 0 ? (
+          <div style={{ padding: "24px 16px", fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", border: "1px dashed var(--color-border)", borderRadius: 14, margin: "0 16px 16px", background: "var(--color-bg)" }}>
+            {emptyMessage}
           </div>
         ) : (
-          sorted.map((h) => {
+          <>
+          {visible.map((h) => {
             const emp = empMap.get(h.empId);
             if (!emp) return null;
             const faId = emp.focusAreaIds[0];
@@ -74,8 +73,9 @@ export default function StaffHoursCard({
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
-                  padding: "9px 18px",
-                  borderBottom: "1px solid var(--color-bg)",
+                  padding: "14px 16px",
+                  borderBottom: "1px solid var(--color-border-light)",
+                  margin: "0 16px",
                 }}
               >
                 {/* Avatar */}
@@ -139,7 +139,21 @@ export default function StaffHoursCard({
                 </div>
               </div>
             );
-          })
+          })}
+          {remainingCount > 0 && (
+            <div
+              style={{
+                padding: "10px 16px 16px",
+                margin: "0 16px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--color-text-subtle)",
+              }}
+            >
+              {remainingCount} more
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

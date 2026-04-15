@@ -73,7 +73,7 @@ export default function SuperAdminOrientationStep({
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: "var(--color-brand-bg, #f0f8f0)",
+                background: "var(--color-brand-bg, #eff6ff)",
                 color: "var(--color-brand)",
                 display: "flex",
                 alignItems: "center",

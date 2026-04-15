@@ -10,6 +10,7 @@ import {
 } from "@/lib/impersonation";
 import { endImpersonation } from "@/lib/db";
 import { clearPermsCache } from "@/hooks/usePermissions";
+import { MaybeHint } from "@/components/ui/hint";
 
 const BANNER_HEIGHT = 40;
 
@@ -116,12 +117,13 @@ export default function ImpersonationBanner() {
             <span style={{ opacity: 0.85 }}>({imp.targetOrgName})</span>
           )}
           {imp.justification && (
-            <span
-              style={{ opacity: 0.85, fontSize: "var(--dg-fs-footnote, 11px)", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              title={imp.justification}
-            >
-              — {imp.justification}
-            </span>
+            <MaybeHint content={imp.justification} side="bottom">
+              <span
+                style={{ opacity: 0.85, fontSize: "var(--dg-fs-footnote, 11px)", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                — {imp.justification}
+              </span>
+            </MaybeHint>
           )}
         </span>
         {countdown && (

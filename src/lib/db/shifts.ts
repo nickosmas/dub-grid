@@ -66,7 +66,8 @@ export async function fetchShifts(
       : pubEndTime;
 
     const isDraft = hasDraft && (
-      !arraysEqual(draftIds, pubIds)
+      row.draft_is_delete
+      || !arraysEqual(draftIds, pubIds)
       || draftAbsId !== pubAbsId
       || draftStartTime !== pubStartTime
       || draftEndTime !== pubEndTime
@@ -371,6 +372,8 @@ export async function moveShift(
   targetEmpId: string,
   targetDate: string,
   shiftCodeIds: number[],
+  absenceTypeId?: number | null,
+  dragMode: "move" | "copy" = "move",
   expectedVersion?: number,
 ): Promise<void> {
   const { error } = await supabase.rpc("move_shift", {
@@ -380,6 +383,8 @@ export async function moveShift(
     p_target_emp_id: targetEmpId,
     p_target_date: targetDate,
     p_shift_code_ids: shiftCodeIds,
+    p_absence_type_id: absenceTypeId ?? null,
+    p_drag_mode: dragMode,
     p_expected_version: expectedVersion ?? null,
   });
   if (error) {
@@ -391,5 +396,11 @@ export async function moveShift(
     }
     throw error;
   }
-  void logAudit("shift.moved", "shift", `${sourceEmpId}:${sourceDate}`, { targetEmpId, targetDate, shiftCodeIds }, orgId);
+  void logAudit("shift.moved", "shift", `${sourceEmpId}:${sourceDate}`, {
+    targetEmpId,
+    targetDate,
+    shiftCodeIds,
+    absenceTypeId: absenceTypeId ?? null,
+    dragMode,
+  }, orgId);
 }

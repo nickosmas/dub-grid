@@ -33,9 +33,10 @@ interface ToolbarProps {
   onSpanChange: (n: 1 | 2 | "month") => void;
   onFocusAreaChange: (id: number | null) => void;
   onStaffSearchChange: (q: string) => void;
-  canEditShifts?: boolean;
+  canApplyRecurringSchedule?: boolean;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
+  canImportPrevious?: boolean;
   onImportPrevious?: () => void;
   isImportingPrevious?: boolean;
   onPrintOpen?: () => void;
@@ -98,9 +99,10 @@ function ToolsMenu({
   onAuditToggle,
   onPrintOpen,
   onExportCSV,
-  canEditShifts,
+  canApplyRecurringSchedule,
   onApplyRecurring,
   isApplyingRecurring,
+  canImportPrevious,
   onImportPrevious,
   isImportingPrevious,
   requestsBadgeCount,
@@ -113,9 +115,10 @@ function ToolsMenu({
   onAuditToggle?: () => void;
   onPrintOpen?: () => void;
   onExportCSV?: () => void;
-  canEditShifts?: boolean;
+  canApplyRecurringSchedule?: boolean;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
+  canImportPrevious?: boolean;
   onImportPrevious?: () => void;
   isImportingPrevious?: boolean;
   requestsBadgeCount?: number;
@@ -264,7 +267,7 @@ function ToolsMenu({
       )}
 
       {/* Auto Fill */}
-      {canEditShifts && onApplyRecurring && (
+      {canApplyRecurringSchedule && onApplyRecurring && (
         <Hint content={hint("Apply all recurring shift templates to the schedule")} side="left">
           <button
             role="menuitem"
@@ -286,7 +289,7 @@ function ToolsMenu({
       )}
 
       {/* Import Previous Schedule */}
-      {canEditShifts && onImportPrevious && (
+      {canImportPrevious && onImportPrevious && (
         <Hint content={hint("Copy shifts from the previous period into this one")} side="left">
           <button
             role="menuitem"
@@ -320,9 +323,10 @@ export default function Toolbar({
   onSpanChange,
   onFocusAreaChange,
   onStaffSearchChange,
-  canEditShifts,
+  canApplyRecurringSchedule,
   onApplyRecurring,
   isApplyingRecurring,
+  canImportPrevious,
   onImportPrevious,
   isImportingPrevious,
   onPrintOpen,
@@ -495,12 +499,12 @@ export default function Toolbar({
               className="dg-btn dg-btn-ghost"
               data-tour="toolbar-tools-btn"
               style={{
-                border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+                border: toolsOpen ? "1px solid var(--color-brand-border)" : "1px solid var(--color-border)",
                 borderRadius: 10,
                 height: 44,
                 padding: "0 12px",
-                background: toolsOpen ? "rgba(46, 153, 48, 0.08)" : undefined,
-                color: toolsOpen ? "var(--color-primary)" : undefined,
+                background: toolsOpen ? "var(--color-brand-bg)" : undefined,
+                color: toolsOpen ? "var(--color-brand)" : undefined,
                 flexShrink: 0,
                 position: "relative",
               }}
@@ -532,9 +536,10 @@ export default function Toolbar({
               onAuditToggle={onAuditToggle}
               onPrintOpen={onPrintOpen}
               onExportCSV={onExportCSV}
-              canEditShifts={canEditShifts}
+              canApplyRecurringSchedule={canApplyRecurringSchedule}
               onApplyRecurring={onApplyRecurring}
               isApplyingRecurring={isApplyingRecurring}
+              canImportPrevious={canImportPrevious}
               onImportPrevious={onImportPrevious}
               isImportingPrevious={isImportingPrevious}
               requestsBadgeCount={requestsBadgeCount}
@@ -761,12 +766,12 @@ export default function Toolbar({
             className="dg-btn dg-btn-ghost"
             data-tour="toolbar-tools-btn"
             style={{
-              border: toolsOpen ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+              border: toolsOpen ? "1px solid var(--color-brand-border)" : "1px solid var(--color-border)",
               borderRadius: 10,
               height: "var(--dg-toolbar-h)",
               padding: "0 12px",
-              background: toolsOpen ? "rgba(46, 153, 48, 0.08)" : undefined,
-              color: toolsOpen ? "var(--color-primary)" : undefined,
+              background: toolsOpen ? "var(--color-brand-bg)" : undefined,
+              color: toolsOpen ? "var(--color-brand)" : undefined,
               position: "relative",
             }}
           >
@@ -798,9 +803,10 @@ export default function Toolbar({
             onAuditToggle={onAuditToggle}
             onPrintOpen={onPrintOpen}
             onExportCSV={onExportCSV}
-            canEditShifts={canEditShifts}
+            canApplyRecurringSchedule={canApplyRecurringSchedule}
             onApplyRecurring={onApplyRecurring}
             isApplyingRecurring={isApplyingRecurring}
+            canImportPrevious={canImportPrevious}
             onImportPrevious={onImportPrevious}
             isImportingPrevious={isImportingPrevious}
             requestsBadgeCount={requestsBadgeCount}

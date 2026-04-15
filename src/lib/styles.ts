@@ -59,9 +59,9 @@ export const ROLE_BADGE_COLORS: Record<
   { bg: string; text: string; border: string }
 > = {
   gridmaster: {
-    bg: "#EFF6FF",
+    bg: "#DBEAFE",
     text: "#1D4ED8",
-    border: "#BFDBFE",
+    border: "#93C5FD",
   },
   super_admin: {
     bg: "#FEF3C7",
@@ -69,9 +69,9 @@ export const ROLE_BADGE_COLORS: Record<
     border: "#FDE68A",
   },
   admin: {
-    bg: "#F0F7F0",
-    text: "#004501",
-    border: "#BFDFBF",
+    bg: "#EFF6FF",
+    text: "#1D4ED8",
+    border: "#BFDBFE",
   },
   user: {
     bg: "var(--color-bg-secondary)",
