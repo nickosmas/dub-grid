@@ -9,7 +9,7 @@ import * as Sentry from "@/lib/sentry";
 import { buildMembershipAccessChanges, buildMembershipRemovalChanges } from "@/lib/access-management";
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
-import type { AdminPermissions, OrganizationRole, OrganizationUser, PlatformRole } from "@/types";
+import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 
 export const dynamic = "force-dynamic";
 

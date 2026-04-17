@@ -35,7 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EDITOR_ACTION_LABELS, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import ChangeReviewModal from "@/components/review/ChangeReviewModal";
-import { buildInvitationRevocationChanges, buildMembershipAccessChanges, formatAdminPermissionsSummary } from "@/lib/access-management";
+import { buildInvitationRevocationChanges, buildMembershipAccessChanges } from "@/lib/access-management";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 // ── Admin permission metadata ──────────────────────────────────────────────────
@@ -1189,7 +1189,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         <ChangeReviewModal
           title="Review Invitation Revocation"
           description="Review this invitation change before saving. Revoking an invitation immediately blocks the recipient from using the current invite link."
-          changes={buildInvitationRevocationChanges(invitationRevokeConfirm)}
+          changes={buildInvitationRevocationChanges()}
           saving={invitationAction === invitationRevokeConfirm.id}
           confirmLabel="Revoke Invitation"
           warningText="This change revokes a pending invitation."

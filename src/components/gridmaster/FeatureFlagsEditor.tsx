@@ -43,7 +43,6 @@ export default function FeatureFlagsEditor({
     () => normalizeFlagState(organization.featureOverrides ?? {}),
     [organization.featureOverrides],
   );
-  const propFlagsKey = serializeFlagState(propFlags);
   const [flags, setFlags] = useState<Record<string, boolean>>(propFlags);
   const [savedFlags, setSavedFlags] = useState<Record<string, boolean>>(propFlags);
   const [saving, setSaving] = useState(false);
@@ -54,7 +53,7 @@ export default function FeatureFlagsEditor({
   useEffect(() => {
     setFlags(propFlags);
     setSavedFlags(propFlags);
-  }, [organization.id, propFlagsKey]);
+  }, [organization.id, propFlags]);
 
   async function handleSave() {
     if (!organization.updatedAt) {

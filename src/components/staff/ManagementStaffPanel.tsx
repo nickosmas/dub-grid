@@ -110,24 +110,28 @@ export function ManagementStaffPanel({
   const [resending, setResending] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  // Reset form when person changes
-  useEffect(() => {
-    const nextDraft = getManagementStaffDraft(person);
-    setFirstName(nextDraft.firstName);
-    setLastName(nextDraft.lastName);
-    setPhone(nextDraft.phone);
-    setDeptIds([...nextDraft.managementDepartmentIds]);
-    setSavedDraft(nextDraft);
-    setShowRevokeConfirm(false);
-    setTouched({});
-  }, [
-    person.personId,
+  const personDraft = useMemo(() => normalizeManagementStaffDraft({
+    firstName: person.firstName,
+    lastName: person.lastName,
+    phone: person.phone,
+    managementDepartmentIds: person.managementDepartmentIds,
+  }), [
     person.firstName,
     person.lastName,
     person.phone,
     person.managementDepartmentIds,
   ]);
+
+  // Reset form when person changes
+  useEffect(() => {
+    setFirstName(personDraft.firstName);
+    setLastName(personDraft.lastName);
+    setPhone(personDraft.phone);
+    setDeptIds([...personDraft.managementDepartmentIds]);
+    setSavedDraft(personDraft);
+    setShowRevokeConfirm(false);
+    setTouched({});
+  }, [person.personId, personDraft]);
 
   const closePanel = useCallback(() => {
     setClosing(true);

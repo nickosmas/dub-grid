@@ -75,8 +75,8 @@ vi.mock("@/components/auth/PasswordInput", () => ({
   PasswordInput: ({
     value,
     onChange,
-    showPassword: _showPassword,
-    onToggle: _onToggle,
+    showPassword,
+    onToggle,
     ariaDescribedBy,
     ...props
   }: {
@@ -85,14 +85,19 @@ vi.mock("@/components/auth/PasswordInput", () => ({
     showPassword?: boolean;
     onToggle?: () => void;
     ariaDescribedBy?: string;
-  }) => (
-    <input
-      {...props}
-      aria-describedby={ariaDescribedBy}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  ),
+  }) => {
+    void showPassword;
+    void onToggle;
+
+    return (
+      <input
+        {...props}
+        aria-describedby={ariaDescribedBy}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  },
 }));
 
 vi.mock("@/components/auth/PasswordStrength", () => ({
@@ -167,7 +172,7 @@ describe("ProfilePageContent", () => {
 
     mockUseSelfProfileData.mockReturnValue(buildSelfProfileData());
 
-    vi.mocked(supabase.from).mockImplementation((table: string) => ({
+    vi.mocked(supabase.from).mockImplementation(() => ({
       update: vi.fn().mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
       }),

@@ -225,9 +225,7 @@ export function buildInvitationChanges(
   return changes;
 }
 
-export function buildInvitationRevocationChanges(
-  invitation: Invitation,
-): AccessReviewChange[] {
+export function buildInvitationRevocationChanges(): AccessReviewChange[] {
   return [
     {
       key: "invitationStatus",

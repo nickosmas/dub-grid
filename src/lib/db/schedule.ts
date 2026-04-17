@@ -2,7 +2,7 @@ import {
   supabase, logAudit, formatDateKey,
   RECURRING_SHIFT_COLS,
 } from "./shared";
-import type { DbRecurringShift, DbShift, DbScheduleNote, RecurringDraft } from "./types";
+import type { DbRecurringShift, DbScheduleNote, RecurringDraft } from "./types";
 import { rowToRecurringShift, generateSeriesDates } from "./mappers";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type {

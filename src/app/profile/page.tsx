@@ -18,7 +18,7 @@ import { ProfileHeroCard } from "@/components/profile/ProfileHeroCard";
 import { ProfileSectionTabs } from "@/components/profile/ProfileSectionTabs";
 import { SelfWorkOverview, SelfWorkSchedule } from "@/components/profile/SelfWorkProfile";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
-import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 
 const ROLE_LABELS: Record<string, string> = {
   gridmaster: "Gridmaster",

@@ -1,6 +1,14 @@
 "use client";
 
-import { Fragment, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import {
+  Fragment,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { SeriesFrequency, ShiftCode, AbsenceType } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -30,7 +38,6 @@ interface RepeatFormProps {
     maxOccurrences: number | null,
     previewTotal: number,
   ) => void;
-  onBack: () => void;
   /** When set, the form is creating a repeating off day instead of a shift. */
   absenceType?: AbsenceType;
 }
@@ -97,11 +104,6 @@ function CalendarField({
   const [expanded, setExpanded] = useState(true);
   const [visibleMonth, setVisibleMonth] = useState<Date>(startOfMonth(selectedDate ?? minSelectableDate));
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
-
-  useEffect(() => {
-    setVisibleMonth(startOfMonth(selectedDate ?? minSelectableDate));
-    if (!value) setExpanded(true);
-  }, [value, minDate]);
 
   function handleSelect(day: Date) {
     onChange(formatLocalDate(day));
@@ -294,7 +296,6 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   startDate,
   shiftCodes,
   onConfirm,
-  onBack: _onBack,
   absenceType,
 }: RepeatFormProps, ref) {
   const isAbsence = absenceType != null;
@@ -360,7 +361,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const missingEndDate = endType === 'on_date' && endDate === '';
   const endDateInvalid = endType === 'on_date' && endDate !== '' && endDate < start;
 
-  function handleConfirm() {
+  const handleConfirm = useCallback(() => {
     setSubmitAttempted(true);
     if (missingDays || missingEndDate || endDateInvalid) return;
     onConfirm(
@@ -371,11 +372,22 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       resolvedMax,
       preview.total,
     );
-  }
+  }, [
+    endDateInvalid,
+    frequency,
+    missingDays,
+    missingEndDate,
+    onConfirm,
+    preview.total,
+    resolvedDays,
+    resolvedEnd,
+    resolvedMax,
+    start,
+  ]);
 
   useImperativeHandle(ref, () => ({
     submit: handleConfirm,
-  }), [missingDays, missingEndDate, endDateInvalid, frequency, resolvedDays, start, resolvedEnd, resolvedMax]);
+  }), [handleConfirm]);
 
   const isCapped = preview.total >= MAX_SERIES_OCCURRENCES && endType !== 'after_n';
 

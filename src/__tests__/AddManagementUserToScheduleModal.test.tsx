@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
-import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
+import type { DirectoryPerson, FocusArea, NamedItem } from "@/types";
 import { createEmployeeFromOrgUser, reconcileEmployeeFromOrgUser } from "@/lib/db";
 import { NameMismatchError } from "@/lib/account-linking";
 

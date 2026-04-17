@@ -15,7 +15,6 @@ import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { BulkImportModal } from "@/components/staff/BulkImportModal";
 import { fetchInvitations, revokeInvitation, resendInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft, removeUserFromOrganization, updateAppOnlyUser, updatePendingInvitation, updateEmployeeIdentity } from "@/lib/db";
-import { supabase } from "@/lib/supabase";
 import * as Sentry from "@/lib/sentry";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";

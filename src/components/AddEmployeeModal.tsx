@@ -91,7 +91,14 @@ export default function AddEmployeeModal({
     [defaultCertId, defaultFocusAreaIds],
   );
   const hasUnsavedChanges =
-    serializeRows(rows.map(({ _id, ...row }) => row)) !== initialRowsSnapshot;
+    serializeRows(
+      rows.map((row) => ({
+        firstName: row.firstName,
+        lastName: row.lastName,
+        certificationId: row.certificationId,
+        focusAreaIds: row.focusAreaIds,
+      })),
+    ) !== initialRowsSnapshot;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges,
     onDiscard: onClose,

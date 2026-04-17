@@ -78,14 +78,7 @@ export default function TimezoneSelect({
 
   useEffect(() => {
     if (!open) return;
-    setFocusedIndex(0);
-    setSearch("");
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      searchRef.current?.focus({ preventScroll: true });
-    }
+    searchRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   useEffect(() => {
@@ -210,7 +203,17 @@ export default function TimezoneSelect({
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-disabled={disabled || undefined}
-          onClick={() => !disabled && setOpen((prev) => !prev)}
+          onClick={() => {
+            if (disabled) return;
+            setOpen((prev) => {
+              const next = !prev;
+              if (next) {
+                setFocusedIndex(0);
+                setSearch("");
+              }
+              return next;
+            });
+          }}
           style={{
             display: "inline-flex",
             alignItems: "center",

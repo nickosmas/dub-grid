@@ -307,14 +307,21 @@ const SectionBlock = memo(function SectionBlock({
   }, [fitToContainer]);
 
   useEffect(() => {
-    updateScrollButtons();
+    const frame = window.requestAnimationFrame(() => {
+      updateScrollButtons();
+    });
     const el = scrollContainerRef.current;
-    if (!el || fitToContainer) return;
+    if (!el || fitToContainer) {
+      return () => {
+        window.cancelAnimationFrame(frame);
+      };
+    }
 
     el.addEventListener("scroll", updateScrollButtons, { passive: true });
     const ro = new ResizeObserver(() => updateScrollButtons());
     ro.observe(el);
     return () => {
+      window.cancelAnimationFrame(frame);
       el.removeEventListener("scroll", updateScrollButtons);
       ro.disconnect();
     };

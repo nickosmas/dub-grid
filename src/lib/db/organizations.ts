@@ -1,6 +1,6 @@
 import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, parseHost, ORGANIZATION_COLS } from "./shared";
-import type { DbInvitation, DbOrganization } from "./types";
-import { rowToInvitation, rowToOrganization, rowToOrganizationUser } from "./mappers";
+import type { DbOrganization } from "./types";
+import { rowToOrganization, rowToOrganizationUser } from "./mappers";
 import type {
   AdminPermissions,
   DirectoryPerson,
@@ -305,7 +305,6 @@ export async function updateAdminPermissions(
   userId: string,
   permissions: AdminPermissions | null,
   orgId: string,
-  targetEmail?: string,
 ): Promise<void> {
   const { data: membershipRow, error } = await supabase
     .from("organization_memberships")
@@ -333,7 +332,6 @@ export async function changeOrganizationUserRole(
   targetUserId: string,
   newRole: OrganizationRole,
   orgId?: string,
-  targetEmail?: string,
 ): Promise<void> {
   if (!orgId) {
     throw new Error("Organization context is required to update roles safely.");

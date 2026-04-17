@@ -162,13 +162,27 @@ function ShiftCodeRow({
   const certIdsKey = JSON.stringify(st.requiredCertificationIds ?? []);
   const prevStIdRef = useRef(st.id);
   const prevCertIdsKeyRef = useRef(certIdsKey);
+  const latestShiftCodeRef = useRef(st);
+  const latestShiftCategoriesRef = useRef(shiftCategories);
+  latestShiftCodeRef.current = st;
+  latestShiftCategoriesRef.current = shiftCategories;
   useEffect(() => {
     if (st.id === prevStIdRef.current && certIdsKey === prevCertIdsKeyRef.current) return;
     prevStIdRef.current = st.id;
     prevCertIdsKeyRef.current = certIdsKey;
-    setForm(buildShiftCodeFormState(st, shiftCategories));
-    setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
-  }, [st.id, st.label, st.name, st.color, st.border, st.text, st.categoryId, st.focusAreaId, st.requiredCertificationIds, certIdsKey, st.defaultStartTime, st.defaultEndTime, st.defaultDurationHours, st.defaultDurationMinutes, shiftCategories]);
+    setForm(
+      buildShiftCodeFormState(
+        latestShiftCodeRef.current,
+        latestShiftCategoriesRef.current,
+      ),
+    );
+    setCustomizeTime(
+      shouldUseCustomShiftCodeTime(
+        latestShiftCodeRef.current,
+        latestShiftCategoriesRef.current,
+      ),
+    );
+  }, [certIdsKey, st.id]);
 
   // Normalize times: if they match the category exactly, treat as null (inherit)
   const effectiveStartTime = (() => {
@@ -1292,7 +1306,6 @@ function ShiftCodesSettings({
     [isNameMode],
   );
   const exampleArea = focusAreas.find((focusArea) => !focusArea.archivedAt) ?? null;
-  const exampleCategory = shiftCategories.find((category) => !category.archivedAt) ?? null;
   const exampleCertification = certifications[0]?.name || certificationLabel.replace(/s$/i, "") || "Certification";
   const areaSpecificLabel = shiftText(undefined, "Ds", "Day Supervisor");
   const generalLabel = shiftText(undefined, "Ofc", "Office");

@@ -1570,7 +1570,6 @@ export default function ShiftEditPanel({
               startDate={modal.date}
               shiftCodes={shiftCodes}
               onConfirm={onRepeatConfirm}
-              onBack={() => setShowRepeatForm(false)}
               absenceType={isAbsence ? absenceTypes?.find(at => at.id === currentAbsenceTypeId) : undefined}
             />
           ) : inDetailMode ? (

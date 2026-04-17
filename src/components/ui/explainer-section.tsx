@@ -190,7 +190,26 @@ export function WorkflowStrip({ steps, compact = false }: WorkflowStripProps) {
   );
 }
 
-export function ExplainerSection({
+function readStoredOpenPreference(
+  storageKey: string | undefined,
+  defaultOpen: boolean,
+): boolean {
+  if (!storageKey || typeof window === "undefined") {
+    return defaultOpen;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(storageKey);
+    if (storedValue === "open") return true;
+    if (storedValue === "closed") return false;
+  } catch {
+    // Ignore unavailable storage and fall back to the default state.
+  }
+
+  return defaultOpen;
+}
+
+function ExplainerSectionContent({
   title,
   points,
   preview,
@@ -198,35 +217,20 @@ export function ExplainerSection({
   compact = false,
   storageKey,
 }: ExplainerSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  const [hasLoadedPreference, setHasLoadedPreference] = useState(!storageKey);
+  const [isOpen, setIsOpen] = useState(() =>
+    readStoredOpenPreference(storageKey, defaultOpen),
+  );
   const contentId = `explainer-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
-    if (!storageKey || typeof window === "undefined") {
-      setHasLoadedPreference(true);
-      return;
-    }
-
-    try {
-      const storedValue = window.localStorage.getItem(storageKey);
-      if (storedValue === "open") setIsOpen(true);
-      if (storedValue === "closed") setIsOpen(false);
-    } catch {
-      // Ignore unavailable storage and fall back to the default state.
-    }
-    setHasLoadedPreference(true);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!storageKey || !hasLoadedPreference || typeof window === "undefined") return;
+    if (!storageKey || typeof window === "undefined") return;
 
     try {
       window.localStorage.setItem(storageKey, isOpen ? "open" : "closed");
     } catch {
       // Ignore storage write failures.
     }
-  }, [hasLoadedPreference, isOpen, storageKey]);
+  }, [isOpen, storageKey]);
 
   const padding = compact ? "10px 12px" : "12px 14px";
   const iconSize = compact ? 24 : 28;
@@ -358,4 +362,9 @@ export function ExplainerSection({
       ) : null}
     </div>
   );
+}
+
+export function ExplainerSection(props: ExplainerSectionProps) {
+  const remountKey = `${props.storageKey ?? "default"}:${props.defaultOpen ?? true ? "open" : "closed"}`;
+  return <ExplainerSectionContent key={remountKey} {...props} />;
 }

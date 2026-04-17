@@ -339,7 +339,7 @@ export async function DELETE(req: NextRequest) {
       actorEmail: user.email ?? null,
       resourceId: invitationId,
       action: "invitation.revoked",
-      changes: buildInvitationRevocationChanges(currentInvitation),
+      changes: buildInvitationRevocationChanges(),
       req,
     });
 

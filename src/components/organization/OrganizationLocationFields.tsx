@@ -148,11 +148,20 @@ function AddressLine1Input({
     });
   }, []);
 
-  useEffect(() => {
-    if (!apiKey) {
-      setPlacesLibrary(null);
-      return;
+  const closePanel = useCallback((clearSuggestions = false) => {
+    requestIdRef.current += 1;
+    setPanelOpen(false);
+    setLoading(false);
+
+    if (clearSuggestions) {
+      setSuggestions([]);
+      setActiveIndex(0);
+      sessionTokenRef.current = null;
     }
+  }, []);
+
+  useEffect(() => {
+    if (!apiKey) return;
 
     let cancelled = false;
 
@@ -176,22 +185,21 @@ function AddressLine1Input({
       query.length >= 2 &&
       inputRef.current === document.activeElement
     ) {
-      updatePanelPosition();
-      setPanelOpen(true);
+      const frame = window.requestAnimationFrame(() => {
+        updatePanelPosition();
+        setPanelOpen(true);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frame);
+      };
     }
   }, [hasAutocomplete, query, updatePanelPosition]);
 
   useEffect(() => {
     const autocompleteLibrary = placesLibrary;
 
-    if (!hasAutocomplete || !panelOpen || query.length < 2 || !autocompleteLibrary) {
-      setLoading(false);
-      if (query.length < 2) {
-        setSuggestions([]);
-        sessionTokenRef.current = null;
-      }
-      return;
-    }
+    if (!hasAutocomplete || !panelOpen || query.length < 2 || !autocompleteLibrary) return;
 
     if (skipNextFetchRef.current) {
       skipNextFetchRef.current = false;
@@ -286,16 +294,13 @@ function AddressLine1Input({
       const patch = parseGooglePlaceAddress(place);
       skipNextFetchRef.current = true;
       skipNextPanelOpenRef.current = true;
-      requestIdRef.current += 1;
       sessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
-      setSuggestions([]);
-      setActiveIndex(0);
-      setPanelOpen(false);
+      closePanel(true);
 
       if (patch.addressLine1) onChange(patch.addressLine1);
       onAutofill(patch);
     } catch {
-      setPanelOpen(false);
+      closePanel();
     }
   }
 
@@ -308,13 +313,26 @@ function AddressLine1Input({
     }
 
     setActiveIndex(0);
-    if (Boolean(nextValue.trim()) && hasAutocomplete) {
+    const nextQuery = nextValue.trim();
+
+    if (!nextQuery) {
+      closePanel(true);
+      return;
+    }
+
+    if (nextQuery.length < 2 || !hasAutocomplete) {
+      setSuggestions([]);
+      setLoading(false);
+      sessionTokenRef.current = null;
+      setPanelOpen(false);
+      return;
+    }
+
+    if (hasAutocomplete) {
       updatePanelPosition();
       setPanelOpen(true);
       return;
     }
-
-    setPanelOpen(false);
   }
 
   return (
@@ -333,7 +351,7 @@ function AddressLine1Input({
         }}
         onBlur={() => {
           blurTimeoutRef.current = window.setTimeout(() => {
-            setPanelOpen(false);
+            closePanel();
           }, 120);
         }}
         onKeyDown={(event) => {
@@ -354,7 +372,7 @@ function AddressLine1Input({
             void handleSelectPrediction(selected);
           } else if (event.key === "Escape") {
             event.preventDefault();
-            setPanelOpen(false);
+            closePanel();
           }
         }}
         placeholder="Search a place or address"
