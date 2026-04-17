@@ -3,15 +3,18 @@ import type {
   DepartmentType,
   Employee,
   Organization,
+  OrganizationUser,
   FocusArea,
   ShiftCategory,
   ShiftCode,
   AbsenceType,
   IndicatorType,
+  Invitation,
   RecurringShift,
   ShiftRequest,
   NamedItem,
   CoverageRequirement,
+  CoverageRuleConfig,
   SeriesFrequency,
 } from "@/types";
 import type {
@@ -20,15 +23,20 @@ import type {
   DbDepartment,
   DbShiftCategory,
   DbCoverageRequirement,
+  DbCoverageRuleConfig,
+  DbCoverageRuleConfigCode,
   DbShiftCode,
   DbAbsenceType,
   DbEmployee,
   DbIndicatorType,
+  DbInvitation,
+  DbOrganizationMembership,
   DbRecurringShift,
   DbShiftRequest,
   DbNamedItem,
 } from "./types";
 import { trimTime, resolveCodeLabels, iterateDateRange, MAX_SERIES_OCCURRENCES } from "./shared";
+import { composeOrganizationAddress } from "@/lib/organization-profile";
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
 
@@ -58,11 +66,31 @@ export function rowToDepartment(row: DbDepartment): Department {
 }
 
 export function rowToOrganization(row: DbOrganization): Organization {
+  const addressLine1 = row.address_line_1 || row.address || "";
+  const addressLine2 = row.address_line_2 || "";
+  const addressCity = row.address_city || "";
+  const addressState = row.address_state || "";
+  const addressPostalCode = row.address_postal_code || "";
+  const addressCountry = row.address_country || "";
+
   return {
     id: row.id,
     name: row.name,
     slug: row.slug ?? null,
-    address: row.address,
+    address: composeOrganizationAddress({
+      addressLine1,
+      addressLine2,
+      addressCity,
+      addressState,
+      addressPostalCode,
+      addressCountry,
+    }) || row.address,
+    addressLine1,
+    addressLine2,
+    addressCity,
+    addressState,
+    addressPostalCode,
+    addressCountry,
     phone: row.phone,
     employeeCount: row.employee_count,
     focusAreaLabel: row.focus_area_label ?? 'Focus Areas',
@@ -81,6 +109,75 @@ export function rowToOrganization(row: DbOrganization): Organization {
     subscriptionSeats: row.subscription_seats ?? null,
     dataRetentionDays: row.data_retention_days ?? 365,
     featureOverrides: row.feature_overrides ?? {},
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+export function rowToOrganizationUser(
+  row: Record<string, unknown>,
+): OrganizationUser {
+  return {
+    id: row.id as string,
+    email: (row.email as string | null) ?? null,
+    firstName: (row.first_name as string | null) ?? null,
+    lastName: (row.last_name as string | null) ?? null,
+    orgRole: (row.org_role as import("@/types").OrganizationRole) ?? "user",
+    platformRole: (row.platform_role as import("@/types").PlatformRole) ?? "none",
+    adminPermissions: (row.admin_permissions as import("@/types").AdminPermissions | null) ?? null,
+    createdAt: row.created_at as string,
+    lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+    updatedAt: (row.updated_at as string | null) ?? null,
+    departmentIds: (row.department_ids as number[]) ?? [],
+    deptAdminIds: (row.dept_admin_ids as number[]) ?? [],
+  };
+}
+
+export function membershipRowToOrganizationUser(
+  membership: DbOrganizationMembership,
+  profile?: {
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    platformRole?: import("@/types").PlatformRole | null;
+    createdAt?: string | null;
+    lastSignInAt?: string | null;
+  },
+): OrganizationUser {
+  return {
+    id: membership.user_id,
+    email: profile?.email ?? null,
+    firstName: profile?.firstName ?? null,
+    lastName: profile?.lastName ?? null,
+    orgRole: membership.org_role as import("@/types").OrganizationRole,
+    platformRole: profile?.platformRole ?? "none",
+    adminPermissions:
+      (membership.admin_permissions as import("@/types").AdminPermissions | null) ?? null,
+    createdAt: profile?.createdAt ?? new Date(0).toISOString(),
+    lastSignInAt: profile?.lastSignInAt ?? null,
+    updatedAt: membership.updated_at ?? null,
+    departmentIds: membership.department_ids ?? [],
+    deptAdminIds: membership.dept_admin_ids ?? [],
+  };
+}
+
+export function rowToInvitation(row: DbInvitation): Invitation {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    invitedBy: row.invited_by ?? null,
+    email: row.email,
+    roleToAssign: row.role_to_assign as import("@/types").AssignableOrganizationRole,
+    expiresAt: row.expires_at,
+    acceptedAt: row.accepted_at ?? null,
+    revokedAt: row.revoked_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? null,
+    employeeId: row.employee_id ?? null,
+    firstName: row.first_name ?? null,
+    lastName: row.last_name ?? null,
+    phone: row.phone ?? null,
+    departmentIds: row.department_ids ?? [],
+    deptAdminIds: row.dept_admin_ids ?? [],
   };
 }
 
@@ -118,6 +215,20 @@ export function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRe
     shiftCodeId: row.shift_code_id,
     dayOfWeek: row.day_of_week,
     minStaff: row.min_staff,
+  };
+}
+
+export function rowsToCoverageRuleConfig(
+  row: DbCoverageRuleConfig,
+  codeRows: DbCoverageRuleConfigCode[],
+): CoverageRuleConfig {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    focusAreaId: row.focus_area_id,
+    requirementShiftCodeId: row.requirement_shift_code_id,
+    eligibleShiftCodeIds: codeRows.map((code) => code.eligible_shift_code_id),
+    preferredOpenShiftCodeId: row.preferred_open_shift_code_id,
   };
 }
 

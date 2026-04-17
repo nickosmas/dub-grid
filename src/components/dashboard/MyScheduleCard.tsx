@@ -91,7 +91,7 @@ export default function MyScheduleCard({
                     alignItems: "center",
                     gap: 3,
                     padding: "12px 8px",
-                    borderRadius: 14,
+                    borderRadius: "var(--dg-radius-md)",
                     background: isToday ? "var(--color-brand-bg)" : "var(--color-bg)",
                     border: isToday ? "1px solid var(--color-brand-border, var(--color-border))" : "1px solid var(--color-border-light)",
                   }}

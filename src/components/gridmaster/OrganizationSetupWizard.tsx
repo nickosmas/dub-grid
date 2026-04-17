@@ -18,34 +18,19 @@ import {
 import type { Organization, AssignableOrganizationRole } from "@/types";
 import * as Sentry from "@/lib/sentry";
 import CustomSelect from "@/components/CustomSelect";
+import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import StepperBar from "@/components/StepperBar";
+import { withComposedOrganizationAddress } from "@/lib/organization-profile";
 import {
   sectionStyle,
   sectionHeaderStyle,
   sectionBodyStyle,
   labelStyle,
 } from "@/lib/styles";
+import { formatTimezoneLabel } from "@/lib/timezones";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const TIMEZONES = [
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Anchorage",
-  "Pacific/Honolulu",
-  "America/Phoenix",
-  "America/Indiana/Indianapolis",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-  "Asia/Shanghai",
-  "Asia/Kolkata",
-  "Australia/Sydney",
-];
 
 const STEPS = [
   { key: "details", label: "Details" },
@@ -184,15 +169,20 @@ export default function OrganizationSetupWizard({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [address, setAddress] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [addressCity, setAddressCity] = useState("");
+  const [addressState, setAddressState] = useState("");
+  const [addressPostalCode, setAddressPostalCode] = useState("");
+  const [addressCountry, setAddressCountry] = useState("");
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("");
-  const [employeeCount, setEmployeeCount] = useState("");
   const [focusAreaLabel, setFocusAreaLabel] = useState("Focus Areas");
   const [certificationLabel, setCertificationLabel] =
     useState("Certifications");
   const [roleLabel, setRoleLabel] = useState("Roles");
   const [slugError, setSlugError] = useState<string | null>(null);
+  const [createdEmployeeCount, setCreatedEmployeeCount] = useState(0);
 
   // ── Step 2: Super Admin ───────────────────────────────────────────────────
   const [superAdminFirstName, setSuperAdminFirstName] = useState("");
@@ -303,9 +293,16 @@ export default function OrganizationSetupWizard({
       const org = await createOrganization({
         name: name.trim(),
         slug: slug.trim() || null,
-        address: address.trim(),
+        ...withComposedOrganizationAddress({
+          addressLine1: addressLine1.trim(),
+          addressLine2: addressLine2.trim(),
+          addressCity: addressCity.trim(),
+          addressState: addressState.trim(),
+          addressPostalCode: addressPostalCode.trim(),
+          addressCountry: addressCountry.trim(),
+        }),
         phone: phone.trim(),
-        employeeCount: employeeCount ? parseInt(employeeCount, 10) : null,
+        employeeCount: null,
         focusAreaLabel: focusAreaLabel.trim() || "Focus Areas",
         certificationLabel: certificationLabel.trim() || "Certifications",
         roleLabel: roleLabel.trim() || "Roles",
@@ -413,9 +410,13 @@ export default function OrganizationSetupWizard({
   }, [
     name,
     slug,
-    address,
+    addressLine1,
+    addressLine2,
+    addressCity,
+    addressState,
+    addressPostalCode,
+    addressCountry,
     phone,
-    employeeCount,
     focusAreaLabel,
     certificationLabel,
     roleLabel,
@@ -611,6 +612,7 @@ export default function OrganizationSetupWizard({
 
       // Build invitation rows for employees with emails
       const withEmail = created.filter((e) => e.email);
+      setCreatedEmployeeCount(created.length);
       setInvitationRows(
         withEmail.map((e) => ({
           employeeId: e.id,
@@ -795,6 +797,7 @@ export default function OrganizationSetupWizard({
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
                 gap: 16,
+                marginBottom: 16,
               }}
             >
               <div>
@@ -832,48 +835,31 @@ export default function OrganizationSetupWizard({
                   </span>
                 )}
               </div>
-              <div>
-                <label style={labelStyle}>Address</label>
-                <input
-                  className="dg-input"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="123 Main St, City, ST"
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Phone</label>
-                <input
-                  className="dg-input"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Timezone</label>
-                <CustomSelect
-                  value={timezone}
-                  options={[
-                    { value: "", label: "Select timezone…" },
-                    ...TIMEZONES.map((tz) => ({ value: tz, label: tz })),
-                  ]}
-                  onChange={setTimezone}
-                  style={{ width: "100%" }}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Employee Count</label>
-                <input
-                  className="dg-input"
-                  type="number"
-                  min={0}
-                  value={employeeCount}
-                  onChange={(e) => setEmployeeCount(e.target.value)}
-                  placeholder="e.g. 50"
-                />
-              </div>
             </div>
+            <OrganizationLocationFields
+              value={{
+                phone,
+                timezone,
+                addressLine1,
+                addressLine2,
+                addressCity,
+                addressState,
+                addressPostalCode,
+                addressCountry,
+              }}
+              onChange={(patch) => {
+                if (patch.phone !== undefined) setPhone(patch.phone);
+                if (patch.timezone !== undefined) setTimezone(patch.timezone);
+                if (patch.addressLine1 !== undefined) setAddressLine1(patch.addressLine1);
+                if (patch.addressLine2 !== undefined) setAddressLine2(patch.addressLine2);
+                if (patch.addressCity !== undefined) setAddressCity(patch.addressCity);
+                if (patch.addressState !== undefined) setAddressState(patch.addressState);
+                if (patch.addressPostalCode !== undefined) setAddressPostalCode(patch.addressPostalCode);
+                if (patch.addressCountry !== undefined) setAddressCountry(patch.addressCountry);
+              }}
+              showEmployeeCount={false}
+              gridTemplateColumns="1fr 1fr"
+            />
           </div>
         </div>
 
@@ -952,6 +938,15 @@ export default function OrganizationSetupWizard({
   // ── Render: Step 2 — Super Admin ──────────────────────────────────────────
 
   function renderSuperAdmin() {
+    const summaryAddress = withComposedOrganizationAddress({
+      addressLine1,
+      addressLine2,
+      addressCity,
+      addressState,
+      addressPostalCode,
+      addressCountry,
+    }).address;
+
     return (
       <>
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
@@ -1085,7 +1080,22 @@ export default function OrganizationSetupWizard({
                     Timezone
                   </span>
                   <span style={{ color: "var(--color-text-primary)" }}>
-                    {timezone}
+                    {formatTimezoneLabel(timezone)} · {timezone}
+                  </span>
+                </>
+              )}
+              {summaryAddress && (
+                <>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    Address
+                  </span>
+                  <span style={{ color: "var(--color-text-primary)" }}>
+                    {summaryAddress}
                   </span>
                 </>
               )}
@@ -2028,6 +2038,33 @@ export default function OrganizationSetupWizard({
               needed if you want to invite them in the next step.
             </p>
 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16, maxWidth: 420 }}>
+              <div>
+                <label htmlFor="wizard-employees-ready-count" style={labelStyle}>
+                  Employees Ready To Create
+                </label>
+                <input
+                  id="wizard-employees-ready-count"
+                  className="dg-input"
+                  value={String(validCount)}
+                  readOnly
+                  aria-readonly="true"
+                />
+              </div>
+              <div>
+                <label htmlFor="wizard-employees-created-count" style={labelStyle}>
+                  Employees Already Created
+                </label>
+                <input
+                  id="wizard-employees-created-count"
+                  className="dg-input"
+                  value={String(createdEmployeeCount)}
+                  readOnly
+                  aria-readonly="true"
+                />
+              </div>
+            </div>
+
             {/* Header */}
             <div
               style={{
@@ -2191,6 +2228,19 @@ export default function OrganizationSetupWizard({
               Select employees to invite. They will receive an email with a link
               to set their password and join the organization.
             </p>
+
+            <div style={{ maxWidth: 220, marginBottom: 16 }}>
+              <label htmlFor="wizard-invitations-created-count" style={labelStyle}>
+                Employees Created
+              </label>
+              <input
+                id="wizard-invitations-created-count"
+                className="dg-input"
+                value={String(createdEmployeeCount)}
+                readOnly
+                aria-readonly="true"
+              />
+            </div>
 
             {invitationRows.length === 0 ? (
               <p

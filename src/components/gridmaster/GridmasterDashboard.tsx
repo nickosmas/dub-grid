@@ -152,7 +152,7 @@ export default function GridmasterDashboard({
         {anomalies.length > 0 && (
           <div style={{
             padding: "10px 14px", background: "var(--color-danger-bg)", border: "1px solid var(--color-danger)",
-            borderRadius: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-danger)", fontWeight: 600,
+            borderRadius: "var(--dg-radius-md)", fontSize: "var(--dg-fs-label)", color: "var(--color-danger)", fontWeight: 600,
           }}>
             Anomaly detected: {anomalies.map((a) => `${a.name} (${a.count} actions)`).join(", ")}
           </div>
@@ -188,7 +188,7 @@ export default function GridmasterDashboard({
             padding: "12px 16px",
             background: "var(--color-warning-bg)",
             border: "1px solid var(--color-warning)",
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
             color: "var(--color-warning)",

@@ -1,14 +1,23 @@
 import {
   supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit,
-  EMPLOYEE_COLS, DEPARTMENT_COLS, arraysEqual, OptimisticLockError,
+  EMPLOYEE_COLS, DEPARTMENT_COLS, OptimisticLockError,
 } from "./shared";
-import type { DbEmployee, DbShift } from "./types";
-import { rowToEmployee, employeeToRow, rowToDepartment } from "./mappers";
+import { parseNameMismatchResponse } from "@/lib/account-linking";
+import { classifyPersistedDraftShift } from "@/lib/draft-utils";
+import type { DbEmployee, DbInvitation, DbShift } from "./types";
+import { rowToEmployee, employeeToRow, rowToDepartment, rowToInvitation } from "./mappers";
 import type {
   Employee, Department, ShiftMap, Invitation,
   AdminPermissions, EmployeeStatus, DraftKind,
-  AssignableOrganizationRole, AuditLogEntry,
+  AuditLogEntry,
 } from "@/types";
+
+export class EmployeeStatusConflictError extends Error {
+  constructor(public readonly latestEmployee: Employee) {
+    super("Employee status changed elsewhere.");
+    this.name = "EmployeeStatusConflictError";
+  }
+}
 
 // ── Departments ──────────────────────────────────────────────────────────────
 
@@ -194,6 +203,17 @@ export async function fetchEmployees(
   return (data as DbEmployee[]).map(rowToEmployee);
 }
 
+export async function fetchEmployeeCount(orgId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("employees")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .is("archived_at", null);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function insertEmployee(
   data: Omit<Employee, "id">,
   orgId: string,
@@ -210,22 +230,111 @@ export async function insertEmployee(
   return result;
 }
 
+async function syncLinkedProfileName(
+  userId: string | null,
+  firstName: string,
+  lastName: string,
+): Promise<void> {
+  if (!userId) return;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      first_name: firstName,
+      last_name: lastName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
 export async function updateEmployee(emp: Employee, orgId: string, expectedVersion?: number): Promise<void> {
+  const nextEmployee: Employee = {
+    ...emp,
+    firstName: emp.firstName.trim(),
+    lastName: emp.lastName.trim(),
+    phone: emp.phone.trim(),
+    email: emp.email.trim(),
+    contactNotes: emp.contactNotes.trim(),
+  };
   let query = supabase
     .from("employees")
-    .update(employeeToRow(emp, orgId))
+    .update(employeeToRow(nextEmployee, orgId))
     .eq("org_id", orgId)
-    .eq("id", emp.id);
+    .eq("id", nextEmployee.id);
   if (expectedVersion !== undefined) {
     query = query.eq("version", expectedVersion);
   }
   const { error, count } = await query.select("id").maybeSingle();
   if (error) throw error;
   if (expectedVersion !== undefined && count === 0) {
-    throw new OptimisticLockError(emp.id, expectedVersion);
+    throw new OptimisticLockError(nextEmployee.id, expectedVersion);
   }
-  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(emp.id), CacheKey.orgDirectory(orgId));
-  void logAudit("employee.updated", "employee", emp.id, { firstName: emp.firstName, lastName: emp.lastName }, orgId);
+
+  let syncError: unknown = null;
+  if (nextEmployee.userId) {
+    try {
+      await syncLinkedProfileName(nextEmployee.userId, nextEmployee.firstName, nextEmployee.lastName);
+    } catch (err) {
+      syncError = err;
+    }
+  }
+  await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(nextEmployee.id), CacheKey.orgDirectory(orgId));
+  if (syncError) throw syncError;
+  void logAudit("employee.updated", "employee", nextEmployee.id, { firstName: nextEmployee.firstName, lastName: nextEmployee.lastName }, orgId);
+}
+
+export async function updateEmployeeIdentity(
+  input: {
+    employeeId: string;
+    orgId: string;
+    userId: string | null;
+    firstName: string;
+    lastName: string;
+    phone: string;
+  },
+): Promise<void> {
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim();
+  const phone = input.phone.trim();
+
+  const { error } = await supabase
+    .from("employees")
+    .update({
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", input.orgId)
+    .eq("id", input.employeeId);
+
+  if (error) throw error;
+
+  let syncError: unknown = null;
+  if (input.userId) {
+    try {
+      await syncLinkedProfileName(input.userId, firstName, lastName);
+    } catch (err) {
+      syncError = err;
+    }
+  }
+
+  await cacheDel(
+    CacheKey.employees(input.orgId),
+    CacheKey.employeeDetail(input.employeeId),
+    CacheKey.orgDirectory(input.orgId),
+  );
+  if (syncError) throw syncError;
+
+  void logAudit(
+    "employee.updated",
+    "employee",
+    input.employeeId,
+    { firstName, lastName },
+    input.orgId,
+  );
 }
 
 export async function updateEmployeeDepartments(
@@ -249,47 +358,70 @@ export async function updateEmployeeDepartments(
   await cacheDel(CacheKey.employees(orgId), CacheKey.employeeDetail(employeeId), CacheKey.orgDirectory(orgId));
 }
 
-export async function deleteEmployee(empId: string, orgId: string): Promise<void> {
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("employees")
-    .update({ archived_at: now, status: 'terminated' as EmployeeStatus, status_changed_at: now })
-    .eq("org_id", orgId)
-    .eq("id", empId);
-  if (error) throw error;
-  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("employee.archived", "employee", empId, {}, orgId);
+async function updateEmployeeStatus(
+  input: {
+    empId: string;
+    orgId: string;
+    action: "bench" | "activate" | "terminate";
+    expectedVersion: number;
+    note?: string;
+  },
+): Promise<Employee> {
+  const response = await fetch("/api/employees/status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  const body = await response.json().catch(() => null) as {
+    error?: string;
+    employee?: Employee;
+  } | null;
+
+  if (response.status === 409 && body?.employee) {
+    throw new EmployeeStatusConflictError(body.employee);
+  }
+
+  if (!response.ok || !body?.employee) {
+    throw new Error(body?.error || "Failed to update employee status");
+  }
+
+  await cacheDel(
+    CacheKey.employeeDetail(input.empId),
+    CacheKey.tenantStats(),
+    CacheKey.employees(input.orgId),
+    CacheKey.orgDirectory(input.orgId),
+  );
+
+  return body.employee;
 }
 
-export async function benchEmployee(empId: string, note: string | undefined, orgId: string): Promise<void> {
-  const { error } = await supabase
-    .from("employees")
-    .update({
-      status: 'benched' as EmployeeStatus,
-      status_changed_at: new Date().toISOString(),
-      status_note: note ?? '',
-    })
-    .eq("org_id", orgId)
-    .eq("id", empId);
-  if (error) throw error;
-  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("employee.benched", "employee", empId, { note }, orgId);
+export async function deleteEmployee(empId: string, orgId: string, expectedVersion: number): Promise<Employee> {
+  return updateEmployeeStatus({
+    empId,
+    orgId,
+    action: "terminate",
+    expectedVersion,
+  });
 }
 
-export async function activateEmployee(empId: string, orgId: string): Promise<void> {
-  const { error } = await supabase
-    .from("employees")
-    .update({
-      status: 'active' as EmployeeStatus,
-      status_changed_at: new Date().toISOString(),
-      status_note: '',
-      archived_at: null,
-    })
-    .eq("org_id", orgId)
-    .eq("id", empId);
-  if (error) throw error;
-  await cacheDel(CacheKey.employeeDetail(empId), CacheKey.tenantStats(), CacheKey.employees(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("employee.activated", "employee", empId, {}, orgId);
+export async function benchEmployee(empId: string, note: string | undefined, orgId: string, expectedVersion: number): Promise<Employee> {
+  return updateEmployeeStatus({
+    empId,
+    orgId,
+    action: "bench",
+    note,
+    expectedVersion,
+  });
+}
+
+export async function activateEmployee(empId: string, orgId: string, expectedVersion: number): Promise<Employee> {
+  return updateEmployeeStatus({
+    empId,
+    orgId,
+    action: "activate",
+    expectedVersion,
+  });
 }
 
 export interface CreateEmployeeFromOrgUserInput {
@@ -308,12 +440,27 @@ export interface CreateEmployeeFromOrgUserInput {
 export async function createEmployeeFromOrgUser(
   input: CreateEmployeeFromOrgUserInput,
 ): Promise<Employee> {
-  const response = await fetch("/api/employees/from-user", {
+  return postCreateEmployeeFromOrgUser("/api/employees/from-user", input);
+}
+
+export async function reconcileEmployeeFromOrgUser(
+  input: CreateEmployeeFromOrgUserInput,
+): Promise<Employee> {
+  return postCreateEmployeeFromOrgUser("/api/employees/from-user/reconcile", input);
+}
+
+async function postCreateEmployeeFromOrgUser(
+  url: string,
+  input: CreateEmployeeFromOrgUserInput,
+): Promise<Employee> {
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   const payload = await response.json().catch(() => null) as { error?: string; employee?: Employee } | null;
+  const mismatchError = parseNameMismatchResponse(payload);
+  if (mismatchError) throw mismatchError;
   if (!response.ok || !payload?.employee) {
     throw new Error(payload?.error || "Failed to add management user to the schedule");
   }
@@ -337,6 +484,21 @@ export async function fetchEmployeeById(
     if (!data) return null;
     return rowToEmployee(data as DbEmployee);
   });
+}
+
+export async function fetchEmployeeByUserId(
+  userId: string,
+  orgId: string,
+): Promise<Employee | null> {
+  const { data, error } = await supabase
+    .from("employees")
+    .select(EMPLOYEE_COLS)
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return rowToEmployee(data as DbEmployee);
 }
 
 // ── Employee Shifts (date-range scoped) ──────────────────────────────────────
@@ -385,28 +547,20 @@ export async function fetchEmployeeShifts(
     const effectiveAbsId = hasDraft ? draftAbsId : pubAbsId;
     const effectiveStartTime = draftStartTime ?? pubStartTime;
     const effectiveEndTime = draftEndTime ?? pubEndTime;
-    const isDraft = hasDraft && (
-      !arraysEqual(draftIds, pubIds)
-      || draftAbsId !== pubAbsId
-      || draftStartTime !== pubStartTime
-      || draftEndTime !== pubEndTime
-    );
-
-    let draftKind: DraftKind = null;
-    if (isDraft) {
-      if (row.draft_is_delete && (pubIds.length > 0 || pubAbsId != null)) draftKind = 'deleted';
-      else if (pubIds.length === 0 && pubAbsId == null) draftKind = 'new';
-      else draftKind = 'modified';
-    }
+    const draftKind: DraftKind = classifyPersistedDraftShift(row);
+    const isDraft = draftKind !== null;
 
     const publishedLabel = pubAbsId != null
       ? (atMap.get(pubAbsId) ?? '?')
       : pubIds.length > 0 ? pubIds.map(id => shiftCodeMap.get(id) ?? '?').join('/') : '';
 
-    const hasContent = effectiveIds.length > 0 || effectiveAbsId != null || row.draft_is_delete;
+    const hasContent =
+      effectiveIds.length > 0
+      || effectiveAbsId != null
+      || draftKind === "deleted";
 
     if (hasContent) {
-      const label = row.draft_is_delete
+      const label = draftKind === "deleted"
         ? "OFF"
         : effectiveAbsId != null
           ? (atMap.get(effectiveAbsId) ?? '?')
@@ -474,21 +628,10 @@ export async function fetchEmployeeInvitations(
 ): Promise<Invitation[]> {
   const { data, error } = await supabase
     .from("invitations")
-    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
+    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    orgId: row.org_id as string,
-    invitedBy: (row.invited_by as string) ?? null,
-    email: row.email as string,
-    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-    expiresAt: row.expires_at as string,
-    acceptedAt: (row.accepted_at as string) ?? null,
-    revokedAt: (row.revoked_at as string) ?? null,
-    createdAt: row.created_at as string,
-    employeeId: (row.employee_id as string) ?? null,
-  }));
+  return (data ?? []).map((row: DbInvitation) => rowToInvitation(row));
 }

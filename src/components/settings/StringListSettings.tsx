@@ -6,6 +6,10 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { ExplainerSection } from "@/components/ui/explainer-section";
+import type { ExplainerSectionProps } from "@/components/ui/explainer-section";
+import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { SectionCard } from "./shared";
 import type { DependencyInfo } from "@/lib/db";
 
@@ -20,6 +24,7 @@ export default function StringListSettings({
   initialEditing,
   onCheckDependencies,
   sectionTitle,
+  explainer,
 }: {
   label: string;
   items: NamedItem[];
@@ -34,13 +39,14 @@ export default function StringListSettings({
   onCheckDependencies?: (itemId: number) => Promise<DependencyInfo>;
   /** When provided, wraps content in a SectionCard. */
   sectionTitle?: string;
+  /** Optional explainer shown above the editable list. */
+  explainer?: ExplainerSectionProps;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [isEditing, setIsEditing] = useState(initialEditing ?? false);
   const [local, setLocal] = useState<NamedItem[]>(items);
   const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; item: NamedItem; deps: DependencyInfo | null } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,12 +79,21 @@ export default function StringListSettings({
     setError(null);
   };
 
-  const handleCancel = () => {
+  const resetDraft = useCallback(() => {
     setLocal([...items]);
-    setIsEditing(false);
     setDraggedIdx(null);
     setDragOverIdx(null);
     setError(null);
+    setDeleteConfirm(null);
+  }, [items]);
+
+  const handleDiscard = () => {
+    resetDraft();
+  };
+
+  const handleClose = () => {
+    resetDraft();
+    setIsEditing(false);
   };
 
   const handleSave = async () => {
@@ -101,9 +116,7 @@ export default function StringListSettings({
     setError(null);
     try {
       await onSave(cleaned);
-      setSaved(true);
       setIsEditing(false);
-      setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -248,9 +261,27 @@ export default function StringListSettings({
       ? `24px 2fr 1fr${deptCol} auto`
       : `2fr 1fr${deptCol}`;
 
-  const actionButtons = (
-    <>
-      {!isEditing && canEdit && displayList.length > 0 && (
+  const footerActions = isEditing ? (
+    <EditorActionRow
+      secondaryAction={(
+        <button onClick={isDirty ? handleDiscard : handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
+          {getEditorDismissLabel(isDirty)}
+        </button>
+      )}
+      primaryAction={(
+        <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+          {getEditorSaveLabel(saving)}
+        </button>
+      )}
+      style={{
+        marginTop: 12,
+        padding: sectionTitle ? "12px 16px" : undefined,
+        borderTop: sectionTitle ? "1px solid var(--color-border-light)" : undefined,
+      }}
+    />
+  ) : canEdit && displayList.length > 0 ? (
+    <EditorActionRow
+      primaryAction={(
         <button
           onClick={handleEnterEdit}
           className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -258,25 +289,16 @@ export default function StringListSettings({
           Edit
         </button>
       )}
-      {isEditing && (
-        <>
-          <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
-            {saving ? "Saving\u2026" : "Save All"}
-          </button>
-          <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">
-            Cancel
-          </button>
-        </>
-      )}
-      {saved && (
-        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-success)", fontWeight: 600 }}>Saved!</span>
-      )}
-    </>
-  );
+      style={{
+        marginTop: 12,
+        padding: sectionTitle ? "12px 16px" : undefined,
+        borderTop: sectionTitle ? "1px solid var(--color-border-light)" : undefined,
+      }}
+    />
+  ) : null;
 
   const content = (
-    <div>
-
+    <div style={{ display: "flex", flexDirection: "column" }}>
       {/* Table */}
       {displayList.length === 0 && !isEditing ? (
         <EmptyState
@@ -474,10 +496,12 @@ export default function StringListSettings({
       )}
 
       {error && (
-        <div style={{ marginTop: 12, padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        <div style={{ marginTop: 12, padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--dg-radius-md)", color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           <strong>Save Error:</strong> {error}
         </div>
       )}
+
+      {footerActions}
 
       {deleteConfirm && (
         deleteConfirm.deps?.hasDependencies ? (
@@ -518,15 +542,30 @@ export default function StringListSettings({
   );
 
   if (sectionTitle) {
+    if (explainer) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <ExplainerSection {...explainer} />
+          <SectionCard noPadding>
+            {content}
+          </SectionCard>
+        </div>
+      );
+    }
+
     return (
       <SectionCard noPadding>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {actionButtons}
-          </div>
-        </div>
         {content}
       </SectionCard>
+    );
+  }
+
+  if (explainer) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <ExplainerSection {...explainer} />
+        {content}
+      </div>
     );
   }
 

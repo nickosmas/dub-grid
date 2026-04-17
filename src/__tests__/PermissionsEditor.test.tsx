@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import PermissionsEditor from "@/components/PermissionsEditor";
 
 describe("PermissionsEditor", () => {
-  it("enables Save Permissions only after a real permission change and disables it when reverted", async () => {
+  it("enables Save only after a real permission change and disables it when reverted", async () => {
     const user = userEvent.setup();
 
     render(
@@ -17,7 +17,7 @@ describe("PermissionsEditor", () => {
       />,
     );
 
-    const saveButton = screen.getByRole("button", { name: /save permissions/i });
+    const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /select all/i }));

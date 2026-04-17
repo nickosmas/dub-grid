@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminPermissions, OrganizationUser, OrganizationRole } from "@/types";
 import {
   fetchOrganizationUsers,
-  changeOrganizationUserRole,
-  updateAdminPermissions,
   fetchInvitations,
-  revokeInvitation,
-  resendInvitation,
-  removeUserFromOrganization,
+  updateOrganizationMembershipGuarded,
+  OrganizationAccessConflictError,
+  removeOrganizationMembershipGuarded,
+  revokeOrganizationInvitationGuarded,
+  resendOrganizationInvitationGuarded,
+  InvitationAccessConflictError,
 } from "@/lib/db";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -31,6 +32,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EDITOR_ACTION_LABELS, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import ChangeReviewModal from "@/components/review/ChangeReviewModal";
+import { buildInvitationRevocationChanges, buildMembershipAccessChanges } from "@/lib/access-management";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 // ── Admin permission metadata ──────────────────────────────────────────────────
 
@@ -129,6 +135,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [editingPerms, setEditingPerms] = useState<Record<string, AdminPermissions>>({});
   const [savingPerms, setSavingPerms] = useState<string | null>(null);
+  const pendingPermissionsExitRef = useRef<string | null>(null);
 
   // Revoke access
   const [revokeConfirm, setRevokeConfirm] = useState<{ userId: string; userName: string } | null>(null);
@@ -136,6 +143,11 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
   // Invitation actions
   const [invitationAction, setInvitationAction] = useState<string | null>(null);
+  const [permissionsReview, setPermissionsReview] = useState<{
+    userId: string;
+    changes: ReturnType<typeof buildMembershipAccessChanges>;
+  } | null>(null);
+  const [invitationRevokeConfirm, setInvitationRevokeConfirm] = useState<import("@/types").Invitation | null>(null);
 
   // ── Data fetching ────────────────────────────────────────────────────────────
 
@@ -198,14 +210,111 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     );
   };
 
+  const replaceUser = (updatedUser: OrganizationUser) => {
+    setUsers((prev) => prev.map((user) => (
+      user.id === updatedUser.id ? updatedUser : user
+    )));
+  };
+
+  const replaceInvitation = (updatedInvitation: import("@/types").Invitation) => {
+    setInvitations((prev) => prev.map((invitation) => (
+      invitation.id === updatedInvitation.id ? updatedInvitation : invitation
+    )));
+  };
+
+  const permissionKeys = useMemo(
+    () => PERM_GROUPS.flatMap((group) => group.keys),
+    [],
+  );
+
+  const expandedUser = useMemo(
+    () => users.find((user) => user.id === expandedUserId) ?? null,
+    [expandedUserId, users],
+  );
+
+  const expandedSavedPerms = useMemo(
+    () => (
+      expandedUser
+        ? { ...emptyAdminPerms(), ...(expandedUser.adminPermissions ?? {}) }
+        : null
+    ),
+    [expandedUser],
+  );
+
+  const hasExpandedUnsavedChanges = useMemo(() => {
+    if (!expandedUserId || !expandedSavedPerms || editingPerms[expandedUserId] == null) return false;
+    return permissionKeys.some((key) => editingPerms[expandedUserId][key] !== expandedSavedPerms[key]);
+  }, [editingPerms, expandedSavedPerms, expandedUserId, permissionKeys]);
+
+  const primePermissionsDraft = useCallback((user: OrganizationUser) => {
+    setEditingPerms((prev) => ({
+      ...prev,
+      [user.id]: { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) },
+    }));
+  }, []);
+
+  const discardExpandedPermissionsDraft = useCallback((userId: string) => {
+    const user = users.find((candidate) => candidate.id === userId);
+    if (!user) return;
+    primePermissionsDraft(user);
+  }, [primePermissionsDraft, users]);
+
+  const completePermissionsExit = useCallback((nextUserId: string | null) => {
+    if (expandedUserId) {
+      discardExpandedPermissionsDraft(expandedUserId);
+    }
+
+    if (!nextUserId) {
+      setExpandedUserId(null);
+      return;
+    }
+
+    const nextUser = users.find((user) => user.id === nextUserId);
+    if (!nextUser) {
+      setExpandedUserId(null);
+      return;
+    }
+
+    setExpandedUserId(nextUser.id);
+    primePermissionsDraft(nextUser);
+  }, [discardExpandedPermissionsDraft, expandedUserId, primePermissionsDraft, users]);
+
+  const { requestClose: requestPermissionsExit, unsavedChangesDialog: permissionsUnsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: hasExpandedUnsavedChanges,
+    onDiscard: () => {
+      const nextUserId = pendingPermissionsExitRef.current;
+      pendingPermissionsExitRef.current = null;
+      completePermissionsExit(nextUserId);
+    },
+  });
+
+  const attemptPermissionsExit = useCallback((nextUserId: string | null) => {
+    pendingPermissionsExitRef.current = nextUserId;
+    if (requestPermissionsExit()) {
+      pendingPermissionsExitRef.current = null;
+      completePermissionsExit(nextUserId);
+    }
+  }, [completePermissionsExit, requestPermissionsExit]);
+
   const handleRoleChange = async (userId: string, newRole: OrganizationRole) => {
     setSaving(userId);
     setError(null);
     try {
       const target = users.find((u) => u.id === userId);
+      if (!target?.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
       const oldRole = target?.orgRole ?? "user";
-      await changeOrganizationUserRole(userId, newRole, orgId, target?.email ?? undefined);
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, orgRole: newRole } : u));
+      const updatedUser = await updateOrganizationMembershipGuarded({
+        orgId,
+        userId,
+        expectedUpdatedAt: target.updatedAt,
+        orgRole: newRole,
+        adminPermissions: newRole === "admin"
+          ? target.adminPermissions
+          : null,
+      });
+      replaceUser(updatedUser);
       toast.success("Role updated");
       queueNotification({ action: "role_changed", orgId, targetUserId: userId, fromRole: oldRole, toRole: newRole });
       // Auto-expand permissions panel when promoting to admin
@@ -213,12 +322,18 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         setExpandedUserId(userId);
         setEditingPerms((prev) => ({
           ...prev,
-          [userId]: { ...emptyAdminPerms(), ...(target?.adminPermissions ?? {}) },
+          [userId]: { ...emptyAdminPerms(), ...(updatedUser.adminPermissions ?? {}) },
         }));
       } else if (expandedUserId === userId) {
         setExpandedUserId(null);
       }
     } catch (e) {
+      if (e instanceof OrganizationAccessConflictError) {
+        replaceUser(e.latestUser);
+        setRoleChangeConfirm(null);
+        toast.error("User access changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       toast.error("Failed to change role");
       setError(e instanceof Error ? e.message : "Failed to change role");
     } finally {
@@ -234,7 +349,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
   const confirmRoleChange = () => {
     if (!roleChangeConfirm) return;
-    handleRoleChange(roleChangeConfirm.userId, roleChangeConfirm.to);
+    void handleRoleChange(roleChangeConfirm.userId, roleChangeConfirm.to);
     setRoleChangeConfirm(null);
   };
 
@@ -242,10 +357,23 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     if (!revokeConfirm) return;
     setRevoking(true);
     try {
-      await removeUserFromOrganization(revokeConfirm.userId, orgId);
+      const target = users.find((user) => user.id === revokeConfirm.userId);
+      if (!target?.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
+      await removeOrganizationMembershipGuarded({
+        orgId,
+        userId: revokeConfirm.userId,
+        expectedUpdatedAt: target.updatedAt,
+      });
       setUsers((prev) => prev.filter((u) => u.id !== revokeConfirm.userId));
       toast.success("Access revoked");
     } catch (e) {
+      if (e instanceof OrganizationAccessConflictError) {
+        replaceUser(e.latestUser);
+        toast.error("User access changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       toast.error(e instanceof Error ? e.message : "Failed to revoke access");
     } finally {
       setRevoking(false);
@@ -254,14 +382,15 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
   };
 
   const openPermissions = (user: OrganizationUser) => {
-    if (expandedUserId === user.id) { setExpandedUserId(null); return; }
-    setExpandedUserId(user.id);
-    // Always re-initialize from the user's current permissions to avoid stale data
-    // (e.g. if another super_admin changed their permissions since last open).
-    setEditingPerms((prev) => ({
-      ...prev,
-      [user.id]: { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) },
-    }));
+    if (expandedUserId === user.id) {
+      attemptPermissionsExit(null);
+      return;
+    }
+    if (expandedUserId) {
+      attemptPermissionsExit(user.id);
+      return;
+    }
+    completePermissionsExit(user.id);
   };
 
   const handlePermToggle = (userId: string, key: keyof AdminPermissions, value: boolean) => {
@@ -272,14 +401,70 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     setSavingPerms(userId);
     setError(null);
     try {
-      await updateAdminPermissions(userId, editingPerms[userId], orgId, users.find((u) => u.id === userId)?.email ?? undefined);
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, adminPermissions: editingPerms[userId] } : u));
+      const target = users.find((user) => user.id === userId);
+      if (!target?.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
+      const updatedUser = await updateOrganizationMembershipGuarded({
+        orgId,
+        userId,
+        expectedUpdatedAt: target.updatedAt,
+        adminPermissions: editingPerms[userId],
+      });
+      replaceUser(updatedUser);
+      setPermissionsReview(null);
       toast.success("Permissions saved");
     } catch (e) {
+      if (e instanceof OrganizationAccessConflictError) {
+        replaceUser(e.latestUser);
+        setEditingPerms((prev) => ({
+          ...prev,
+          [userId]: { ...emptyAdminPerms(), ...(e.latestUser.adminPermissions ?? {}) },
+        }));
+        setPermissionsReview(null);
+        toast.error("Permissions changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       toast.error("Failed to save permissions");
       setError(e instanceof Error ? e.message : "Failed to save permissions");
     } finally {
       setSavingPerms(null);
+    }
+  };
+
+  const requestPermsSave = (userId: string) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) return;
+    const nextPermissions = editingPerms[userId];
+    const changes = buildMembershipAccessChanges(target, {
+      orgRole: target.orgRole,
+      adminPermissions: nextPermissions,
+    });
+    if (changes.length === 0) return;
+    setPermissionsReview({ userId, changes });
+  };
+
+  const handleInvitationRevoke = async () => {
+    if (!invitationRevokeConfirm?.updatedAt) return;
+    setInvitationAction(invitationRevokeConfirm.id);
+    try {
+      const revokedInvitation = await revokeOrganizationInvitationGuarded({
+        orgId,
+        invitationId: invitationRevokeConfirm.id,
+        expectedUpdatedAt: invitationRevokeConfirm.updatedAt,
+      });
+      replaceInvitation(revokedInvitation);
+      toast.success("Invitation revoked");
+    } catch (err) {
+      if (err instanceof InvitationAccessConflictError) {
+        replaceInvitation(err.latestInvitation);
+        toast.error("Invitation changed elsewhere. Review the latest values and try again.");
+      } else {
+        toast.error("Failed to revoke");
+      }
+    } finally {
+      setInvitationAction(null);
+      setInvitationRevokeConfirm(null);
     }
   };
 
@@ -352,11 +537,11 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         </div>
         <Separator />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[88px] rounded-xl" />)}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[88px] rounded-[var(--dg-radius-md)]" />)}
         </div>
-        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-[var(--dg-radius-sm)]" />
         <Skeleton className="h-8 w-80" />
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-[var(--dg-radius-md)] border border-border overflow-hidden">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-border last:border-b-0">
               <Skeleton className="h-8 w-8 rounded-full shrink-0" />
@@ -378,7 +563,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     <div className="space-y-8">
       {/* Error banner */}
       {error && (
-        <div className="rounded-lg border px-4 py-3 text-[13px]" style={{ background: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
+        <div className="rounded-[var(--dg-radius-md)] border px-4 py-3 text-[13px]" style={{ background: "var(--color-danger-bg)", borderColor: "var(--color-danger-border)", color: "var(--color-danger-text)" }}>
           {error}
         </div>
       )}
@@ -450,7 +635,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or email..."
-          style={{ height: 40, paddingLeft: 36 }}
+          style={{ height: "var(--dg-toolbar-h)", paddingLeft: 36 }}
         />
       </div>
 
@@ -495,7 +680,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
       {/* ── Active Users Tab ──────────────────────────────────────────────── */}
       {activeTab === "active" && (
-          <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+          <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent bg-[var(--color-bg)]">
@@ -555,9 +740,8 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
                   const savedPerms = { ...emptyAdminPerms(), ...(user.adminPermissions ?? {}) };
                   const perms = editingPerms[user.id] ?? savedPerms;
-                  const allPermKeys = PERM_GROUPS.flatMap((g) => g.keys);
                   const hasUnsavedChanges = isExpanded && editingPerms[user.id] != null &&
-                    allPermKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
+                    permissionKeys.some((key) => editingPerms[user.id][key] !== savedPerms[key]);
 
                   const lastLogin = formatDate(user.lastSignInAt);
 
@@ -691,7 +875,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
                                           return (
                                             <div key={mod.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-[var(--color-bg)] transition-colors items-center">
                                               <div className="col-span-1 md:col-span-8 flex items-start">
-                                                <div className={`p-2 rounded-lg mr-4 shrink-0 ${isActive ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)]" : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)]"}`}>
+                                                <div className={`p-2 rounded-[var(--dg-radius-sm)] mr-4 shrink-0 ${isActive ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)]" : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)]"}`}>
                                                   {(() => { const ModIcon = MODULE_ICONS[mod.icon as keyof typeof MODULE_ICONS]; return ModIcon ? <ModIcon /> : null; })()}
                                                 </div>
                                                 <div>
@@ -765,28 +949,33 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
                               })()}
 
                               {/* Save / Undo */}
-                              <div className="flex items-center gap-3 px-6 py-4 border-t border-[var(--color-border-light)] bg-[var(--color-bg)]">
-                                <button
-                                  onClick={() => handlePermsSave(user.id)}
-                                  disabled={savingPerms === user.id || !hasUnsavedChanges}
-                                  className="dg-btn dg-btn-primary dg-btn-sm"
-                                >
-                                  {savingPerms === user.id ? "Saving..." : "Save Permissions"}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (hasUnsavedChanges) {
-                                      setEditingPerms((prev) => ({ ...prev, [user.id]: { ...savedPerms } }));
-                                    } else {
-                                      setExpandedUserId(null);
-                                    }
-                                  }}
-                                  disabled={savingPerms === user.id}
-                                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                                >
-                                  {hasUnsavedChanges ? "Undo Changes" : "Collapse"}
-                                </button>
-                              </div>
+                              <EditorActionRow
+                                className="px-6 py-4 border-t border-[var(--color-border-light)] bg-[var(--color-bg)]"
+                                secondaryAction={(
+                                  <button
+                                    onClick={() => {
+                                      if (hasUnsavedChanges) {
+                                        setEditingPerms((prev) => ({ ...prev, [user.id]: { ...savedPerms } }));
+                                      } else {
+                                        attemptPermissionsExit(null);
+                                      }
+                                    }}
+                                    disabled={savingPerms === user.id}
+                                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                                  >
+                                    {hasUnsavedChanges ? EDITOR_ACTION_LABELS.discard : EDITOR_ACTION_LABELS.close}
+                                  </button>
+                                )}
+                                primaryAction={(
+                                  <button
+                                    onClick={() => requestPermsSave(user.id)}
+                                    disabled={savingPerms === user.id || !hasUnsavedChanges}
+                                    className="dg-btn dg-btn-primary dg-btn-sm"
+                                  >
+                                    {getEditorSaveLabel(savingPerms === user.id)}
+                                  </button>
+                                )}
+                              />
                             </div>
                           </TableCell>
                         </TableRow>
@@ -801,7 +990,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
       {/* ── Pending Requests Tab ──────────────────────────────────────────── */}
       {activeTab === "pending" && (
-          <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+          <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
             {pendingInvitations.length === 0 ? (
               <div className="py-16 flex flex-col items-center gap-2">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-faint)]">
@@ -859,13 +1048,27 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
                             <button
                               disabled={invitationAction === inv.id}
                               onClick={async () => {
+                                if (!inv.updatedAt) {
+                                  toast.error("Invitation data is out of date. Refresh and try again.");
+                                  return;
+                                }
                                 setInvitationAction(inv.id);
                                 try {
-                                  await resendInvitation(inv.id, orgId);
-                                  const refreshed = await fetchInvitations(orgId);
-                                  setInvitations(refreshed);
+                                  const resent = await resendOrganizationInvitationGuarded({
+                                    orgId,
+                                    invitationId: inv.id,
+                                    expectedUpdatedAt: inv.updatedAt,
+                                  });
+                                  replaceInvitation(resent.invitation);
                                   toast.success("Invitation resent");
-                                } catch { toast.error("Failed to resend"); }
+                                } catch (err) {
+                                  if (err instanceof InvitationAccessConflictError) {
+                                    replaceInvitation(err.latestInvitation);
+                                    toast.error("Invitation changed elsewhere. Review the latest values and try again.");
+                                  } else {
+                                    toast.error("Failed to resend");
+                                  }
+                                }
                                 finally { setInvitationAction(null); }
                               }}
                               className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -875,16 +1078,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
                             {!isExpired && (
                               <button
                                 disabled={invitationAction === inv.id}
-                                onClick={async () => {
-                                  setInvitationAction(inv.id);
-                                  try {
-                                    await revokeInvitation(inv.id, orgId);
-                                    const refreshed = await fetchInvitations(orgId);
-                                    setInvitations(refreshed);
-                                    toast.success("Invitation revoked");
-                                  } catch { toast.error("Failed to revoke"); }
-                                  finally { setInvitationAction(null); }
-                                }}
+                                onClick={() => setInvitationRevokeConfirm(inv)}
                                 className="dg-btn dg-btn-danger dg-btn-sm"
                               >
                                 Revoke
@@ -903,7 +1097,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
       {/* ── Revoked Users Tab ─────────────────────────────────────────────── */}
       {activeTab === "revoked" && (
-          <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+          <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
             {deniedInvitations.length === 0 ? (
               <div className="py-16 flex flex-col items-center gap-2">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-faint)]">
@@ -973,6 +1167,42 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
           onCancel={() => setRevokeConfirm(null)}
         />
       )}
+
+      {permissionsReview ? (
+        <ChangeReviewModal
+          title="Review Permission Changes"
+          description="Review these permission changes before saving. Admin access changes affect what this person can see and do across the organization."
+          changes={permissionsReview.changes}
+          saving={savingPerms === permissionsReview.userId}
+          confirmLabel="Confirm Save"
+          warningText="This save updates sensitive admin permissions."
+          onCancel={() => {
+            if (!savingPerms) setPermissionsReview(null);
+          }}
+          onConfirm={() => {
+            void handlePermsSave(permissionsReview.userId);
+          }}
+        />
+      ) : null}
+
+      {invitationRevokeConfirm ? (
+        <ChangeReviewModal
+          title="Review Invitation Revocation"
+          description="Review this invitation change before saving. Revoking an invitation immediately blocks the recipient from using the current invite link."
+          changes={buildInvitationRevocationChanges()}
+          saving={invitationAction === invitationRevokeConfirm.id}
+          confirmLabel="Revoke Invitation"
+          warningText="This change revokes a pending invitation."
+          onCancel={() => {
+            if (!invitationAction) setInvitationRevokeConfirm(null);
+          }}
+          onConfirm={() => {
+            void handleInvitationRevoke();
+          }}
+        />
+      ) : null}
+
+      {permissionsUnsavedChangesDialog}
     </div>
   );
 }

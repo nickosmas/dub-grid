@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { updateOrganization } from "@/lib/db";
+import { OrganizationSettingsConflictError, updateOrganizationSettings } from "@/lib/db";
+import { getEditorSaveLabel, EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import type { Organization } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const KNOWN_FLAGS: { name: string; label: string; description: string }[] = [
   { name: "beta_shift_requests", label: "Shift Requests (Beta)", description: "Enable shift pickup and swap request workflow" },
@@ -14,6 +17,8 @@ const KNOWN_FLAGS: { name: string; label: string; description: string }[] = [
   { name: "maintenance_mode", label: "Maintenance Mode", description: "Put org in read-only mode (data migration, incident response)" },
   { name: "disable_realtime", label: "Disable Realtime", description: "Turn off Supabase Realtime subscriptions for this org" },
 ];
+
+const HIGH_IMPACT_FLAGS = new Set(["maintenance_mode", "disable_realtime"]);
 
 function normalizeFlagState(flags: Record<string, boolean>): Record<string, boolean> {
   return Object.fromEntries(
@@ -38,32 +43,48 @@ export default function FeatureFlagsEditor({
     () => normalizeFlagState(organization.featureOverrides ?? {}),
     [organization.featureOverrides],
   );
-  const propFlagsKey = serializeFlagState(propFlags);
   const [flags, setFlags] = useState<Record<string, boolean>>(propFlags);
   const [savedFlags, setSavedFlags] = useState<Record<string, boolean>>(propFlags);
   const [saving, setSaving] = useState(false);
   const [newFlagName, setNewFlagName] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const hasChanges = serializeFlagState(flags) !== serializeFlagState(savedFlags);
 
   useEffect(() => {
     setFlags(propFlags);
     setSavedFlags(propFlags);
-  }, [organization.id, propFlagsKey]);
+  }, [organization.id, propFlags]);
 
   async function handleSave() {
+    if (!organization.updatedAt) {
+      toast.error("Organization data is out of date. Refresh and try again.");
+      return;
+    }
     setSaving(true);
     try {
       const nextFlags = normalizeFlagState(flags);
-      const updated = { ...organization, featureOverrides: nextFlags };
-      await updateOrganization(updated);
+      const updated = await updateOrganizationSettings({
+        orgId: organization.id,
+        expectedUpdatedAt: organization.updatedAt,
+        featureOverrides: nextFlags,
+      });
       setFlags(nextFlags);
       setSavedFlags(nextFlags);
       toast.success("Feature flags updated");
       onUpdated?.(updated);
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to update flags");
+      if (err instanceof OrganizationSettingsConflictError) {
+        const latestFlags = normalizeFlagState(err.latestOrganization.featureOverrides ?? {});
+        setFlags(latestFlags);
+        setSavedFlags(latestFlags);
+        onUpdated?.(err.latestOrganization);
+        toast.error("Feature flags changed elsewhere. Review the latest values and try again.");
+      } else {
+        toast.error((err instanceof Error ? err.message : null) ?? "Failed to update flags");
+      }
     } finally {
       setSaving(false);
+      setConfirmOpen(false);
     }
   }
 
@@ -89,6 +110,12 @@ export default function FeatureFlagsEditor({
 
   // All flags: known + any custom ones from the current overrides
   const customFlags = Object.keys(flags).filter((k) => !KNOWN_FLAGS.find((f) => f.name === k));
+  const hasHighImpactChanges = useMemo(() => {
+    const nextFlags = normalizeFlagState(flags);
+    return Object.keys(nextFlags).some((flag) =>
+      HIGH_IMPACT_FLAGS.has(flag) && (nextFlags[flag] ?? false) !== (savedFlags[flag] ?? false),
+    );
+  }, [flags, savedFlags]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -163,14 +190,44 @@ export default function FeatureFlagsEditor({
       </div>
 
       {/* Save */}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
-          {saving ? "Saving…" : "Save Changes"}
-        </button>
-        <button className="dg-btn dg-btn-secondary" onClick={() => setFlags(savedFlags)} disabled={saving || !hasChanges}>
-          Discard
-        </button>
-      </div>
+      <EditorActionRow
+        secondaryAction={(
+          hasChanges ? (
+            <button className="dg-btn dg-btn-secondary" onClick={() => setFlags(savedFlags)} disabled={saving}>
+              {EDITOR_ACTION_LABELS.discard}
+            </button>
+          ) : undefined
+        )}
+        primaryAction={(
+          <button
+            className="dg-btn dg-btn-primary"
+            onClick={() => {
+              if (hasHighImpactChanges) {
+                setConfirmOpen(true);
+              } else {
+                void handleSave();
+              }
+            }}
+            disabled={saving || !hasChanges}
+          >
+            {getEditorSaveLabel(saving)}
+          </button>
+        )}
+      />
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title="Save Feature Flag Changes"
+          message="This change updates high-impact organization flags. Review carefully before saving because these flags can affect workspace-wide behavior."
+          confirmLabel="Save Changes"
+          variant="warning"
+          isLoading={saving}
+          onConfirm={() => {
+            void handleSave();
+          }}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      )}
     </div>
   );
 }

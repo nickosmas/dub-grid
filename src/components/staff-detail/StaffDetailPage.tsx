@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
-import { useOrganizationData, usePermissions } from "@/hooks";
+import InviteEmployeeModal from "@/components/InviteEmployeeModal";
+import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
+import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import {
   fetchEmployeeById,
   fetchEmployeeShifts,
@@ -13,10 +17,17 @@ import {
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
   fetchShiftRequests,
+  updateEmployee,
+  revokeInvitation,
+  removeUserFromOrganization,
   benchEmployee,
   activateEmployee,
   deleteEmployee,
+  EmployeeStatusConflictError,
+  OptimisticLockError,
 } from "@/lib/db";
+import { queryKeys } from "@/lib/query-keys";
+import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
 import {
   computeEmployeeWeeklyHours,
   formatDateKey,
@@ -24,6 +35,7 @@ import {
   getWeekStart,
 } from "@/lib/dashboard-stats";
 import type {
+  DirectoryPerson,
   Employee,
   RecurringShift,
   ShiftMap,
@@ -33,6 +45,9 @@ import type {
 } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { StaffDetailHeader } from "./StaffDetailHeader";
+import EditEmployeePanel from "@/components/EditEmployeePanel";
+import { EmployeeStatusActions } from "./EmployeeStatusActions";
+import { ProfileSectionTabs } from "@/components/profile/ProfileSectionTabs";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ScheduleTab } from "./tabs/ScheduleTab";
 import { ActivityTab } from "./tabs/ActivityTab";
@@ -52,6 +67,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     shiftCategories,
     certifications,
     orgRoles,
+    departments,
     shiftCodeMap,
     absenceTypeMap,
     loading: orgLoading,
@@ -65,8 +81,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<"overview" | "schedule" | "activity">("overview");
+  const [showManagementPanel, setShowManagementPanel] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
 
   const orgId = perms.orgId ?? org?.id ?? null;
+  const { directory } = useDirectory(orgId);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (perms.isLoading) return;
@@ -165,45 +187,134 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     perms.isLoading,
   ]);
 
+  useEffect(() => {
+    setActiveSection("overview");
+    setShowManagementPanel(false);
+    setShowInviteModal(false);
+    setShowManagementAccessModal(false);
+  }, [employeeId]);
+
+  const refreshInvitations = useCallback(async () => {
+    if (!orgId) return;
+    try {
+      const refreshed = await fetchEmployeeInvitations(orgId, employeeId);
+      setInvitations(refreshed);
+    } catch {
+      // Non-critical refresh path for invite-related UI
+    }
+  }, [employeeId, orgId]);
+
+  const refreshDirectory = useCallback(() => {
+    if (!orgId) return;
+    void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+  }, [orgId, queryClient]);
+
+  const syncEmployeeCaches = useCallback((updatedEmployee?: Employee | null) => {
+    if (!orgId || !updatedEmployee) return;
+
+    setEmployee(updatedEmployee);
+    queryClient.setQueryData(
+      queryKeys.employees.all(orgId),
+      (current: Employee[] | undefined) =>
+        current ? upsertEmployeeInList(current, updatedEmployee) : current,
+    );
+    queryClient.setQueryData(
+      queryKeys.org.directory(orgId),
+      (current: DirectoryPerson[] | undefined) =>
+        current?.map((person) => (
+          person.employeeId === updatedEmployee.id
+            ? mergeEmployeeIntoDirectoryPerson(person, updatedEmployee)
+            : person
+        )) ?? current,
+    );
+  }, [orgId, queryClient]);
+
+  const handleSaveEmployee = useCallback(async (updatedEmployee: Employee) => {
+    if (!orgId || !employee) return;
+    const previousEmployee = employee;
+    setEmployee(updatedEmployee);
+    try {
+      await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+      syncEmployeeCaches(updatedEmployee);
+      toast.success("Employee saved");
+      refreshDirectory();
+    } catch (err) {
+      if (err instanceof OptimisticLockError) {
+        const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
+        if (latestEmployee) {
+          setEmployee(latestEmployee);
+          syncEmployeeCaches(latestEmployee);
+        } else {
+          setEmployee(previousEmployee);
+        }
+        toast.error("Employee details changed elsewhere. Review the latest values and try again.");
+        return;
+      }
+      setEmployee(previousEmployee);
+      toast.error("Failed to save employee");
+    }
+  }, [employee, orgId, refreshDirectory, syncEmployeeCaches]);
+
   // ── Status action handlers ──────────────────────────────────────────────────
   const handleBench = useCallback(async (empId: string, note?: string) => {
-    if (!orgId) return;
+    if (!orgId || !employee) return;
     setEmployee((prev) => prev ? { ...prev, status: "benched" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() } : prev);
     try {
-      await benchEmployee(empId, note, orgId);
+      const updatedEmployee = await benchEmployee(empId, note, orgId, employee.version);
+      syncEmployeeCaches(updatedEmployee);
       toast.success("Employee benched");
-    } catch {
+    } catch (err) {
+      if (err instanceof EmployeeStatusConflictError) {
+        setEmployee(err.latestEmployee);
+        syncEmployeeCaches(err.latestEmployee);
+        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       // Revert on failure
       setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "" } : prev);
       toast.error("Failed to bench employee");
     }
-  }, [orgId]);
+  }, [employee, orgId, syncEmployeeCaches]);
 
   const handleActivate = useCallback(async (empId: string) => {
-    if (!orgId) return;
+    if (!orgId || !employee) return;
     const prevStatus = employee?.status;
     setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "", statusChangedAt: new Date().toISOString() } : prev);
     try {
-      await activateEmployee(empId, orgId);
+      const updatedEmployee = await activateEmployee(empId, orgId, employee.version);
+      syncEmployeeCaches(updatedEmployee);
       toast.success("Employee activated");
-    } catch {
+    } catch (err) {
+      if (err instanceof EmployeeStatusConflictError) {
+        setEmployee(err.latestEmployee);
+        syncEmployeeCaches(err.latestEmployee);
+        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "benched" } : prev);
       toast.error("Failed to activate employee");
     }
-  }, [orgId, employee?.status]);
+  }, [employee, orgId, syncEmployeeCaches]);
 
   const handleTerminate = useCallback(async (empId: string) => {
-    if (!orgId) return;
+    if (!orgId || !employee) return;
     const prevStatus = employee?.status;
     setEmployee((prev) => prev ? { ...prev, status: "terminated" as const, statusChangedAt: new Date().toISOString() } : prev);
     try {
-      await deleteEmployee(empId, orgId);
+      const updatedEmployee = await deleteEmployee(empId, orgId, employee.version);
+      syncEmployeeCaches(updatedEmployee);
       toast.success("Employee terminated");
-    } catch {
+    } catch (err) {
+      if (err instanceof EmployeeStatusConflictError) {
+        setEmployee(err.latestEmployee);
+        syncEmployeeCaches(err.latestEmployee);
+        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "active" } : prev);
       toast.error("Failed to terminate employee");
     }
-  }, [orgId, employee?.status]);
+  }, [employee, orgId, syncEmployeeCaches]);
 
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
@@ -256,6 +367,47 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return invitations.find(i => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date()) ?? null;
   }, [invitations]);
 
+  const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
+  const canManageManagementAccess = perms.isSuperAdmin || perms.isGridmaster;
+  const directoryPerson = useMemo(
+    () => directory.find((person) => person.employeeId === employee?.id) ?? null,
+    [directory, employee?.id],
+  );
+  const hasPendingManagementInvite = !!directoryPerson
+    && directoryPerson.managementDepartmentIds.length > 0
+    && directoryPerson.invitationStatus !== null
+    && !directoryPerson.hasAppAccess;
+
+  const handleRevokeInvitation = useCallback(async (invitationId: string) => {
+    if (!orgId) return false;
+    try {
+      await revokeInvitation(invitationId, orgId);
+      await refreshInvitations();
+      refreshDirectory();
+      toast.success("Invitation revoked");
+      return true;
+    } catch {
+      toast.error("Failed to revoke invitation");
+      return false;
+    }
+  }, [orgId, refreshDirectory, refreshInvitations]);
+
+  const handleRevokeAccess = useCallback(async (userId: string) => {
+    if (!orgId || !perms.isSuperAdmin) return;
+    try {
+      await removeUserFromOrganization(userId, orgId);
+      refreshDirectory();
+      toast.success("App access revoked");
+    } catch {
+      toast.error("Failed to revoke app access");
+    }
+  }, [orgId, perms.isSuperAdmin, refreshDirectory]);
+
+  const showQuickActions = perms.canManageEmployees
+    || canManageManagementAccess
+    || (perms.canManageEmployees && !!pendingInvite)
+    || (perms.canManageEmployees && !employee?.userId && !!employee?.email);
+
   const isLoading = loading || orgLoading || perms.isLoading;
 
   if (!perms.isLoading && !perms.canViewEmployeeDetails) {
@@ -269,7 +421,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           <p className="text-muted-foreground mb-4">{error}</p>
           <button
             onClick={() => router.push("/people")}
-            className="px-5 py-2 rounded-lg border border-border bg-card text-card-foreground font-semibold text-sm cursor-pointer hover:bg-muted transition-colors"
+            className="px-5 py-2 rounded-[var(--dg-radius-md)] border border-border bg-card text-card-foreground font-semibold text-sm cursor-pointer hover:bg-muted transition-colors"
           >
             Back to Staff
           </button>
@@ -283,74 +435,228 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       <ProgressBar loading={isLoading} />
 
       {!isLoading && employee && org && (
-        <div className="max-w-[1100px] mx-auto px-5 py-6 pb-16">
-          <StaffDetailHeader
-            employee={employee}
-            focusAreas={focusAreas}
-            certifications={certifications}
-            orgRoles={orgRoles}
-            org={org}
-            canManageEmployees={perms.canManageEmployees}
-            thisWeekHours={thisWeekHours}
-            pendingInvite={pendingInvite}
-            onBench={perms.canManageEmployees ? handleBench : undefined}
-            onActivate={perms.canManageEmployees ? handleActivate : undefined}
-            onTerminate={perms.canManageEmployees ? handleTerminate : undefined}
-          />
+        <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+          <div className="mx-auto max-w-[1100px] space-y-8 pb-10 dg-page-enter">
+            <Link
+              href="/people"
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-primary)]"
+            >
+              <ChevronLeft className="size-4" strokeWidth={2.5} />
+              People
+            </Link>
 
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList variant="line" className="w-full justify-start h-auto p-0 mb-6 mt-4 border-b border-border">
-              {["overview", "schedule", "activity"].map((tab) => (
-                <TabsTrigger
-                  key={tab}
-                  value={tab}
-                  className="px-4 py-2.5 text-[13px] font-semibold capitalize"
-                >
-                  {tab}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <StaffDetailHeader
+              employee={employee}
+              canEditDetails={canEditDetails}
+              showManagementPanel={showManagementPanel}
+              onToggleEditDetails={() => setShowManagementPanel((current) => !current)}
+            />
 
-            <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-              <OverviewTab
-                employee={employee}
-                shifts={shifts}
-                shiftCodeById={shiftCodeById}
-                categoryById={categoryById}
-                certifications={certifications}
-                orgRoles={orgRoles}
-                shiftDisplayMode={org?.shiftDisplayMode}
-              />
-            </TabsContent>
+            {showQuickActions && (
+              <section>
+                <div className="dg-card">
+                  <div className="dg-card-header">
+                    <div>
+                      <div className="dg-card-title">Actions</div>
+                      <div className="dg-card-subtitle">Common staffing and access actions for this person.</div>
+                    </div>
+                  </div>
+                  <div className="dg-card-body flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-2">
+                      {perms.canManageEmployees && pendingInvite && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowInviteModal(true)}
+                            className="dg-btn dg-btn-secondary dg-btn-sm"
+                          >
+                            Reinvite
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRevokeInvitation(pendingInvite.id)}
+                            className="dg-btn dg-btn-secondary dg-btn-sm"
+                          >
+                            Revoke Invitation
+                          </button>
+                        </>
+                      )}
 
-            <TabsContent value="schedule" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-              <ScheduleTab
-                employee={employee}
-                shifts={shifts}
-                shiftCodeById={shiftCodeById}
-                focusAreas={focusAreas}
-                categoryById={categoryById}
-                focusAreaById={focusAreaById}
-                absenceTypeById={absenceTypeById}
-                auditNames={auditNames}
-                shiftRequests={shiftRequests}
-                recurringShifts={recurringShifts}
-                canViewRecurringShifts={perms.canViewRecurringShifts}
-                shiftDisplayMode={org?.shiftDisplayMode}
-              />
-            </TabsContent>
+                      {perms.canManageEmployees && !pendingInvite && !employee.userId && employee.email && (
+                        <button
+                          type="button"
+                          onClick={() => setShowInviteModal(true)}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          Send Invitation
+                        </button>
+                      )}
 
-            <TabsContent value="activity" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-              <ActivityTab
-                employee={employee}
-                roleHistory={roleHistory}
-                invitations={invitations}
-              />
-            </TabsContent>
+                      {canManageManagementAccess && employee.status !== "terminated" && (
+                        <button
+                          type="button"
+                          onClick={() => setShowManagementAccessModal(true)}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          {directoryPerson?.isManagementUser || hasPendingManagementInvite
+                            ? "Edit Management Access"
+                            : "Grant Management Access"}
+                        </button>
+                      )}
+                    </div>
 
+                    {perms.canManageEmployees && (
+                      <div>
+                        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-subtle)]">
+                          Staffing actions
+                        </div>
+                        <EmployeeStatusActions
+                          employee={employee}
+                          canEdit={perms.canManageEmployees}
+                          pendingInvitation={pendingInvite ?? undefined}
+                          onBench={handleBench}
+                          onActivate={handleActivate}
+                          onTerminate={handleTerminate}
+                          onRevokeAccess={perms.isSuperAdmin ? handleRevokeAccess : undefined}
+                          onInvite={orgId ? () => setShowInviteModal(true) : undefined}
+                          onRevoke={handleRevokeInvitation}
+                          variant="page"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
 
-          </Tabs>
+            {canEditDetails && (
+              showManagementPanel && (
+                <section>
+                  <div className="dg-card">
+                    <div className="dg-card-header">
+                      <div>
+                        <div className="dg-card-title">Edit details</div>
+                        <div className="dg-card-subtitle">Update biodata, assignments, and account-related staff settings.</div>
+                      </div>
+                    </div>
+
+                    <EditEmployeePanel
+                      employee={employee}
+                      focusAreas={focusAreas}
+                      certifications={certifications}
+                      roles={orgRoles}
+                      focusAreaLabel={org?.focusAreaLabel}
+                      certificationLabel={org?.certificationLabel}
+                      roleLabel={org?.roleLabel}
+                      onSave={handleSaveEmployee}
+                      onCancel={() => setShowManagementPanel(false)}
+                    />
+                  </div>
+                </section>
+              )
+            )}
+
+            <section className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight text-[var(--color-text-primary)]">
+                    Profile sections
+                  </h2>
+                  <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+                    Move between overview, schedule, and activity without leaving the People workspace.
+                  </p>
+                </div>
+
+                {/* ProfileSectionTabs renders the shared dg-span-tabs / dg-span-tab shell. */}
+                <ProfileSectionTabs
+                  tabs={[
+                    { id: "overview", label: "Overview" },
+                    { id: "schedule", label: "Schedule" },
+                    { id: "activity", label: "Activity" },
+                  ]}
+                  activeTab={activeSection}
+                  onChange={(tabId) => setActiveSection(tabId as "overview" | "schedule" | "activity")}
+                  className="dg-span-tabs dg-span-tabs--light"
+                />
+              </div>
+
+              {activeSection === "overview" ? (
+                <OverviewTab
+                  employee={employee}
+                  shifts={shifts}
+                  shiftCodeById={shiftCodeById}
+                  categoryById={categoryById}
+                  focusAreas={focusAreas}
+                  focusAreaLabel={org?.focusAreaLabel}
+                  certifications={certifications}
+                  orgRoles={orgRoles}
+                  pendingInvite={pendingInvite}
+                  thisWeekHours={thisWeekHours}
+                  shiftDisplayMode={org?.shiftDisplayMode}
+                />
+              ) : null}
+
+              {activeSection === "schedule" ? (
+                <ScheduleTab
+                  employee={employee}
+                  shifts={shifts}
+                  shiftCodeById={shiftCodeById}
+                  focusAreas={focusAreas}
+                  categoryById={categoryById}
+                  focusAreaById={focusAreaById}
+                  absenceTypeById={absenceTypeById}
+                  auditNames={auditNames}
+                  shiftRequests={shiftRequests}
+                  recurringShifts={recurringShifts}
+                  canViewRecurringShifts={perms.canViewRecurringShifts}
+                  shiftDisplayMode={org?.shiftDisplayMode}
+                />
+              ) : null}
+
+              {activeSection === "activity" ? (
+                <ActivityTab
+                  employee={employee}
+                  roleHistory={roleHistory}
+                  invitations={invitations}
+                />
+              ) : null}
+            </section>
+          </div>
         </div>
+      )}
+
+      {showInviteModal && employee && orgId && org && (
+        <InviteEmployeeModal
+          employee={employee}
+          orgId={orgId}
+          orgName={org.name || "your organization"}
+          onClose={() => setShowInviteModal(false)}
+          onInvited={async (updatedEmployee) => {
+            syncEmployeeCaches(updatedEmployee);
+            await refreshInvitations();
+            refreshDirectory();
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+            setShowInviteModal(false);
+          }}
+        />
+      )}
+
+      {showManagementAccessModal && employee && orgId && org && (
+        <EmployeeManagementAccessModal
+          employee={employee}
+          orgId={orgId}
+          orgName={org.name || "your organization"}
+          managementDepartments={(departments ?? []).filter((department) => department.type === "management")}
+          directoryPerson={directoryPerson}
+          pendingInvitation={pendingInvite ?? undefined}
+          onClose={() => setShowManagementAccessModal(false)}
+          onCompleted={async (updatedEmployee) => {
+            syncEmployeeCaches(updatedEmployee);
+            await refreshInvitations();
+            refreshDirectory();
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+          }}
+        />
       )}
     </>
   );

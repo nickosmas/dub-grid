@@ -64,7 +64,7 @@ export default function DisplayModeStep({ onNext, onBack }: DisplayModeStepProps
                 flexDirection: "column",
                 gap: 12,
                 padding: 16,
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-md)",
                 border: isActive
                   ? "2px solid var(--color-brand)"
                   : "1px solid var(--color-border)",

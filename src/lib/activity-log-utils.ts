@@ -19,7 +19,7 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   { value: "shift_request", label: "Shift Requests", prefixes: ["shift_request."] },
   { value: "access", label: "Access & Roles", prefixes: ["role.", "permissions.", "user."] },
   { value: "invitation", label: "Invitations", prefixes: ["invitation."] },
-  { value: "config", label: "Configuration", prefixes: ["focus_area.", "shift_code.", "shift_category.", "absence_type.", "indicator_type.", "certifications.", "org_roles.", "coverage_requirements."] },
+  { value: "config", label: "Configuration", prefixes: ["focus_area.", "shift_code.", "shift_category.", "absence_type.", "indicator_type.", "certifications.", "org_roles.", "coverage_requirements.", "coverage_rule_config."] },
   { value: "recurring", label: "Recurring", prefixes: ["recurring_shift.", "recurring_schedule.", "shift_series."] },
   { value: "org", label: "Organization", prefixes: ["org."] },
   { value: "impersonation", label: "Impersonation", prefixes: ["impersonation."] },
@@ -202,6 +202,7 @@ export function describeAction(entry: FullAuditLogEntry): string {
     case "certifications.saved": return "Updated certifications";
     case "org_roles.saved": return "Updated organization roles";
     case "coverage_requirements.saved": return "Updated coverage requirements";
+    case "coverage_rule_config.saved": return "Updated coverage rule settings";
 
     // Recurring
     case "recurring_shift.upserted": return "Updated a recurring shift";

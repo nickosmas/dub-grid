@@ -104,13 +104,13 @@ export default function DashboardHeader({
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
               style={{
-                width: 44,
-                height: 44,
+                width: "var(--dg-toolbar-h)",
+                height: "var(--dg-toolbar-h)",
                 padding: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to previous period"
@@ -137,13 +137,13 @@ export default function DashboardHeader({
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
               style={{
-                width: 44,
-                height: 44,
+                width: "var(--dg-toolbar-h)",
+                height: "var(--dg-toolbar-h)",
                 padding: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to next period"
@@ -157,11 +157,11 @@ export default function DashboardHeader({
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
             style={{
-              height: 44,
+              height: "var(--dg-toolbar-h)",
               padding: "0 14px",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              borderRadius: 10,
+              borderRadius: "var(--dg-btn-radius)",
               flexShrink: 0,
             }}
           >
@@ -236,7 +236,7 @@ export default function DashboardHeader({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to previous period"
@@ -284,7 +284,7 @@ export default function DashboardHeader({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to next period"
@@ -314,7 +314,7 @@ export default function DashboardHeader({
             padding: "0 14px",
             fontSize: "var(--dg-fs-caption)",
             fontWeight: 600,
-            borderRadius: 10,
+            borderRadius: "var(--dg-btn-radius)",
           }}
         >
           {todayLabel}

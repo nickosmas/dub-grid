@@ -123,7 +123,7 @@ export default function CustomSelect<T extends string | number>({
           height: "var(--dg-toolbar-h)",
           background: disabled ? "var(--color-bg)" : "var(--color-surface)",
           border: "1px solid var(--color-border)",
-          borderRadius: 10,
+          borderRadius: "var(--dg-btn-radius)",
           padding: "0 10px 0 12px",
           fontSize,
           fontWeight: 500,

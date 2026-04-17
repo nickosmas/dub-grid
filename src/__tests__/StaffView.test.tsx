@@ -5,8 +5,15 @@ import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Employee, FocusArea, NamedItem } from "@/types";
+import { upsertRecurringShift } from "@/lib/db";
+
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}));
 
 let mockSearchParams = new URLSearchParams();
+let mockCurrentUser: { id: string } | null = null;
 const DESIGNATIONS: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
@@ -29,6 +36,13 @@ vi.mock("@/components/EditEmployeePanel", () => ({
   default: () => <div data-testid="edit-panel" />,
 }));
 
+vi.mock("sonner", () => ({
+  toast: {
+    success: mockToastSuccess,
+    error: mockToastError,
+  },
+}));
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/people",
   useSearchParams: () => mockSearchParams,
@@ -40,7 +54,40 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
-  useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
+  useAuth: () => ({ user: mockCurrentUser, signOut: vi.fn(), isLoading: false }),
+}));
+
+vi.mock("@/components/ShiftPicker", () => ({
+  default: ({
+    shiftCodes = [],
+    absenceTypes = [],
+    onSelect,
+    onAbsenceSelect,
+  }: {
+    shiftCodes?: Array<{ id: number; label: string }>;
+    absenceTypes?: Array<{ id: number; label: string }>;
+    onSelect: (label: string, shiftCodeIds: number[]) => void;
+    onAbsenceSelect?: (absenceType: { id: number; label: string }) => void;
+  }) => (
+    <div>
+      {shiftCodes.map((shiftCode) => (
+        <button
+          key={shiftCode.id}
+          onClick={() => onSelect(shiftCode.label, [shiftCode.id])}
+        >
+          {`pick-${shiftCode.label}`}
+        </button>
+      ))}
+      {absenceTypes.map((absenceType) => (
+        <button
+          key={`absence-${absenceType.id}`}
+          onClick={() => onAbsenceSelect?.(absenceType)}
+        >
+          {`absence-${absenceType.label}`}
+        </button>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -163,7 +210,9 @@ function renderWithProviders(ui: React.ReactElement) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mockSearchParams = new URLSearchParams();
+  mockCurrentUser = null;
 });
 
 describe("StaffView", () => {
@@ -226,6 +275,25 @@ describe("StaffView", () => {
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
       expect(screen.getByText("Bob Jones")).toBeInTheDocument();
     });
+
+    it("routes the current user's own profile link to /profile", () => {
+      mockCurrentUser = { id: "user-1" };
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          employees={[
+            {
+              ...employees[0],
+              userId: "user-1",
+            },
+            employees[1],
+          ]}
+        />,
+      );
+
+      expect(screen.getByRole("link", { name: "Alice Smith" })).toHaveAttribute("href", "/profile");
+      expect(screen.getByRole("link", { name: "Bob Jones" })).toHaveAttribute("href", "/people/emp-2");
+    });
   });
 
   describe("Recurring permissions", () => {
@@ -250,6 +318,57 @@ describe("StaffView", () => {
       expect(screen.getAllByRole("gridcell")[0]).toHaveAttribute("tabindex", "-1");
       expect(screen.queryByRole("button", { name: "Save Draft" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
+    });
+
+    it("saves recurring shift changes through the recurring upsert helper", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+      const user = userEvent.setup();
+      const mockedUpsertRecurringShift = vi.mocked(upsertRecurringShift);
+
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          shiftCodes={[
+            {
+              id: 101,
+              orgId: "org-1",
+              label: "D",
+              name: "Day",
+              color: "#dbeafe",
+              border: "#93c5fd",
+              text: "#1d4ed8",
+              categoryId: null,
+              focusAreaId: null,
+              sortOrder: 0,
+              requiredCertificationIds: [],
+              defaultStartTime: "07:00",
+              defaultEndTime: "15:00",
+              defaultDurationHours: 8,
+              defaultDurationMinutes: 0,
+              archivedAt: null,
+            },
+          ]}
+          canViewRecurringShifts
+          canManageRecurringShifts
+        />,
+      );
+
+      expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
+
+      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click(screen.getByRole("button", { name: "pick-D" }));
+      await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+      expect(mockedUpsertRecurringShift).toHaveBeenCalledTimes(1);
+      expect(mockedUpsertRecurringShift).toHaveBeenCalledWith(
+        "emp-2",
+        "org-1",
+        0,
+        101,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+      expect(mockToastSuccess).toHaveBeenCalledWith("Recurring schedules saved");
     });
   });
 });

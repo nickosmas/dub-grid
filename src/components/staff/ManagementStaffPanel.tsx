@@ -7,8 +7,11 @@ import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { validateRequired } from "@/components/FormField";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -107,40 +110,36 @@ export function ManagementStaffPanel({
   const [resending, setResending] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  // Reset form when person changes
-  useEffect(() => {
-    const nextDraft = getManagementStaffDraft(person);
-    setFirstName(nextDraft.firstName);
-    setLastName(nextDraft.lastName);
-    setPhone(nextDraft.phone);
-    setDeptIds([...nextDraft.managementDepartmentIds]);
-    setSavedDraft(nextDraft);
-    setShowRevokeConfirm(false);
-    setTouched({});
-  }, [
-    person.personId,
+  const personDraft = useMemo(() => normalizeManagementStaffDraft({
+    firstName: person.firstName,
+    lastName: person.lastName,
+    phone: person.phone,
+    managementDepartmentIds: person.managementDepartmentIds,
+  }), [
     person.firstName,
     person.lastName,
     person.phone,
     person.managementDepartmentIds,
   ]);
 
-  const handleClose = useCallback(() => {
+  // Reset form when person changes
+  useEffect(() => {
+    setFirstName(personDraft.firstName);
+    setLastName(personDraft.lastName);
+    setPhone(personDraft.phone);
+    setDeptIds([...personDraft.managementDepartmentIds]);
+    setSavedDraft(personDraft);
+    setShowRevokeConfirm(false);
+    setTouched({});
+  }, [person.personId, personDraft]);
+
+  const closePanel = useCallback(() => {
     setClosing(true);
     setTimeout(() => {
       setClosing(false);
       onCloseRef.current();
     }, 200);
   }, []);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") handleClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleClose]);
 
   const markTouched = useCallback((field: string) => {
     setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
@@ -157,6 +156,23 @@ export function ManagementStaffPanel({
     currentDraft.lastName !== savedDraft.lastName ||
     currentDraft.phone !== savedDraft.phone ||
     JSON.stringify(currentDraft.managementDepartmentIds) !== JSON.stringify(savedDraft.managementDepartmentIds);
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: hasChanges,
+    onDiscard: closePanel,
+  });
+  const handleRequestClose = useCallback(() => {
+    if (requestClose()) {
+      closePanel();
+    }
+  }, [closePanel, requestClose]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") handleRequestClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleRequestClose]);
   const isPending = person.invitationStatus !== null && !person.hasAppAccess;
   const isEmployee = person.source === "employee";
   const isExpired = person.invitationStatus === "expired";
@@ -170,9 +186,24 @@ export function ManagementStaffPanel({
         !isEmployee && touched.lastName
           ? validateRequired(lastName, "Last name")
           : null,
+      managementDepartmentIds:
+        !isEmployee && touched.managementDepartmentIds && deptIds.length === 0
+          ? "People who are not on the schedule must stay assigned to at least one management department."
+          : null,
     }),
-    [firstName, isEmployee, lastName, touched],
+    [deptIds.length, firstName, isEmployee, lastName, touched],
   );
+
+  const showScheduleOnlyHint = isEmployee && deptIds.length === 0;
+
+  const toggleDepartment = useCallback((departmentId: number) => {
+    markTouched("managementDepartmentIds");
+    setDeptIds((prev) =>
+      prev.includes(departmentId)
+        ? prev.filter((id) => id !== departmentId)
+        : [...prev, departmentId],
+    );
+  }, [markTouched]);
 
   const handleSave = async () => {
     const nextDraft = normalizeManagementStaffDraft({
@@ -186,6 +217,13 @@ export function ManagementStaffPanel({
         ...prev,
         firstName: true,
         lastName: true,
+      }));
+      return;
+    }
+    if (!isEmployee && nextDraft.managementDepartmentIds.length === 0) {
+      setTouched((prev) => ({
+        ...prev,
+        managementDepartmentIds: true,
       }));
       return;
     }
@@ -208,7 +246,7 @@ export function ManagementStaffPanel({
     try {
       // person.personId is "inv:<uuid>" — extract the uuid
       await onRevokeInvitation(person.personId.replace("inv:", ""));
-      handleClose();
+      closePanel();
     } finally {
       setRevoking(false);
     }
@@ -283,7 +321,7 @@ export function ManagementStaffPanel({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: "var(--color-border)",
-    borderRadius: 8,
+    borderRadius: "var(--dg-btn-radius)",
     fontSize: "var(--dg-fs-body-sm)",
     color: "var(--color-text-primary)",
     background: "var(--color-surface)",
@@ -294,14 +332,14 @@ export function ManagementStaffPanel({
     <>
       <div
         className={`staff-detail-overlay${closing ? " closing" : ""}`}
-        onClick={handleClose}
+        onClick={handleRequestClose}
       />
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Header */}
         <div className="staff-detail-header">
           <button
             className="staff-detail-close"
-            onClick={handleClose}
+            onClick={handleRequestClose}
             aria-label="Close"
           >
             <svg
@@ -499,13 +537,7 @@ export function ManagementStaffPanel({
                       <SelectableTag
                         key={department.id}
                         selected={deptIds.includes(department.id)}
-                        onClick={() =>
-                          setDeptIds((prev) =>
-                            prev.includes(department.id)
-                              ? prev.filter((id) => id !== department.id)
-                              : [...prev, department.id],
-                          )
-                        }
+                        onClick={() => toggleDepartment(department.id)}
                         padding="5px 12px"
                         unselectedBackground="var(--color-bg-secondary)"
                         unselectedBorderColor="transparent"
@@ -515,18 +547,44 @@ export function ManagementStaffPanel({
                       </SelectableTag>
                     ))}
                   </div>
+                  {showScheduleOnlyHint && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      Saving now will remove them from the Management roster and keep them on the schedule.
+                    </div>
+                  )}
                 </div>
               )}
-              <button
-                onClick={handleSave}
-                disabled={saving || !hasChanges}
-                className="dg-btn dg-btn-primary"
-                style={{ alignSelf: "flex-start" }}
-              >
-                <ButtonLoading loading={saving} spinnerSize={16}>
-                  Save Changes
-                </ButtonLoading>
-              </button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                {person.managementDepartmentIds.length > 0 && deptIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      markTouched("managementDepartmentIds");
+                      setDeptIds([]);
+                    }}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ color: "var(--color-danger)" }}
+                  >
+                    Remove from Management
+                  </button>
+                )}
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !hasChanges}
+                  className="dg-btn dg-btn-primary"
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  <ButtonLoading loading={saving} spinnerSize={16}>
+                    {EDITOR_ACTION_LABELS.save}
+                  </ButtonLoading>
+                </button>
+              </div>
               <div
                 style={{
                   fontSize: "var(--dg-fs-caption)",
@@ -625,13 +683,7 @@ export function ManagementStaffPanel({
                       <SelectableTag
                         key={department.id}
                         selected={deptIds.includes(department.id)}
-                        onClick={() =>
-                          setDeptIds((prev) =>
-                            prev.includes(department.id)
-                              ? prev.filter((id) => id !== department.id)
-                              : [...prev, department.id],
-                          )
-                        }
+                        onClick={() => toggleDepartment(department.id)}
                         padding="5px 12px"
                         unselectedBackground="var(--color-bg-secondary)"
                         unselectedBorderColor="transparent"
@@ -641,25 +693,49 @@ export function ManagementStaffPanel({
                       </SelectableTag>
                     ))}
                   </div>
+                  {fieldErrors.managementDepartmentIds && (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--color-danger)",
+                        marginTop: 4,
+                      }}
+                      role="alert"
+                    >
+                      {fieldErrors.managementDepartmentIds}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Save button */}
-              <button
-                onClick={handleSave}
-                disabled={
-                  saving ||
-                  !hasChanges ||
-                  !currentDraft.firstName ||
-                  !currentDraft.lastName
-                }
-                className="dg-btn dg-btn-primary"
-                style={{ alignSelf: "flex-start" }}
-              >
-                <ButtonLoading loading={saving} spinnerSize={16}>
-                  Save Changes
-                </ButtonLoading>
-              </button>
+              <EditorActionRow
+                secondaryAction={(
+                  <button
+                    onClick={handleRequestClose}
+                    disabled={saving}
+                    className="dg-btn dg-btn-secondary"
+                  >
+                    {EDITOR_ACTION_LABELS.close}
+                  </button>
+                )}
+                primaryAction={(
+                  <button
+                    onClick={handleSave}
+                    disabled={
+                      saving ||
+                      !hasChanges ||
+                      !currentDraft.firstName ||
+                      !currentDraft.lastName ||
+                      currentDraft.managementDepartmentIds.length === 0
+                    }
+                    className="dg-btn dg-btn-primary"
+                  >
+                    <ButtonLoading loading={saving} spinnerSize={16}>
+                      {EDITOR_ACTION_LABELS.save}
+                    </ButtonLoading>
+                  </button>
+                )}
+              />
             </>
           )}
 
@@ -987,7 +1063,7 @@ export function ManagementStaffPanel({
                       gap: 10,
                       background: "var(--color-danger-bg)",
                       padding: "14px 16px",
-                      borderRadius: 10,
+                      borderRadius: "var(--dg-radius-lg)",
                       border: "1px solid var(--color-danger-border)",
                     }}
                   >
@@ -1070,6 +1146,7 @@ export function ManagementStaffPanel({
               />
             </div>
           )}
+        {unsavedChangesDialog}
       </div>
     </>,
     document.body,

@@ -1,4 +1,11 @@
 import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit } from "./shared";
+import { parseNameMismatchResponse } from "@/lib/account-linking";
+import { rowToInvitation } from "./mappers";
+import type { DbInvitation } from "./types";
+import {
+  resendOrganizationInvitationGuarded,
+  revokeOrganizationInvitationGuarded,
+} from "./access";
 import type { Invitation, AssignableOrganizationRole } from "@/types";
 
 // ── Invitations ──────────────────────────────────────────────────────────────
@@ -50,57 +57,57 @@ export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
   return cacheThrough(CacheKey.invitations(orgId), TTL.MODERATE, async () => {
     const { data, error } = await supabase
       .from("invitations")
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
       .eq("org_id", orgId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []).map((row: Record<string, unknown>) => ({
-      id: row.id as string,
-      orgId: row.org_id as string,
-      invitedBy: (row.invited_by as string) ?? null,
-      email: row.email as string,
-      roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-      expiresAt: row.expires_at as string,
-      acceptedAt: (row.accepted_at as string) ?? null,
-      revokedAt: (row.revoked_at as string) ?? null,
-      createdAt: row.created_at as string,
-      employeeId: (row.employee_id as string) ?? null,
-      firstName: (row.first_name as string | null) ?? null,
-      lastName: (row.last_name as string | null) ?? null,
-      phone: (row.phone as string | null) ?? null,
-      departmentIds: (row.department_ids as number[]) ?? [],
-      deptAdminIds: (row.dept_admin_ids as number[]) ?? [],
-    }));
+    return (data ?? []).map((row: DbInvitation) => rowToInvitation(row));
   });
 }
 
 export async function revokeInvitation(invitationId: string, orgId: string): Promise<void> {
-  const { error } = await supabase
+  const { data: invitationRow, error } = await supabase
     .from("invitations")
-    .update({ revoked_at: new Date().toISOString() })
+    .select("updated_at")
     .eq("org_id", orgId)
-    .eq("id", invitationId);
+    .eq("id", invitationId)
+    .maybeSingle();
   if (error) throw error;
+  if (!invitationRow?.updated_at) {
+    throw new Error("Invitation data is out of date. Refresh and try again.");
+  }
+  await revokeOrganizationInvitationGuarded({
+    orgId,
+    invitationId,
+    expectedUpdatedAt: invitationRow.updated_at,
+  });
   await cacheDel(CacheKey.invitations(orgId));
-  void logAudit("invitation.revoked", "invitation", invitationId, {}, orgId);
 }
 
 export async function resendInvitation(
   invitationId: string,
   orgId: string,
 ): Promise<{ token: string; expiresAt: string }> {
-  const newToken = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await supabase
+  const { data: invitationRow, error } = await supabase
     .from("invitations")
-    .update({ token: newToken, expires_at: expiresAt, revoked_at: null })
-    .eq("id", invitationId)
+    .select("updated_at")
     .eq("org_id", orgId)
-    .is("accepted_at", null);
+    .eq("id", invitationId)
+    .maybeSingle();
   if (error) throw error;
+  if (!invitationRow?.updated_at) {
+    throw new Error("Invitation data is out of date. Refresh and try again.");
+  }
+  const resent = await resendOrganizationInvitationGuarded({
+    orgId,
+    invitationId,
+    expectedUpdatedAt: invitationRow.updated_at,
+  });
   await cacheDel(CacheKey.invitations(orgId));
-  void logAudit("invitation.resent", "invitation", invitationId, {}, orgId);
-  return { token: newToken, expiresAt };
+  return {
+    token: resent.token,
+    expiresAt: resent.expiresAt,
+  };
 }
 
 export async function linkEmployeeToUser(
@@ -108,12 +115,29 @@ export async function linkEmployeeToUser(
   userId: string,
   orgId: string,
 ): Promise<{ status: string }> {
-  const response = await fetch("/api/employees/link-user", {
+  return postLinkRequest("/api/employees/link-user", { employeeId, userId, orgId });
+}
+
+export async function reconcileEmployeeNameAndLinkUser(
+  employeeId: string,
+  userId: string,
+  orgId: string,
+): Promise<{ status: string }> {
+  return postLinkRequest("/api/employees/link-user/reconcile", { employeeId, userId, orgId });
+}
+
+async function postLinkRequest(
+  url: string,
+  body: { employeeId: string; userId: string; orgId: string },
+): Promise<{ status: string }> {
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ employeeId, userId, orgId }),
+    body: JSON.stringify(body),
   });
   const payload = await response.json().catch(() => null) as { error?: string; status?: string } | null;
+  const mismatchError = parseNameMismatchResponse(payload);
+  if (mismatchError) throw mismatchError;
   if (!response.ok) {
     throw new Error(payload?.error || "Failed to link employee to user");
   }

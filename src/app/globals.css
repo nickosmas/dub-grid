@@ -188,7 +188,19 @@
 
   /* Layout */
   --header-height: 56px;
-  --dg-toolbar-h: 34px;
+  --dg-toolbar-h: 38px;
+
+  /* Button sizing */
+  --dg-btn-radius: 6px;
+  --dg-btn-h: 38px;
+  --dg-btn-h-sm: 34px;
+  --dg-btn-h-xs: 30px;
+  --dg-btn-h-lg: 44px;
+  --dg-btn-px: 16px;
+  --dg-btn-px-sm: 14px;
+  --dg-btn-px-xs: 10px;
+  --dg-btn-gap: 8px;
+  --dg-btn-icon: 14px;
 
   /* Typography scale */
   --dg-fs-page-title: 28px;
@@ -245,10 +257,13 @@
   /* ----------------------------------------------------------
      Border radius scale
   ---------------------------------------------------------- */
-  --dg-radius-sm: 8px;     /* inner elements: menu items, ghost buttons, badges, skeletons */
-  --dg-radius-md: 10px;    /* standard controls: buttons, inputs, cards, segments */
-  --dg-radius-lg: 12px;    /* panels, drawers, menus */
-  --dg-radius-xl: 16px;    /* modals, auth cards */
+  --dg-radius-sm: 6px;     /* inner chrome: menu items, tooltip shells, skeletons */
+  --dg-radius-md: 8px;     /* standard containers: cards, tables, inline alerts */
+  --dg-radius-lg: 10px;    /* elevated shells: menus, popovers, drawers, toasts */
+  --dg-radius-xl: 12px;    /* modal, auth, and setup hero shells */
+  --dg-tab-shell-radius: var(--dg-radius-md);
+  --dg-tab-shell-pad: 2px;
+  --dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));
 
   /* ----------------------------------------------------------
      Overlay backgrounds
@@ -314,18 +329,27 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--dg-btn-gap);
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 13px;
+  box-sizing: border-box;
+  font-size: var(--dg-fs-label);
   font-weight: 600;
   line-height: 1;
-  padding: 8px 16px;
-  border-radius: var(--dg-radius-md);
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 80ms ease, opacity 150ms ease;
+  height: var(--dg-btn-h);
+  min-height: var(--dg-btn-h);
+  padding: 0 var(--dg-btn-px);
+  border-radius: var(--dg-btn-radius);
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 80ms ease, opacity 150ms ease, filter 150ms ease;
   white-space: nowrap;
   text-decoration: none;
+}
+
+.dg-btn > svg {
+  width: var(--dg-btn-icon);
+  height: var(--dg-btn-icon);
+  flex-shrink: 0;
 }
 
 .dg-btn:active {
@@ -392,8 +416,10 @@ textarea {
   background: transparent;
   color: var(--color-text-muted);
   border: none;
-  padding: 6px 10px;
-  border-radius: var(--dg-radius-sm);
+  height: var(--dg-btn-h-sm);
+  min-height: var(--dg-btn-h-sm);
+  padding: 0 var(--dg-btn-px-sm);
+  border-radius: var(--dg-btn-radius);
 }
 
 .dg-btn-ghost:hover {
@@ -423,11 +449,30 @@ textarea {
 .dg-btn-danger-filled {
   background: var(--color-danger);
   color: var(--color-text-inverse);
-  border: none;
+  border: 1px solid var(--color-danger);
 }
 
 .dg-btn-danger-filled:hover {
-  background: var(--color-danger-text);
+  filter: brightness(0.95);
+}
+
+.dg-btn-danger-filled:active {
+  filter: brightness(0.9);
+}
+
+/* Warning filled (bench/attention CTA) */
+.dg-btn-warning-filled {
+  background: var(--color-warning);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-warning);
+}
+
+.dg-btn-warning-filled:hover {
+  filter: brightness(0.95);
+}
+
+.dg-btn-warning-filled:active {
+  filter: brightness(0.9);
 }
 
 /* Dashed outline (add item) */
@@ -445,7 +490,18 @@ textarea {
 /* Small variant */
 .dg-btn-sm {
   font-size: var(--dg-fs-caption);
-  padding: 6px 14px;
+  height: var(--dg-btn-h-sm);
+  min-height: var(--dg-btn-h-sm);
+  padding: 0 var(--dg-btn-px-sm);
+}
+
+/* Extra small variant */
+.dg-btn-xs {
+  font-size: var(--dg-fs-footnote);
+  height: var(--dg-btn-h-xs);
+  min-height: var(--dg-btn-h-xs);
+  padding: 0 var(--dg-btn-px-xs);
+  gap: 6px;
 }
 
 /* Hover row (settings list items) */
@@ -460,7 +516,7 @@ textarea {
   height: var(--dg-toolbar-h);
   padding: 0 12px;
   border: 1px solid var(--color-border);
-  border-radius: var(--dg-radius-md);
+  border-radius: var(--dg-btn-radius);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -506,7 +562,7 @@ textarea {
   display: flex;
   height: var(--dg-toolbar-h);
   background: var(--color-surface);
-  border-radius: var(--dg-radius-md);
+  border-radius: var(--dg-btn-radius);
   border: 1px solid var(--color-border);
   overflow: hidden;
 }
@@ -549,9 +605,9 @@ textarea {
   align-items: stretch;
   height: var(--dg-toolbar-h);
   background: var(--color-dark);
-  border-radius: var(--dg-radius-md);
-  padding: 3px;
-  gap: 2px;
+  border-radius: var(--dg-tab-shell-radius);
+  padding: var(--dg-tab-shell-pad);
+  gap: var(--dg-tab-shell-pad);
 }
 
 .dg-span-tab {
@@ -565,7 +621,8 @@ textarea {
   font-size: var(--dg-fs-caption);
   font-weight: 600;
   cursor: pointer;
-  border-radius: 7px;
+  height: 100%;
+  border-radius: var(--dg-tab-inner-radius);
   font-family: inherit;
   line-height: 1;
   white-space: nowrap;
@@ -590,7 +647,7 @@ textarea {
 
 .dg-span-tabs--light .dg-span-tab {
   color: var(--color-text-muted);
-  border-radius: 6px;
+  border-radius: var(--dg-tab-inner-radius);
 }
 
 .dg-span-tabs--light .dg-span-tab:hover:not(.active) {
@@ -615,6 +672,7 @@ textarea {
   display: flex;
   align-items: stretch;
   flex: 1;
+  height: 100%;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -665,9 +723,9 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: calc(var(--dg-toolbar-h) - 10px);
+  height: calc(var(--dg-toolbar-h) - 10px);
+  border-radius: var(--dg-btn-radius);
   border: none;
   background: transparent;
   color: var(--color-text-muted);
@@ -711,10 +769,11 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 14px;
+  min-height: var(--dg-toolbar-h);
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 600;
-  border-radius: var(--dg-radius-sm);
+  border-radius: var(--dg-btn-radius);
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
@@ -741,11 +800,16 @@ textarea {
 
 /* ── Sub Tab (Settings / Contextual Tier 2) ─────────────── */
 .dg-sub-tab {
-  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--dg-toolbar-h);
+  padding: 0 16px;
   font-size: 13px;
   font-weight: 500;
   border: none;
   border-bottom: 2px solid transparent;
+  border-radius: var(--dg-btn-radius) var(--dg-btn-radius) 0 0;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -910,6 +974,121 @@ textarea {
   height: 1px;
   background: var(--color-border-light);
   margin: 4px 0;
+}
+
+/* ── Address Autocomplete ─────────────────────────────── */
+.dg-address-autocomplete {
+  position: relative;
+}
+
+.dg-address-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--dg-radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.dg-address-panel-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+  scrollbar-width: none;
+}
+
+.dg-address-panel-list::-webkit-scrollbar {
+  display: none;
+}
+
+.dg-address-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.dg-address-item:hover,
+.dg-address-item[aria-selected="true"] {
+  background: var(--color-bg-secondary);
+}
+
+.dg-address-item:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.dg-address-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-faint);
+  margin-top: 1px;
+}
+
+.dg-address-item-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dg-address-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+}
+
+.dg-address-item-subtitle {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.dg-address-match {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.dg-address-state {
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.dg-address-panel-foot {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.dg-address-panel-attribution {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-faint);
 }
 
 /* ── Modal ──────────────────────────────────────────────── */
@@ -1884,6 +2063,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 @media (max-width: 767px) {
   /* Typography — responsive overrides */
   :root {
+    --dg-toolbar-h: var(--dg-btn-h-lg);
     --dg-fs-page-title: 22px;
     --dg-fs-section-title: 20px;
     --dg-fs-card-title: 18px;
@@ -1904,14 +2084,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
   /* Touch-friendly targets (min 44px) */
   .dg-btn {
-    padding: 10px 18px;
+    height: var(--dg-btn-h-lg);
+    min-height: var(--dg-btn-h-lg);
+    padding: 0 18px;
     font-size: 14px;
-    min-height: 44px;
   }
 
   .dg-btn-ghost {
-    padding: 10px 12px;
-    min-height: 44px;
+    height: var(--dg-btn-h-lg);
+    min-height: var(--dg-btn-h-lg);
+    padding: 0 12px;
   }
 
   .dg-input {
@@ -1924,6 +2106,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     padding: 10px 12px;
     font-size: 13px;
     min-height: 44px;
+  }
+
+  .dg-span-tabs {
+    height: var(--dg-toolbar-h);
   }
 
   .dg-nav-tab {

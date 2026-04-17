@@ -20,7 +20,14 @@ export interface Organization {
   id: string;
   name: string;
   slug: string | null;
+  /** Legacy composed address string retained for compatibility with existing consumers. */
   address: string;
+  addressLine1: string;
+  addressLine2: string;
+  addressCity: string;
+  addressState: string;
+  addressPostalCode: string;
+  addressCountry: string;
   phone: string;
   employeeCount: number | null;
   /** Custom display label for focus areas (e.g. "Wings", "Departments"). Defaults to "Focus Areas". */
@@ -55,6 +62,8 @@ export interface Organization {
   dataRetentionDays: number;
   /** Per-org feature flag overrides. Keys are flag names, values are booleans. */
   featureOverrides: Record<string, boolean>;
+  /** Last update timestamp used for optimistic locking on sensitive org edits. */
+  updatedAt?: string | null;
 }
 
 
@@ -118,6 +127,36 @@ export interface CoverageRequirement {
 }
 
 /**
+ * Optional config layer on top of a coverage requirement. When absent, the
+ * requirement behaves in legacy exact-code mode.
+ */
+export interface CoverageRuleConfig {
+  id: number;
+  orgId: string;
+  focusAreaId: number;
+  requirementShiftCodeId: number;
+  /** Eligible shift codes that can satisfy this requirement. */
+  eligibleShiftCodeIds: number[];
+  /** Exact shift code offered by default when volunteering for this rule. */
+  preferredOpenShiftCodeId: number;
+}
+
+/**
+ * A normalized, validated rule assembled from coverage requirements,
+ * optional rule configs, and active shift-code metadata.
+ */
+export interface ResolvedCoverageRule {
+  id: string;
+  orgId: string;
+  focusAreaId: number;
+  requirementShiftCodeId: number;
+  eligibleShiftCodeIds: number[];
+  preferredOpenShiftCodeId: number;
+  ruleLabel: string;
+  shiftCategoryId: number | null;
+}
+
+/**
  * Computed coverage status for a single (focus_area, shift_code, date) cell.
  */
 export interface CoverageStatus {
@@ -131,18 +170,32 @@ export interface CoverageStatus {
   hasRequirement: boolean;
 }
 
+export interface CoverageShortageDetail {
+  shiftCodeId: number;
+  shiftCodeLabel: string;
+  required: number;
+  actual: number;
+  shortage: number;
+}
+
 /**
- * A coverage gap: a (focus_area, shift_code, date) tuple where requirements are not met.
+ * A coverage gap: a (focus_area, shift_category, date) tuple where category
+ * staffing totals are not met. Exact-code shortages are carried as detail.
  */
 export interface CoverageGap {
   focusAreaId: number;
   focusAreaName: string;
+  requirementShiftCodeId: number;
   shiftCodeId: number;
+  ruleLabel: string;
   shiftCodeLabel: string;
+  eligibleShiftCodeIds: number[];
+  preferredOpenShiftCodeId: number;
   shiftCategoryId: number;
   shiftCategoryName: string;
   date: Date;
   status: CoverageStatus;
+  shortageDetails: CoverageShortageDetail[];
 }
 
 /**
@@ -487,8 +540,24 @@ export interface OrganizationUser {
   adminPermissions: AdminPermissions | null;
   createdAt: string;
   lastSignInAt: string | null;
+  updatedAt: string | null;
   departmentIds: number[];
   deptAdminIds: number[];
+}
+
+export interface NameMismatchDetails {
+  employeeId: string | null;
+  userId: string;
+  employeeFirstName: string;
+  employeeLastName: string;
+  accountFirstName: string;
+  accountLastName: string;
+}
+
+export interface NameMismatchResponseBody {
+  code: "NAME_MISMATCH";
+  error: string;
+  details: NameMismatchDetails;
 }
 
 /** A unified person record for the People Directory (union of employees + management staff + pending invites). */
@@ -612,6 +681,7 @@ export interface Invitation {
   acceptedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  updatedAt: string | null;
   /** Employee record this invitation is for. Null if not linked to an employee. */
   employeeId: string | null;
   firstName?: string | null;
@@ -719,6 +789,7 @@ export interface OrganizationMembership {
   orgRole: OrganizationRole;
   adminPermissions: AdminPermissions | null;
   joinedAt: string;
+  updatedAt: string | null;
   onboardingCompletedAt: string | null;
   tooltipToursCompleted: Record<string, string>;
   email: string | null;
@@ -753,6 +824,7 @@ export interface UserMembership {
   orgSlug: string | null;
   orgRole: OrganizationRole;
   joinedAt: string;
+  updatedAt: string | null;
   adminPermissions: AdminPermissions | null;
 }
 
@@ -799,7 +871,11 @@ export interface GridOpenShift {
   source: 'calloff' | 'coverage_gap';
   date: string;
   focusAreaId: number;
+  requirementShiftCodeId?: number;
   shiftCodeIds: number[];
+  eligibleShiftCodeIds?: number[];
+  preferredOpenShiftCodeId?: number;
+  ruleLabel?: string;
   shiftCodeLabel: string;
   customStartTime: string | null;
   customEndTime: string | null;

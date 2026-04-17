@@ -1,28 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import {
-  changeOrganizationUserRole,
   fetchOrganizationUsers,
   linkEmployeeToUser,
-  resendInvitation,
-  revokeInvitation,
+  reconcileEmployeeNameAndLinkUser,
   sendInvitation,
+  resendOrganizationInvitationGuarded,
+  revokeOrganizationInvitationGuarded,
+  updateOrganizationInvitationGuarded,
+  updateOrganizationMembershipGuarded,
+  OrganizationAccessConflictError,
+  InvitationAccessConflictError,
   updateAppOnlyUser,
-  updatePendingInvitation,
 } from "@/lib/db";
+import { NameMismatchError } from "@/lib/account-linking";
+import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
 import { validateEmail } from "@/components/FormField";
 import { toast } from "sonner";
+import { ExplainerSection, WorkflowStrip } from "@/components/ui/explainer-section";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import type {
   AssignableOrganizationRole,
   Department,
   DirectoryPerson,
   Employee,
   Invitation,
+  NameMismatchDetails,
   OrganizationUser,
 } from "@/types";
 
@@ -34,7 +43,7 @@ interface EmployeeManagementAccessModalProps {
   directoryPerson?: DirectoryPerson | null;
   pendingInvitation?: Invitation;
   onClose: () => void;
-  onCompleted: () => void;
+  onCompleted: (updatedEmployee?: Employee | null) => void | Promise<void>;
 }
 
 const ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[] = [
@@ -60,6 +69,7 @@ export function EmployeeManagementAccessModal({
     pendingInvitation?.roleToAssign
       ?? (directoryPerson?.orgRole === "admin" ? "admin" : "user"),
   );
+  const [nameMismatch, setNameMismatch] = useState<NameMismatchDetails | null>(null);
   const [managementDepartmentIds, setManagementDepartmentIds] = useState<number[]>(
     pendingInvitation?.departmentIds
       ?? directoryPerson?.managementDepartmentIds
@@ -109,11 +119,46 @@ export function EmployeeManagementAccessModal({
   }, [matchedUser?.orgRole]);
 
   const effectiveEmail = linkedUser?.email ?? email;
+  useEffect(() => {
+    setNameMismatch(null);
+  }, [employee.id, effectiveEmail, matchedUser?.id]);
+  const baseRole: AssignableOrganizationRole =
+    linkedUser?.orgRole === "admin" || linkedUser?.orgRole === "user"
+      ? linkedUser.orgRole
+      : pendingInvitation?.roleToAssign
+        ?? (directoryPerson?.orgRole === "admin" ? "admin" : "user");
+  const baseManagementDepartmentIds =
+    pendingInvitation?.departmentIds
+    ?? directoryPerson?.managementDepartmentIds
+    ?? [];
+  const hasUnsavedChanges =
+    JSON.stringify({
+      email,
+      role,
+      managementDepartmentIds: [...managementDepartmentIds].sort((left, right) => left - right),
+    }) !== JSON.stringify({
+      email: employee.email || pendingInvitation?.email || "",
+      role: baseRole,
+      managementDepartmentIds: [...baseManagementDepartmentIds].sort((left, right) => left - right),
+    });
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+  const handleRequestClose = useCallback(() => {
+    if (!saving && requestClose()) {
+      onClose();
+    }
+  }, [onClose, requestClose, saving]);
+
+  const hasExistingManagementAccess =
+    (pendingInvitation?.departmentIds?.length ?? 0) > 0
+    || (directoryPerson?.managementDepartmentIds.length ?? 0) > 0;
   const emailError = !effectiveEmail.trim() ? "Email address is required" : validateEmail(effectiveEmail);
   const canSubmit =
     !loadingUsers &&
     !emailError &&
-    managementDepartmentIds.length > 0 &&
+    (managementDepartmentIds.length > 0 || hasExistingManagementAccess) &&
     !saving;
   const isEditingExistingAccess =
     (directoryPerson?.managementDepartmentIds.length ?? 0) > 0
@@ -144,29 +189,71 @@ export function EmployeeManagementAccessModal({
     }
   }
 
+  async function applyMatchedUserAccess(reconcileName: boolean): Promise<Employee | null> {
+    if (!matchedUser) return null;
+
+    let updatedEmployee: Employee | null = null;
+
+    if (!employee.userId) {
+      if (reconcileName) {
+        await reconcileEmployeeNameAndLinkUser(employee.id, matchedUser.id, orgId);
+      } else {
+        await linkEmployeeToUser(employee.id, matchedUser.id, orgId);
+      }
+      updatedEmployee = {
+        ...employee,
+        firstName: reconcileName && nameMismatch ? nameMismatch.accountFirstName : employee.firstName,
+        lastName: reconcileName && nameMismatch ? nameMismatch.accountLastName : employee.lastName,
+        userId: matchedUser.id,
+      };
+    }
+    if (pendingInvitation) {
+      if (!pendingInvitation.updatedAt) {
+        throw new Error("Invitation data is out of date. Refresh and try again.");
+      }
+      await revokeOrganizationInvitationGuarded({
+        orgId,
+        invitationId: pendingInvitation.id,
+        expectedUpdatedAt: pendingInvitation.updatedAt,
+      });
+    }
+    if (matchedUser.orgRole !== role && matchedUser.orgRole !== "super_admin") {
+      if (!matchedUser.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
+      await updateOrganizationMembershipGuarded({
+        orgId,
+        userId: matchedUser.id,
+        expectedUpdatedAt: matchedUser.updatedAt,
+        orgRole: role,
+        adminPermissions: role === "admin" ? matchedUser.adminPermissions : null,
+      });
+    }
+    await updateAppOnlyUser(matchedUser.id, orgId, {
+      departmentIds: managementDepartmentIds,
+    });
+    return updatedEmployee;
+  }
+
   async function handleSubmit() {
     if (!canSubmit) return;
 
     setSaving(true);
     try {
       if (matchedUser) {
-        if (!employee.userId) {
-          await linkEmployeeToUser(employee.id, matchedUser.id, orgId);
-        }
-        if (pendingInvitation) {
-          await revokeInvitation(pendingInvitation.id, orgId);
-        }
-        if (matchedUser.orgRole !== role && matchedUser.orgRole !== "super_admin") {
-          await changeOrganizationUserRole(matchedUser.id, role, orgId, matchedUser.email ?? undefined);
-        }
-        await updateAppOnlyUser(matchedUser.id, orgId, {
-          departmentIds: managementDepartmentIds,
-        });
+        const updatedEmployee = await applyMatchedUserAccess(false);
         toast.success("Management access updated");
+        await onCompleted(updatedEmployee);
       } else {
         let token: string;
         if (pendingInvitation) {
-          await updatePendingInvitation(pendingInvitation.id, orgId, {
+          if (!pendingInvitation.updatedAt) {
+            throw new Error("Invitation data is out of date. Refresh and try again.");
+          }
+          const updatedInvitation = await updateOrganizationInvitationGuarded({
+            orgId,
+            invitationId: pendingInvitation.id,
+            expectedUpdatedAt: pendingInvitation.updatedAt,
             firstName: employee.firstName,
             lastName: employee.lastName,
             phone: employee.phone || undefined,
@@ -174,7 +261,11 @@ export function EmployeeManagementAccessModal({
             roleToAssign: role,
             departmentIds: managementDepartmentIds,
           });
-          const resent = await resendInvitation(pendingInvitation.id, orgId);
+          const resent = await resendOrganizationInvitationGuarded({
+            orgId,
+            invitationId: updatedInvitation.id,
+            expectedUpdatedAt: updatedInvitation.updatedAt ?? pendingInvitation.updatedAt,
+          });
           token = resent.token;
         } else {
           const created = await sendInvitation(
@@ -193,11 +284,38 @@ export function EmployeeManagementAccessModal({
         }
         await sendInviteEmail(token, effectiveEmail.trim());
         toast.success(`Management invitation sent to ${effectiveEmail.trim()}`);
+        await onCompleted(null);
       }
-
-      onCompleted();
       onClose();
     } catch (err) {
+      if (err instanceof OrganizationAccessConflictError || err instanceof InvitationAccessConflictError) {
+        toast.error("Access changed elsewhere. Review the latest values and try again.");
+        return;
+      }
+      if (err instanceof NameMismatchError && matchedUser && !employee.userId) {
+        setNameMismatch(err.details);
+        return;
+      }
+      toast.error(err instanceof Error ? err.message : "Failed to update management access");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReconcileLink() {
+    if (!matchedUser || !nameMismatch) return;
+
+    setSaving(true);
+    try {
+      const updatedEmployee = await applyMatchedUserAccess(true);
+      toast.success("Management access updated");
+      await onCompleted(updatedEmployee);
+      onClose();
+    } catch (err) {
+      if (err instanceof OrganizationAccessConflictError || err instanceof InvitationAccessConflictError) {
+        toast.error("Access changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       toast.error(err instanceof Error ? err.message : "Failed to update management access");
     } finally {
       setSaving(false);
@@ -205,23 +323,68 @@ export function EmployeeManagementAccessModal({
   }
 
   return (
-    <Modal
-      title={isEditingExistingAccess ? "Edit Management Access" : "Grant Management Access"}
-      onClose={onClose}
-      style={{ maxWidth: 560, width: "100%" }}
-    >
+    <>
+      <Modal
+        title={isEditingExistingAccess ? "Edit Management Access" : "Grant Management Access"}
+        onClose={onClose}
+        onRequestClose={() => !saving && requestClose()}
+        style={{ maxWidth: 560, width: "100%" }}
+      >
+      {nameMismatch ? (
+        <AccountNameMismatchPanel
+          details={nameMismatch}
+          title="Name mismatch found"
+          description="This employee record does not match the existing org member name. If the account name is correct, you can update the employee record to match it and continue granting management access."
+          confirmLabel="Use Account Name and Link"
+          dismissLabel={EDITOR_ACTION_LABELS.close}
+          onCancel={handleRequestClose}
+          onConfirm={handleReconcileLink}
+          confirming={saving}
+        />
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div
-          style={{
-            padding: "12px 16px",
-            borderRadius: 10,
-            background: "var(--color-bg-secondary)",
-            color: "var(--color-text-secondary)",
-            fontSize: "var(--dg-fs-label)",
-          }}
-        >
-          Grant app access for management work without changing this employee&apos;s schedule status. Management departments stay on the org membership or invitation, not on the employee record.
-        </div>
+        <ExplainerSection
+          title="How management access works"
+          compact
+          defaultOpen={false}
+          storageKey="dg-explainer-management-access"
+          points={[
+            {
+              title: "The employee record stays separate from the login",
+              description: "You can grant management access without changing the employee's scheduled departments, focus areas, or schedule status.",
+            },
+            {
+              title: "Org role controls app-level access",
+              description: "Role determines whether the linked account is a regular user or an admin inside the organization.",
+            },
+            {
+              title: "Management departments live on the membership or invite",
+              description: "These departments organize management access and roster membership. They do not rewrite the employee record itself.",
+            },
+          ]}
+          preview={(
+            <WorkflowStrip
+              compact
+              steps={[
+                {
+                  label: "Employee record",
+                  description: "Scheduled identity and staffing details",
+                  tone: "default",
+                },
+                {
+                  label: "Linked login",
+                  description: "Email-based account access",
+                  tone: "info",
+                },
+                {
+                  label: "Org role + management departments",
+                  description: "Permissions and management roster membership",
+                  tone: "success",
+                },
+              ]}
+            />
+          )}
+        />
 
         <div>
           <label style={fieldLabelStyle}>Login email</label>
@@ -258,7 +421,8 @@ export function EmployeeManagementAccessModal({
 
         <div>
           <label style={fieldLabelStyle}>
-            Management departments <span style={{ color: "var(--color-danger)" }}>*</span>
+            Management departments
+            {!hasExistingManagementAccess && <span style={{ color: "var(--color-danger)" }}> *</span>}
           </label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {managementDepartments.map((department) => (
@@ -275,15 +439,35 @@ export function EmployeeManagementAccessModal({
               </SelectableTag>
             ))}
           </div>
-          {managementDepartmentIds.length === 0 && (
+          {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
             <FieldError message="Select at least one management department" />
+          )}
+          {managementDepartmentIds.length === 0 && hasExistingManagementAccess && (
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Saving now will remove this person from the Management roster and keep them on the schedule.
+            </div>
           )}
         </div>
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="dg-btn dg-btn-ghost" onClick={onClose}>
-            Cancel
+          <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            {EDITOR_ACTION_LABELS.close}
           </button>
+          {hasExistingManagementAccess && managementDepartmentIds.length > 0 && (
+            <button
+              className="dg-btn dg-btn-ghost"
+              onClick={() => setManagementDepartmentIds([])}
+              style={{ color: "var(--color-danger)" }}
+            >
+              Remove from Management
+            </button>
+          )}
           <button
             className="dg-btn dg-btn-primary"
             onClick={handleSubmit}
@@ -296,7 +480,10 @@ export function EmployeeManagementAccessModal({
           </button>
         </div>
       </div>
-    </Modal>
+      )}
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }
 

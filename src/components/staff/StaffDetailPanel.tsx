@@ -4,9 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
+import { getEmployeeProfileHref } from "@/lib/profile-links";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -69,33 +73,63 @@ export function StaffDetailPanel({
   onRevoke,
   onRevokeAccess,
 }: StaffDetailPanelProps) {
+  const { user: currentUser } = useAuth();
   const hue = hashCode(employee.id) % 360;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [revokingInvite, setRevokingInvite] = useState(false);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
+  const pendingInvitation = canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined;
+  const canEditEmployee = employee.status === "active" || employee.status === "benched";
+  const showInviteActions =
+    canEditEmployee &&
+    canManageEmployees &&
+    !employee.userId &&
+    Boolean(employee.email) &&
+    Boolean(pendingInvitation || (orgId && onInvite));
+  const showManagementAccessAction =
+    Boolean(canManageManagementAccess && onManageManagementAccess && employee.status !== "terminated");
+  const showStatusActions = canEditEmployee;
+  const showAccountAccessActions = showInviteActions || showManagementAccessAction;
+  const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
 
-  const handleClose = useCallback(() => {
+  const closePanel = useCallback(() => {
     setClosing(true);
     setTimeout(() => {
       setClosing(false);
       onCloseRef.current();
     }, 200);
   }, []);
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: closePanel,
+  });
+
+  const handleRequestClose = useCallback(() => {
+    if (requestClose()) {
+      closePanel();
+    }
+  }, [closePanel, requestClose]);
 
   // Escape key to close
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") handleRequestClose();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleClose]);
+  }, [handleRequestClose]);
 
   // Reset scroll when switching employees
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = 0;
+  }, [employee.id]);
+
+  useEffect(() => {
+    setHasUnsavedChanges(false);
   }, [employee.id]);
 
   const statusConfig = {
@@ -106,11 +140,11 @@ export function StaffDetailPanel({
 
   return createPortal(
     <>
-      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={handleClose} />
+      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={handleRequestClose} />
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Panel header */}
         <div className="staff-detail-header">
-          <button className="staff-detail-close" onClick={handleClose} aria-label="Close detail panel">
+          <button className="staff-detail-close" onClick={handleRequestClose} aria-label="Close detail panel">
             <svg
               width="15"
               height="15"
@@ -182,7 +216,7 @@ export function StaffDetailPanel({
                 )}
               </div>
               <Link
-                href={`/people/${employee.id}`}
+                href={profileHref}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -216,38 +250,209 @@ export function StaffDetailPanel({
             departments={departments}
             departmentLabel={departmentLabel}
             onSave={onSave}
-            onCancel={handleClose}
-            onInvite={canManageEmployees && orgId ? onInvite : undefined}
-            pendingInvitation={canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined}
-            onRevoke={canManageEmployees ? onRevoke : undefined}
+            onCancel={closePanel}
+            onDirtyChange={setHasUnsavedChanges}
           />
+          {showAccountAccessActions && (
+            <div
+              style={{
+                padding: "0 24px 24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Account access
+              </div>
+              {pendingInvitation ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    background: "var(--color-warning-bg)",
+                    border: "1px solid var(--color-warning-border)",
+                    borderRadius: "var(--dg-radius-lg)",
+                    padding: "10px 14px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      minWidth: 0,
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--color-warning-text)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--color-warning-text)",
+                        }}
+                      >
+                        Invitation pending
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-warning-text)",
+                          marginTop: 1,
+                        }}
+                      >
+                        Sent to {pendingInvitation.email}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {onInvite && (
+                      <button
+                        disabled={revokingInvite}
+                        onClick={async () => {
+                          if (onRevoke) {
+                            setRevokingInvite(true);
+                            try {
+                              const result = await onRevoke(pendingInvitation.id);
+                              if (result === false) return;
+                            } finally {
+                              setRevokingInvite(false);
+                            }
+                          }
+                          onInvite(employee);
+                        }}
+                        className="dg-btn dg-btn-ghost dg-btn-xs"
+                        style={{
+                          color: "var(--color-link)",
+                        }}
+                      >
+                        <ButtonLoading loading={revokingInvite} spinnerSize={12}>
+                          Reinvite
+                        </ButtonLoading>
+                      </button>
+                    )}
+                    {onRevoke && (
+                      <button
+                        disabled={revokingInvite}
+                        onClick={async () => {
+                          setRevokingInvite(true);
+                          try {
+                            await onRevoke(pendingInvitation.id);
+                          } finally {
+                            setRevokingInvite(false);
+                          }
+                        }}
+                        className="dg-btn dg-btn-ghost dg-btn-xs"
+                        style={{
+                          color: "var(--color-danger)",
+                        }}
+                      >
+                        <ButtonLoading loading={revokingInvite} spinnerSize={12}>
+                          Revoke
+                        </ButtonLoading>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                showInviteActions && onInvite && (
+                  <button
+                    onClick={() => onInvite(employee)}
+                    className="dg-btn dg-btn-secondary"
+                    style={{
+                      width: "100%",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    Send Invitation
+                  </button>
+                )
+              )}
+              {showManagementAccessAction && onManageManagementAccess && (
+                <button
+                  onClick={() => onManageManagementAccess(employee)}
+                  className="dg-btn dg-btn-secondary"
+                  style={{ width: "100%" }}
+                >
+                  {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Grant Management Access"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sticky bottom status actions */}
-        <div style={{ flexShrink: 0, padding: "12px 24px", borderTop: "1px solid var(--color-border-light)" }}>
-          {canManageManagementAccess && onManageManagementAccess && employee.status !== "terminated" && (
-            <button
-              onClick={() => onManageManagementAccess(employee)}
-              className="dg-btn dg-btn-secondary"
-              style={{ width: "100%", marginBottom: 12 }}
+        {showStatusActions && (
+          <div style={{ flexShrink: 0, padding: "16px 24px", borderTop: "1px solid var(--color-border-light)" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
             >
-              {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Grant Management Access"}
-            </button>
-          )}
-          <EmployeeStatusActions
-            employee={employee}
-            canEdit={employee.status === "active" || employee.status === "benched"}
-            pendingInvitation={canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined}
-            onBench={onBench}
-            onActivate={onActivate}
-            onTerminate={onDelete}
-            onRevokeAccess={canManageEmployees ? onRevokeAccess : undefined}
-            onInvite={canManageEmployees && orgId ? onInvite : undefined}
-            onRevoke={canManageEmployees ? onRevoke : undefined}
-            variant="panel"
-          />
-        </div>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Staffing status
+              </div>
+              <EmployeeStatusActions
+                employee={employee}
+                canEdit={canEditEmployee}
+                onBench={onBench}
+                onActivate={onActivate}
+                onTerminate={onDelete}
+                onRevokeAccess={canManageEmployees ? onRevokeAccess : undefined}
+                variant="panel"
+              />
+            </div>
+          </div>
+        )}
       </div>
+      {unsavedChangesDialog}
     </>,
     document.body
   );

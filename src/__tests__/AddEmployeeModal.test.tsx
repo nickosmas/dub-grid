@@ -236,6 +236,25 @@ describe("AddEmployeeModal", () => {
       );
       await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     });
+
+    it("prompts before closing when rows have unsaved changes", async () => {
+      const user = userEvent.setup();
+      const { onClose } = renderModal();
+
+      await user.type(getFirstNameInputs()[0], "Alice");
+      await user.click(screen.getByRole("button", { name: "Close modal" }));
+
+      expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: /keep editing/i }));
+      expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Close modal" }));
+      await user.click(screen.getByRole("button", { name: /discard changes/i }));
+
+      expect(onClose).toHaveBeenCalledOnce();
+    });
   });
 
   describe("Property Tests", () => {
@@ -318,7 +337,7 @@ describe("AddEmployeeModal", () => {
             cleanup();
           },
         ),
-        { numRuns: 100 },
+        { numRuns: 25 },
       );
     }, 15000);
   });

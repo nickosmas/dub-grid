@@ -5,6 +5,8 @@ import type { Employee } from "@/types";
 import Modal from "@/components/Modal";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
@@ -61,6 +63,16 @@ export default function ShiftSwapModal({
   } | null>(null);
 
   const canGoPrev = viewDate > todayIso();
+  const hasUnsavedChanges = viewDate !== shiftDate || selectedTarget !== null;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+  const handleRequestClose = useCallback(() => {
+    if (requestClose()) {
+      onClose();
+    }
+  }, [onClose, requestClose]);
 
   const goDay = useCallback((delta: 1 | -1) => {
     setViewDate((d) => addDaysIso(d, delta));
@@ -131,141 +143,147 @@ export default function ShiftSwapModal({
   }
 
   return (
-    <Modal title="Propose a Swap" onClose={onClose} style={{ maxWidth: 480, width: "100%" }}>
-      {/* Requester shift info */}
-      <div
-        style={{
-          padding: "10px 14px",
-          borderRadius: 8,
-          backgroundColor: "var(--color-bg-secondary)",
-          marginBottom: 16,
-        }}
+    <>
+      <Modal
+        title="Propose a Swap"
+        onClose={onClose}
+        onRequestClose={requestClose}
+        style={{ maxWidth: 480, width: "100%" }}
       >
-        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 2 }}>
-          Your shift
-        </div>
-        <MaybeHint content={shiftLabel} side="bottom">
-          <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {shiftLabel}
-            <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
-              {shiftDate}
-            </span>
+        {/* Requester shift info */}
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: "var(--dg-radius-md)",
+            backgroundColor: "var(--color-bg-secondary)",
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 2 }}>
+            Your shift
           </div>
-        </MaybeHint>
-      </div>
-
-      {/* ── Confirmation view ── */}
-      {selectedTarget ? (
-        <div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              padding: "14px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
-              marginBottom: 16,
-            }}
-          >
-            <div>
-              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You give</span>
-              <MaybeHint content={shiftLabel} side="bottom">
-                <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {shiftLabel}
-                  <span
-                    style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
-                  >
-                    on {shiftDate}
-                  </span>
-                </div>
-              </MaybeHint>
+          <MaybeHint content={shiftLabel} side="bottom">
+            <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {shiftLabel}
+              <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}>
+                {shiftDate}
+              </span>
             </div>
-            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
-              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You get</span>
-              <MaybeHint content={selectedTarget.shiftLabel} side="bottom">
-                <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {selectedTarget.shiftLabel}
-                  <span
-                    style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
-                  >
-                    on {viewDate}
-                  </span>
+          </MaybeHint>
+        </div>
+
+        {/* ── Confirmation view ── */}
+        {selectedTarget ? (
+          <div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                padding: "14px",
+                borderRadius: "var(--dg-radius-md)",
+                border: "1px solid var(--color-border)",
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You give</span>
+                <MaybeHint content={shiftLabel} side="bottom">
+                  <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {shiftLabel}
+                    <span
+                      style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
+                    >
+                      on {shiftDate}
+                    </span>
+                  </div>
+                </MaybeHint>
+              </div>
+              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
+                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)" }}>You get</span>
+                <MaybeHint content={selectedTarget.shiftLabel} side="bottom">
+                  <div style={{ fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {selectedTarget.shiftLabel}
+                    <span
+                      style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: 8 }}
+                    >
+                      on {viewDate}
+                    </span>
+                  </div>
+                </MaybeHint>
+                <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
+                  from {selectedTarget.name}
                 </div>
-              </MaybeHint>
-              <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-                from {selectedTarget.name}
               </div>
             </div>
-          </div>
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="dg-btn dg-btn-ghost" onClick={() => setSelectedTarget(null)}>
-              Back
-            </button>
-            <button className="dg-btn dg-btn-primary" onClick={handleSubmit}>
-              Submit Swap Request
-            </button>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="dg-btn dg-btn-ghost" onClick={() => setSelectedTarget(null)}>
+                Back
+              </button>
+              <button className="dg-btn dg-btn-primary" onClick={handleSubmit}>
+                Submit Swap Request
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        /* ── Day view with eligible employees ── */
-        <div>
-          {/* Day navigation header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 12,
-            }}
-          >
-            <Hint content={hint("Go to previous day")} side="bottom">
-              <span style={{ display: "inline-flex" }}>
+        ) : (
+          /* ── Day view with eligible employees ── */
+          <div>
+            {/* Day navigation header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Hint content={hint("Go to previous day")} side="bottom">
+                <span style={{ display: "inline-flex" }}>
+                  <button
+                    type="button"
+                    onClick={() => goDay(-1)}
+                    disabled={!canGoPrev}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: canGoPrev ? "pointer" : "not-allowed",
+                      padding: "4px 8px",
+                      fontSize: "var(--dg-fs-title)",
+                      color: canGoPrev ? "var(--color-text-secondary)" : "var(--color-text-faint)",
+                      borderRadius: 8,
+                      fontFamily: "inherit",
+                      opacity: canGoPrev ? 1 : 0.5,
+                    }}
+                    aria-label="Go to previous day"
+                  >
+                    ‹
+                  </button>
+                </span>
+              </Hint>
+              <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                {formatDisplayDate(viewDate)}
+              </span>
+              <Hint content={hint("Go to next day")} side="bottom">
                 <button
                   type="button"
-                  onClick={() => goDay(-1)}
-                  disabled={!canGoPrev}
+                  onClick={() => goDay(1)}
                   style={{
                     background: "none",
                     border: "none",
-                    cursor: canGoPrev ? "pointer" : "not-allowed",
+                    cursor: "pointer",
                     padding: "4px 8px",
                     fontSize: "var(--dg-fs-title)",
-                    color: canGoPrev ? "var(--color-text-secondary)" : "var(--color-text-faint)",
+                    color: "var(--color-text-secondary)",
                     borderRadius: 8,
                     fontFamily: "inherit",
-                    opacity: canGoPrev ? 1 : 0.5,
                   }}
-                  aria-label="Go to previous day"
+                  aria-label="Go to next day"
                 >
-                  ‹
+                  ›
                 </button>
-              </span>
-            </Hint>
-            <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-              {formatDisplayDate(viewDate)}
-            </span>
-            <Hint content={hint("Go to next day")} side="bottom">
-              <button
-                type="button"
-                onClick={() => goDay(1)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "4px 8px",
-                  fontSize: "var(--dg-fs-title)",
-                  color: "var(--color-text-secondary)",
-                  borderRadius: 8,
-                  fontFamily: "inherit",
-                }}
-                aria-label="Go to next day"
-              >
-                ›
-              </button>
-            </Hint>
-          </div>
+              </Hint>
+            </div>
 
           {/* Eligible employee list */}
           <div
@@ -273,7 +291,7 @@ export default function ShiftSwapModal({
               maxHeight: 300,
               overflowY: "auto",
               border: "1px solid var(--color-border)",
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               marginBottom: 16,
             }}
           >
@@ -345,12 +363,14 @@ export default function ShiftSwapModal({
 
           {/* Footer */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="dg-btn dg-btn-ghost" onClick={onClose}>
-              Cancel
+            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
             </button>
           </div>
         </div>
       )}
-    </Modal>
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }

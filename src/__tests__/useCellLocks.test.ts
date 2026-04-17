@@ -18,9 +18,9 @@ function createChannel() {
   let state: Record<string, PresenceRecord[]> = {};
   return {
     state: "joined",
-    send: vi.fn(),
-    track: vi.fn(),
-    untrack: vi.fn(),
+    send: vi.fn().mockResolvedValue("ok"),
+    track: vi.fn().mockResolvedValue("ok"),
+    untrack: vi.fn().mockResolvedValue("ok"),
     presenceState: vi.fn(() => state),
     setPresenceState(next: Record<string, PresenceRecord[]>) {
       state = next;
@@ -63,6 +63,40 @@ describe("useCellLocks", () => {
       }),
     );
     expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it("replays the latest presence after the channel reconnects", async () => {
+    const channel = createChannel();
+    channel.state = "closed";
+
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.lockCell("emp-1_2026-04-12");
+    });
+
+    expect(channel.track).not.toHaveBeenCalled();
+
+    channel.state = "joined";
+    await act(async () => {
+      await result.current.refreshPresence();
+    });
+
+    expect(channel.track).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editingCell: "emp-1_2026-04-12",
+        editorSessionId: "session-1",
+        userId: "user-1",
+      }),
+    );
   });
 
   it("shows note-only editors online without hard-locking their cells", () => {
@@ -175,6 +209,181 @@ describe("useCellLocks", () => {
     });
 
     expect(result.current.getCellLock("emp-4_2026-04-12")).toBeNull();
+  });
+
+  it("does not let stale presence sync roll back a newer remote movement broadcast", () => {
+    const channel = createChannel();
+    channel.setPresenceState({
+      "user-2": [
+        {
+          editingCell: "emp-8_2026-04-12",
+          userId: "user-2",
+          userName: "Riley RN",
+          editorSessionId: "session-2",
+          canLockCells: true,
+          isScheduleEditor: true,
+          lockRevision: 1,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.syncPresence();
+    });
+
+    act(() => {
+      result.current.handleLockBroadcast({
+        cellKey: "emp-8_2026-04-13",
+        userId: "user-2",
+        userName: "Riley RN",
+        editorSessionId: "session-2",
+        lockRevision: 2,
+        canLockCells: true,
+      });
+    });
+
+    expect(result.current.getCellLock("emp-8_2026-04-12")).toBeNull();
+    expect(result.current.getCellLock("emp-8_2026-04-13")).toEqual(
+      expect.objectContaining({
+        userId: "user-2",
+        editorSessionId: "session-2",
+        cellKey: "emp-8_2026-04-13",
+        lockRevision: 2,
+      }),
+    );
+
+    act(() => {
+      result.current.syncPresence();
+    });
+
+    expect(result.current.getCellLock("emp-8_2026-04-12")).toBeNull();
+    expect(result.current.getCellLock("emp-8_2026-04-13")).toEqual(
+      expect.objectContaining({
+        userId: "user-2",
+        editorSessionId: "session-2",
+        cellKey: "emp-8_2026-04-13",
+        lockRevision: 2,
+      }),
+    );
+    expect(result.current.onlineUsers).toEqual([
+      expect.objectContaining({
+        userId: "user-2",
+        editingCell: "emp-8_2026-04-13",
+        sessionCount: 1,
+      }),
+    ]);
+  });
+
+  it("lets an equal-revision presence snapshot win when it reflects the latest server state", () => {
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.handleLockBroadcast({
+        cellKey: "emp-9_2026-04-13",
+        userId: "user-2",
+        userName: "Riley RN",
+        editorSessionId: "session-2",
+        lockRevision: 2,
+        canLockCells: true,
+      });
+    });
+
+    channel.setPresenceState({
+      "user-2": [
+        {
+          editingCell: "emp-9_2026-04-14",
+          userId: "user-2",
+          userName: "Riley Updated",
+          editorSessionId: "session-2",
+          canLockCells: true,
+          isScheduleEditor: true,
+          lockRevision: 2,
+        },
+      ],
+    });
+
+    act(() => {
+      result.current.syncPresence();
+    });
+
+    expect(result.current.getCellLock("emp-9_2026-04-13")).toBeNull();
+    expect(result.current.getCellLock("emp-9_2026-04-14")).toEqual(
+      expect.objectContaining({
+        userId: "user-2",
+        userName: "Riley Updated",
+        editorSessionId: "session-2",
+        cellKey: "emp-9_2026-04-14",
+        lockRevision: 2,
+      }),
+    );
+    expect(result.current.onlineUsers).toEqual([
+      expect.objectContaining({
+        userId: "user-2",
+        userName: "Riley Updated",
+        editingCell: "emp-9_2026-04-14",
+        sessionCount: 1,
+      }),
+    ]);
+  });
+
+  it("clears cached presence avatars and locks when the channel is reset", () => {
+    const channel = createChannel();
+    channel.setPresenceState({
+      "user-2": [
+        {
+          editingCell: "emp-7_2026-04-12",
+          userId: "user-2",
+          userName: "Riley RN",
+          editorSessionId: "session-2",
+          canLockCells: true,
+          isScheduleEditor: true,
+          lockRevision: 5,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.syncPresence();
+    });
+
+    expect(result.current.onlineUsers).toHaveLength(1);
+    expect(result.current.getCellLock("emp-7_2026-04-12")).not.toBeNull();
+
+    act(() => {
+      result.current.clearPresenceState();
+    });
+
+    expect(result.current.onlineUsers).toEqual([]);
+    expect(result.current.getCellLock("emp-7_2026-04-12")).toBeNull();
   });
 
   it("shows another tab for the same user in presence without hard-blocking the cell", () => {

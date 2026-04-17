@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements, autoMigrateOrphanedFocusAreas } from "@/lib/db";
+import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements, fetchCoverageRuleConfigs, autoMigrateOrphanedFocusAreas } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
@@ -18,6 +18,7 @@ import type {
   NamedItem,
   Department,
   CoverageRequirement,
+  CoverageRuleConfig,
 } from "@/types";
 
 // ── Types ────────────────────────��───────────────────────────────────────────
@@ -62,6 +63,8 @@ export interface OrganizationData {
   setDepartments: (items: Department[]) => void;
   coverageRequirements: CoverageRequirement[];
   setCoverageRequirements: (reqs: CoverageRequirement[]) => void;
+  coverageRuleConfigs: CoverageRuleConfig[];
+  setCoverageRuleConfigs: (configs: CoverageRuleConfig[]) => void;
 }
 
 // ── Org context resolution ───────────────��───────────────────────────────────
@@ -228,6 +231,13 @@ export function useOrganizationData(): OrganizationData {
     staleTime: CONFIG_STALE_TIME,
   });
 
+  const coverageRuleConfigsQuery = useQuery({
+    queryKey: queryKeys.org.coverageRuleConfigs(effectiveOrgId!),
+    queryFn: () => fetchCoverageRuleConfigs(effectiveOrgId!),
+    enabled: !!effectiveOrgId,
+    staleTime: CONFIG_STALE_TIME,
+  });
+
   // ── Derived values (memoized to stabilize references for downstream deps) ─
   const focusAreas = useMemo(() => focusAreasQuery.data ?? [], [focusAreasQuery.data]);
   const allShiftCodes = useMemo(() => allShiftCodesQuery.data ?? [], [allShiftCodesQuery.data]);
@@ -238,6 +248,7 @@ export function useOrganizationData(): OrganizationData {
   const orgRoles = useMemo(() => orgRolesQuery.data ?? [], [orgRolesQuery.data]);
   const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
   const coverageRequirements = useMemo(() => coverageReqsQuery.data ?? [], [coverageReqsQuery.data]);
+  const coverageRuleConfigs = useMemo(() => coverageRuleConfigsQuery.data ?? [], [coverageRuleConfigsQuery.data]);
 
   const shiftCodes = useMemo(
     () => allShiftCodes.filter((sc) => !sc.archivedAt),
@@ -301,6 +312,7 @@ export function useOrganizationData(): OrganizationData {
     certificationsQuery.isLoading ||
     orgRolesQuery.isLoading ||
     coverageReqsQuery.isLoading ||
+    coverageRuleConfigsQuery.isLoading ||
     departmentsQuery.isLoading;
 
   const loading = ctx.isGridmaster
@@ -325,6 +337,7 @@ export function useOrganizationData(): OrganizationData {
       { key: "certifications", error: certificationsQuery.error },
       { key: "orgRoles", error: orgRolesQuery.error },
       { key: "coverageReqs", error: coverageReqsQuery.error },
+      { key: "coverageRuleConfigs", error: coverageRuleConfigsQuery.error },
     ];
     for (const { key, error } of queries) {
       if (error && !handledErrorsRef.current.has(key)) {
@@ -339,7 +352,7 @@ export function useOrganizationData(): OrganizationData {
     orgQuery.error, focusAreasQuery.error, allShiftCodesQuery.error,
     allAbsenceTypesQuery.error, shiftCategoriesQuery.error,
     indicatorTypesQuery.error, certificationsQuery.error,
-    orgRolesQuery.error, coverageReqsQuery.error,
+    orgRolesQuery.error, coverageReqsQuery.error, coverageRuleConfigsQuery.error,
   ]);
 
   // ── Setup status ────────────────────────────────────────────────────────
@@ -428,6 +441,12 @@ export function useOrganizationData(): OrganizationData {
     }
   }, [queryClient, effectiveOrgId]);
 
+  const setCoverageRuleConfigs = useCallback((configs: CoverageRuleConfig[]) => {
+    if (effectiveOrgId) {
+      queryClient.setQueryData(queryKeys.org.coverageRuleConfigs(effectiveOrgId), configs);
+    }
+  }, [queryClient, effectiveOrgId]);
+
   return {
     org,
     focusAreas,
@@ -458,5 +477,7 @@ export function useOrganizationData(): OrganizationData {
     setDepartments,
     coverageRequirements,
     setCoverageRequirements,
+    coverageRuleConfigs,
+    setCoverageRuleConfigs,
   };
 }

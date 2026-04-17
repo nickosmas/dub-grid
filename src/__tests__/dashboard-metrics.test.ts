@@ -13,7 +13,8 @@ import {
   filterShiftsByWeek,
   getWeekStart,
 } from "@/lib/dashboard-stats";
-import type { ShiftMap, Employee, FocusArea, ShiftCode, CoverageRequirement } from "@/types";
+import { buildPublishedDateSet, filterPublishedDates } from "@/lib/schedule-logic";
+import type { ShiftMap, Employee, FocusArea, ShiftCode, CoverageRequirement, CoverageRuleConfig } from "@/types";
 
 describe("Dashboard Metrics", () => {
   // Sample data
@@ -90,6 +91,14 @@ describe("Dashboard Metrics", () => {
     minStaff: 2,
     dayOfWeek: 1, // Monday
   };
+  const flexibleCoverageRuleConfig: CoverageRuleConfig = {
+    id: 1,
+    orgId: "org1",
+    focusAreaId: 1,
+    requirementShiftCodeId: 101,
+    eligibleShiftCodeIds: [101, 102],
+    preferredOpenShiftCodeId: 102,
+  };
 
   function createShift(
     empId: string,
@@ -126,6 +135,7 @@ describe("Dashboard Metrics", () => {
       [focusArea1],
       [shiftCode1, shiftCode2],
       [coverageRequirement],
+      [],
       weekDates,
       [employee1, employee2],
       shifts,
@@ -146,6 +156,7 @@ describe("Dashboard Metrics", () => {
       [focusArea1],
       [shiftCode1, shiftCode2],
       [coverageRequirement],
+      [],
       weekDates,
       [employee1, employee2],
       shifts,
@@ -167,6 +178,7 @@ describe("Dashboard Metrics", () => {
       [focusArea1],
       [shiftCode1, shiftCode2],
       [coverageRequirement],
+      [],
       weekDates,
       [employee1, employee2],
       shifts,
@@ -178,6 +190,122 @@ describe("Dashboard Metrics", () => {
     // Verify Monday date is in the detected gaps
     const hasMonday = openShifts.some((s) => formatDateKey(s.date) === mondayKey);
     expect(hasMonday).toBe(true);
+  });
+
+  it("hides dashboard open shifts when the gap falls on an unpublished date", () => {
+    const mondayDateObj = weekDates[1];
+    const shiftCodeById = new Map([[101, shiftCode1]]);
+    const publishedDateSet = buildPublishedDateSet([
+      { startDate: formatDateKey(weekDates[2]), endDate: formatDateKey(weekDates[2]) },
+    ]);
+    const publishedDates = filterPublishedDates(weekDates, publishedDateSet);
+
+    const openShifts = computeOpenShifts(
+      [focusArea1],
+      [shiftCode1, shiftCode2],
+      [coverageRequirement],
+      [],
+      publishedDates,
+      [employee1, employee2],
+      {},
+      shiftCodeById,
+    );
+
+    expect(openShifts).toEqual([]);
+    expect(publishedDates.some((date) => formatDateKey(date) === formatDateKey(mondayDateObj))).toBe(false);
+  });
+
+  it("should use flexible coverage rules for totals and open shifts", () => {
+    const mondayKey = formatDateKey(weekDates[1]);
+    const shifts: ShiftMap = {
+      ...Object.fromEntries([
+        createShift("emp1", mondayKey, [101]),
+        createShift("emp2", mondayKey, [102]),
+      ]),
+    };
+    const shiftCodeById = new Map([
+      [101, shiftCode1],
+      [102, shiftCode2],
+    ]);
+
+    const coverage = computeCoveragePctAndSlots(
+      [focusArea1],
+      [shiftCode1, shiftCode2],
+      [coverageRequirement],
+      [flexibleCoverageRuleConfig],
+      weekDates,
+      [employee1, employee2],
+      shifts,
+    );
+    const openShifts = computeOpenShifts(
+      [focusArea1],
+      [shiftCode1, shiftCode2],
+      [coverageRequirement],
+      [flexibleCoverageRuleConfig],
+      weekDates,
+      [employee1, employee2],
+      shifts,
+      shiftCodeById,
+    );
+
+    expect(coverage.pct).toBe(100);
+    expect(coverage.openSlots).toBe(0);
+    expect(openShifts).toEqual([]);
+  });
+
+  it("uses category totals for coverage even when one exact code is short", () => {
+    const employee3: Employee = {
+      ...employee1,
+      id: "emp3",
+      firstName: "Alex",
+    };
+    const mondayKey = formatDateKey(weekDates[1]);
+    const shifts: ShiftMap = {
+      ...Object.fromEntries([
+        createShift("emp1", mondayKey, [101]),
+        createShift("emp2", mondayKey, [102]),
+        createShift("emp3", mondayKey, [102]),
+      ]),
+    };
+    const shiftCodeById = new Map([
+      [101, shiftCode1],
+      [102, shiftCode2],
+    ]);
+    const dayRequirement: CoverageRequirement = {
+      ...coverageRequirement,
+      shiftCodeId: 101,
+      minStaff: 2,
+    };
+    const eveningRequirement: CoverageRequirement = {
+      ...coverageRequirement,
+      id: 2,
+      shiftCodeId: 102,
+      minStaff: 1,
+    };
+
+    const coverage = computeCoveragePctAndSlots(
+      [focusArea1],
+      [shiftCode1, shiftCode2],
+      [dayRequirement, eveningRequirement],
+      [],
+      weekDates,
+      [employee1, employee2, employee3],
+      shifts,
+    );
+    const openShifts = computeOpenShifts(
+      [focusArea1],
+      [shiftCode1, shiftCode2],
+      [dayRequirement, eveningRequirement],
+      [],
+      weekDates,
+      [employee1, employee2, employee3],
+      shifts,
+      shiftCodeById,
+    );
+
+    expect(coverage.pct).toBe(100);
+    expect(coverage.openSlots).toBe(0);
+    expect(openShifts).toEqual([]);
   });
 
   it("should calculate shift duration correctly", () => {

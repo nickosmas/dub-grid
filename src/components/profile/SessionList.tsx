@@ -152,8 +152,8 @@ export function SessionList() {
               <button
                 onClick={() => handleRevoke(s)}
                 disabled={revokingId === s.id}
-                className="dg-btn dg-btn-ghost"
-                style={{ padding: "4px 8px", color: "var(--color-danger)" }}
+                className="dg-btn dg-btn-ghost dg-btn-xs"
+                style={{ color: "var(--color-danger)" }}
                 aria-label="Revoke session"
               >
                 <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>

@@ -6,6 +6,8 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 
@@ -21,6 +23,7 @@ export interface EditEmployeePanelProps {
   departmentLabel?: string;
   onSave: (updatedEmployee: Employee) => void;
   onCancel: () => void;
+  onDirtyChange?: (hasUnsavedChanges: boolean) => void;
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
@@ -48,6 +51,7 @@ export default function EditEmployeePanel({
   focusAreaLabel = "Focus Areas",
   onSave,
   onCancel,
+  onDirtyChange,
   onInvite,
   pendingInvitation,
   onRevoke,
@@ -118,6 +122,10 @@ export default function EditEmployeePanel({
       form.departmentIds.some((id) => !employee.departmentIds.includes(id))
     );
   }, [form, employee]);
+
+  useEffect(() => {
+    onDirtyChange?.(isModified);
+  }, [isModified, onDirtyChange]);
 
   const handleSave = useCallback(() => {
     if (!form.firstName.trim() || !form.lastName.trim() || form.focusAreaIds.length === 0) {
@@ -517,7 +525,7 @@ export default function EditEmployeePanel({
                   gap: 10,
                   background: "var(--color-warning-bg)",
                   border: "1px solid var(--color-warning-border)",
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-radius-lg)",
                   padding: "10px 14px",
                 }}
               >
@@ -580,10 +588,8 @@ export default function EditEmployeePanel({
                         }
                         onInvite(employee);
                       }}
-                      className="dg-btn dg-btn-ghost"
+                      className="dg-btn dg-btn-ghost dg-btn-xs"
                       style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        padding: "4px 8px",
                         color: "var(--color-link)",
                       }}
                     >
@@ -603,10 +609,8 @@ export default function EditEmployeePanel({
                           setRevoking(false);
                         }
                       }}
-                      className="dg-btn dg-btn-ghost"
+                      className="dg-btn dg-btn-ghost dg-btn-xs"
                       style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        padding: "4px 8px",
                         color: "var(--color-danger)",
                       }}
                     >
@@ -628,7 +632,7 @@ export default function EditEmployeePanel({
                   width: "100%",
                   justifyContent: "center",
                   border: "1px dashed var(--color-brand-border)",
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-btn-radius)",
                 }}
               >
                 <svg
@@ -662,37 +666,42 @@ export default function EditEmployeePanel({
       >
         {/* Primary actions */}
         {canEdit && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSave}
-              disabled={
-                !isModified ||
-                !form.firstName.trim() ||
-                !form.lastName.trim() ||
-                form.focusAreaIds.length === 0
-              }
-              className="dg-btn dg-btn-primary"
-              style={{ flex: 1 }}
-            >
-              Save Changes
-            </button>
-            <button
-              onClick={onCancel}
-              className="dg-btn dg-btn-secondary"
-              style={{ flex: 1 }}
-            >
-              {isModified ? "Discard" : "Close"}
-            </button>
-          </div>
+          <EditorActionRow
+            secondaryAction={(
+              <button
+                onClick={onCancel}
+                className="dg-btn dg-btn-secondary"
+              >
+                {EDITOR_ACTION_LABELS.close}
+              </button>
+            )}
+            primaryAction={(
+              <button
+                onClick={handleSave}
+                disabled={
+                  !isModified ||
+                  !form.firstName.trim() ||
+                  !form.lastName.trim() ||
+                  form.focusAreaIds.length === 0
+                }
+                className="dg-btn dg-btn-primary"
+              >
+                {EDITOR_ACTION_LABELS.save}
+              </button>
+            )}
+          />
         )}
         {!canEdit && (
-          <button
-            onClick={onCancel}
-            className="dg-btn dg-btn-secondary"
-            style={{ width: "100%" }}
-          >
-            Close
-          </button>
+          <EditorActionRow
+            secondaryAction={(
+              <button
+                onClick={onCancel}
+                className="dg-btn dg-btn-secondary"
+              >
+                {EDITOR_ACTION_LABELS.close}
+              </button>
+            )}
+          />
         )}
       </div>
     </div>

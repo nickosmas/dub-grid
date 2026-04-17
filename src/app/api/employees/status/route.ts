@@ -6,6 +6,9 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { rowToEmployee } from "@/lib/db/mappers";
+import type { DbEmployee } from "@/lib/db/types";
+import { EMPLOYEE_COLS } from "@/lib/db/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +16,27 @@ const bodySchema = z.object({
   empId: z.string().uuid(),
   orgId: z.string().uuid(),
   action: z.enum(["bench", "activate", "terminate"]),
+  expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
 });
+
+function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
+  return NextResponse.json(
+    {
+      error:
+        "Employee status changed elsewhere. Review the latest values before saving again.",
+      code: "EMPLOYEE_STATUS_CONFLICT",
+      employee,
+    },
+    { status: 409 },
+  );
+}
+
+function getRequestIp(req: NextRequest): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+  return forwarded.split(",")[0]?.trim() || null;
+}
 
 /**
  * POST /api/employees/status
@@ -55,7 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { empId, orgId, action, note } = parsed.data;
+  const { empId, orgId, action, expectedVersion, note } = parsed.data;
 
   try {
     // ── Permission check ──────────────────────────────────────────────
@@ -88,40 +110,114 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    // ── Execute action via service client (avoids client-only import chain) ──
-    const now = new Date().toISOString();
+    const { data: currentRow, error: currentError } = await serviceClient
+      .from("employees")
+      .select(EMPLOYEE_COLS)
+      .eq("id", empId)
+      .eq("org_id", orgId)
+      .single();
 
-    switch (action) {
-      case "bench": {
-        const { error } = await serviceClient
-          .from("employees")
-          .update({ status: "benched", status_note: note ?? "", status_changed_at: now })
-          .eq("id", empId)
-          .eq("org_id", orgId);
-        if (error) throw error;
-        break;
-      }
-      case "activate": {
-        const { error } = await serviceClient
-          .from("employees")
-          .update({ status: "active", status_note: "", status_changed_at: now })
-          .eq("id", empId)
-          .eq("org_id", orgId);
-        if (error) throw error;
-        break;
-      }
-      case "terminate": {
-        const { error } = await serviceClient
-          .from("employees")
-          .update({ archived_at: now, status: "terminated", status_changed_at: now })
-          .eq("id", empId)
-          .eq("org_id", orgId);
-        if (error) throw error;
-        break;
-      }
+    if (currentError) throw currentError;
+
+    const currentEmployee = rowToEmployee(currentRow as DbEmployee);
+
+    if (currentEmployee.version !== expectedVersion) {
+      return buildConflictResponse(currentEmployee);
     }
 
-    return NextResponse.json({ success: true });
+    const now = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      status_changed_at: now,
+      version: expectedVersion + 1,
+    };
+
+    let auditAction = "employee.updated";
+    let auditDetails: Record<string, unknown> = {
+      fromStatus: currentEmployee.status,
+    };
+
+    switch (action) {
+      case "bench":
+        update.status = "benched";
+        update.status_note = note ?? "";
+        auditAction = "employee.benched";
+        auditDetails = {
+          ...auditDetails,
+          toStatus: "benched",
+          note: note ?? "",
+        };
+        break;
+      case "activate":
+        update.status = "active";
+        update.status_note = "";
+        update.archived_at = null;
+        auditAction = "employee.activated";
+        auditDetails = {
+          ...auditDetails,
+          toStatus: "active",
+        };
+        break;
+      case "terminate":
+        update.status = "terminated";
+        update.archived_at = now;
+        auditAction = "employee.archived";
+        auditDetails = {
+          ...auditDetails,
+          toStatus: "terminated",
+        };
+        break;
+    }
+
+    const { data: updatedRow, error: updateError } = await serviceClient
+      .from("employees")
+      .update(update)
+      .eq("id", empId)
+      .eq("org_id", orgId)
+      .eq("version", expectedVersion)
+      .select(EMPLOYEE_COLS)
+      .maybeSingle();
+
+    if (updateError) throw updateError;
+
+    if (!updatedRow) {
+      const { data: latestRow, error: latestError } = await serviceClient
+        .from("employees")
+        .select(EMPLOYEE_COLS)
+        .eq("id", empId)
+        .eq("org_id", orgId)
+        .single();
+
+      if (latestError) throw latestError;
+      return buildConflictResponse(rowToEmployee(latestRow as DbEmployee));
+    }
+
+    const updatedEmployee = rowToEmployee(updatedRow as DbEmployee);
+
+    const { error: auditError } = await serviceClient
+      .from("audit_log")
+      .insert({
+        org_id: orgId,
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        action: auditAction,
+        resource_type: "employee",
+        resource_id: empId,
+        details: {
+          ...auditDetails,
+          changedFields: ["status"],
+        },
+        ip_address: getRequestIp(req),
+        user_agent: req.headers.get("user-agent"),
+      });
+
+    if (auditError) {
+      logger.error(
+        { error: auditError, orgId, empId, action },
+        "Employee status audit log write failed",
+      );
+    }
+
+    return NextResponse.json({ success: true, employee: updatedEmployee });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "employees/status", empId, orgId, action } });
     logger.error({ error: err, empId, orgId, action }, "Employee status change failed");

@@ -5,6 +5,8 @@ import Modal from "@/components/Modal";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MOBILE, useMediaQuery } from "@/hooks";
 
 type RowEntry = {
@@ -14,6 +16,8 @@ type RowEntry = {
   certificationId: number | null;
   focusAreaIds: number[];
 };
+
+type RowDraft = Omit<RowEntry, "_id">;
 
 function makeRow(
   certificationId: number | null,
@@ -26,6 +30,15 @@ function makeRow(
     certificationId,
     focusAreaIds,
   };
+}
+
+function serializeRows(rows: RowDraft[]): string {
+  return JSON.stringify(
+    rows.map((row) => ({
+      ...row,
+      focusAreaIds: [...row.focusAreaIds].sort((left, right) => left - right),
+    })),
+  );
 }
 
 export type NewEmployeeData = Omit<Employee, "id" | "seniority"> & {
@@ -65,6 +78,36 @@ export default function AddEmployeeModal({
   ]);
 
   const newRowFirstNameRef = useRef<HTMLInputElement | null>(null);
+  const initialRowsSnapshot = useMemo(
+    () =>
+      serializeRows(
+        Array.from({ length: 3 }, () => ({
+          firstName: "",
+          lastName: "",
+          certificationId: defaultCertId,
+          focusAreaIds: [...defaultFocusAreaIds],
+        })),
+      ),
+    [defaultCertId, defaultFocusAreaIds],
+  );
+  const hasUnsavedChanges =
+    serializeRows(
+      rows.map((row) => ({
+        firstName: row.firstName,
+        lastName: row.lastName,
+        certificationId: row.certificationId,
+        focusAreaIds: row.focusAreaIds,
+      })),
+    ) !== initialRowsSnapshot;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+  const handleRequestClose = useCallback(() => {
+    if (requestClose()) {
+      onClose();
+    }
+  }, [onClose, requestClose]);
 
   const validRows = rows.filter(
     (r) => r.firstName.trim() && r.lastName.trim() && r.focusAreaIds.length > 0,
@@ -147,16 +190,18 @@ export default function AddEmployeeModal({
   };
 
   return (
-    <Modal
-      title="Add Staff Members"
-      onClose={onClose}
-      aria-describedby={descriptionId}
-      style={{
-        maxWidth: 1080,
-        width: isMobile ? "calc(100vw - 32px)" : "min(1080px, calc(100vw - 48px))",
-        maxHeight: isMobile ? "calc(100dvh - 24px)" : "calc(100vh - 40px)",
-      }}
-    >
+    <>
+      <Modal
+        title="Add Staff Members"
+        onClose={onClose}
+        onRequestClose={requestClose}
+        aria-describedby={descriptionId}
+        style={{
+          maxWidth: 1080,
+          width: isMobile ? "calc(100vw - 32px)" : "min(1080px, calc(100vw - 48px))",
+          maxHeight: isMobile ? "calc(100dvh - 24px)" : "calc(100vh - 40px)",
+        }}
+      >
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
         <p
           id={descriptionId}
@@ -192,7 +237,7 @@ export default function AddEmployeeModal({
               overflowY: "auto",
               paddingRight: isMobile ? 0 : 4,
               border: "1px solid var(--color-border)",
-              borderRadius: 12,
+              borderRadius: "var(--dg-radius-md)",
               background: "var(--color-surface)",
             }}
           >
@@ -458,15 +503,15 @@ export default function AddEmployeeModal({
               Add Another Person
             </button>
             <button
-              onClick={onClose}
+              onClick={handleRequestClose}
               className="dg-btn dg-btn-ghost"
               style={{ flex: isMobile ? 1 : undefined }}
             >
-              Cancel
+              {EDITOR_ACTION_LABELS.close}
             </button>
             <button
               onClick={handleSubmit}
-              className="dg-btn dg-btn-primary px-5 py-2.5"
+              className="dg-btn dg-btn-primary"
               disabled={validRows.length === 0}
               style={{ flex: isMobile ? 1 : undefined }}
             >
@@ -476,6 +521,8 @@ export default function AddEmployeeModal({
           </div>
         </div>
       </div>
-    </Modal>
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }

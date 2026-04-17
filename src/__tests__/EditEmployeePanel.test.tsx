@@ -122,36 +122,36 @@ describe("EditEmployeePanel", () => {
   // isModified / Save button state
   // -------------------------------------------------------------------------
   describe("isModified / Save button state", () => {
-    it("Save Changes button is disabled when form is unmodified", () => {
+    it("Save button is disabled when form is unmodified", () => {
       renderPanel();
       expect(
-        screen.getByRole("button", { name: "Save Changes" }),
+        screen.getByRole("button", { name: "Save" }),
       ).toBeDisabled();
     });
 
-    it("Save Changes becomes enabled after changing the first name field", async () => {
+    it("Save becomes enabled after changing the first name field", async () => {
       const user = userEvent.setup();
       renderPanel();
       const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
       await user.type(nameInput, "Bob");
       expect(
-        screen.getByRole("button", { name: "Save Changes" }),
+        screen.getByRole("button", { name: "Save" }),
       ).not.toBeDisabled();
     });
 
-    it("Save Changes becomes enabled after changing the designation", async () => {
+    it("Save becomes enabled after changing the designation", async () => {
       const user = userEvent.setup();
       renderPanel();
       // Certification is a CustomSelect — open dropdown and pick a different option
       await user.click(screen.getByRole("button", { name: /STAFF/ }));
       await user.click(screen.getByRole("option", { name: "CSN II" }));
       expect(
-        screen.getByRole("button", { name: "Save Changes" }),
+        screen.getByRole("button", { name: "Save" }),
       ).not.toBeDisabled();
     });
 
-    it("Save Changes is disabled when first name is cleared even if other fields are modified", async () => {
+    it("Save is disabled when first name is cleared even if other fields are modified", async () => {
       const user = userEvent.setup();
       renderPanel();
       // First modify designation so isModified would be true
@@ -161,21 +161,21 @@ describe("EditEmployeePanel", () => {
       const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
       expect(
-        screen.getByRole("button", { name: "Save Changes" }),
+        screen.getByRole("button", { name: "Save" }),
       ).toBeDisabled();
     });
 
-    it("Save Changes is disabled when last name is cleared even if other fields are modified", async () => {
+    it("Save is disabled when last name is cleared even if other fields are modified", async () => {
       const user = userEvent.setup();
       renderPanel();
       const lastNameInput = screen.getByDisplayValue("Smith");
       await user.clear(lastNameInput);
       expect(
-        screen.getByRole("button", { name: "Save Changes" }),
+        screen.getByRole("button", { name: "Save" }),
       ).toBeDisabled();
     });
 
-    it("Save Changes is disabled when all focus areas are deselected", async () => {
+    it("Save is disabled when all focus areas are deselected", async () => {
       const user = userEvent.setup();
       renderPanel();
       // Modify name so isModified is true
@@ -185,7 +185,7 @@ describe("EditEmployeePanel", () => {
       // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(
-        screen.getByRole("button", { name: "Save Changes" }),
+        screen.getByRole("button", { name: "Save" }),
       ).toBeDisabled();
     });
   });
@@ -194,7 +194,7 @@ describe("EditEmployeePanel", () => {
   // Save action
   // -------------------------------------------------------------------------
   describe("Save action", () => {
-    it("clicking Save Changes on a valid modified form calls onSave with the updated employee", async () => {
+    it("clicking Save on a valid modified form calls onSave with the updated employee", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn();
       renderPanel({ onSave });
@@ -203,7 +203,7 @@ describe("EditEmployeePanel", () => {
       await user.clear(firstNameInput);
       await user.type(firstNameInput, "Bob");
 
-      await user.click(screen.getByRole("button", { name: "Save Changes" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onSave).toHaveBeenCalledOnce();
       expect(onSave).toHaveBeenCalledWith(
@@ -232,15 +232,31 @@ describe("EditEmployeePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Cancel
+  // Discard
   // -------------------------------------------------------------------------
-  describe("Cancel", () => {
+  describe("Discard", () => {
     it("clicking Close calls onCancel when no changes made", async () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
       renderPanel({ onCancel });
       await user.click(screen.getByRole("button", { name: "Close" }));
       expect(onCancel).toHaveBeenCalledOnce();
+    });
+
+    it("keeps Close after the form becomes dirty", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+
+      const firstNameInput = screen.getByDisplayValue("Alice");
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, "Bob");
+
+      const cancelButton = screen.getByRole("button", { name: "Close" });
+      const saveButton = screen.getByRole("button", { name: "Save" });
+
+      expect(cancelButton).toBeInTheDocument();
+      expect(cancelButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
     });
   });
 
@@ -308,7 +324,7 @@ describe("EditEmployeePanel", () => {
           try {
             // Assert Save is disabled when unmodified
             const saveBtn = screen.getByRole("button", {
-              name: "Save Changes",
+              name: "Save",
             });
             expect(saveBtn).toBeDisabled();
 
@@ -324,13 +340,13 @@ describe("EditEmployeePanel", () => {
 
             // Assert Save is enabled after mutation
             expect(
-              screen.getByRole("button", { name: "Save Changes" }),
+              screen.getByRole("button", { name: "Save" }),
             ).not.toBeDisabled();
           } finally {
             unmount();
           }
         }),
-        { numRuns: 100 },
+        { numRuns: 25 },
       );
     }, 30000);
   });

@@ -1,0 +1,190 @@
+"use client";
+
+import { useMemo } from "react";
+import { toast } from "sonner";
+import { Calendar, Copy } from "lucide-react";
+import { OverviewTab } from "@/components/staff-detail/tabs/OverviewTab";
+import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
+import { computeEmployeeWeeklyHours, formatDateKey, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
+import type {
+  AbsenceType,
+  Employee,
+  FocusArea,
+  NamedItem,
+  RecurringShift,
+  ShiftCategory,
+  ShiftCode,
+  ShiftDisplayMode,
+  ShiftMap,
+  ShiftRequest,
+} from "@/types";
+
+interface SharedSelfWorkProps {
+  employee: Employee;
+  focusAreas: FocusArea[];
+  focusAreaLabel?: string;
+  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  absenceTypes: AbsenceType[];
+  certifications: NamedItem[];
+  orgRoles: NamedItem[];
+  shiftDisplayMode?: ShiftDisplayMode;
+  shifts: ShiftMap;
+  recurringShifts: RecurringShift[];
+  shiftRequests: ShiftRequest[];
+  auditNames: Map<string, string>;
+}
+
+function useSelfWorkMaps({
+  focusAreas,
+  shiftCodes,
+  shiftCategories,
+  absenceTypes,
+}: Pick<SharedSelfWorkProps, "focusAreas" | "shiftCodes" | "shiftCategories" | "absenceTypes">) {
+  const shiftCodeById = useMemo(() => {
+    const map = new Map<number, ShiftCode>();
+    for (const shiftCode of shiftCodes) map.set(shiftCode.id, shiftCode);
+    return map;
+  }, [shiftCodes]);
+
+  const categoryById = useMemo(() => {
+    const map = new Map<number, ShiftCategory>();
+    for (const category of shiftCategories) map.set(category.id, category);
+    return map;
+  }, [shiftCategories]);
+
+  const focusAreaById = useMemo(() => {
+    const map = new Map<number, FocusArea>();
+    for (const focusArea of focusAreas) map.set(focusArea.id, focusArea);
+    return map;
+  }, [focusAreas]);
+
+  const absenceTypeById = useMemo(() => {
+    const map = new Map<number, AbsenceType>();
+    for (const absenceType of absenceTypes) map.set(absenceType.id, absenceType);
+    return map;
+  }, [absenceTypes]);
+
+  return {
+    shiftCodeById,
+    categoryById,
+    focusAreaById,
+    absenceTypeById,
+  };
+}
+
+export function SelfWorkOverview({
+  employee,
+  shifts,
+  certifications,
+  orgRoles,
+  shiftDisplayMode,
+  ...rest
+}: SharedSelfWorkProps) {
+  const { shiftCodeById, categoryById } = useSelfWorkMaps(rest);
+
+  const thisWeekHours = useMemo(() => {
+    const weekStart = getWeekStart(new Date());
+    const weekDateKeys = getWeekDates(weekStart).map(formatDateKey);
+    return computeEmployeeWeeklyHours(
+      employee.id,
+      weekDateKeys,
+      shifts,
+      shiftCodeById,
+      40,
+      categoryById,
+    );
+  }, [categoryById, employee.id, shiftCodeById, shifts]);
+
+  return (
+    <OverviewTab
+      employee={employee}
+      shifts={shifts}
+      shiftCodeById={shiftCodeById}
+      categoryById={categoryById}
+      focusAreas={rest.focusAreas}
+      focusAreaLabel={rest.focusAreaLabel}
+      certifications={certifications}
+      orgRoles={orgRoles}
+      pendingInvite={null}
+      thisWeekHours={thisWeekHours}
+      shiftDisplayMode={shiftDisplayMode}
+    />
+  );
+}
+
+export function SelfWorkSchedule({
+  employee,
+  focusAreas,
+  shifts,
+  recurringShifts,
+  shiftRequests,
+  auditNames,
+  shiftDisplayMode,
+  ...rest
+}: SharedSelfWorkProps) {
+  const { shiftCodeById, categoryById, focusAreaById, absenceTypeById } = useSelfWorkMaps({
+    focusAreas,
+    shiftCodes: rest.shiftCodes,
+    shiftCategories: rest.shiftCategories,
+    absenceTypes: rest.absenceTypes,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="dg-card">
+        <div className="dg-card-header">
+          <div>
+            <div className="dg-card-title">Calendar Subscription</div>
+            <div className="dg-card-subtitle">Subscribe to your shift schedule in your preferred calendar app.</div>
+          </div>
+        </div>
+        <div className="dg-card-body flex flex-col gap-3">
+          <p className="m-0 text-[14px] text-[var(--color-text-muted)]">
+            Use this private feed in Google Calendar, Apple Calendar, or Outlook.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-1 items-center gap-2 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
+              <Calendar className="size-4 shrink-0 text-[var(--color-text-muted)]" />
+              <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--color-text-secondary)]">
+                {typeof window !== "undefined" ? `${window.location.origin}/api/calendar` : "/api/calendar"}
+              </code>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${window.location.origin}/api/calendar`;
+                navigator.clipboard.writeText(url).then(
+                  () => toast.success("Calendar URL copied to clipboard"),
+                  () => toast.error("Failed to copy calendar URL"),
+                );
+              }}
+              className="dg-btn dg-btn-secondary"
+            >
+              <Copy className="mr-1 size-4" />
+              Copy URL
+            </button>
+          </div>
+          <p className="m-0 text-[12px] text-[var(--color-text-subtle)]">
+            You must be logged in for the feed to work. The URL returns your shifts for the next 4 weeks.
+          </p>
+        </div>
+      </div>
+
+      <ScheduleTab
+        employee={employee}
+        shifts={shifts}
+        shiftCodeById={shiftCodeById}
+        focusAreas={focusAreas}
+        categoryById={categoryById}
+        focusAreaById={focusAreaById}
+        absenceTypeById={absenceTypeById}
+        auditNames={auditNames}
+        shiftRequests={shiftRequests}
+        recurringShifts={recurringShifts}
+        canViewRecurringShifts
+        shiftDisplayMode={shiftDisplayMode}
+      />
+    </div>
+  );
+}

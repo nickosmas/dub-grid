@@ -65,6 +65,8 @@ Fill in your Supabase credentials:
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Optional: browser-restricted Google Maps Places key for org address autocomplete
+# NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
 ```
 
 3. **Start Supabase locally:**
