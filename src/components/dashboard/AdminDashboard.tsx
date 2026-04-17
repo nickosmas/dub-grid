@@ -12,6 +12,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
     permissions,
     sectionCoverage,
     openShifts,
+    publishedWindowState,
     activityItems,
     currentHours,
     activeEmployees,
@@ -39,11 +40,13 @@ export default function AdminDashboard(props: DashboardContentProps) {
             focusAreaLabel={org.focusAreaLabel || "section"}
             isMobile={isMobile}
             hasRequirements={coverageRequirements.length > 0}
+            publishedWindowState={publishedWindowState}
             onExpand={() => onExpandPanel("coverage")}
           />
         )}
         <OpenShiftsCard
           openShifts={openShifts}
+          publishedWindowState={publishedWindowState}
           maxVisible={5}
           onExpand={() => onExpandPanel("openShifts")}
         />

@@ -1,26 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
-import { usePermissions } from "@/hooks";
+import { useOrganizationData, usePermissions } from "@/hooks";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
-import type { User } from "@supabase/supabase-js";
-import { ChevronDown, Pencil, X, Check, Trash2, Calendar, Copy } from "lucide-react";
+import { ChevronLeft, Check, Trash2, X } from "lucide-react";
 import { MFASetup } from "@/components/profile/MFASetup";
 import { NotificationPreferences } from "@/components/profile/NotificationPreferences";
 import { SessionList } from "@/components/profile/SessionList";
-
-interface ProfileData {
-  first_name: string | null;
-  last_name: string | null;
-}
+import { ProfileHeroCard } from "@/components/profile/ProfileHeroCard";
+import { ProfileSectionTabs } from "@/components/profile/ProfileSectionTabs";
+import { SelfWorkOverview, SelfWorkSchedule } from "@/components/profile/SelfWorkProfile";
+import { useSelfProfileData } from "@/hooks/useSelfProfileData";
+import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 
 const ROLE_LABELS: Record<string, string> = {
   gridmaster: "Gridmaster",
@@ -31,44 +29,11 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-  gridmaster:  { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
-  super_admin: { bg: "var(--color-success-bg)", text: "var(--color-success-text)" },
-  admin:       { bg: "var(--color-info-bg)", text: "var(--color-info)" },
-  scheduler:   { bg: "var(--color-info-bg)", text: "var(--color-info)" },
-  supervisor:  { bg: "var(--color-info-bg)", text: "var(--color-info)" },
-  user:        { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)" },
-};
-
-const cardStyle: React.CSSProperties = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 14,
-  boxShadow: "var(--shadow-raised)",
-  overflow: "hidden",
-};
-
-const cardHeaderStyle: React.CSSProperties = {
-  padding: "16px 24px",
-  borderBottom: "1px solid var(--color-border)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
-
-const cardHeaderLabelStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 700,
-  color: "var(--color-text-secondary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-};
-
-const inputFieldStyle: React.CSSProperties = {
+const inputFieldStyle: CSSProperties = {
   width: "100%",
   padding: "10px 13px",
   border: "1.5px solid var(--color-border)",
-  borderRadius: "8px",
+  borderRadius: "var(--dg-btn-radius)",
   fontSize: "var(--dg-fs-body-sm)",
   outline: "none",
   boxSizing: "border-box",
@@ -90,31 +55,48 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 
 export function ProfilePageContent() {
   const router = useRouter();
-  const { role, orgId, isLoading } = usePermissions();
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const { role, orgId, isLoading: permissionsLoading } = usePermissions();
+  const {
+    org,
+    focusAreas,
+    shiftCodes,
+    shiftCategories,
+    absenceTypes,
+    certifications,
+    orgRoles,
+    shiftCodeMap,
+    absenceTypeMap,
+  } = useOrganizationData();
+  const {
+    user,
+    profile,
+    employee,
+    shifts,
+    recurringShifts,
+    shiftRequests,
+    auditNames,
+    isLoading: selfProfileLoading,
+    error: selfProfileError,
+    setProfile,
+    setEmployee,
+  } = useSelfProfileData({ orgId, shiftCodeMap, absenceTypeMap });
 
-  // Name editing
-  const [editingName, setEditingName] = useState(false);
+  type ProfileSection = "account" | "overview" | "schedule";
+
+  // Account details editing
+  const [isEditingAccountDetails, setIsEditingAccountDetails] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
-  const [savingName, setSavingName] = useState(false);
-
-  // Email change
-  const [editingEmail, setEditingEmail] = useState(false);
   const [editEmail, setEditEmail] = useState("");
-  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingAccountDetails, setSavingAccountDetails] = useState(false);
 
   // Password change
-  const [securityOpen, setSecurityOpen] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-
-  // MFA
-  const [mfaEnabled, setMfaEnabled] = useState(false);
 
   // Session management
   const [signingOut, setSigningOut] = useState<"others" | "global" | null>(null);
@@ -123,41 +105,27 @@ export function ProfilePageContent() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const verifiedUser = await getVerifiedBrowserUser();
-      if (cancelled || !verifiedUser) return;
-      setUser(verifiedUser);
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, mfa_enabled")
-        .eq("id", verifiedUser.id)
-        .single();
-      if (!cancelled) {
-        setProfile(prof ? { first_name: prof.first_name, last_name: prof.last_name } : null);
-        setMfaEnabled(prof?.mfa_enabled ?? false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const [activeTab, setActiveTab] = useState<ProfileSection>("account");
 
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
   const name = [firstName, lastName].filter(Boolean).join(" ") || null;
+  const mfaEnabled = profile?.mfa_enabled ?? false;
 
   const initials = name
     ? name.split(" ").filter(Boolean).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : (user?.email?.[0] ?? "?").toUpperCase();
 
-  const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.user;
+  const hasLinkedEmployee = !!employee;
   const hasNameChanges =
     editFirstName.trim() !== (firstName ?? "") ||
     editLastName.trim() !== (lastName ?? "");
   const savedEmail = (user?.email ?? "").trim().toLowerCase();
   const editedEmail = editEmail.trim().toLowerCase();
   const hasEmailChanges = editedEmail !== "" && editedEmail !== savedEmail;
+  const hasAccountChanges = hasNameChanges || hasEmailChanges;
+  const hasPasswordChanges = newPassword.length > 0 || confirmNewPassword.length > 0;
+  const hasInvalidAccountDraft = isEditingAccountDetails && editEmail.trim() === "";
 
   const createdAt = user?.created_at
     ? new Date(user.created_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -166,59 +134,110 @@ export function ProfilePageContent() {
   const lastSignIn = user?.last_sign_in_at
     ? new Date(user.last_sign_in_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
     : null;
+  const displayName = name ?? user?.email?.split("@")[0] ?? "Your profile";
+  const isPageLoading = permissionsLoading || selfProfileLoading;
+  const profileTabs = hasLinkedEmployee
+    ? [
+        { id: "account", label: "Account" },
+        { id: "overview", label: "Overview" },
+        { id: "schedule", label: "Schedule" },
+      ]
+    : [
+        { id: "account", label: "Account" },
+      ];
 
-  function startEditingName() {
+  useEffect(() => {
+    if (!hasLinkedEmployee && activeTab !== "account") {
+      setActiveTab("account");
+    }
+  }, [activeTab, hasLinkedEmployee]);
+
+  function startEditingAccountDetails() {
     setEditFirstName(firstName ?? "");
     setEditLastName(lastName ?? "");
-    setEditingName(true);
+    setEditEmail(user?.email ?? "");
+    setIsEditingAccountDetails(true);
   }
 
-  async function saveName() {
-    if (!user) return;
-    setSavingName(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          first_name: editFirstName.trim() || null,
-          last_name: editLastName.trim() || null,
-        })
-        .eq("id", user.id);
-      if (error) throw error;
-      setProfile({
-        first_name: editFirstName.trim() || null,
-        last_name: editLastName.trim() || null,
-      });
-      setEditingName(false);
-      toast.success("Name updated.");
-    } catch (err: unknown) {
-      toast.error(extractErrorMessage(err, "Failed to update name."));
-    } finally {
-      setSavingName(false);
-    }
+  function cancelEditingAccountDetails() {
+    setEditFirstName(firstName ?? "");
+    setEditLastName(lastName ?? "");
+    setEditEmail(user?.email ?? "");
   }
 
-  async function saveEmail() {
+  function closeAccountDetailsEditor() {
+    cancelEditingAccountDetails();
+    setIsEditingAccountDetails(false);
+  }
+
+  async function saveAccountDetails() {
     if (!user) return;
-    const trimmed = editEmail.trim().toLowerCase();
-    if (!trimmed || trimmed === user.email) {
-      setEditingEmail(false);
+    if (!hasAccountChanges) {
+      setIsEditingAccountDetails(false);
       return;
     }
-    setSavingEmail(true);
+
+    setSavingAccountDetails(true);
     try {
-      const { error } = await supabase.auth.updateUser({ email: trimmed });
-      if (error) throw error;
-      setEditingEmail(false);
-      toast.success("Confirmation sent to your new email address.");
+      const nextFirstName = editFirstName.trim() || null;
+      const nextLastName = editLastName.trim() || null;
+      const nextEmail = editEmail.trim().toLowerCase();
+
+      if (hasNameChanges) {
+        const profileUpdate = await supabase
+          .from("profiles")
+          .update({
+            first_name: nextFirstName,
+            last_name: nextLastName,
+          })
+          .eq("id", user.id);
+        if (profileUpdate.error) throw profileUpdate.error;
+
+        if (employee) {
+          const employeeUpdate = await supabase
+            .from("employees")
+            .update({
+              first_name: nextFirstName ?? "",
+              last_name: nextLastName ?? "",
+            })
+            .eq("id", employee.id);
+          if (employeeUpdate.error) throw employeeUpdate.error;
+        }
+
+        setProfile((current) => ({
+          first_name: nextFirstName,
+          last_name: nextLastName,
+          mfa_enabled: current?.mfa_enabled ?? false,
+        }));
+        setEmployee((current) => current ? {
+          ...current,
+          firstName: nextFirstName ?? "",
+          lastName: nextLastName ?? "",
+        } : current);
+      }
+
+      if (hasEmailChanges) {
+        const { error } = await supabase.auth.updateUser({ email: nextEmail });
+        if (error) throw error;
+      }
+
+      setIsEditingAccountDetails(false);
+
+      if (hasNameChanges && hasEmailChanges) {
+        toast.success("Account details updated. Confirmation sent to your new email address.");
+      } else if (hasNameChanges) {
+        toast.success("Account details updated.");
+      } else if (hasEmailChanges) {
+        toast.success("Confirmation sent to your new email address.");
+      }
     } catch (err: unknown) {
-      toast.error(extractErrorMessage(err, "Failed to update email."));
+      toast.error(extractErrorMessage(err, "Failed to update account details."));
     } finally {
-      setSavingEmail(false);
+      setSavingAccountDetails(false);
     }
   }
 
-  async function handlePasswordChange(e: React.FormEvent) {
+  async function handlePasswordChange(e: FormEvent) {
     e.preventDefault();
     if (savingPassword) return;
     setPasswordError(null);
@@ -239,7 +258,7 @@ export function ProfilePageContent() {
       toast.success("Password updated successfully.");
       setNewPassword("");
       setConfirmNewPassword("");
-      setSecurityOpen(false);
+      setShowPasswordForm(false);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("same") || msg.includes("different")) {
@@ -254,6 +273,29 @@ export function ProfilePageContent() {
     } finally {
       setSavingPassword(false);
     }
+  }
+
+  function openPasswordForm() {
+    setPasswordError(null);
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setShowPassword(false);
+    setShowPasswordForm(true);
+  }
+
+  function closePasswordForm() {
+    setPasswordError(null);
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setShowPassword(false);
+    setShowPasswordForm(false);
+  }
+
+  function discardPasswordChanges() {
+    setPasswordError(null);
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setShowPassword(false);
   }
 
   async function handleSignOutOthers() {
@@ -303,543 +345,462 @@ export function ProfilePageContent() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
-      {/* Minimal top bar */}
-      <div style={{
-        background: "var(--color-surface)",
-        borderBottom: "1px solid var(--color-border)",
-        padding: "0 24px",
-        height: 56,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        boxShadow: "var(--shadow-raised)",
-      }}>
-        <button
-          onClick={() => window.history.length > 1 ? router.back() : router.push(role === "gridmaster" ? "/gridmaster" : "/schedule")}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-muted)",
-            fontFamily: "inherit",
-            padding: "4px 0",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-primary)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back
-        </button>
-        <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-body)", fontWeight: 300, userSelect: "none" }}>|</span>
-        <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Profile</span>
-      </div>
+    <div className="min-h-screen bg-[var(--color-bg)]">
+      <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+        <div className="mx-auto max-w-[1100px] space-y-6 pb-10 dg-page-enter">
+          <button
+            type="button"
+            onClick={() => window.history.length > 1 ? router.back() : router.push(role === "gridmaster" ? "/gridmaster" : "/schedule")}
+            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-primary)]"
+          >
+            <ChevronLeft className="size-4" strokeWidth={2.5} />
+            Back
+          </button>
 
-      {/* Content */}
-      <div style={{ flex: 1, display: "flex", justifyContent: "center", padding: "40px 24px" }}>
-        <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 20 }}>
+          <ProfileHeroCard
+            initials={isPageLoading ? "" : initials}
+            name={displayName}
+            email={user?.email ?? null}
+            roleLabel={ROLE_LABELS[role] ?? "User"}
+            createdAt={createdAt}
+            lastSignIn={lastSignIn}
+            employee={employee}
+          />
 
-          {/* Avatar + name card */}
-          <div style={{
-            ...cardStyle,
-            padding: "28px 28px",
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-            overflow: "visible",
-          }}>
-            <div style={{
-              width: 60,
-              height: 60,
-              borderRadius: "50%",
-              background: "var(--color-brand)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "var(--dg-fs-card-title)",
-              fontWeight: 700,
-              color: "var(--color-text-inverse)",
-              flexShrink: 0,
-            }}>
-              {isLoading ? "" : initials}
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              {editingName ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      value={editFirstName}
-                      onChange={(e) => setEditFirstName(e.target.value)}
-                      placeholder="First name"
-                      style={{ ...inputFieldStyle, flex: 1 }}
-                      autoFocus
-                    />
-                    <input
-                      value={editLastName}
-                      onChange={(e) => setEditLastName(e.target.value)}
-                      placeholder="Last name"
-                      style={{ ...inputFieldStyle, flex: 1 }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={saveName}
-                      disabled={savingName || !hasNameChanges}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "6px 12px",
-                        background: "var(--color-brand)",
-                        color: "var(--color-text-inverse)",
-                        border: "none",
-                        borderRadius: 8,
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        cursor: savingName || !hasNameChanges ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <Check size={14} />
-                      {savingName ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      onClick={() => setEditingName(false)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "6px 12px",
-                        background: "transparent",
-                        color: "var(--color-text-muted)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <X size={14} />
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                      {name ?? user?.email?.split("@")[0] ?? "—"}
-                    </span>
-                    <button
-                      onClick={startEditingName}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: 4,
-                        color: "var(--color-text-subtle)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                      aria-label="Edit name"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  </div>
-                  <span style={{
-                    display: "inline-block",
-                    fontSize: "var(--dg-fs-caption)",
-                    fontWeight: 600,
-                    padding: "2px 10px",
-                    borderRadius: 20,
-                    background: roleColor.bg,
-                    color: roleColor.text,
-                  }}>
-                    {ROLE_LABELS[role] ?? "User"}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Details card */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <span style={cardHeaderLabelStyle}>Account details</span>
-            </div>
-            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
-              <Field label="First name" value={firstName} />
-              <Field label="Last name" value={lastName} />
-              {editingEmail ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Email
-                  </span>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <input
-                      type="email"
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      autoFocus
-                      style={{
-                        flex: 1,
-                        padding: "6px 10px",
-                        fontSize: "var(--dg-fs-body-sm)",
-                        borderRadius: 6,
-                        border: "1px solid var(--color-border)",
-                        background: "var(--color-bg)",
-                        color: "var(--color-text-primary)",
-                        outline: "none",
-                      }}
-                    />
-                    <button
-                      onClick={saveEmail}
-                      disabled={savingEmail || !hasEmailChanges}
-                      style={{
-                        padding: "6px 12px",
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 600,
-                        borderRadius: 6,
-                        border: "none",
-                        background: "var(--color-primary)",
-                        color: "#fff",
-                        cursor: savingEmail || !hasEmailChanges ? "wait" : "pointer",
-                      }}
-                    >
-                      {savingEmail ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      onClick={() => setEditingEmail(false)}
-                      style={{
-                        padding: "6px 12px",
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 600,
-                        borderRadius: 6,
-                        border: "1px solid var(--color-border)",
-                        background: "transparent",
-                        color: "var(--color-text-muted)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Field label="Email" value={user?.email} />
-                  <button
-                    onClick={() => { setEditEmail(user?.email ?? ""); setEditingEmail(true); }}
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: "1px solid var(--color-border)",
-                      background: "transparent",
-                      color: "var(--color-text-muted)",
-                      cursor: "pointer",
-                      alignSelf: "flex-end",
-                    }}
-                  >
-                    Change
-                  </button>
-                </div>
-              )}
-              {role === "gridmaster" ? (
-                <Field label="Platform role" value="Gridmaster" />
-              ) : (
-                <>
-                  <Field label="Organization role" value={ROLE_LABELS[role] ?? "User"} />
-                  <Field label="Organization ID" value={orgId} />
-                </>
-              )}
-              <Field label="Member since" value={createdAt} />
-              <Field label="Last sign in" value={lastSignIn} />
-            </div>
-          </div>
-
-          {/* Security card */}
-          <div style={cardStyle}>
-            <button
-              onClick={() => {
-                setSecurityOpen((v) => !v);
-                if (!securityOpen) {
-                  setPasswordError(null);
-                  setNewPassword("");
-                  setConfirmNewPassword("");
-                }
-              }}
-              style={{
-                ...cardHeaderStyle,
-                width: "100%",
-                background: "none",
-                cursor: "pointer",
-                borderBottom: securityOpen ? "1px solid var(--color-border)" : "none",
-                fontFamily: "inherit",
-              }}
+          {selfProfileError && (
+            <div
+              className="dg-card"
+              style={{ borderColor: "var(--color-warning-border)", background: "var(--color-warning-bg)" }}
             >
-              <span style={cardHeaderLabelStyle}>Security</span>
-              <ChevronDown
-                size={16}
-                style={{
-                  color: "var(--color-text-muted)",
-                  transition: "transform 150ms ease",
-                  transform: securityOpen ? "rotate(180deg)" : "rotate(0deg)",
-                }}
-              />
-            </button>
-            {securityOpen && (
-              <div style={{ padding: "20px 24px" }}>
-                <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", marginBottom: 16, marginTop: 0 }}>
-                  Choose a strong password with at least 10 characters.
+              <div className="dg-card-body">
+                <p className="m-0 text-[14px] text-[var(--color-text-muted)]">
+                  {selfProfileError}
                 </p>
-                <form
-                  onSubmit={handlePasswordChange}
-                  style={{ display: "flex", flexDirection: "column", gap: 14 }}
-                >
-                  <div>
-                    <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>
-                      New Password
-                    </label>
-                    <PasswordInput
-                      placeholder="Enter new password"
-                      value={newPassword}
-                      onChange={setNewPassword}
-                      showPassword={showPassword}
-                      onToggle={() => setShowPassword((v) => !v)}
-                      autoComplete="new-password"
-                      ariaDescribedBy="password-strength-label"
-                      style={inputFieldStyle}
-                    />
-                    {newPassword.length > 0 && <PasswordStrength password={newPassword} />}
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>
-                      Confirm New Password
-                    </label>
-                    <PasswordInput
-                      placeholder="Confirm new password"
-                      value={confirmNewPassword}
-                      onChange={setConfirmNewPassword}
-                      showPassword={showPassword}
-                      onToggle={() => setShowPassword((v) => !v)}
-                      autoComplete="new-password"
-                      style={inputFieldStyle}
-                    />
-                  </div>
-                  {passwordError && (
-                    <p style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0 }}>
-                      {passwordError}
-                    </p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={savingPassword || !newPassword || !confirmNewPassword}
-                    className="dg-btn dg-btn-primary"
-                    style={{ alignSelf: "flex-start", marginTop: 4 }}
-                  >
-                    <ButtonLoading loading={savingPassword} spinnerColor="var(--color-text-inverse)" spinnerSize={16}>
-                      Update Password
-                    </ButtonLoading>
-                  </button>
-                </form>
+              </div>
+            </div>
+          )}
 
-                {/* Two-factor authentication */}
-                <div style={{
-                  marginTop: 24,
-                  paddingTop: 20,
-                  borderTop: "1px solid var(--color-border-light)",
-                }}>
-                  <label style={{
-                    display: "block",
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    color: "var(--color-text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                    marginBottom: 12,
-                  }}>
-                    Two-Factor Authentication
-                  </label>
-                  <MFASetup
-                    mfaEnabled={mfaEnabled}
-                    onStatusChange={setMfaEnabled}
-                  />
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-[var(--color-text-primary)]">
+                  Profile sections
+                </h2>
+                <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+                  {hasLinkedEmployee
+                    ? "Move between account settings and your work profile without leaving the page."
+                    : "Manage your account settings from one place."}
+                </p>
+              </div>
+
+              {profileTabs.length > 1 ? (
+                <ProfileSectionTabs
+                  tabs={profileTabs}
+                  activeTab={activeTab}
+                  onChange={(tabId) => setActiveTab(tabId as ProfileSection)}
+                />
+              ) : null}
+            </div>
+
+            {activeTab === "account" ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="dg-card h-full">
+                    <div className="dg-card-header">
+                      <div>
+                        <div className="dg-card-title">Account details</div>
+                        <div className="dg-card-subtitle">Personal identity and organization access for this account.</div>
+                      </div>
+                      {!isEditingAccountDetails ? (
+                        <button
+                          type="button"
+                          onClick={startEditingAccountDetails}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          Edit account details
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="dg-card-body flex flex-col gap-5">
+                      {isEditingAccountDetails ? (
+                        <form
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void saveAccountDetails();
+                          }}
+                          className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
+                        >
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <label style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                First name
+                              </label>
+                              <input
+                                value={editFirstName}
+                                onChange={(e) => setEditFirstName(e.target.value)}
+                                placeholder="First name"
+                                style={inputFieldStyle}
+                                autoFocus
+                              />
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <label style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                Last name
+                              </label>
+                              <input
+                                value={editLastName}
+                                onChange={(e) => setEditLastName(e.target.value)}
+                                placeholder="Last name"
+                                style={inputFieldStyle}
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <label style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                              Email
+                            </label>
+                            <input
+                              type="email"
+                              value={editEmail}
+                              onChange={(e) => setEditEmail(e.target.value)}
+                              style={inputFieldStyle}
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="submit"
+                              disabled={savingAccountDetails || !hasAccountChanges || hasInvalidAccountDraft}
+                              className="dg-btn dg-btn-primary dg-btn-sm"
+                            >
+                              <Check size={14} />
+                              {savingAccountDetails ? "Saving..." : "Save changes"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={hasAccountChanges ? cancelEditingAccountDetails : closeAccountDetailsEditor}
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                            >
+                              <X size={14} />
+                              {getEditorDismissLabel(hasAccountChanges)}
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <Field label="First name" value={firstName} />
+                            <Field label="Last name" value={lastName} />
+                          </div>
+                          <Field label="Email" value={user?.email} />
+                        </>
+                      )}
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {role === "gridmaster" ? (
+                          <Field label="Platform role" value="Gridmaster" />
+                        ) : (
+                          <Field label="Organization role" value={ROLE_LABELS[role] ?? "User"} />
+                        )}
+                        <Field label="Member since" value={createdAt} />
+                        <Field label="Last sign in" value={lastSignIn} />
+                      </div>
+                    </div>
+                </div>
+
+                <div className="dg-card h-full">
+                    <div className="dg-card-header">
+                        <div>
+                          <div className="dg-card-title">Security</div>
+                          <div className="dg-card-subtitle">Password, two-factor authentication, and sign-in protection.</div>
+                        </div>
+                    </div>
+                    <div className="dg-card-body flex flex-col gap-5">
+                      <div className="flex flex-col gap-4 rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-bg)] p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                              Password
+                            </div>
+                            <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+                              Choose a strong password with at least 10 characters.
+                            </p>
+                          </div>
+                          {!showPasswordForm ? (
+                            <button
+                              type="button"
+                              onClick={openPasswordForm}
+                              className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+                            >
+                              Change password
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {showPasswordForm ? (
+                          <form
+                            onSubmit={handlePasswordChange}
+                            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+                          >
+                            <div>
+                              <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>
+                                New Password
+                              </label>
+                              <PasswordInput
+                                placeholder="Enter new password"
+                                value={newPassword}
+                                onChange={setNewPassword}
+                                showPassword={showPassword}
+                                onToggle={() => setShowPassword((v) => !v)}
+                                autoComplete="new-password"
+                                ariaDescribedBy="password-strength-label"
+                                style={inputFieldStyle}
+                              />
+                              {newPassword.length > 0 ? <PasswordStrength password={newPassword} /> : null}
+                            </div>
+                            <div>
+                              <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>
+                                Confirm New Password
+                              </label>
+                              <PasswordInput
+                                placeholder="Confirm new password"
+                                value={confirmNewPassword}
+                                onChange={setConfirmNewPassword}
+                                showPassword={showPassword}
+                                onToggle={() => setShowPassword((v) => !v)}
+                                autoComplete="new-password"
+                                style={inputFieldStyle}
+                              />
+                            </div>
+                            {passwordError ? (
+                              <p style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0 }}>
+                                {passwordError}
+                              </p>
+                            ) : null}
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="submit"
+                                disabled={savingPassword || !newPassword || !confirmNewPassword}
+                                className="dg-btn dg-btn-primary dg-btn-sm"
+                              >
+                                <ButtonLoading loading={savingPassword} spinnerColor="var(--color-text-inverse)" spinnerSize={16}>
+                                  Update Password
+                                </ButtonLoading>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={hasPasswordChanges ? discardPasswordChanges : closePasswordForm}
+                                className="dg-btn dg-btn-secondary dg-btn-sm"
+                              >
+                                {getEditorDismissLabel(hasPasswordChanges)}
+                              </button>
+                            </div>
+                          </form>
+                        ) : null}
+                      </div>
+
+                      <div
+                        style={{
+                          paddingTop: 4,
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontWeight: 600,
+                            color: "var(--color-text-muted)",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                            marginBottom: 12,
+                          }}
+                        >
+                          Two-Factor Authentication
+                        </label>
+                        <MFASetup
+                          mfaEnabled={mfaEnabled}
+                          onStatusChange={(enabled) => {
+                            setProfile((current) => ({
+                              first_name: current?.first_name ?? null,
+                              last_name: current?.last_name ?? null,
+                              mfa_enabled: enabled,
+                            }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                </div>
+
+                <div className="dg-card h-full">
+                    <div className="dg-card-header">
+                      <div>
+                        <div className="dg-card-title">Notifications</div>
+                        <div className="dg-card-subtitle">Choose how and when DubGrid contacts you.</div>
+                      </div>
+                    </div>
+                    <div className="dg-card-body">
+                      <NotificationPreferences visibleCategories={role === "gridmaster" ? ["system"] : undefined} />
+                    </div>
+                </div>
+
+                <div className="dg-card h-full">
+                    <div className="dg-card-header">
+                      <div>
+                        <div className="dg-card-title">Sessions</div>
+                        <div className="dg-card-subtitle">Manage sign-in state across browsers and devices.</div>
+                      </div>
+                    </div>
+                    <div className="dg-card-body flex flex-col gap-3">
+                      <p className="m-0 text-[14px] text-[var(--color-text-muted)]">
+                        Manage your active sessions across devices.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSignOutOthers}
+                          disabled={signingOut !== null}
+                          className="dg-btn dg-btn-secondary"
+                        >
+                          <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
+                            Sign out other devices
+                          </ButtonLoading>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSignOutAll}
+                          disabled={signingOut !== null}
+                          className="dg-btn dg-btn-danger"
+                        >
+                          <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
+                            Sign out everywhere
+                          </ButtonLoading>
+                        </button>
+                      </div>
+                      <div className="border-t border-[var(--color-border-light)] pt-4">
+                        <div className="mb-3">
+                          <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                            Active sessions
+                          </div>
+                          <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+                            Inspect current and recent authenticated devices.
+                          </div>
+                        </div>
+                        <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
+                          <SessionList />
+                        </div>
+                      </div>
+                    </div>
+                </div>
+
+                <div className="dg-card h-full md:col-span-2" style={{ borderColor: "var(--color-danger)" }}>
+                    <div
+                      className="dg-card-header"
+                      style={{ borderBottomColor: "var(--color-danger-bg)" }}
+                    >
+                      <div>
+                        <div className="dg-card-title" style={{ color: "var(--color-danger)" }}>Danger zone</div>
+                        <div className="dg-card-subtitle">Irreversible account actions that affect your login and data.</div>
+                      </div>
+                    </div>
+                    <div className="dg-card-body flex flex-col gap-3">
+                      {role === "gridmaster" ? (
+                        <p className="m-0 text-[14px] text-[var(--color-text-muted)]">
+                          Gridmaster accounts cannot be deleted through self-service. Contact another gridmaster or use direct database access to remove this account.
+                        </p>
+                      ) : !showDeleteConfirm ? (
+                        <>
+                          <p className="m-0 text-[14px] text-[var(--color-text-muted)]">
+                            Permanently delete your account and all associated data. This action cannot be undone.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="dg-btn dg-btn-danger"
+                            style={{ alignSelf: "flex-start" }}
+                          >
+                            <Trash2 size={14} style={{ marginRight: 4 }} />
+                            Delete Account
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="m-0 text-[14px] font-semibold text-[var(--color-danger)]">
+                            This will permanently delete your account, remove you from all organizations, and sign you out of all devices.
+                          </p>
+                          <div>
+                            <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 5 }}>
+                              Type <strong>DELETE MY ACCOUNT</strong> to confirm
+                            </label>
+                            <input
+                              value={deleteConfirmText}
+                              onChange={(e) => setDeleteConfirmText(e.target.value)}
+                              placeholder="DELETE MY ACCOUNT"
+                              style={{ ...inputFieldStyle, borderColor: "var(--color-danger)" }}
+                              autoComplete="off"
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={handleDeleteAccount}
+                              disabled={deleting || deleteConfirmText !== "DELETE MY ACCOUNT"}
+                              className="dg-btn dg-btn-danger"
+                            >
+                              <ButtonLoading loading={deleting} spinnerSize={14}>
+                                Permanently Delete
+                              </ButtonLoading>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+                              className="dg-btn dg-btn-secondary"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                 </div>
               </div>
-            )}
-          </div>
+            ) : null}
 
-          {/* Notifications card */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <span style={cardHeaderLabelStyle}>Notifications</span>
-            </div>
-            <div style={{ padding: "20px 24px" }}>
-              <NotificationPreferences visibleCategories={role === "gridmaster" ? ["system"] : undefined} />
-            </div>
-          </div>
+            {activeTab === "overview" && employee ? (
+              <SelfWorkOverview
+                employee={employee}
+                focusAreas={focusAreas}
+                focusAreaLabel={org?.focusAreaLabel}
+                shiftCodes={shiftCodes}
+                shiftCategories={shiftCategories}
+                absenceTypes={absenceTypes}
+                certifications={certifications}
+                orgRoles={orgRoles}
+                shiftDisplayMode={org?.shiftDisplayMode}
+                shifts={shifts}
+                recurringShifts={recurringShifts}
+                shiftRequests={shiftRequests}
+                auditNames={auditNames}
+              />
+            ) : null}
 
-          {/* Calendar Subscription card (not relevant for gridmaster — no shifts) */}
-          {role !== "gridmaster" && <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <span style={cardHeaderLabelStyle}>Calendar Subscription</span>
-            </div>
-            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
-                Subscribe to your shift schedule in any calendar app (Google Calendar, Apple Calendar, Outlook).
-              </p>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <Calendar size={16} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
-                <code
-                  style={{
-                    flex: 1,
-                    padding: "8px 12px",
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-text-secondary)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {typeof window !== "undefined" ? `${window.location.origin}/api/calendar` : "/api/calendar"}
-                </code>
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}/api/calendar`;
-                    navigator.clipboard.writeText(url).then(
-                      () => toast.success("Calendar URL copied to clipboard"),
-                      () => toast.error("Failed to copy URL"),
-                    );
-                  }}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ padding: "6px 10px", flexShrink: 0 }}
-                  aria-label="Copy calendar URL"
-                >
-                  <Copy size={14} />
-                </button>
-              </div>
-              <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", margin: 0 }}>
-                Note: You must be logged in for the calendar feed to work. This URL returns your shifts for the next 4 weeks.
-              </p>
-            </div>
-          </div>}
-
-          {/* Sessions card */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <span style={cardHeaderLabelStyle}>Sessions</span>
-            </div>
-            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
-                Manage your active sessions across devices.
-              </p>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  onClick={handleSignOutOthers}
-                  disabled={signingOut !== null}
-                  className="dg-btn dg-btn-secondary"
-                >
-                  <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
-                    Sign out other devices
-                  </ButtonLoading>
-                </button>
-                <button
-                  onClick={handleSignOutAll}
-                  disabled={signingOut !== null}
-                  className="dg-btn dg-btn-danger"
-                >
-                  <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
-                    Sign out everywhere
-                  </ButtonLoading>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Sessions */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <span style={cardHeaderLabelStyle}>Active Sessions</span>
-            </div>
-            <SessionList />
-          </div>
-
-          {/* Danger Zone */}
-          <div style={{ ...cardStyle, borderColor: "var(--color-danger)" }}>
-            <div style={{ ...cardHeaderStyle, borderBottomColor: "var(--color-danger-bg)" }}>
-              <span style={{ ...cardHeaderLabelStyle, color: "var(--color-danger)" }}>Danger Zone</span>
-            </div>
-            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {role === "gridmaster" ? (
-                <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
-                  Gridmaster accounts cannot be deleted through self-service. Contact another gridmaster or use direct database access to remove this account.
-                </p>
-              ) : !showDeleteConfirm ? (
-                <>
-                  <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
-                    Permanently delete your account and all associated data. This action cannot be undone.
-                  </p>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="dg-btn dg-btn-danger"
-                    style={{ alignSelf: "flex-start" }}
-                  >
-                    <Trash2 size={14} style={{ marginRight: 4 }} />
-                    Delete Account
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-danger)", margin: 0, fontWeight: 600 }}>
-                    This will permanently delete your account, remove you from all organizations, and sign you out of all devices.
-                  </p>
-                  <div>
-                    <label style={{ display: "block", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 5 }}>
-                      Type <strong>DELETE MY ACCOUNT</strong> to confirm
-                    </label>
-                    <input
-                      value={deleteConfirmText}
-                      onChange={(e) => setDeleteConfirmText(e.target.value)}
-                      placeholder="DELETE MY ACCOUNT"
-                      style={{ ...inputFieldStyle, borderColor: "var(--color-danger)" }}
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={handleDeleteAccount}
-                      disabled={deleting || deleteConfirmText !== "DELETE MY ACCOUNT"}
-                      className="dg-btn dg-btn-danger"
-                    >
-                      <ButtonLoading loading={deleting} spinnerSize={14}>
-                        Permanently Delete
-                      </ButtonLoading>
-                    </button>
-                    <button
-                      onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
-                      className="dg-btn dg-btn-secondary"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
+            {activeTab === "schedule" && employee ? (
+              <SelfWorkSchedule
+                employee={employee}
+                focusAreas={focusAreas}
+                focusAreaLabel={org?.focusAreaLabel}
+                shiftCodes={shiftCodes}
+                shiftCategories={shiftCategories}
+                absenceTypes={absenceTypes}
+                certifications={certifications}
+                orgRoles={orgRoles}
+                shiftDisplayMode={org?.shiftDisplayMode}
+                shifts={shifts}
+                recurringShifts={recurringShifts}
+                shiftRequests={shiftRequests}
+                auditNames={auditNames}
+              />
+            ) : null}
+          </section>
         </div>
       </div>
     </div>

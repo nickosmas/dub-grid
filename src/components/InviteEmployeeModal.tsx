@@ -3,14 +3,18 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
-import { Employee, OrganizationUser, NamedItem, Department } from "@/types";
+import { Employee, OrganizationUser, NamedItem, Department, NameMismatchDetails } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
-import { fetchOrganizationUsers, linkEmployeeToUser, sendInvitation } from "@/lib/db";
+import { fetchOrganizationUsers, linkEmployeeToUser, reconcileEmployeeNameAndLinkUser, sendInvitation } from "@/lib/db";
 import { validateEmail, validateRequired } from "@/components/FormField";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { NameMismatchError } from "@/lib/account-linking";
+import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -23,7 +27,7 @@ interface InviteEmployeeModalProps {
   orgId: string;
   orgName: string;
   onClose: () => void;
-  onInvited: () => void;
+  onInvited: (updatedEmployee?: Employee | null) => void | Promise<void>;
   /** Available departments (for management staff mode). Accepts NamedItem[] or Department[]. */
   departments?: (NamedItem | Department)[];
 }
@@ -49,6 +53,7 @@ export default function InviteEmployeeModal({
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [nameMismatch, setNameMismatch] = useState<NameMismatchDetails | null>(null);
 
   // Management departments only (filtered from all departments — only Department has .type)
   const managementDepts = useMemo(
@@ -83,11 +88,45 @@ export default function InviteEmployeeModal({
       ) ?? null
     : null;
 
+  useEffect(() => {
+    setNameMismatch(null);
+  }, [employee?.id, email, matchedUser?.id]);
+
   const mode: ModalMode = !orgUsersLoaded
     ? "loading"
     : matchedUser
       ? "link"
       : "invite";
+  const initialDraftSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        email: employee?.email || "",
+        firstName: "",
+        lastName: "",
+        phone: "",
+        departmentIds: [] as number[],
+        role: "user",
+      }),
+    [employee?.email],
+  );
+  const hasUnsavedChanges =
+    JSON.stringify({
+      email,
+      firstName,
+      lastName,
+      phone,
+      departmentIds: [...departmentIds].sort((left, right) => left - right),
+      role,
+    }) !== initialDraftSnapshot;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+  const handleRequestClose = useCallback(() => {
+    if (!sending && requestClose()) {
+      onClose();
+    }
+  }, [onClose, requestClose, sending]);
   const trimmedEmail = email.trim();
   const requiredEmailError = trimmedEmail ? validateEmail(trimmedEmail) : "Email address is required";
   const canSend =
@@ -135,11 +174,43 @@ export default function InviteEmployeeModal({
 
     try {
       await linkEmployeeToUser(employee.id, matchedUser.id, orgId);
+      const updatedEmployee: Employee = {
+        ...employee,
+        userId: matchedUser.id,
+      };
       toast.success(`${getEmployeeDisplayName(employee)} linked to ${matchedUser.email}`);
-      onInvited();
+      await onInvited(updatedEmployee);
       onClose();
     } catch (err) {
+      if (err instanceof NameMismatchError) {
+        setNameMismatch(err.details);
+        return;
+      }
       const message = err instanceof Error ? err.message : "Failed to link user";
+      setError(message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleReconcileLink() {
+    if (!matchedUser || !employee || !nameMismatch) return;
+    setSending(true);
+    setError(null);
+
+    try {
+      await reconcileEmployeeNameAndLinkUser(employee.id, matchedUser.id, orgId);
+      const updatedEmployee: Employee = {
+        ...employee,
+        firstName: nameMismatch.accountFirstName,
+        lastName: nameMismatch.accountLastName,
+        userId: matchedUser.id,
+      };
+      toast.success(`${getEmployeeDisplayName(employee)} updated to match ${matchedUser.email} and linked`);
+      await onInvited(updatedEmployee);
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to reconcile and link user";
       setError(message);
     } finally {
       setSending(false);
@@ -188,7 +259,7 @@ export default function InviteEmployeeModal({
 
       toast.success(`Invitation email sent to ${trimmedEmail}`);
       setSent(true);
-      onInvited();
+      await onInvited(null);
       onClose();
     } catch (err) {
       const message =
@@ -208,12 +279,25 @@ export default function InviteEmployeeModal({
     : null;
 
   return (
-    <Modal
-      title={isManagementInvite ? "Invite Management Staff" : mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
-      onClose={onClose}
-      style={{ maxWidth: 480 }}
-    >
-      {mode === "loading" ? (
+    <>
+      <Modal
+        title={isManagementInvite ? "Invite Management Staff" : mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
+        onClose={onClose}
+        onRequestClose={() => !sending && requestClose()}
+        style={{ maxWidth: 480 }}
+      >
+      {nameMismatch ? (
+        <AccountNameMismatchPanel
+          details={nameMismatch}
+          title="Name mismatch found"
+          description="This employee record does not match the existing user account name. If the account name is correct, you can update the employee record to match it and complete the link."
+          confirmLabel="Use Account Name and Link"
+          dismissLabel={EDITOR_ACTION_LABELS.close}
+          onCancel={handleRequestClose}
+          onConfirm={handleReconcileLink}
+          confirming={sending}
+        />
+      ) : mode === "loading" ? (
         <div style={{ padding: "24px 0", textAlign: "center", color: "var(--color-text-muted, #4D6080)", fontSize: "var(--dg-fs-body-sm)" }}>
           Checking for existing users...
         </div>
@@ -243,8 +327,8 @@ export default function InviteEmployeeModal({
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <button className="dg-btn dg-btn-ghost" onClick={onClose}>
-              Cancel
+            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
             </button>
             <button
               className="dg-btn dg-btn-primary"
@@ -443,8 +527,8 @@ export default function InviteEmployeeModal({
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <button className="dg-btn dg-btn-ghost" onClick={onClose}>
-              Cancel
+            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
             </button>
             <button
               className="dg-btn dg-btn-primary"
@@ -457,7 +541,9 @@ export default function InviteEmployeeModal({
           </div>
         </div>
       )}
-    </Modal>
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }
 
@@ -470,7 +556,7 @@ function ErrorBanner({ message }: { message: string }) {
         margin: 0,
         padding: "8px 12px",
         background: "var(--color-danger-bg)",
-        borderRadius: 8,
+        borderRadius: "var(--dg-radius-md)",
       }}
     >
       {message}
@@ -492,7 +578,7 @@ const inputStyle: React.CSSProperties = {
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "var(--color-border, #C8D6EC)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-btn-radius)",
   fontSize: "var(--dg-fs-body-sm)",
   color: "var(--color-text-primary, #0F1724)",
   background: "var(--color-bg, #fff)",

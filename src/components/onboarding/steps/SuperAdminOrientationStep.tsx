@@ -64,7 +64,7 @@ export default function SuperAdminOrientationStep({
               gap: 16,
               padding: "16px 20px",
               background: "var(--color-bg-card, white)",
-              borderRadius: 14,
+              borderRadius: "var(--dg-radius-md)",
               border: "1px solid var(--color-border)",
             }}
           >
@@ -72,7 +72,7 @@ export default function SuperAdminOrientationStep({
               style={{
                 width: 42,
                 height: 42,
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-md)",
                 background: "var(--color-brand-bg, #eff6ff)",
                 color: "var(--color-brand)",
                 display: "flex",

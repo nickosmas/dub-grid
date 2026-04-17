@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
+import type { PublishedWindowState } from "@/lib/schedule-logic";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 
@@ -13,12 +14,19 @@ const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
 
 interface ExpandedOpenShiftsProps {
   openShifts: OpenShift[];
+  publishedWindowState?: PublishedWindowState;
   onClose: () => void;
 }
 
-export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpenShiftsProps) {
+export default function ExpandedOpenShifts({
+  openShifts,
+  publishedWindowState = "published",
+  onClose,
+}: ExpandedOpenShiftsProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
+  const isUnpublished = publishedWindowState === "unpublished";
+  const isPartial = publishedWindowState === "partial";
 
   const filtered = useMemo(() => {
     let list = openShifts;
@@ -35,8 +43,28 @@ export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpen
   return (
     <Modal title="Open shifts" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {isUnpublished ? (
+          <div style={emptyStyle}>
+            This period has not been published yet. Open shifts will appear after the first publish.
+          </div>
+        ) : (
+          <>
+        {isPartial && (
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: "var(--color-bg)",
+              border: "1px dashed var(--color-border)",
+              fontSize: 11,
+              color: "var(--color-text-subtle)",
+            }}
+          >
+            Showing published dates only.
+          </div>
+        )}
         {/* Filters */}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           <span style={filterLabelStyle}>Filter:</span>
           <CustomSelect
             value={urgencyFilter}
@@ -64,7 +92,11 @@ export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpen
         {/* List */}
         <div style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.length === 0 ? (
-            <div style={emptyStyle}>No open shifts matching filters</div>
+            <div style={emptyStyle}>
+              {isPartial
+                ? "No open shifts on published dates"
+                : "No open shifts matching filters"}
+            </div>
           ) : (
             filtered.map((shift) => {
               const badge = BADGE_STYLES[shift.urgency];
@@ -108,6 +140,8 @@ export default function ExpandedOpenShifts({ openShifts, onClose }: ExpandedOpen
             })
           )}
         </div>
+          </>
+        )}
       </div>
     </Modal>
   );
@@ -128,7 +162,7 @@ const itemStyle = {
   alignItems: "center" as const,
   gap: 12,
   padding: "14px 16px",
-  borderRadius: 14,
+  borderRadius: "var(--dg-radius-md)",
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
 };

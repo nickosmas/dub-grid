@@ -11,6 +11,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     coverageRequirements,
     sectionCoverage,
     openShifts,
+    publishedWindowState,
     activityItems,
     currentHours,
     activeEmployees,
@@ -37,10 +38,12 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           focusAreaLabel={org.focusAreaLabel || "section"}
           isMobile={isMobile}
           hasRequirements={coverageRequirements.length > 0}
+          publishedWindowState={publishedWindowState}
           onExpand={() => onExpandPanel("coverage")}
         />
         <OpenShiftsCard
           openShifts={openShifts}
+          publishedWindowState={publishedWindowState}
           onExpand={() => onExpandPanel("openShifts")}
         />
       </div>

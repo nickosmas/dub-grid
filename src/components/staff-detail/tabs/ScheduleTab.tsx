@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, Fragment } from "react";
-import { Hint, MaybeHint } from "@/components/ui/hint";
+import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import type {
   Employee,
@@ -17,7 +17,6 @@ import type {
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 import { DAY_LABELS } from "@/lib/constants";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,7 +37,6 @@ interface ScheduleTabProps {
   shiftDisplayMode?: ShiftDisplayMode;
 }
 
-/** Format a full name as "F. LastName" for compact display. */
 function compactName(fullName: string): string {
   const parts = fullName.split(" ").filter(Boolean);
   if (parts.length <= 1) return fullName;
@@ -76,12 +74,11 @@ export function ScheduleTab({
   const totalPages = Math.ceil(shiftEntries.length / PAGE_SIZE);
   const pageEntries = shiftEntries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  // Group page entries by month
   const groupedEntries = useMemo(() => {
     const groups: { month: string; entries: typeof pageEntries }[] = [];
     let currentMonth = "";
     for (const entry of pageEntries) {
-      const date = new Date(entry.dateKey + "T00:00:00");
+      const date = new Date(`${entry.dateKey}T00:00:00`);
       const month = date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
       if (month !== currentMonth) {
         currentMonth = month;
@@ -95,70 +92,87 @@ export function ScheduleTab({
   return (
     <div className="flex flex-col gap-4">
       {canViewRecurringShifts && (
-        <Card className="shadow-sm">
-          <CardHeader className="border-b pb-3">
-            <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
-              <CalendarClock className="w-4 h-4 text-muted-foreground" />
-              Recurring Schedule
-              <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{recurringShifts.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="dg-card">
+          <div className="dg-card-header">
+            <div>
+              <div className="dg-card-title flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-[var(--color-text-muted)]" />
+                Recurring schedule
+                <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
+                  {recurringShifts.length}
+                </Badge>
+              </div>
+              <div className="dg-card-subtitle">Weekly pattern for repeating assignments.</div>
+            </div>
+          </div>
+          <div className="dg-card-body">
             {recurringShifts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CalendarClock className="w-7 h-7 text-muted-foreground/30 mb-3" />
-                <p className="text-[13px] text-muted-foreground">No recurring shifts configured</p>
+                <CalendarClock className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
+                <p className="text-[13px] text-[var(--color-text-muted)]">No recurring shifts configured</p>
               </div>
             ) : (
               <div>
                 <div className="grid grid-cols-7 gap-1 text-center">
                   {DAY_LABELS.map((day, i) => {
-                    const rs = recurringShifts.find(r => r.dayOfWeek === i);
+                    const recurringShift = recurringShifts.find((shift) => shift.dayOfWeek === i);
                     return (
                       <div
                         key={day}
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-lg border ${
-                          rs ? 'bg-muted/50 border-border' : 'bg-transparent border-transparent'
+                        className={`flex flex-col items-center justify-center rounded-lg border py-2.5 ${
+                          recurringShift
+                            ? "border-[var(--color-border-light)] bg-[var(--color-bg)]"
+                            : "border-transparent bg-transparent"
                         }`}
                       >
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{day}</span>
-                        <span className={`text-[11px] mt-1 font-semibold truncate max-w-full px-0.5 ${
-                          rs ? 'text-foreground' : 'text-muted-foreground/30'
-                        }`}>
-                          {rs ? rs.shiftLabel : "—"}
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                          {day}
+                        </span>
+                        <span
+                          className={`mt-1 max-w-full truncate px-0.5 text-[11px] font-semibold ${
+                            recurringShift
+                              ? "text-[var(--color-text-primary)]"
+                              : "text-[var(--color-text-faint)]"
+                          }`}
+                        >
+                          {recurringShift ? recurringShift.shiftLabel : "—"}
                         </span>
                       </div>
                     );
                   })}
                 </div>
-                {recurringShifts.some(rs => rs.effectiveUntil) && (
-                  <p className="text-[10px] text-muted-foreground mt-3 text-center">
+                {recurringShifts.some((shift) => shift.effectiveUntil) && (
+                  <p className="mt-3 text-center text-[10px] text-[var(--color-text-muted)]">
                     {recurringShifts
-                      .filter(rs => rs.effectiveUntil)
-                      .map(rs => `${DAY_LABELS[rs.dayOfWeek]}: until ${rs.effectiveUntil}`)
+                      .filter((shift) => shift.effectiveUntil)
+                      .map((shift) => `${DAY_LABELS[shift.dayOfWeek]}: until ${shift.effectiveUntil}`)
                       .join(" · ")}
                   </p>
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Shift History */}
-      <Card className="shadow-sm">
-        <CardHeader className="border-b pb-3">
-          <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
-            <History className="w-4 h-4 text-muted-foreground" />
-            Shift History
-            <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{shiftEntries.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+      <div className="dg-card">
+        <div className="dg-card-header">
+          <div>
+            <div className="dg-card-title flex items-center gap-2">
+              <History className="h-4 w-4 text-[var(--color-text-muted)]" />
+              Shift history
+              <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
+                {shiftEntries.length}
+              </Badge>
+            </div>
+            <div className="dg-card-subtitle">Published and draft assignment history for this person.</div>
+          </div>
+        </div>
+        <div className="p-0">
           {shiftEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <History className="w-7 h-7 text-muted-foreground/30 mb-3" />
-              <p className="text-[13px] text-muted-foreground">No shifts found</p>
+              <History className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
+              <p className="text-[13px] text-[var(--color-text-muted)]">No shifts found</p>
             </div>
           ) : (
             <>
@@ -179,8 +193,8 @@ export function ScheduleTab({
                     {groupedEntries.map((group) => (
                       <Fragment key={`month-${group.month}`}>
                         <TableRow>
-                          <TableCell colSpan={7} className="bg-muted/30 py-1.5 px-4">
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.05em]">
+                          <TableCell colSpan={7} className="bg-[var(--color-bg)] px-4 py-1.5">
+                            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
                               {group.month}
                             </span>
                           </TableCell>
@@ -188,37 +202,37 @@ export function ScheduleTab({
                         {group.entries.map((entry) => {
                           const isAbsence = entry.absenceTypeId != null;
                           const absenceType = isAbsence ? absenceTypeById.get(entry.absenceTypeId!) ?? null : null;
-
-                          // Resolve each shift code with its focus area, times, and per-code draft status
-                          const pubSet = new Set(entry.publishedShiftCodeIds ?? []);
+                          const publishedSet = new Set(entry.publishedShiftCodeIds ?? []);
                           const codes = !isAbsence
                             ? entry.shiftCodeIds.map((id) => {
-                                const sc = shiftCodeById.get(id);
-                                const fa = sc?.focusAreaId != null ? focusAreaById.get(sc.focusAreaId) : null;
-                                const isCodeDraft = !pubSet.has(id);
-                                return { sc: sc ?? null, fa, isCodeDraft };
+                                const shiftCode = shiftCodeById.get(id);
+                                const focusArea = shiftCode?.focusAreaId != null ? focusAreaById.get(shiftCode.focusAreaId) : null;
+                                const isCodeDraft = !publishedSet.has(id);
+                                return { shiftCode: shiftCode ?? null, focusArea, isCodeDraft };
                               })
                             : [];
 
-                          const hours = isAbsence ? 0 : computeShiftDurationHours(
-                            entry.shiftCodeIds,
-                            shiftCodeById,
-                            entry.customStartTime,
-                            entry.customEndTime,
-                            categoryById,
-                          );
-                          const date = new Date(entry.dateKey + "T00:00:00");
+                          const hours = isAbsence
+                            ? 0
+                            : computeShiftDurationHours(
+                                entry.shiftCodeIds,
+                                shiftCodeById,
+                                entry.customStartTime,
+                                entry.customEndTime,
+                                categoryById,
+                              );
+                          const date = new Date(`${entry.dateKey}T00:00:00`);
                           const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
                           const isSplit = codes.length > 1;
 
                           return (
                             <TableRow key={entry.dateKey}>
                               <TableCell>
-                                <span className="font-semibold text-foreground mr-1.5">{dayName}</span>
-                                <span className="text-muted-foreground">{entry.dateKey}</span>
+                                <span className="mr-1.5 font-semibold text-[var(--color-text-primary)]">{dayName}</span>
+                                <span className="text-[var(--color-text-muted)]">{entry.dateKey}</span>
                               </TableCell>
                               <TableCell>
-                                <div className={`flex ${isSplit ? 'flex-col' : 'flex-wrap'} gap-1`}>
+                                <div className={`flex gap-1 ${isSplit ? "flex-col" : "flex-wrap"}`}>
                                   {isAbsence ? (
                                     absenceType ? (
                                       <Badge
@@ -228,66 +242,79 @@ export function ScheduleTab({
                                           color: absenceType.text,
                                           borderColor: absenceType.border,
                                         }}
-                                        className="px-1.5 py-0 h-5 text-[10px] w-fit"
+                                        className="h-5 w-fit px-1.5 py-0 text-[10px]"
                                       >
                                         {isNameMode ? (absenceType.name || absenceType.label) : absenceType.label}
                                       </Badge>
                                     ) : (
-                                      <Badge variant="outline" className="px-1.5 py-0 h-5 text-[10px] w-fit text-muted-foreground">
+                                      <Badge variant="outline" className="h-5 w-fit px-1.5 py-0 text-[10px] text-muted-foreground">
                                         {entry.label || "?"}
                                       </Badge>
                                     )
                                   ) : (
-                                    codes.map(({ sc }, idx) =>
-                                      sc ? (
-                                        <div key={sc.id} className="flex items-center gap-1.5">
+                                    codes.map(({ shiftCode, isCodeDraft }, idx) =>
+                                      shiftCode ? (
+                                        <div key={shiftCode.id} className="flex items-center gap-1.5">
                                           <Badge
                                             variant="outline"
                                             style={{
-                                              backgroundColor: sc.color,
-                                              color: sc.text,
-                                              borderColor: sc.border,
+                                              backgroundColor: shiftCode.color,
+                                              color: shiftCode.text,
+                                              borderColor: shiftCode.border,
                                             }}
-                                            className="px-1.5 py-0 h-5 text-[10px]"
+                                            className="h-5 px-1.5 py-0 text-[10px]"
                                           >
-                                            {isNameMode ? (sc.name || sc.label) : sc.label}
+                                            {isNameMode ? (shiftCode.name || shiftCode.label) : shiftCode.label}
                                           </Badge>
-                                          {!isNameMode && isSplit && sc.name && (
-                                            <span className="text-[11px] text-muted-foreground">{sc.name}</span>
+                                          {!isNameMode && isSplit && shiftCode.name && (
+                                            <span className="text-[11px] text-[var(--color-text-muted)]">
+                                              {shiftCode.name}
+                                            </span>
+                                          )}
+                                          {isSplit && entry.isDraft && (
+                                            <span
+                                              className="text-[10px] font-semibold"
+                                              style={{
+                                                color: isCodeDraft ? "var(--color-warning)" : "var(--color-success)",
+                                              }}
+                                            >
+                                              {isCodeDraft ? "Draft" : "Live"}
+                                            </span>
                                           )}
                                         </div>
                                       ) : (
-                                        <Badge key={`unknown-${idx}`} variant="outline" className="px-1.5 py-0 h-5 text-[10px] text-muted-foreground">
+                                        <Badge key={`unknown-${idx}`} variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
                                           ?
                                         </Badge>
                                       ),
                                     )
                                   )}
                                   {entry.fromRecurring && (
-                                    <Hint content={hint("From recurring schedule")} side="top"><span className="text-muted-foreground text-[11px]">↻</span></Hint>
+                                    <Hint content={hint("From recurring schedule")} side="top">
+                                      <span className="text-[11px] text-[var(--color-text-muted)]">↻</span>
+                                    </Hint>
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-[13px] text-muted-foreground">
+                              <TableCell className="text-[13px] text-[var(--color-text-muted)]">
                                 {isAbsence ? "—" : isSplit ? (
                                   <div className="flex flex-col gap-0.5">
-                                    {codes.map(({ fa }, idx) => (
-                                      <span key={idx}>{fa ? fa.name : "—"}</span>
+                                    {codes.map(({ focusArea }, idx) => (
+                                      <span key={idx}>{focusArea ? focusArea.name : "—"}</span>
                                     ))}
                                   </div>
                                 ) : (
-                                  codes[0]?.fa?.name ?? "—"
+                                  codes[0]?.focusArea?.name ?? "—"
                                 )}
                               </TableCell>
-                              <TableCell className="text-[13px] text-muted-foreground">
+                              <TableCell className="text-[13px] text-[var(--color-text-muted)]">
                                 {isAbsence ? "—" : isSplit ? (
                                   <div className="flex flex-col gap-0.5">
-                                    {codes.map(({ sc }, idx) => {
-                                      // Parse pipe-delimited custom times for split shifts
+                                    {codes.map(({ shiftCode }, idx) => {
                                       const customStarts = entry.customStartTime?.split("|") ?? [];
                                       const customEnds = entry.customEndTime?.split("|") ?? [];
-                                      const start = customStarts[idx] || sc?.defaultStartTime;
-                                      const end = customEnds[idx] || sc?.defaultEndTime;
+                                      const start = customStarts[idx] || shiftCode?.defaultStartTime;
+                                      const end = customEnds[idx] || shiftCode?.defaultEndTime;
                                       return (
                                         <span key={idx}>
                                           {start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—"}
@@ -296,48 +323,50 @@ export function ScheduleTab({
                                     })}
                                   </div>
                                 ) : (() => {
-                                  const sc = codes[0]?.sc;
-                                  const start = entry.customStartTime ?? sc?.defaultStartTime;
-                                  const end = entry.customEndTime ?? sc?.defaultEndTime;
+                                  const shiftCode = codes[0]?.shiftCode;
+                                  const start = entry.customStartTime ?? shiftCode?.defaultStartTime;
+                                  const end = entry.customEndTime ?? shiftCode?.defaultEndTime;
                                   return start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—";
                                 })()}
                               </TableCell>
-                              <TableCell className="font-semibold text-foreground text-[13px]">
+                              <TableCell className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                                 {hours > 0 ? `${Math.round(hours * 10) / 10}h` : "—"}
                               </TableCell>
                               <TableCell>
-                                {isSplit && entry.isDraft && codes.some(c => c.isCodeDraft) && codes.some(c => !c.isCodeDraft) ? (
+                                {isSplit && entry.isDraft && codes.some((code) => code.isCodeDraft) && codes.some((code) => !code.isCodeDraft) ? (
                                   <div className="flex flex-col gap-0.5">
                                     {codes.map(({ isCodeDraft }, idx) => (
-                                      <span key={idx} className={"text-[12px] font-semibold"} style={{ color: isCodeDraft ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                                      <span
+                                        key={idx}
+                                        className="text-[12px] font-semibold"
+                                        style={{ color: isCodeDraft ? "var(--color-warning)" : "var(--color-success)" }}
+                                      >
                                         {isCodeDraft ? "Draft" : "Published"}
                                       </span>
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-[12px] font-semibold" style={{ color: entry.isDraft ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                                  <span
+                                    className="text-[12px] font-semibold"
+                                    style={{ color: entry.isDraft ? "var(--color-warning)" : "var(--color-success)" }}
+                                  >
                                     {entry.isDraft ? "Draft" : "Published"}
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-[12px] text-muted-foreground">
+                              <TableCell className="text-[12px] text-[var(--color-text-muted)]">
                                 {(() => {
                                   const editorId = entry.updatedBy || entry.createdBy;
                                   if (!editorId) return "—";
                                   const name = auditNames.get(editorId);
                                   if (!name) return "—";
                                   const timestamp = entry.updatedAt || entry.createdAt;
+                                  const label = <span>{compactName(name)}</span>;
+                                  if (!timestamp) return label;
                                   return (
-                                    <MaybeHint
-                                      content={
-                                        timestamp
-                                          ? new Date(timestamp).toLocaleString()
-                                          : undefined
-                                      }
-                                      side="bottom"
-                                    >
-                                      <span>{compactName(name)}</span>
-                                    </MaybeHint>
+                                    <Hint content={hint(new Date(timestamp).toLocaleString())} side="bottom">
+                                      {label}
+                                    </Hint>
                                   );
                                 })()}
                               </TableCell>
@@ -350,17 +379,16 @@ export function ScheduleTab({
                 </Table>
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                  <span className="text-[12px] text-muted-foreground">
+                <div className="flex items-center justify-between border-t border-[var(--color-border-light)] px-4 py-3">
+                  <span className="text-[12px] text-[var(--color-text-muted)]">
                     Page {page + 1} of {totalPages}
                   </span>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      onClick={() => setPage((currentPage) => Math.max(0, currentPage - 1))}
                       disabled={page === 0}
                     >
                       Previous
@@ -368,7 +396,7 @@ export function ScheduleTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                      onClick={() => setPage((currentPage) => Math.min(totalPages - 1, currentPage + 1))}
                       disabled={page >= totalPages - 1}
                     >
                       Next
@@ -378,20 +406,24 @@ export function ScheduleTab({
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Shift Requests */}
       {shiftRequests.length > 0 && (
-        <Card className="shadow-sm">
-          <CardHeader className="border-b pb-3">
-            <CardTitle className="text-[14px] font-bold text-foreground flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              Shift Requests
-              <Badge variant="secondary" className="ml-1 font-mono text-[10px] px-1.5 py-0 h-4">{shiftRequests.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+        <div className="dg-card">
+          <div className="dg-card-header">
+            <div>
+              <div className="dg-card-title flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[var(--color-text-muted)]" />
+                Shift requests
+                <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
+                  {shiftRequests.length}
+                </Badge>
+              </div>
+              <div className="dg-card-subtitle">Requests initiated by or for this person.</div>
+            </div>
+          </div>
+          <div className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -404,30 +436,36 @@ export function ScheduleTab({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {shiftRequests.map((req) => (
-                    <TableRow key={req.id}>
-                      <TableCell className="capitalize font-medium text-[13px]">{req.type}</TableCell>
-                      <TableCell className="text-[13px]">{req.requesterShiftDate}</TableCell>
-                      <TableCell className="font-semibold text-[13px]">{req.requesterShiftLabel}</TableCell>
+                  {shiftRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="text-[13px] font-medium capitalize">{request.type}</TableCell>
+                      <TableCell className="text-[13px]">{request.requesterShiftDate}</TableCell>
+                      <TableCell className="text-[13px] font-semibold">{request.requesterShiftLabel}</TableCell>
                       <TableCell>
-                        <span className="text-[12px] font-semibold capitalize" style={{ color:
-                          req.status === 'approved' ? 'var(--color-success)' :
-                          req.status === 'rejected' ? 'var(--color-danger)' :
-                          'var(--color-warning)'
-                        }}>
-                          {req.status.replace("_", " ")}
+                        <span
+                          className="text-[12px] font-semibold capitalize"
+                          style={{
+                            color:
+                              request.status === "approved"
+                                ? "var(--color-success)"
+                                : request.status === "rejected"
+                                  ? "var(--color-danger)"
+                                  : "var(--color-warning)",
+                          }}
+                        >
+                          {request.status.replace("_", " ")}
                         </span>
                       </TableCell>
-                      <TableCell className="text-[13px] text-muted-foreground">
-                        {new Date(req.createdAt).toLocaleDateString()}
+                      <TableCell className="text-[13px] text-[var(--color-text-muted)]">
+                        {new Date(request.createdAt).toLocaleDateString()}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

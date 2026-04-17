@@ -3,14 +3,19 @@ import * as fc from "fast-check";
 import {
   isEmployeeQualified,
   getDisqualificationReasons,
+  hasVisibleGridShiftEntry,
   rangesOverlap,
   timesOverlap,
   checkCrossDateOverlap,
   checkSameDayOverlaps,
   resolveRequirement,
+  resolveCoverageRules,
   computeCoverageStatus,
+  buildShiftCodeIdsByFocusArea,
   computeCoverageGaps,
   buildPublishedDateSet,
+  filterPublishedDates,
+  getPublishedWindowState,
 } from "@/lib/schedule-logic";
 import {
   makeEmployee,
@@ -18,7 +23,9 @@ import {
   makeFocusArea,
   makeShiftCategory,
   makeCoverageRequirement,
+  makeCoverageRuleConfig,
 } from "./factories";
+import { formatDateKey } from "@/lib/utils";
 
 // ── isEmployeeQualified ──────────────────────────────────────────────────────
 
@@ -69,6 +76,53 @@ describe("isEmployeeQualified", () => {
     const emp = makeEmployee({ certificationId: 1, focusAreaIds: [1] });
     const code = makeShiftCode({ requiredCertificationIds: [5], focusAreaId: 2 });
     expect(isEmployeeQualified(emp, code)).toBe(false);
+  });
+});
+
+describe("hasVisibleGridShiftEntry", () => {
+  it("returns true for a scheduled shift", () => {
+    expect(
+      hasVisibleGridShiftEntry({
+        label: "D",
+        shiftCodeIds: [1],
+        isDraft: false,
+        draftKind: null,
+        publishedShiftCodeIds: [1],
+        publishedLabel: "D",
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true for an absence entry", () => {
+    expect(
+      hasVisibleGridShiftEntry({
+        label: "VAC",
+        shiftCodeIds: [],
+        absenceTypeId: 3,
+        isDraft: true,
+        draftKind: "new",
+        publishedShiftCodeIds: [],
+        publishedLabel: "",
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false for a draft-deleted row", () => {
+    expect(
+      hasVisibleGridShiftEntry({
+        label: "OFF",
+        shiftCodeIds: [],
+        isDelete: true,
+        isDraft: true,
+        draftKind: "deleted",
+        publishedShiftCodeIds: [1],
+        publishedLabel: "D",
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false for an empty cell", () => {
+    expect(hasVisibleGridShiftEntry(undefined)).toBe(false);
   });
 });
 
@@ -390,7 +444,7 @@ describe("computeCoverageStatus", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
     const idsForKey = () => [10];
-    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10]), 10, { minStaff: 2 });
+    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10]), [10], { minStaff: 2 });
     expect(result.actual).toBe(2);
     expect(result.required).toBe(2);
     expect(result.isMet).toBe(true);
@@ -400,20 +454,20 @@ describe("computeCoverageStatus", () => {
   it("reports not met when actual < required", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const idsForKey = () => [10];
-    const result = computeCoverageStatus([emp1], date, idsForKey, new Set([10]), 10, { minStaff: 3 });
+    const result = computeCoverageStatus([emp1], date, idsForKey, new Set([10]), [10], { minStaff: 3 });
     expect(result.actual).toBe(1);
     expect(result.required).toBe(3);
     expect(result.isMet).toBe(false);
   });
 
   it("reports no requirement when minStaff is 0", () => {
-    const result = computeCoverageStatus([], date, () => [], new Set([10]), 10, { minStaff: 0 });
+    const result = computeCoverageStatus([], date, () => [], new Set([10]), [10], { minStaff: 0 });
     expect(result.hasRequirement).toBe(false);
     expect(result.isMet).toBe(true);
   });
 
   it("returns actual 0 when no employees", () => {
-    const result = computeCoverageStatus([], date, () => [10], new Set([10]), 10, { minStaff: 2 });
+    const result = computeCoverageStatus([], date, () => [10], new Set([10]), [10], { minStaff: 2 });
     expect(result.actual).toBe(0);
   });
 
@@ -422,8 +476,88 @@ describe("computeCoverageStatus", () => {
     const emp2 = makeEmployee({ id: "emp-2" });
     // emp1 has shift 10, emp2 has shift 20
     const idsForKey = (empId: string) => empId === "emp-1" ? [10] : [20];
-    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10, 20]), 10, { minStaff: 1 });
+    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10, 20]), [10], { minStaff: 1 });
     expect(result.actual).toBe(1); // only emp1 on shift 10
+  });
+
+  it("counts an employee once when any eligible shift code matches", () => {
+    const emp1 = makeEmployee({ id: "emp-1" });
+    const emp2 = makeEmployee({ id: "emp-2" });
+    const idsForKey = (empId: string) => (empId === "emp-1" ? [10] : [11]);
+    const result = computeCoverageStatus(
+      [emp1, emp2],
+      date,
+      idsForKey,
+      new Set([10, 11]),
+      [10, 11],
+      { minStaff: 2 },
+    );
+    expect(result.actual).toBe(2);
+    expect(result.isMet).toBe(true);
+  });
+});
+
+describe("resolveCoverageRules", () => {
+  it("defaults to exact-code behavior when no config exists", () => {
+    const code = makeShiftCode({ id: 10, label: "D", focusAreaId: 1, categoryId: 1 });
+    const requirement = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10 });
+
+    const rules = resolveCoverageRules([requirement], [], [code]);
+
+    expect(rules).toEqual([
+      {
+        id: "1:10",
+        orgId: "org1",
+        focusAreaId: 1,
+        requirementShiftCodeId: 10,
+        eligibleShiftCodeIds: [10],
+        preferredOpenShiftCodeId: 10,
+        ruleLabel: "D",
+        shiftCategoryId: 1,
+      },
+    ]);
+  });
+
+  it("includes configured eligible shift codes in the same focus area and category", () => {
+    const base = makeShiftCode({ id: 10, label: "D", focusAreaId: 1, categoryId: 1 });
+    const supervisor = makeShiftCode({ id: 11, label: "Ds", focusAreaId: 1, categoryId: 1 });
+    const mentoring = makeShiftCode({ id: 12, label: "(D)", focusAreaId: 1, categoryId: 1 });
+    const wrongArea = makeShiftCode({ id: 13, label: "D-other", focusAreaId: 2, categoryId: 1 });
+    const wrongCategory = makeShiftCode({ id: 14, label: "E", focusAreaId: 1, categoryId: 2 });
+    const requirement = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10 });
+    const config = makeCoverageRuleConfig({
+      focusAreaId: 1,
+      requirementShiftCodeId: 10,
+      eligibleShiftCodeIds: [10, 11, 12, 13, 14],
+      preferredOpenShiftCodeId: 12,
+    });
+
+    const rules = resolveCoverageRules(
+      [requirement],
+      [config],
+      [base, supervisor, mentoring, wrongArea, wrongCategory],
+    );
+
+    expect(rules[0]?.ruleLabel).toBe("D");
+    expect(rules[0]?.eligibleShiftCodeIds).toEqual([10, 11, 12]);
+    expect(rules[0]?.preferredOpenShiftCodeId).toBe(12);
+  });
+
+  it("falls back to the base code when configured eligible codes become invalid", () => {
+    const base = makeShiftCode({ id: 10, label: "D", focusAreaId: 1, categoryId: 1 });
+    const archived = makeShiftCode({ id: 11, label: "Ds", focusAreaId: 1, categoryId: 1, archivedAt: "2026-01-01" });
+    const requirement = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10 });
+    const config = makeCoverageRuleConfig({
+      focusAreaId: 1,
+      requirementShiftCodeId: 10,
+      eligibleShiftCodeIds: [11],
+      preferredOpenShiftCodeId: 11,
+    });
+
+    const rules = resolveCoverageRules([requirement], [config], [base, archived]);
+
+    expect(rules[0]?.eligibleShiftCodeIds).toEqual([10]);
+    expect(rules[0]?.preferredOpenShiftCodeId).toBe(10);
   });
 });
 
@@ -431,6 +565,22 @@ describe("computeCoverageStatus", () => {
 
 describe("computeCoverageGaps", () => {
   const date = new Date(2024, 0, 15); // Monday (day 1)
+
+  it("includes general shift codes in each focus area's eligible code set", () => {
+    const icu = makeFocusArea({ id: 1, name: "ICU" });
+    const er = makeFocusArea({ id: 2, name: "ER" });
+    const generalCode = makeShiftCode({ id: 10, label: "Ofc", focusAreaId: null });
+    const icuCode = makeShiftCode({ id: 11, label: "D", focusAreaId: 1 });
+    const erCode = makeShiftCode({ id: 12, label: "N", focusAreaId: 2 });
+
+    const result = buildShiftCodeIdsByFocusArea(
+      [icu, er],
+      [generalCode, icuCode, erCode],
+    );
+
+    expect(result.get(1)).toEqual(new Set([10, 11]));
+    expect(result.get(2)).toEqual(new Set([10, 12]));
+  });
 
   it("returns empty when all requirements met", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
@@ -444,6 +594,7 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [req],
+      [],
       [date],
       new Map([[1, [emp]]]),
       () => [10],
@@ -464,6 +615,7 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [req],
+      [],
       [date],
       new Map([[1, []]]), // no employees
       () => [],
@@ -475,6 +627,15 @@ describe("computeCoverageGaps", () => {
     expect(gaps[0].shiftCodeId).toBe(10);
     expect(gaps[0].status.actual).toBe(0);
     expect(gaps[0].status.required).toBe(3);
+    expect(gaps[0].shortageDetails).toEqual([
+      {
+        shiftCodeId: 10,
+        shiftCodeLabel: "D",
+        required: 3,
+        actual: 0,
+        shortage: 3,
+      },
+    ]);
   });
 
   it("skips shift codes not in section", () => {
@@ -488,6 +649,7 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [req],
+      [],
       [date],
       new Map([[1, []]]),
       () => [],
@@ -507,6 +669,7 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [], // no requirements
+      [],
       [date],
       new Map([[1, []]]),
       () => [],
@@ -527,6 +690,7 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [req],
+      [],
       [date],
       new Map([[1, []]]),
       () => [],
@@ -536,6 +700,178 @@ describe("computeCoverageGaps", () => {
     expect(gaps).toHaveLength(1);
     expect(gaps[0].shiftCategoryName).toBe("Evening");
     expect(gaps[0].focusAreaName).toBe("ER");
+  });
+
+  it("counts overlapping eligible codes toward a flexible coverage rule", () => {
+    const fa = makeFocusArea({ id: 1, name: "ICU" });
+    const cat = makeShiftCategory({ id: 1, name: "Day" });
+    const day = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const supervisor = makeShiftCode({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
+    const mentoring = makeShiftCode({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
+    const req = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
+    const config = makeCoverageRuleConfig({
+      focusAreaId: 1,
+      requirementShiftCodeId: 10,
+      eligibleShiftCodeIds: [10, 11, 12],
+      preferredOpenShiftCodeId: 10,
+    });
+    const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
+    const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
+    const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
+
+    const gaps = computeCoverageGaps(
+      [fa],
+      [cat],
+      [day, supervisor, mentoring],
+      [req],
+      [config],
+      [date],
+      new Map([[1, [emp1, emp2, emp3]]]),
+      (empId: string) =>
+        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12],
+      new Map([
+        [10, day],
+        [11, supervisor],
+        [12, mentoring],
+      ]),
+      new Map([[1, new Set([10, 11, 12])]]),
+    );
+
+    expect(gaps).toEqual([]);
+  });
+
+  it("stays green when category staffing is met even if an exact code is short", () => {
+    const fa = makeFocusArea({ id: 1, name: "ICU" });
+    const cat = makeShiftCategory({ id: 1, name: "Day" });
+    const day = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const supervisor = makeShiftCode({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
+    const mentoring = makeShiftCode({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
+    const dayReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
+    const supReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 11, dayOfWeek: null, minStaff: 1 });
+    const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
+    const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
+    const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
+    const emp4 = makeEmployee({ id: "emp-4", focusAreaIds: [1] });
+    const emp5 = makeEmployee({ id: "emp-5", focusAreaIds: [1] });
+
+    const gaps = computeCoverageGaps(
+      [fa],
+      [cat],
+      [day, supervisor, mentoring],
+      [dayReq, supReq],
+      [],
+      [date],
+      new Map([[1, [emp1, emp2, emp3, emp4, emp5]]]),
+      (empId: string) => {
+        if (empId === "emp-1" || empId === "emp-2") return [10];
+        if (empId === "emp-3") return [11];
+        return [12];
+      },
+      new Map([
+        [10, day],
+        [11, supervisor],
+        [12, mentoring],
+      ]),
+      new Map([[1, new Set([10, 11, 12])]]),
+    );
+
+    expect(gaps).toEqual([]);
+  });
+
+  it("goes red when the category total is short and lists exact-code shortages as detail", () => {
+    const fa = makeFocusArea({ id: 1, name: "ICU" });
+    const cat = makeShiftCategory({ id: 1, name: "Day" });
+    const day = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const supervisor = makeShiftCode({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
+    const dayReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
+    const supReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 11, dayOfWeek: null, minStaff: 1 });
+    const config = makeCoverageRuleConfig({
+      focusAreaId: 1,
+      requirementShiftCodeId: 10,
+      eligibleShiftCodeIds: [10, 11],
+      preferredOpenShiftCodeId: 10,
+      id: 99,
+    });
+    const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
+    const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
+    const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
+
+    const gaps = computeCoverageGaps(
+      [fa],
+      [cat],
+      [day, supervisor],
+      [dayReq, supReq],
+      [config],
+      [date],
+      new Map([[1, [emp1, emp2, emp3]]]),
+      (empId: string) =>
+        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10],
+      new Map([
+        [10, day],
+        [11, supervisor],
+      ]),
+      new Map([[1, new Set([10, 11])]]),
+    );
+
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].shiftCategoryName).toBe("Day");
+    expect(gaps[0].status.actual).toBe(3);
+    expect(gaps[0].status.required).toBe(4);
+    expect(gaps[0].shortageDetails).toEqual([
+      {
+        shiftCodeId: 10,
+        shiftCodeLabel: "D",
+        required: 3,
+        actual: 2,
+        shortage: 1,
+      },
+    ]);
+  });
+
+  it("only returns coverage gaps for visible dates that have been published", () => {
+    const march1 = new Date(2026, 2, 1);
+    const march2 = new Date(2026, 2, 2);
+    const fa = makeFocusArea({ id: 1, name: "ICU" });
+    const cat = makeShiftCategory({ id: 1, name: "Day" });
+    const code = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const reqDay1 = makeCoverageRequirement({
+      focusAreaId: 1,
+      shiftCodeId: 10,
+      dayOfWeek: march1.getDay(),
+      minStaff: 1,
+    });
+    const reqDay2 = makeCoverageRequirement({
+      focusAreaId: 1,
+      shiftCodeId: 10,
+      dayOfWeek: march2.getDay(),
+      minStaff: 1,
+    });
+    const publishedDateSet = buildPublishedDateSet([
+      {
+        startDate: formatDateKey(march2),
+        endDate: formatDateKey(march2),
+      },
+    ]);
+    const publishedDates = filterPublishedDates(
+      [march1, march2],
+      publishedDateSet,
+    );
+
+    const gaps = computeCoverageGaps(
+      [fa],
+      [cat],
+      [code],
+      [reqDay1, reqDay2],
+      [],
+      publishedDates,
+      new Map([[1, []]]),
+      () => [],
+      new Map([[10, code]]),
+      new Map([[1, new Set([10])]]),
+    );
+
+    expect(gaps).toHaveLength(1);
+    expect(formatDateKey(gaps[0].date)).toBe(formatDateKey(march2));
   });
 });
 
@@ -568,5 +904,48 @@ describe("buildPublishedDateSet", () => {
       { startDate: "2026-06-15", endDate: "2026-06-15" },
     ]);
     expect(set).toEqual(new Set(["2026-06-15"]));
+  });
+});
+
+describe("filterPublishedDates", () => {
+  it("returns only visible dates that have been published", () => {
+    const dates = [
+      new Date("2026-03-01T00:00:00"),
+      new Date("2026-03-02T00:00:00"),
+      new Date("2026-03-03T00:00:00"),
+    ];
+    const set = new Set(["2026-03-01", "2026-03-03"]);
+
+    expect(filterPublishedDates(dates, set)).toEqual([
+      new Date("2026-03-01T00:00:00"),
+      new Date("2026-03-03T00:00:00"),
+    ]);
+  });
+});
+
+describe("getPublishedWindowState", () => {
+  const dates = [
+    new Date("2026-03-01T00:00:00"),
+    new Date("2026-03-02T00:00:00"),
+    new Date("2026-03-03T00:00:00"),
+  ];
+
+  it("returns unpublished when no visible dates are published", () => {
+    expect(getPublishedWindowState(dates, new Set())).toBe("unpublished");
+  });
+
+  it("returns partial when only some visible dates are published", () => {
+    expect(getPublishedWindowState(dates, new Set(["2026-03-02"]))).toBe(
+      "partial",
+    );
+  });
+
+  it("returns published when every visible date is published", () => {
+    expect(
+      getPublishedWindowState(
+        dates,
+        new Set(["2026-03-01", "2026-03-02", "2026-03-03"]),
+      ),
+    ).toBe("published");
   });
 });

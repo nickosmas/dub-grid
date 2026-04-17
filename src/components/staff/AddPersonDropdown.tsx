@@ -36,7 +36,7 @@ export function AddPersonDropdown({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center justify-center shrink-0 rounded-[10px] bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
+        className={`flex items-center justify-center shrink-0 rounded-[var(--dg-btn-radius)] bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-border-focus)] focus-visible:outline-offset-2 ${
           isMobile ? "h-11 w-11" : "h-[var(--dg-toolbar-h)] gap-1.5 px-3"
         }`}
       >
@@ -51,11 +51,11 @@ export function AddPersonDropdown({
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 min-w-[200px] rounded-[10px] border border-[var(--color-border)] bg-white py-1 shadow-[var(--shadow-float)]"
+          className="absolute right-0 top-full mt-1 z-50 min-w-[200px] rounded-[var(--dg-btn-radius)] border border-[var(--color-border)] bg-white py-1 shadow-[var(--shadow-float)]"
         >
           <button
             onClick={() => { onAddToSchedule(); setOpen(false); }}
-            className="flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded-[8px] mx-1"
+            className="mx-1 flex w-full items-center gap-2.5 rounded-[var(--dg-btn-radius)] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]"
             style={{ width: "calc(100% - 8px)" }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)] shrink-0">
@@ -68,7 +68,7 @@ export function AddPersonDropdown({
           </button>
           <button
             onClick={() => { onInviteToApp(); setOpen(false); }}
-            className="flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded-[8px] mx-1"
+            className="mx-1 flex w-full items-center gap-2.5 rounded-[var(--dg-btn-radius)] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]"
             style={{ width: "calc(100% - 8px)" }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)] shrink-0">

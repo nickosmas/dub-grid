@@ -1,6 +1,7 @@
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import type { Employee, FocusArea } from "@/types";
 import ExpandButton from "./ExpandButton";
+import DashboardEmptyState from "./DashboardEmptyState";
 
 interface StaffHoursCardProps {
   employeeHours: EmployeeHours[];
@@ -39,7 +40,7 @@ export default function StaffHoursCard({
   const remainingCount = Math.max(0, sorted.length - visible.length);
 
   return (
-    <div className="dg-card">
+    <div className="dg-card" style={{ display: "flex", flexDirection: "column" }}>
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">
@@ -52,12 +53,16 @@ export default function StaffHoursCard({
         {onExpand && <ExpandButton onClick={onExpand} label="Expand staff hours" />}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {visible.length === 0 ? (
-          <div style={{ padding: "24px 16px", fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", border: "1px dashed var(--color-border)", borderRadius: 14, margin: "0 16px 16px", background: "var(--color-bg)" }}>
-            {emptyMessage}
-          </div>
-        ) : (
+      {visible.length === 0 ? (
+        <div className="dg-card-body" style={{ display: "flex", flex: 1 }}>
+          <DashboardEmptyState
+            title={emptyMessage}
+            variant="inline"
+            style={{ flex: 1 }}
+          />
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column" }}>
           <>
           {visible.map((h) => {
             const emp = empMap.get(h.empId);
@@ -154,8 +159,8 @@ export default function StaffHoursCard({
             </div>
           )}
           </>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

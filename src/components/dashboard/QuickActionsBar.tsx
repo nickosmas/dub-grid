@@ -79,7 +79,7 @@ export default function QuickActionsBar({
             alignItems: "center",
             gap: 6,
             padding: "10px 14px",
-            borderRadius: 12,
+            borderRadius: "var(--dg-radius-md)",
             fontSize: 12,
             fontWeight: 600,
             textDecoration: "none",

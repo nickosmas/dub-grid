@@ -96,5 +96,31 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: "Activate" }));
 
     expect(onActivate).toHaveBeenCalledWith("emp-1");
+    expect(screen.getByRole("button", { name: "Activate" })).toHaveClass("dg-btn-sm");
+  });
+
+  it("uses the shared filled warning and danger button treatments for status actions", () => {
+    render(
+      <EmployeeStatusActions
+        employee={makeEmployee()}
+        canEdit
+        onBench={vi.fn()}
+        onActivate={vi.fn()}
+        onTerminate={vi.fn()}
+        variant="page"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Bench" })).toHaveClass(
+      "dg-btn",
+      "dg-btn-warning-filled",
+    );
+    expect(screen.getByRole("button", { name: "Terminate" })).toHaveClass(
+      "dg-btn",
+      "dg-btn-danger-filled",
+    );
+    expect(screen.getByRole("button", { name: "Bench" })).toHaveStyle({
+      minWidth: "132px",
+    });
   });
 });

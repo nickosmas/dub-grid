@@ -17,11 +17,18 @@ export type { OrganizationData, SetupStatus } from "./useOrganizationData";
 export { useEmployees } from "./useEmployees";
 export type { EmployeesData } from "./useEmployees";
 
+export { useEmployeeCount } from "./useEmployeeCount";
+export type { EmployeeCountData } from "./useEmployeeCount";
+
 export { useDirectory } from "./useDirectory";
 export type { DirectoryData } from "./useDirectory";
 
 export { useCellLocks } from "./useCellLocks";
 export type { CellLock, OnlineUser } from "./useCellLocks";
+export {
+  useReliableRealtimeBroadcasts,
+  type ReliableBroadcastOptions,
+} from "./useReliableRealtimeBroadcasts";
 
 export {
   useMediaQuery,
@@ -34,3 +41,6 @@ export {
 
 export { useShiftRequests } from "./useShiftRequests";
 export type { ShiftRequestsData } from "./useShiftRequests";
+
+export { useSelfProfileData } from "./useSelfProfileData";
+export type { SelfProfileRecord } from "./useSelfProfileData";

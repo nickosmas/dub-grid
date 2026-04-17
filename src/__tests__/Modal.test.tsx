@@ -90,4 +90,20 @@ describe("Modal — Close interactions", () => {
     fireEvent.keyDown(backdrop, { key: "Escape" });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
+
+  it("does not close when onRequestClose blocks dismissal", async () => {
+    const onClose = vi.fn();
+    const onRequestClose = vi.fn(() => false);
+
+    render(
+      <Modal title="Guarded Modal" onClose={onClose} onRequestClose={onRequestClose}>
+        <p>Modal content</p>
+      </Modal>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Close modal" }));
+
+    expect(onRequestClose).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

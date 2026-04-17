@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchEmployees, insertEmployee, updateEmployee, deleteEmployee, benchEmployee, activateEmployee } from "@/lib/db";
+import {
+  fetchEmployees,
+  insertEmployee,
+  updateEmployee,
+  deleteEmployee,
+  benchEmployee,
+  activateEmployee,
+  EmployeeStatusConflictError,
+} from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
@@ -51,15 +59,18 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   const loading = employeesQuery.isLoading;
 
-  // Ref for capturing current active employees in functional updaters
-  const employeesRef = useRef<Employee[]>([]);
-  useEffect(() => { employeesRef.current = employees; }, [employees]);
+  // Ref for capturing the latest employee list inside optimistic callbacks.
+  const allEmployeesRef = useRef<Employee[]>([]);
+  useEffect(() => {
+    allEmployeesRef.current = allLocal;
+  }, [allLocal]);
 
   // Helper: invalidate the all-employees query so the next focus/navigation
   // picks up any server-side changes.
   const invalidateEmployees = useCallback(() => {
     if (orgId) {
       queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.org.employeeCount(orgId) });
     }
   }, [queryClient, orgId]);
 
@@ -70,7 +81,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         const added: Employee[] = [];
         for (const data of dataList) {
           const maxSen = Math.max(
-            ...employeesRef.current.map((e) => e.seniority),
+            ...allEmployeesRef.current.map((e) => e.seniority),
             ...added.map((e) => e.seniority),
             0,
           );
@@ -102,7 +113,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         return prev.map((e) => (e.id === emp.id ? emp : e));
       });
       try {
-        await updateEmployee(emp, orgId);
+        await updateEmployee(emp, orgId, emp.version);
         toast.success("Employee saved");
         invalidateEmployees();
       } catch (err) {
@@ -115,6 +126,9 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleDeleteEmployee = useCallback(async (empId: string) => {
+    const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+    if (!targetEmployee || !orgId) return;
+
     const now = new Date().toISOString();
     let prevAll: Employee[] = [];
     setAllLocal((prev) => {
@@ -124,10 +138,20 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
     });
     try {
-      await deleteEmployee(empId, orgId!);
+      const updatedEmployee = await deleteEmployee(empId, orgId, targetEmployee.version);
+      setAllLocal((prev) => prev.map((employee) => (
+        employee.id === empId ? updatedEmployee : employee
+      )));
       toast.success("Employee terminated");
       invalidateEmployees();
     } catch (err) {
+      if (err instanceof EmployeeStatusConflictError) {
+        setAllLocal((prev) => prev.map((employee) => (
+          employee.id === empId ? err.latestEmployee : employee
+        )));
+        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       setAllLocal(prevAll);
       toast.error("Failed to terminate employee");
       Sentry.captureException(err);
@@ -135,6 +159,9 @@ export function useEmployees(orgId: string | null): EmployeesData {
   }, [orgId, invalidateEmployees]);
 
   const handleBenchEmployee = useCallback(async (empId: string, note?: string) => {
+    const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+    if (!targetEmployee || !orgId) return;
+
     let prevAll: Employee[] = [];
     setAllLocal((prev) => {
       prevAll = prev;
@@ -145,10 +172,25 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
     });
     try {
-      await benchEmployee(empId, note, orgId!);
+      const updatedEmployee = await benchEmployee(
+        empId,
+        note,
+        orgId,
+        targetEmployee.version,
+      );
+      setAllLocal((prev) => prev.map((employee) => (
+        employee.id === empId ? updatedEmployee : employee
+      )));
       toast.success("Employee benched");
       invalidateEmployees();
     } catch (err) {
+      if (err instanceof EmployeeStatusConflictError) {
+        setAllLocal((prev) => prev.map((employee) => (
+          employee.id === empId ? err.latestEmployee : employee
+        )));
+        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       setAllLocal(prevAll);
       toast.error("Failed to bench employee");
       Sentry.captureException(err);
@@ -156,6 +198,9 @@ export function useEmployees(orgId: string | null): EmployeesData {
   }, [orgId, invalidateEmployees]);
 
   const handleActivateEmployee = useCallback(async (empId: string) => {
+    const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+    if (!targetEmployee || !orgId) return;
+
     const now = new Date().toISOString();
     let prevAll: Employee[] = [];
     setAllLocal((prev) => {
@@ -167,10 +212,20 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
     });
     try {
-      await activateEmployee(empId, orgId!);
+      const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
+      setAllLocal((prev) => prev.map((employee) => (
+        employee.id === empId ? updatedEmployee : employee
+      )));
       toast.success("Employee activated");
       invalidateEmployees();
     } catch (err) {
+      if (err instanceof EmployeeStatusConflictError) {
+        setAllLocal((prev) => prev.map((employee) => (
+          employee.id === empId ? err.latestEmployee : employee
+        )));
+        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       setAllLocal(prevAll);
       toast.error("Failed to activate employee");
       Sentry.captureException(err);

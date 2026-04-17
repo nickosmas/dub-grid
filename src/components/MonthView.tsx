@@ -162,7 +162,7 @@ function DayPopover({
         ...menuStyle,
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
-        borderRadius: 12,
+        borderRadius: "var(--dg-radius-md)",
         boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
         overflow: "hidden",
         display: "flex",

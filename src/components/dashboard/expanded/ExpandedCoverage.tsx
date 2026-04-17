@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from "react";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
+import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
+import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
 
 const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
@@ -20,6 +22,8 @@ interface ExpandedCoverageProps {
   sections: SectionCoverage[];
   focusAreas: FocusArea[];
   focusAreaLabel: string;
+  hasRequirements: boolean;
+  publishedWindowState?: PublishedWindowState;
   onClose: () => void;
 }
 
@@ -27,9 +31,13 @@ export default function ExpandedCoverage({
   sections,
   focusAreas,
   focusAreaLabel,
+  hasRequirements,
+  publishedWindowState = "published",
   onClose,
 }: ExpandedCoverageProps) {
   const [filter, setFilter] = useState<"all" | number>("all");
+  const isUnpublished = hasRequirements && publishedWindowState === "unpublished";
+  const isPartial = hasRequirements && publishedWindowState === "partial";
 
   const filtered = useMemo(
     () => (filter === "all" ? sections : sections.filter((s) => s.focusAreaId === filter)),
@@ -40,12 +48,106 @@ export default function ExpandedCoverage({
   const totalFilled = sections.reduce((s, sec) => s + sec.filledTotal, 0);
   const totalRequired = sections.reduce((s, sec) => s + sec.requiredTotal, 0);
   const overallPct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
+  const sampleSectionName = filtered[0]?.focusAreaName ?? focusAreas[0]?.name ?? focusAreaLabel.replace(/s$/i, "") ?? "Section";
+  const explainerPoints = [
+    {
+      title: "Coverage rolls up by category total",
+      description: "Each day is scored by comparing required headcount to the number of unique staff scheduled in that category.",
+    },
+    {
+      title: "Green means enough staff were scheduled",
+      description: "If scheduled staff meets or exceeds the category total required, coverage is counted as met.",
+    },
+    {
+      title: "Shortages still keep the mix visible",
+      description: "When a category is short, the detailed coverage views explain which shift lines still need attention.",
+    },
+  ];
 
   return (
     <Modal title={`Coverage by ${focusAreaLabel.toLowerCase()}`} onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {isUnpublished ? (
+          <div style={emptyStyle}>
+            This period has not been published yet. Coverage details will appear after the first publish.
+          </div>
+        ) : (
+          <>
+        {isPartial && (
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: "var(--color-bg)",
+              border: "1px dashed var(--color-border)",
+              fontSize: 11,
+              color: "var(--color-text-subtle)",
+            }}
+          >
+            Showing published dates only.
+          </div>
+        )}
+        <ExplainerSection
+          title="How coverage is scored"
+          points={explainerPoints}
+          compact
+          defaultOpen={false}
+          storageKey="dg-explainer-expanded-coverage"
+          preview={(
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <PreviewFrame
+                title="Green"
+                subtitle={sampleSectionName}
+                compact
+              >
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "rgba(16, 185, 129, 0.08)",
+                    border: "1px solid var(--color-success-border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>4 required</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-success-text)" }}>5 scheduled</span>
+                </div>
+              </PreviewFrame>
+
+              <PreviewFrame
+                title="Red"
+                subtitle={sampleSectionName}
+                compact
+              >
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "rgba(220, 38, 38, 0.06)",
+                    border: "1px solid var(--color-danger-border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>4 required</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-danger-dark)" }}>3 scheduled</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-danger-dark)", lineHeight: 1.4 }}>
+                    Detailed views explain which shift lines are still light.
+                  </div>
+                </div>
+              </PreviewFrame>
+            </div>
+          )}
+        />
+
         {/* Summary + filter row */}
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           <div style={summaryBadgeStyle}>
             <span style={{ fontWeight: 700, color: PCT_COLORS[overallPct >= 90 ? "green" : overallPct >= 70 ? "amber" : "red"] }}>
               {overallPct}%
@@ -70,7 +172,11 @@ export default function ExpandedCoverage({
 
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {filtered.length === 0 ? (
-            <div style={emptyStyle}>No coverage data for this filter</div>
+            <div style={emptyStyle}>
+              {isPartial
+                ? "No coverage data on published dates for this filter"
+                : "No coverage data for this filter"}
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {/* Coverage bars */}
@@ -78,7 +184,7 @@ export default function ExpandedCoverage({
                 {filtered.map((sec) => {
                   const pctColor = sec.pct >= 90 ? "green" : sec.pct >= 70 ? "amber" : "red";
                   return (
-                    <div key={sec.focusAreaId} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 16px", borderRadius: 14, border: "1px solid var(--color-border)", background: "var(--color-bg)" }}>
+                    <div key={sec.focusAreaId} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 16px", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg)" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>
@@ -166,6 +272,8 @@ export default function ExpandedCoverage({
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </Modal>
   );
@@ -179,7 +287,7 @@ const summaryBadgeStyle = {
   gap: 5,
   fontSize: 13,
   padding: "8px 12px",
-  borderRadius: 12,
+  borderRadius: "var(--dg-radius-md)",
   background: "var(--color-surface)",
   border: "1px solid var(--color-border)",
 };

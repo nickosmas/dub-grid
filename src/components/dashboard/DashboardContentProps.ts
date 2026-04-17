@@ -6,6 +6,7 @@ import type {
   ShiftCode,
   ShiftCategory,
   CoverageRequirement,
+  CoverageRuleConfig,
   Employee,
   ShiftMap,
   PublishHistoryEntry,
@@ -22,6 +23,7 @@ import type {
   TrendDataPoint,
 } from "@/lib/dashboard-stats";
 import type { ViewMode } from "./DashboardView";
+import type { PublishedWindowState } from "@/lib/schedule-logic";
 
 export interface DashboardContentProps {
   // Organization
@@ -30,6 +32,7 @@ export interface DashboardContentProps {
   shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
+  coverageRuleConfigs: CoverageRuleConfig[];
   shiftCodeMap: Map<number, string>;
   shiftCodeById: Map<number, ShiftCode>;
   employees: Employee[];
@@ -59,6 +62,7 @@ export interface DashboardContentProps {
   shiftBreakdown: ShiftTypeBreakdown;
   activityItems: ActivityItem[];
   trendData: TrendDataPoint[];
+  publishedWindowState: PublishedWindowState;
 
   // Shift requests
   shiftRequests: ShiftRequestsData;

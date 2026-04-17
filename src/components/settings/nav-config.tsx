@@ -98,7 +98,7 @@ export function buildNavGroups(
   if (perms.canAccessSettings) {
     const staffItems: NavItem[] = [];
     if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: overrides?.departmentLabel ?? "Departments", icon: iconDepartment, description: "Organize your workforce into scheduled and management departments, and define focus areas within each." });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, description: "Display roles shown as tags on the schedule grid (e.g., Charge Nurse). These are cosmetic and don't affect permissions." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, description: "Display roles shown as tags on the schedule grid (e.g., Supervisor). These are cosmetic and don't affect permissions." });
     if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations, description: "The certification badge shown next to the employee's name on the schedule grid." });
     if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff & Designations", items: staffItems });
   }

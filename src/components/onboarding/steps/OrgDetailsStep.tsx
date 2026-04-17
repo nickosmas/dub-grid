@@ -25,7 +25,7 @@ export default function OrgDetailsStep({ onNext, onBack }: OrgDetailsStepProps) 
       <div
         style={{
           background: "var(--color-bg-card, white)",
-          borderRadius: 16,
+          borderRadius: "var(--dg-radius-xl)",
           border: "1px solid var(--color-border)",
           padding: "24px",
         }}

@@ -97,7 +97,7 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
       >
         <div style={{
           background: "var(--color-surface)",
-          borderRadius: 16,
+          borderRadius: "var(--dg-radius-xl)",
           padding: "32px 28px",
           maxWidth: 440,
           width: "100%",
@@ -137,7 +137,7 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
           <div style={{
             padding: "12px 16px",
             background: "var(--color-bg-secondary)",
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             border: "1px solid var(--color-border-light)",
             maxHeight: 200,
             overflowY: "auto",

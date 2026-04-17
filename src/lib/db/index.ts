@@ -19,3 +19,4 @@ export * from "./requests";
 export * from "./notifications";
 export * from "./sessions";
 export * from "./admin";
+export * from "./access";

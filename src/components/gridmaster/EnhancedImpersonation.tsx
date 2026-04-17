@@ -193,7 +193,7 @@ export default function EnhancedImpersonation({
           style={{
             background: "var(--color-info-bg)",
             border: "1px solid var(--color-info)",
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             padding: "14px 20px",
             marginBottom: 20,
             display: "flex",
@@ -298,7 +298,7 @@ export default function EnhancedImpersonation({
               </div>
             ) : (
               <>
-                <div style={{ padding: "10px 14px", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", borderRadius: 8 }}>
+                <div style={{ padding: "10px 14px", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)" }}>
                   <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                     {selectedUser.email}
                   </div>

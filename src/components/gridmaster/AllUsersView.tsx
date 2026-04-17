@@ -244,7 +244,7 @@ export default function AllUsersView({
       </h2>
 
       {error && (
-        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: 10, fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
+        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -477,7 +477,7 @@ export default function AllUsersView({
                 <div style={{
                   display: "grid", gridTemplateColumns: "1fr 1fr",
                   gap: "14px 24px", fontSize: "var(--dg-fs-label)",
-                  padding: 16, background: "var(--color-bg)", borderRadius: 10,
+                  padding: 16, background: "var(--color-bg)", borderRadius: "var(--dg-radius-md)",
                 }}>
                   <div>
                     <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Last Login</span>

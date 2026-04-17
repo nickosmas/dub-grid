@@ -1,171 +1,110 @@
 "use client";
 
-import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarBadge } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { ChevronLeft } from "lucide-react";
-import type { Employee, FocusArea, NamedItem, Organization, Invitation } from "@/types";
-import type { EmployeeHours } from "@/lib/dashboard-stats";
-import { getInitials, getEmployeeDisplayName, getCertAbbr, getRoleAbbrs } from "@/lib/utils";
-import { EmployeeStatusActions } from "./EmployeeStatusActions";
+import type { Employee } from "@/types";
+import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 
 interface StaffDetailHeaderProps {
   employee: Employee;
-  focusAreas: FocusArea[];
-  certifications: NamedItem[];
-  orgRoles: NamedItem[];
-  org: Organization;
-  canManageEmployees: boolean;
-  thisWeekHours: EmployeeHours | null;
-  pendingInvite: Invitation | null;
-  onBench?: (empId: string, note?: string) => void;
-  onActivate?: (empId: string) => void;
-  onTerminate?: (empId: string) => void;
+  canEditDetails: boolean;
+  showManagementPanel: boolean;
+  onToggleEditDetails: () => void;
 }
 
 export function StaffDetailHeader({
   employee,
-  focusAreas,
-  certifications,
-  orgRoles,
-  canManageEmployees,
-  thisWeekHours,
-  pendingInvite,
-  onBench,
-  onActivate,
-  onTerminate,
+  canEditDetails,
+  showManagementPanel,
+  onToggleEditDetails,
 }: StaffDetailHeaderProps) {
   const displayName = getEmployeeDisplayName(employee);
-  const certAbbr = getCertAbbr(employee.certificationId, certifications);
-  const roleAbbrs = getRoleAbbrs(employee.roleIds, orgRoles);
 
   const statusConfig = {
-    active: { dot: "bg-emerald-500", label: "Active" },
-    benched: { dot: "bg-amber-500", label: "Benched" },
-    terminated: { dot: "bg-rose-500", label: "Terminated" },
-  }[employee.status] ?? { dot: "bg-muted-foreground", label: employee.status };
-
-  // Account indicator color for AvatarBadge
-  const accountBadgeColor = employee.userId
-    ? "bg-emerald-500"
-    : pendingInvite
-    ? "bg-amber-500"
-    : null;
+    active: {
+      label: "Active",
+      style: {
+        background: "var(--color-success-bg)",
+        color: "var(--color-success-text)",
+        borderColor: "var(--color-success-border)",
+      },
+    },
+    benched: {
+      label: "Benched",
+      style: {
+        background: "var(--color-warning-bg)",
+        color: "var(--color-warning-text)",
+        borderColor: "var(--color-warning-border)",
+      },
+    },
+    terminated: {
+      label: "Terminated",
+      style: {
+        background: "var(--color-danger-bg)",
+        color: "var(--color-danger-text)",
+        borderColor: "var(--color-danger-border)",
+      },
+    },
+  }[employee.status];
 
   return (
-    <div className="flex flex-col mb-4">
-      {/* Back link */}
-      <Link
-        href="/people"
-        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors mb-5 w-fit"
-      >
-        <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
-        People
-      </Link>
+    <div className="dg-card">
+      <div className="p-4 md:p-5">
+        <div className="flex flex-col gap-4 sm:gap-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              <Avatar className="h-16 w-16 shrink-0 ring-1 ring-[var(--color-border)]">
+                <AvatarFallback className="bg-[var(--color-bg-secondary)] text-xl font-bold text-[var(--color-text-secondary)]">
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
 
-      {/* Hero card */}
-      <Card className="shadow-sm">
-        <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
-          <div className="flex items-start gap-4 sm:gap-5">
-            {/* Avatar */}
-            <Avatar className="h-14 w-14 shrink-0">
-              <AvatarFallback className="text-lg font-bold bg-muted text-muted-foreground">
-                {getInitials(displayName)}
-              </AvatarFallback>
-              {accountBadgeColor && (
-                <AvatarBadge className={`${accountBadgeColor} size-3.5`} />
-              )}
-            </Avatar>
+              <div className="min-w-0">
+                <Badge
+                  variant="outline"
+                  className="px-2 font-semibold"
+                  style={statusConfig.style}
+                >
+                  {statusConfig.label}
+                </Badge>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              {/* Name + status */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="font-bold text-xl sm:text-2xl text-foreground tracking-tight m-0 leading-none">
+                <h1 className="mt-3 text-[28px] font-bold tracking-tight text-[var(--color-text-primary)]">
                   {displayName}
                 </h1>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot} shrink-0`} />
-                  {statusConfig.label}
-                </span>
-              </div>
-
-              {/* Contact */}
-              <div className="flex gap-4 mt-2 flex-wrap text-[13px] text-muted-foreground font-medium">
-                {employee.email && <span>{employee.email}</span>}
-                {employee.phone && <span>{employee.phone}</span>}
-                <span>Seniority #{employee.seniority}</span>
               </div>
             </div>
 
-            {/* This week hours */}
-            {thisWeekHours && (
-              <div className="text-right shrink-0 pt-1">
-                <div className={`text-2xl font-bold tracking-tight leading-none ${thisWeekHours.isOvertime ? 'text-destructive' : 'text-foreground'}`}>
-                  {thisWeekHours.totalHours}h
-                </div>
-                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">
-                  This Week
-                </div>
-                {thisWeekHours.isOvertime && (
-                  <div className="text-[11px] font-bold text-destructive mt-0.5">
-                    +{thisWeekHours.overtimeHours}h OT
-                  </div>
-                )}
-              </div>
-            )}
+            {canEditDetails ? (
+              <button
+                type="button"
+                onClick={onToggleEditDetails}
+                className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+              >
+                {showManagementPanel ? "Hide Edit Details" : "Edit Details"}
+              </button>
+            ) : null}
           </div>
 
-          {/* Status actions */}
-          {canManageEmployees && onBench && onActivate && onTerminate && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <EmployeeStatusActions
-                employee={employee}
-                canEdit={canManageEmployees}
-                onBench={onBench}
-                onActivate={onActivate}
-                onTerminate={onTerminate}
-                variant="page"
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <div className="grid gap-3 text-[13px] md:grid-cols-3">
+            <BioField label="Email" value={employee.email || "—"} />
+            <BioField label="Phone" value={employee.phone || "—"} />
+            <BioField label="Seniority" value={`#${employee.seniority}`} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-      {/* Tags */}
-      {(employee.focusAreaIds.length > 0 || certAbbr || roleAbbrs.length > 0) && (
-        <Card className="shadow-sm mt-3">
-          <CardContent className="px-5 py-4">
-            <div className="flex gap-1.5 flex-wrap">
-              {employee.focusAreaIds.map((faId) => {
-                const fa = focusAreas.find((f) => f.id === faId);
-                if (!fa) return null;
-                return (
-                  <Badge
-                    key={faId}
-                    variant="outline"
-                    className="border-transparent px-2"
-                    style={{ background: "var(--color-bg-secondary)", color: "var(--color-text-secondary)" }}
-                  >
-                    {fa.name}
-                  </Badge>
-                );
-              })}
-              {certAbbr && (
-                <Badge variant="secondary" className="px-2 font-semibold text-muted-foreground">
-                  {certAbbr}
-                </Badge>
-              )}
-              {roleAbbrs.map((abbr) => (
-                <Badge key={abbr} variant="outline" className="px-2 font-semibold text-secondary-foreground">
-                  {abbr}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+function BioField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] px-3 py-2.5">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-[13px] font-medium text-[var(--color-text-primary)]">
+        {value}
+      </div>
     </div>
   );
 }

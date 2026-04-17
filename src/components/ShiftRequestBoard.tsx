@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { ExplainerSection, WorkflowStrip } from "@/components/ui/explainer-section";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { EmptyState } from "@/components/EmptyState";
@@ -160,7 +161,7 @@ export default function ShiftRequestBoard({
         key={req.id}
         style={{
           border: isCalloff ? "1px solid var(--color-danger-border, #FCA5A5)" : "1px solid var(--color-border)",
-          borderRadius: 10,
+          borderRadius: "var(--dg-radius-md)",
           padding: "14px 16px",
           background: "var(--color-surface)",
           display: "flex",
@@ -448,6 +449,80 @@ export default function ShiftRequestBoard({
   // ── Render ───────────────────────────────────────────────────────────────
 
   const tabData = getTabData();
+  const requestExplainer = (() => {
+    if (activeTab === "available") {
+      return {
+        points: [
+          {
+            title: "Available shifts are open requests you can respond to",
+            description: "This tab shows pickups and swaps that are currently open to you.",
+          },
+          {
+            title: "Calloffs follow the same board but are flagged clearly",
+            description: "Calloff-related requests stay visible here so approvals and follow-up can happen in the same workflow.",
+          },
+        ],
+        preview: (
+          <WorkflowStrip
+            compact
+            steps={[
+              { label: "Request posted", description: "Pickup, swap, or calloff enters the board", tone: "default" },
+              { label: "Volunteer", description: "A qualified teammate responds", tone: "info" },
+              { label: "Approval", description: "Managers approve when required", tone: "success" },
+            ]}
+          />
+        ),
+      };
+    }
+
+    if (activeTab === "mine") {
+      return {
+        points: [
+          {
+            title: "This tab tracks your own requests",
+            description: "Use it to see whether your request is still open, waiting on approval, approved, rejected, or cancelled.",
+          },
+          {
+            title: "Statuses tell you where the request is in the flow",
+            description: "Open means it is still available, pending means someone responded and it is waiting on review, and approved means the change is going through.",
+          },
+        ],
+        preview: (
+          <WorkflowStrip
+            compact
+            steps={[
+              { label: "Open", description: "Waiting for a response", tone: "default" },
+              { label: "Pending", description: "Response received, waiting on review", tone: "warning" },
+              { label: "Approved or rejected", description: "Final outcome", tone: "success" },
+            ]}
+          />
+        ),
+      };
+    }
+
+    return {
+      points: [
+        {
+          title: "Approval Queue is for manager review",
+          description: "Use this tab to review volunteered pickups, swaps, and calloff-related requests that still need a decision.",
+        },
+        {
+          title: "Approving finalizes the staffing change",
+          description: "Rejecting keeps the original schedule in place and lets you add a note when needed.",
+        },
+      ],
+      preview: (
+        <WorkflowStrip
+          compact
+          steps={[
+            { label: "Review request", description: "Confirm the details and the staffing impact", tone: "default" },
+            { label: "Approve or reject", description: "Add a note when helpful", tone: "info" },
+            { label: "Staff notified", description: "The board updates to the final status", tone: "success" },
+          ]}
+        />
+      ),
+    };
+  })();
 
   return (
     <>
@@ -608,6 +683,16 @@ export default function ShiftRequestBoard({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
+          <div style={{ marginBottom: 12 }}>
+            <ExplainerSection
+              title="How requests flow"
+              points={requestExplainer.points}
+              preview={requestExplainer.preview}
+              compact
+              defaultOpen={false}
+              storageKey="dg-explainer-shift-requests"
+            />
+          </div>
           {loading ? (
             <div
               style={{

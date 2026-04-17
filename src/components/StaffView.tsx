@@ -14,8 +14,7 @@ import { Employee, FocusArea, ShiftCode, NamedItem, Invitation, AbsenceType, Shi
 import { useAuth } from "@/components/AuthProvider";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { BulkImportModal } from "@/components/staff/BulkImportModal";
-import { fetchInvitations, revokeInvitation, resendInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft, removeUserFromOrganization, updateAppOnlyUser, updatePendingInvitation } from "@/lib/db";
-import { supabase } from "@/lib/supabase";
+import { fetchInvitations, revokeInvitation, resendInvitation, fetchRecurringShifts, getRecurringDraft, upsertRecurringShift, deleteRecurringShift, saveRecurringDraft, deleteRecurringDraft, removeUserFromOrganization, updateAppOnlyUser, updatePendingInvitation, updateEmployeeIdentity } from "@/lib/db";
 import * as Sentry from "@/lib/sentry";
 import { toast } from "sonner";
 import CustomSelect, { SelectOption } from "./CustomSelect";
@@ -29,6 +28,11 @@ import { ManagementStaffPanel } from "./staff/ManagementStaffPanel";
 import { AddManagementUserToScheduleModal } from "./staff/AddManagementUserToScheduleModal";
 import { EmployeeManagementAccessModal } from "./staff/EmployeeManagementAccessModal";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  applyManagementDirectoryUpdate,
+  mergeEmployeeIntoDirectoryPerson,
+  upsertEmployeeInList,
+} from "@/lib/staff-directory";
 import { Table, TableHeader, TableBody, TableRow as UITableRow, TableHead, TableCell } from "@/components/ui/table";
 import UserManagementSettings from "@/components/settings/UserManagement";
 import OrgActivityLog from "@/components/settings/ActivityLog";
@@ -312,6 +316,50 @@ function MembersSection({
 
   const selectedPerson = expandedPersonId ? departmentUsers.find((u) => u.personId === expandedPersonId) ?? null : null;
 
+  const syncDirectoryPersonInCaches = useCallback((updatedPerson?: DirectoryPerson | null) => {
+    if (!orgId || !updatedPerson) return;
+
+    queryClient.setQueryData(
+      queryKeys.org.directory(orgId),
+      (current: DirectoryPerson[] | undefined) =>
+        current?.map((person) => (
+          person.personId === updatedPerson.personId ? updatedPerson : person
+        )) ?? current,
+    );
+    setManagementSchedulePerson((current) =>
+      current?.personId === updatedPerson.personId ? updatedPerson : current,
+    );
+  }, [orgId, queryClient]);
+
+  const syncExistingEmployeeInCaches = useCallback((updatedEmployee?: Employee | null) => {
+    if (!orgId || !updatedEmployee) return;
+
+    queryClient.setQueryData(
+      queryKeys.employees.all(orgId),
+      (current: Employee[] | undefined) =>
+        current ? upsertEmployeeInList(current, updatedEmployee) : current,
+    );
+    queryClient.setQueryData(
+      queryKeys.org.directory(orgId),
+      (current: DirectoryPerson[] | undefined) =>
+        current?.map((person) => (
+          person.employeeId === updatedEmployee.id
+            ? mergeEmployeeIntoDirectoryPerson(person, updatedEmployee)
+            : person
+        )) ?? current,
+    );
+    setManagementAccessEmployee((current) =>
+      current?.id === updatedEmployee.id ? updatedEmployee : current,
+    );
+  }, [orgId, queryClient]);
+
+  const syncManagementScheduleEmployeeInCaches = useCallback((person: DirectoryPerson, employee: Employee) => {
+    if (!orgId) return;
+
+    syncExistingEmployeeInCaches(employee);
+    syncDirectoryPersonInCaches(mergeEmployeeIntoDirectoryPerson(person, employee));
+  }, [orgId, syncDirectoryPersonInCaches, syncExistingEmployeeInCaches]);
+
   return (
     <>
       <div className="p-4 md:p-6 lg:px-12 lg:py-10">
@@ -347,155 +395,157 @@ function MembersSection({
           </div>
 
           {/* Action row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* View selector: On Schedule / Management */}
-            {managementDepts.length > 0 && (
-              <CustomSelect
-                value={showManagement ? "management" : "schedule"}
-                options={[
-                  { value: "schedule", label: `On Schedule (${employees.length})` },
-                  { value: "management", label: `Management (${activeManagementUsers.length})` },
-                ]}
-                onChange={(v) => { setShowManagement(v === "management"); if (v === "schedule") { setActiveTab("active"); } }}
-                style={{ minWidth: 180 }}
-                fontSize={13}
-              />
-            )}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {/* View selector: On Schedule / Management */}
+              {managementDepts.length > 0 && (
+                <CustomSelect
+                  value={showManagement ? "management" : "schedule"}
+                  options={[
+                    { value: "schedule", label: `On Schedule (${employees.length})` },
+                    { value: "management", label: `Management (${activeManagementUsers.length})` },
+                  ]}
+                  onChange={(v) => { setShowManagement(v === "management"); if (v === "schedule") { setActiveTab("active"); } }}
+                  style={{ minWidth: 180 }}
+                  fontSize={13}
+                />
+              )}
 
-            {/* Filter button */}
-            {!showManagement && (
-              <button
-                ref={filterBtnRef}
-                onClick={() => setFilterOpen((v) => !v)}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-                style={{ position: "relative" }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                </svg>
-                {isMobile ? "" : "Filter"}
-                {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--color-brand)]" />
-                )}
-              </button>
-            )}
+              {/* Filter button */}
+              {!showManagement && (
+                <button
+                  ref={filterBtnRef}
+                  onClick={() => setFilterOpen((v) => !v)}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                  style={{ position: "relative" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                  </svg>
+                  {isMobile ? "" : "Filter"}
+                  {hasActiveFilters && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--color-brand)]" />
+                  )}
+                </button>
+              )}
 
-            {/* Reorder button */}
-            {canReorder && !showManagement && (
-              <button
-                onClick={() => { handleEnterReorder(); setExpandedEmpId(null); setPage(1); }}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <rect x="3" y="2" width="2" height="2" rx="1" />
-                  <rect x="9" y="2" width="2" height="2" rx="1" />
-                  <rect x="3" y="6" width="2" height="2" rx="1" />
-                  <rect x="9" y="6" width="2" height="2" rx="1" />
-                  <rect x="3" y="10" width="2" height="2" rx="1" />
-                  <rect x="9" y="10" width="2" height="2" rx="1" />
-                </svg>
-                {isMobile ? "" : "Reorder"}
-              </button>
-            )}
+              {/* Reorder button */}
+              {canReorder && !showManagement && (
+                <button
+                  onClick={() => { handleEnterReorder(); setExpandedEmpId(null); setPage(1); }}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <rect x="3" y="2" width="2" height="2" rx="1" />
+                    <rect x="9" y="2" width="2" height="2" rx="1" />
+                    <rect x="3" y="6" width="2" height="2" rx="1" />
+                    <rect x="9" y="6" width="2" height="2" rx="1" />
+                    <rect x="3" y="10" width="2" height="2" rx="1" />
+                    <rect x="9" y="10" width="2" height="2" rx="1" />
+                  </svg>
+                  {isMobile ? "" : "Reorder"}
+                </button>
+              )}
 
-            <div className="flex-1" />
+              {/* Tabs — only when NOT in management mode */}
+              {!showManagement && (
+                <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+                  {tabs.map((tab, i) => {
+                    const active = activeTab === tab.key;
+                    const prevActive = i > 0 && activeTab === tabs[i - 1].key;
+                    const showDivider = i > 0 && !active && !prevActive;
+                    return (
+                      <span key={tab.key} style={{ display: "contents" }}>
+                        {i > 0 && (
+                          <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                        )}
+                        <button
+                          onClick={() => { setActiveTab(tab.key); setExpandedEmpId(null); if (isReordering) handleCancelReorder(); }}
+                          className={`dg-span-tab${active ? " active" : ""}`}
+                        >
+                          {tab.label}
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                            fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                            background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                            color: active ? "inherit" : "var(--color-text-muted)",
+                            marginLeft: 3,
+                          }}>{tab.count}</span>
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Import */}
-            {!showManagement && canManageEmployees && orgId && !isMobile && (
-              <button onClick={() => setShowImport(true)} className="dg-btn dg-btn-secondary dg-btn-sm">Import</button>
-            )}
+              {/* Department sub-filter tabs — management mode */}
+              {showManagement && departmentItems.length > 0 && (
+                <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+                  <button
+                    onClick={() => setDeptFilterId(null)}
+                    className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
+                  >
+                    All
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                      fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                      background: deptFilterId === null ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                      color: deptFilterId === null ? "inherit" : "var(--color-text-muted)",
+                      marginLeft: 3,
+                    }}>{departmentUsers.length}</span>
+                  </button>
+                  {managementDepts.filter((d) => deptCounts.has(d.id)).map((dept, i) => {
+                    const active = deptFilterId === dept.id;
+                    const prevActive = i === 0 ? deptFilterId === null : deptFilterId === managementDepts.filter((d2) => deptCounts.has(d2.id))[i - 1]?.id;
+                    const showDivider = !active && !prevActive;
+                    return (
+                      <span key={dept.id} style={{ display: "contents" }}>
+                        <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                        <button
+                          onClick={() => setDeptFilterId(active ? null : dept.id)}
+                          className={`dg-span-tab${active ? " active" : ""}`}
+                        >
+                          {dept.name}
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
+                            fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
+                            background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
+                            color: active ? "inherit" : "var(--color-text-muted)",
+                            marginLeft: 3,
+                          }}>{deptCounts.get(dept.id) ?? 0}</span>
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-            {/* Export */}
-            {!showManagement && orgId && !isMobile && (
-              <button onClick={handleExport} className="dg-btn dg-btn-secondary dg-btn-sm">Export</button>
-            )}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {/* Import */}
+              {!showManagement && canManageEmployees && orgId && !isMobile && (
+                <button onClick={() => setShowImport(true)} className="dg-btn dg-btn-secondary dg-btn-sm">Import</button>
+              )}
 
-            {/* Add */}
-            {((showManagement && canManageManagementAccess) || (!showManagement && canManageEmployees)) && (
-              <button
-                onClick={showManagement ? () => setShowAppOnlyInvite(true) : onAdd}
-                className="dg-btn dg-btn-primary dg-btn-sm"
-              >
-                + Add
-              </button>
-            )}
+              {/* Export */}
+              {!showManagement && orgId && !isMobile && (
+                <button onClick={handleExport} className="dg-btn dg-btn-secondary dg-btn-sm">Export</button>
+              )}
+
+              {/* Add */}
+              {((showManagement && canManageManagementAccess) || (!showManagement && canManageEmployees)) && (
+                <button
+                  onClick={showManagement ? () => setShowAppOnlyInvite(true) : onAdd}
+                  className="dg-btn dg-btn-primary dg-btn-sm"
+                >
+                  + Add
+                </button>
+              )}
+            </div>
           </div>
-
-          {/* Tabs — only when NOT in management mode */}
-          {!showManagement && (
-            <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
-              {tabs.map((tab, i) => {
-                const active = activeTab === tab.key;
-                const prevActive = i > 0 && activeTab === tabs[i - 1].key;
-                const showDivider = i > 0 && !active && !prevActive;
-                return (
-                  <span key={tab.key} style={{ display: "contents" }}>
-                    {i > 0 && (
-                      <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
-                    )}
-                    <button
-                      onClick={() => { setActiveTab(tab.key); setExpandedEmpId(null); if (isReordering) handleCancelReorder(); }}
-                      className={`dg-span-tab${active ? " active" : ""}`}
-                    >
-                      {tab.label}
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
-                        fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
-                        background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
-                        color: active ? "inherit" : "var(--color-text-muted)",
-                        marginLeft: 3,
-                      }}>{tab.count}</span>
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Department sub-filter tabs — management mode */}
-          {showManagement && departmentItems.length > 0 && (
-            <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
-              <button
-                onClick={() => setDeptFilterId(null)}
-                className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
-              >
-                All
-                <span style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
-                  fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
-                  background: deptFilterId === null ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
-                  color: deptFilterId === null ? "inherit" : "var(--color-text-muted)",
-                  marginLeft: 3,
-                }}>{departmentUsers.length}</span>
-              </button>
-              {managementDepts.filter((d) => deptCounts.has(d.id)).map((dept, i) => {
-                const active = deptFilterId === dept.id;
-                const prevActive = i === 0 ? deptFilterId === null : deptFilterId === managementDepts.filter((d2) => deptCounts.has(d2.id))[i - 1]?.id;
-                const showDivider = !active && !prevActive;
-                return (
-                  <span key={dept.id} style={{ display: "contents" }}>
-                    <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
-                    <button
-                      onClick={() => setDeptFilterId(active ? null : dept.id)}
-                      className={`dg-span-tab${active ? " active" : ""}`}
-                    >
-                      {dept.name}
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        minWidth: 18, height: 18, borderRadius: "50%", padding: "0 4px",
-                        fontSize: "var(--dg-fs-micro)", fontWeight: 700, lineHeight: 1,
-                        background: active ? "rgba(255,255,255,0.25)" : "var(--color-border-light)",
-                        color: active ? "inherit" : "var(--color-text-muted)",
-                        marginLeft: 3,
-                      }}>{deptCounts.get(dept.id) ?? 0}</span>
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          )}
 
           {/* Context bar: filter pills, bulk actions, reorder bar (employee mode only) */}
           {!showManagement && (
@@ -553,7 +603,7 @@ function MembersSection({
           {!showManagement && (
             rawList.length > 0 ? (
               <>
-                <div data-tour="staff-table" data-testid="staff-table" className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+                <div data-tour="staff-table" data-testid="staff-table" className="rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
                   <Table>
                     <TableHeader>
                       <UITableRow className="hover:bg-transparent bg-[var(--color-bg)]">
@@ -655,7 +705,7 @@ function MembersSection({
           {/* ── Management Table ── */}
           {showManagement && (
             filteredDeptUsers.length > 0 ? (
-              <div className="rounded-xl border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
+              <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] overflow-hidden bg-[var(--color-surface)]">
                 <Table>
                   <TableHeader>
                     <UITableRow className="hover:bg-transparent bg-[var(--color-bg)]">
@@ -800,9 +850,11 @@ function MembersSection({
           orgId={orgId}
           orgName={orgName || "your organization"}
           onClose={() => { setInviteEmployee(null); setInviteQueue([]); }}
-          onInvited={() => {
+          onInvited={(updatedEmployee) => {
+            syncExistingEmployeeInCaches(updatedEmployee);
             refreshInvitations();
             if (orgId) {
+              void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
               void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
             }
             if (inviteQueue.length > 0) {
@@ -886,13 +938,17 @@ function MembersSection({
           onClose={() => setExpandedPersonId(null)}
           onSave={async (data) => {
             if (orgId) {
+              let updatedEmployee: Employee | null = null;
+
               if (selectedPerson.source === "employee" && selectedPerson.employeeId) {
-                const { error } = await supabase
-                  .from("employees")
-                  .update({ first_name: data.firstName, last_name: data.lastName, phone: data.phone })
-                  .eq("id", selectedPerson.employeeId)
-                  .eq("org_id", orgId);
-                if (error) throw error;
+                await updateEmployeeIdentity({
+                  employeeId: selectedPerson.employeeId,
+                  orgId,
+                  userId: selectedPerson.userId,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  phone: data.phone,
+                });
                 const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
                 if (selectedPerson.userId) {
                   await updateAppOnlyUser(selectedPerson.userId, orgId, {
@@ -905,6 +961,16 @@ function MembersSection({
                     phone: data.phone,
                     departmentIds: data.managementDepartmentIds,
                   });
+                }
+                const currentEmployee = [...employees, ...benchedEmployees, ...terminatedEmployees]
+                  .find((employee) => employee.id === selectedPerson.employeeId);
+                if (currentEmployee) {
+                  updatedEmployee = {
+                    ...currentEmployee,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    phone: data.phone,
+                  };
                 }
               } else if (selectedPerson.source === "pending_invite") {
                 await updatePendingInvitation(selectedPerson.personId.replace("inv:", ""), orgId, {
@@ -919,8 +985,12 @@ function MembersSection({
                   lastName: data.lastName,
                   phone: data.phone,
                   departmentIds: data.managementDepartmentIds,
-                });
+                  });
               }
+              if (updatedEmployee) {
+                syncExistingEmployeeInCaches(updatedEmployee);
+              }
+              syncDirectoryPersonInCaches(applyManagementDirectoryUpdate(selectedPerson, data));
               refreshInvitations();
               void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
               void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
@@ -957,7 +1027,8 @@ function MembersSection({
           certificationLabel={certificationLabel}
           roleLabel={roleLabel}
           onClose={() => setManagementSchedulePerson(null)}
-          onAdded={() => {
+          onAdded={(employee) => {
+            syncManagementScheduleEmployeeInCaches(managementSchedulePerson, employee);
             setManagementSchedulePerson(null);
             void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
             void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
@@ -974,7 +1045,8 @@ function MembersSection({
           directoryPerson={selectedEmployeeDirectoryPerson}
           pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
           onClose={() => setManagementAccessEmployee(null)}
-          onCompleted={() => {
+          onCompleted={(updatedEmployee) => {
+            syncExistingEmployeeInCaches(updatedEmployee);
             refreshInvitations();
             void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
             void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
@@ -1093,7 +1165,7 @@ function ShiftCellPopover({
         ...menuStyle,
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
-        borderRadius: 12,
+        borderRadius: "var(--dg-radius-lg)",
         boxShadow: "var(--shadow-menu)",
         overflow: "visible",
         display: "flex",
@@ -1118,7 +1190,7 @@ function ShiftCellPopover({
           : { top: -7, borderBottom: "7px solid var(--color-surface)" }),
       }} />
       {/* Inner container clips content while arrow stays visible outside */}
-      <div style={{ overflow: "hidden", borderRadius: 12, display: "flex", flexDirection: "column", maxHeight: "inherit" }}>
+      <div style={{ overflow: "hidden", borderRadius: "var(--dg-radius-lg)", display: "flex", flexDirection: "column", maxHeight: "inherit" }}>
         <div style={{
           padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "center",
           borderBottom: "1px solid var(--color-border-light)",
@@ -1377,7 +1449,7 @@ function RecurringScheduleSection({
               await upsertRecurringShift(empId, orgId, day, parsed.id, todayKey);
             }
           } else {
-            await deleteRecurringShift(empId, day);
+            await deleteRecurringShift(empId, day, orgId);
           }
           savedKeys.add(`${empId}:${dayStr}`);
         }
@@ -1480,7 +1552,7 @@ function RecurringScheduleSection({
       {hasDirtyChanges && canManage && (
         <div style={{
           position: "sticky", top: 0, zIndex: 20,
-          background: "var(--color-info-bg)", border: "1px solid var(--color-info-border)", borderRadius: 12,
+          background: "var(--color-info-bg)", border: "1px solid var(--color-info-border)", borderRadius: "var(--dg-radius-lg)",
           padding: isMobile ? "10px 12px" : "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
           boxShadow: "0 2px 8px rgba(0,0,0,0.06)", flexWrap: "wrap", gap: 8,
         }}>
@@ -1562,7 +1634,7 @@ function RecurringScheduleSection({
             style={{
               padding: "7px 10px 7px 32px",
               border: "1px solid var(--color-border)",
-              borderRadius: 10,
+              borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-caption)",
               outline: "none",
               width: isMobile ? "100%" : 180,
@@ -1579,7 +1651,7 @@ function RecurringScheduleSection({
       {/* Grid table */}
       {loading ? (
         <div style={{
-          background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)",
+          background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)",
           padding: "48px 20px", textAlign: "center", color: "var(--color-text-subtle)", fontSize: "var(--dg-fs-label)",
         }}>
           Loading recurring schedules...
@@ -1609,7 +1681,7 @@ function RecurringScheduleSection({
         />
       ) : (
         <div style={{
-          background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)",
+          background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)",
           overflowX: "auto",
           boxShadow: BOX_SHADOW_CARD, position: "relative",
           WebkitOverflowScrolling: "touch",

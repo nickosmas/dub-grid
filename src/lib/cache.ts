@@ -39,6 +39,7 @@ export const CacheKey = {
   orgRoles: (orgId: string) => `dg:org:${orgId}:orgRoles`,
   departments: (orgId: string) => `dg:org:${orgId}:departments`,
   coverageReqs: (orgId: string) => `dg:org:${orgId}:coverageRequirements`,
+  coverageRuleConfigs: (orgId: string) => `dg:org:${orgId}:coverageRuleConfigs`,
   organization: (orgId: string) => `dg:org:${orgId}:organization`,
   allOrganizations: () => `dg:gm:allOrganizations`,
 

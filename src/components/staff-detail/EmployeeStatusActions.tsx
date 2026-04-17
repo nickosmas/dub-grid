@@ -62,8 +62,8 @@ export function EmployeeStatusActions({
             }
             onInvite(employee);
           }}
-          className="dg-btn dg-btn-ghost"
-          style={{ fontSize: "var(--dg-fs-footnote)", padding: "4px 8px", color: "var(--color-link)" }}
+          className="dg-btn dg-btn-ghost dg-btn-xs"
+          style={{ color: "var(--color-link)" }}
         >
           <ButtonLoading loading={revoking} spinnerSize={12}>Reinvite</ButtonLoading>
         </button>
@@ -78,8 +78,8 @@ export function EmployeeStatusActions({
                 setRevoking(false);
               }
             }}
-            className="dg-btn dg-btn-ghost"
-            style={{ fontSize: "var(--dg-fs-footnote)", padding: "4px 8px", color: "var(--color-danger)" }}
+            className="dg-btn dg-btn-ghost dg-btn-xs"
+            style={{ color: "var(--color-danger)" }}
           >
             <ButtonLoading loading={revoking} spinnerSize={12}>Revoke</ButtonLoading>
           </button>
@@ -93,7 +93,7 @@ export function EmployeeStatusActions({
     return (
       <>
         {invitationSection}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-warning-bg)", padding: "14px 16px", borderRadius: 10, border: "1px solid var(--color-warning-border)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-warning-bg)", padding: "14px 16px", borderRadius: "var(--dg-radius-lg)", border: "1px solid var(--color-warning-border)" }}>
           <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-warning-text)", lineHeight: 1.4 }}>
             Bench {displayName}? They will be hidden from active scheduling and shift requests. Existing and future shift data will be preserved, so review upcoming assignments manually.
           </span>
@@ -107,8 +107,7 @@ export function EmployeeStatusActions({
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => { onBench(employee.id, benchNote.trim() || undefined); }}
-              className="dg-btn dg-btn-primary"
-              style={{ background: "var(--color-warning)", border: "none", color: "var(--color-text-inverse)" }}
+              className="dg-btn dg-btn-warning-filled"
             >
               Confirm Bench
             </button>
@@ -129,7 +128,7 @@ export function EmployeeStatusActions({
     return (
       <>
         {invitationSection}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-danger-bg)", padding: "14px 16px", borderRadius: 10, border: "1px solid var(--color-danger-border)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--color-danger-bg)", padding: "14px 16px", borderRadius: "var(--dg-radius-lg)", border: "1px solid var(--color-danger-border)" }}>
           <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-danger-text)", lineHeight: 1.4 }}>
             Terminate {displayName}? They will be archived from active staff lists and scheduling. Historical and future shift data will be preserved, so review upcoming assignments manually.
           </span>
@@ -152,8 +151,7 @@ export function EmployeeStatusActions({
                   onRevokeAccess(employee.userId);
                 }
               }}
-              className="dg-btn dg-btn-primary"
-              style={{ background: "var(--color-danger)", border: "none", color: "var(--color-text-inverse)" }}
+              className="dg-btn dg-btn-danger-filled"
             >
               Confirm Termination
             </button>
@@ -174,16 +172,25 @@ export function EmployeeStatusActions({
   const showTerminate = employee.status !== "terminated";
   const showActivate = employee.status === "benched" || employee.status === "terminated";
   const hasDangerActions = showBench || showTerminate;
+  const actionGroupStyle = variant === "page"
+    ? { display: "flex", gap: 8, flexWrap: "wrap" as const }
+    : { display: "flex", gap: 8 };
 
   return (
     <>
       {invitationSection}
       {showActivate && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: hasDangerActions ? 8 : 0 }}>
           <button
             onClick={() => onActivate(employee.id)}
-            className="dg-btn dg-btn-ghost"
-            style={{ color: "var(--color-success)", fontSize: "var(--dg-fs-caption)", padding: "5px 10px" }}
+            className={variant === "page" ? "dg-btn dg-btn-secondary dg-btn-sm" : "dg-btn dg-btn-ghost dg-btn-xs"}
+            style={variant === "page"
+              ? {
+                  color: "var(--color-success)",
+                  borderColor: "var(--color-success-border)",
+                  background: "var(--color-success-bg)",
+                }
+              : { color: "var(--color-success)" }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
@@ -193,12 +200,15 @@ export function EmployeeStatusActions({
         </div>
       )}
       {hasDangerActions && (
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={actionGroupStyle}>
           {showBench && (
             <button
               onClick={() => setShowBenchConfirm(true)}
-              className="dg-btn"
-              style={{ flex: 1, color: "var(--color-text-inverse)", border: "1px solid var(--color-warning)", background: "var(--color-warning)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, padding: "8px 10px", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              className="dg-btn dg-btn-warning-filled"
+              style={{
+                flex: variant === "page" ? "0 0 auto" : 1,
+                minWidth: variant === "page" ? 132 : undefined,
+              }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
@@ -209,8 +219,11 @@ export function EmployeeStatusActions({
           {showTerminate && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="dg-btn"
-              style={{ flex: 1, color: "var(--color-text-inverse)", border: "1px solid var(--color-danger)", background: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", fontWeight: 600, padding: "8px 10px", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              className="dg-btn dg-btn-danger-filled"
+              style={{
+                flex: variant === "page" ? "0 0 auto" : 1,
+                minWidth: variant === "page" ? 132 : undefined,
+              }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />

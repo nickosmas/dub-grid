@@ -1,5 +1,7 @@
 import type { OpenShift } from "@/lib/dashboard-stats";
+import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
+import DashboardEmptyState from "./DashboardEmptyState";
 
 const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; border: string; label: string }> = {
   high: { bg: "var(--color-danger-bg)", color: "var(--color-danger)", border: "var(--color-danger-border)", label: "Urgent" },
@@ -9,6 +11,7 @@ const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; bo
 
 interface OpenShiftsCardProps {
   openShifts: OpenShift[];
+  publishedWindowState?: PublishedWindowState;
   maxVisible?: number;
   onExpand?: () => void;
   onVolunteer?: (shift: OpenShift) => void;
@@ -16,12 +19,20 @@ interface OpenShiftsCardProps {
 
 export default function OpenShiftsCard({
   openShifts,
+  publishedWindowState = "published",
   maxVisible = 5,
   onExpand,
   onVolunteer,
 }: OpenShiftsCardProps) {
   const visible = openShifts.slice(0, maxVisible);
   const remainingCount = Math.max(0, openShifts.length - visible.length);
+  const isUnpublished = publishedWindowState === "unpublished";
+  const isPartial = publishedWindowState === "partial";
+  const subtitle = isUnpublished
+    ? "Not published yet"
+    : isPartial
+      ? `${openShifts.length} unfilled across published dates`
+      : `${openShifts.length} unfilled this week`;
 
   return (
     <div className="dg-card">
@@ -32,7 +43,7 @@ export default function OpenShiftsCard({
             Open shifts
           </div>
           <div className="dg-card-subtitle">
-            {openShifts.length} unfilled this week
+            {subtitle}
           </div>
         </div>
         {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
@@ -40,9 +51,23 @@ export default function OpenShiftsCard({
 
       <div className="dg-card-body">
         {openShifts.length === 0 ? (
-          <div style={{ fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", padding: "24px 16px", border: "1px dashed var(--color-border)", borderRadius: 14, background: "var(--color-bg)" }}>
-            All shifts covered this week
-          </div>
+          <DashboardEmptyState
+            title={
+              isUnpublished
+                ? "Not published yet"
+                : isPartial
+                  ? "No open shifts on published dates"
+                  : "All shifts covered this week"
+            }
+            description={
+              isUnpublished
+                ? "Open shifts will appear after this period is published."
+                : isPartial
+                  ? "Only published dates are counted here."
+                  : undefined
+            }
+            variant="inline"
+          />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {visible.map((shift) => {
@@ -55,7 +80,7 @@ export default function OpenShiftsCard({
                     alignItems: "center",
                     gap: 10,
                     padding: "14px 16px",
-                    borderRadius: 14,
+                    borderRadius: "var(--dg-radius-md)",
                     background: "var(--color-bg)",
                     border: "1px solid var(--color-border)",
                   }}

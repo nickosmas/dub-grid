@@ -1,7 +1,8 @@
 import {
-  supabase, OptimisticLockError, resolveCodeLabels, logAudit, arraysEqual,
+  supabase, OptimisticLockError, resolveCodeLabels, logAudit,
 } from "./shared";
 import type { DbShift } from "./types";
+import { classifyPersistedDraftShift } from "@/lib/draft-utils";
 import type { ShiftMap, DraftKind } from "@/types";
 
 const MAX_RANGE_DAYS = 366;
@@ -64,35 +65,20 @@ export async function fetchShifts(
     const effectiveEndTime = isScheduler
       ? (draftEndTime ?? pubEndTime)
       : pubEndTime;
-
-    const isDraft = hasDraft && (
-      row.draft_is_delete
-      || !arraysEqual(draftIds, pubIds)
-      || draftAbsId !== pubAbsId
-      || draftStartTime !== pubStartTime
-      || draftEndTime !== pubEndTime
-    );
-
-    // Classify draft change type
-    let draftKind: DraftKind = null;
-    if (isDraft) {
-      if (row.draft_is_delete && (pubIds.length > 0 || pubAbsId != null)) {
-        draftKind = 'deleted';
-      } else if (pubIds.length === 0 && pubAbsId == null) {
-        draftKind = 'new';
-      } else {
-        draftKind = 'modified';
-      }
-    }
+    const draftKind: DraftKind = classifyPersistedDraftShift(row);
+    const isDraft = draftKind !== null;
 
     const publishedLabel = pubAbsId != null
       ? (atMap.get(pubAbsId) ?? '?')
       : pubIds.length > 0 ? resolveCodeLabels(pubIds, shiftCodeMap) : '';
 
-    const hasContent = effectiveIds.length > 0 || effectiveAbsId != null || (isScheduler && row.draft_is_delete);
+    const hasContent =
+      effectiveIds.length > 0
+      || effectiveAbsId != null
+      || (isScheduler && draftKind === "deleted");
 
     if (hasContent) {
-      const label = row.draft_is_delete && isScheduler
+      const label = draftKind === "deleted" && isScheduler
         ? "OFF"
         : effectiveAbsId != null
           ? (atMap.get(effectiveAbsId) ?? '?')

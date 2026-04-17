@@ -1,0 +1,459 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/access-management";
+import { rowToInvitation } from "@/lib/db/mappers";
+import type { DbInvitation } from "@/lib/db/types";
+import type { Invitation } from "@/types";
+
+export const dynamic = "force-dynamic";
+
+const invitationRoleSchema = z.enum(["super_admin", "admin", "user"]);
+
+const patchSchema = z.object({
+  orgId: z.string().uuid(),
+  invitationId: z.string().uuid(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
+  email: z.string().trim().email().optional(),
+  roleToAssign: invitationRoleSchema.optional(),
+  firstName: z.string().trim().max(80).optional(),
+  lastName: z.string().trim().max(80).optional(),
+  phone: z.string().trim().max(50).optional(),
+  departmentIds: z.array(z.number().int()).optional(),
+  deptAdminIds: z.array(z.number().int()).optional(),
+});
+
+const deleteSchema = z.object({
+  orgId: z.string().uuid(),
+  invitationId: z.string().uuid(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
+});
+
+const resendSchema = z.object({
+  action: z.literal("resend"),
+  orgId: z.string().uuid(),
+  invitationId: z.string().uuid(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
+});
+
+function timestampsMatch(left: string | null | undefined, right: string | null | undefined): boolean {
+  if (!left || !right) return false;
+  return new Date(left).getTime() === new Date(right).getTime();
+}
+
+function getRequestIp(req: NextRequest): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+  return forwarded.split(",")[0]?.trim() || null;
+}
+
+async function requirePrivilegedActor(
+  orgId: string,
+  actorId: string,
+): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+  const serviceClient = getServiceClient();
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("org_role")
+      .eq("user_id", actorId)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .maybeSingle(),
+    serviceClient
+      .from("profiles")
+      .select("platform_role")
+      .eq("id", actorId)
+      .maybeSingle(),
+  ]);
+
+  const isGridmaster = profile?.platform_role === "gridmaster";
+  const isSuperAdmin = membership?.org_role === "super_admin";
+
+  if (!isGridmaster && !isSuperAdmin) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
+async function fetchInvitation(
+  orgId: string,
+  invitationId: string,
+): Promise<Invitation | null> {
+  const serviceClient = getServiceClient();
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+    .eq("org_id", orgId)
+    .eq("id", invitationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? rowToInvitation(data as DbInvitation) : null;
+}
+
+function buildConflictResponse(latestInvitation: Invitation) {
+  return NextResponse.json(
+    {
+      error:
+        "Invitation changed elsewhere. Review the latest values before saving again.",
+      code: "ORG_INVITATION_CONFLICT",
+      invitation: latestInvitation,
+    },
+    { status: 409 },
+  );
+}
+
+async function writeAuditEntry(input: {
+  orgId: string;
+  actorId: string;
+  actorEmail: string | null;
+  resourceId: string;
+  action: string;
+  changes: ReturnType<typeof buildInvitationChanges>;
+  req: NextRequest;
+}) {
+  const serviceClient = getServiceClient();
+  const { error } = await serviceClient.from("audit_log").insert({
+    org_id: input.orgId,
+    actor_id: input.actorId,
+    actor_email: input.actorEmail,
+    action: input.action,
+    resource_type: "invitation",
+    resource_id: input.resourceId,
+    details: {
+      changedFields: input.changes.map((change) => change.key),
+      changes: input.changes.map((change) => ({
+        field: change.key,
+        label: change.label,
+        from: change.previousValue,
+        to: change.nextValue,
+      })),
+    },
+    ip_address: getRequestIp(input.req),
+    user_agent: input.req.headers.get("user-agent"),
+  });
+
+  if (error) {
+    logger.error(
+      { error, orgId: input.orgId, resourceId: input.resourceId },
+      "Invitation audit log write failed",
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
+
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  if (misconfigured) {
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+  }
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const { orgId, invitationId, expectedUpdatedAt, ...fields } = parsed.data;
+
+  try {
+    const allowed = await requirePrivilegedActor(orgId, user.id);
+    if (!allowed.ok) return allowed.response;
+
+    const currentInvitation = await fetchInvitation(orgId, invitationId);
+    if (!currentInvitation) {
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
+      return buildConflictResponse(currentInvitation);
+    }
+
+    const nextInvitation: Partial<Invitation> = {
+      email: fields.email?.toLowerCase(),
+      roleToAssign: fields.roleToAssign,
+      firstName: fields.firstName,
+      lastName: fields.lastName,
+      phone: fields.phone,
+      departmentIds: fields.departmentIds,
+      deptAdminIds: fields.deptAdminIds,
+    };
+
+    const changes = buildInvitationChanges(currentInvitation, nextInvitation);
+    if (changes.length === 0) {
+      return NextResponse.json({ success: true, invitation: currentInvitation });
+    }
+
+    const deptSet = new Set(fields.departmentIds ?? currentInvitation.departmentIds ?? []);
+    const nextDeptAdminIds =
+      fields.deptAdminIds !== undefined
+        ? fields.deptAdminIds.filter((id) => deptSet.has(id))
+        : currentInvitation.deptAdminIds ?? [];
+
+    const serviceClient = getServiceClient();
+    const { data: updatedInvitation, error } = await serviceClient
+      .from("invitations")
+      .update({
+        email: fields.email?.toLowerCase() ?? currentInvitation.email,
+        role_to_assign: fields.roleToAssign ?? currentInvitation.roleToAssign,
+        first_name: fields.firstName ?? currentInvitation.firstName ?? null,
+        last_name: fields.lastName ?? currentInvitation.lastName ?? null,
+        phone: fields.phone ?? currentInvitation.phone ?? null,
+        department_ids: fields.departmentIds ?? currentInvitation.departmentIds ?? [],
+        dept_admin_ids: nextDeptAdminIds,
+      })
+      .eq("org_id", orgId)
+      .eq("id", invitationId)
+      .eq("updated_at", expectedUpdatedAt)
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!updatedInvitation) {
+      const latestInvitation = await fetchInvitation(orgId, invitationId);
+      if (latestInvitation) return buildConflictResponse(latestInvitation);
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    const latestInvitation = rowToInvitation(updatedInvitation as DbInvitation);
+
+    await writeAuditEntry({
+      orgId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      resourceId: invitationId,
+      action: "invitation.updated",
+      changes,
+      req,
+    });
+
+    return NextResponse.json({ success: true, invitation: latestInvitation });
+  } catch (err) {
+    Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
+    logger.error({ error: err, orgId, invitationId }, "Invitation update failed");
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
+
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  if (misconfigured) {
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+  }
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = deleteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const { orgId, invitationId, expectedUpdatedAt } = parsed.data;
+
+  try {
+    const allowed = await requirePrivilegedActor(orgId, user.id);
+    if (!allowed.ok) return allowed.response;
+
+    const currentInvitation = await fetchInvitation(orgId, invitationId);
+    if (!currentInvitation) {
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
+      return buildConflictResponse(currentInvitation);
+    }
+
+    const serviceClient = getServiceClient();
+    const { data: updatedInvitation, error } = await serviceClient
+      .from("invitations")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("org_id", orgId)
+      .eq("id", invitationId)
+      .eq("updated_at", expectedUpdatedAt)
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!updatedInvitation) {
+      const latestInvitation = await fetchInvitation(orgId, invitationId);
+      if (latestInvitation) return buildConflictResponse(latestInvitation);
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    const latestInvitation = rowToInvitation(updatedInvitation as DbInvitation);
+
+    await writeAuditEntry({
+      orgId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      resourceId: invitationId,
+      action: "invitation.revoked",
+      changes: buildInvitationRevocationChanges(),
+      req,
+    });
+
+    return NextResponse.json({ success: true, invitation: latestInvitation });
+  } catch (err) {
+    Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
+    logger.error({ error: err, orgId, invitationId }, "Invitation revocation failed");
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
+
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  if (misconfigured) {
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+  }
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = resendSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const { orgId, invitationId, expectedUpdatedAt } = parsed.data;
+
+  try {
+    const allowed = await requirePrivilegedActor(orgId, user.id);
+    if (!allowed.ok) return allowed.response;
+
+    const currentInvitation = await fetchInvitation(orgId, invitationId);
+    if (!currentInvitation) {
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
+      return buildConflictResponse(currentInvitation);
+    }
+
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const serviceClient = getServiceClient();
+    const { data: updatedInvitation, error } = await serviceClient
+      .from("invitations")
+      .update({
+        token,
+        expires_at: expiresAt,
+        revoked_at: null,
+      })
+      .eq("org_id", orgId)
+      .eq("id", invitationId)
+      .eq("updated_at", expectedUpdatedAt)
+      .is("accepted_at", null)
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!updatedInvitation) {
+      const latestInvitation = await fetchInvitation(orgId, invitationId);
+      if (latestInvitation) return buildConflictResponse(latestInvitation);
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    const latestInvitation = rowToInvitation(updatedInvitation as DbInvitation);
+
+    await writeAuditEntry({
+      orgId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      resourceId: invitationId,
+      action: "invitation.resent",
+      changes: [
+        {
+          key: "expiresAt",
+          label: "Expiry",
+          previousValue: currentInvitation.expiresAt,
+          nextValue: expiresAt,
+          previousDisplay: currentInvitation.expiresAt,
+          nextDisplay: expiresAt,
+          sensitive: false,
+        },
+      ],
+      req,
+    });
+
+    return NextResponse.json({
+      success: true,
+      invitation: latestInvitation,
+      token,
+      expiresAt,
+    });
+  } catch (err) {
+    Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
+    logger.error({ error: err, orgId, invitationId }, "Invitation resend failed");
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}

@@ -203,7 +203,7 @@ function SetupContent() {
         <div
           style={{
             background: "var(--color-bg-card, white)",
-            borderRadius: 16,
+            borderRadius: "var(--dg-radius-xl)",
             border: "1px solid var(--color-border)",
             overflow: "hidden",
           }}
@@ -224,7 +224,7 @@ function SetupContent() {
                 style={{
                   width: 30,
                   height: 30,
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   flexShrink: 0,
                   display: "flex",
                   alignItems: "center",

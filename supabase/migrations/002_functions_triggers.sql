@@ -274,6 +274,17 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.touch_updated_at()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL
+SET search_path = 'public'
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 4. CASCADE TRIGGERS
@@ -386,6 +397,14 @@ CREATE TRIGGER trigger_coverage_requirements_audit
   BEFORE INSERT OR UPDATE ON public.coverage_requirements
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
+CREATE TRIGGER trigger_coverage_rule_configs_audit
+  BEFORE INSERT OR UPDATE ON public.coverage_rule_configs
+  FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
+
+CREATE TRIGGER trigger_coverage_rule_config_codes_audit
+  BEFORE INSERT OR UPDATE ON public.coverage_rule_config_codes
+  FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
+
 CREATE TRIGGER trigger_indicator_types_audit
   BEFORE INSERT OR UPDATE ON public.indicator_types
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
@@ -394,6 +413,14 @@ CREATE TRIGGER trigger_indicator_types_audit
 CREATE TRIGGER trigger_shifts_updated_at
   BEFORE UPDATE ON public.shifts
   FOR EACH ROW EXECUTE FUNCTION public.update_shifts_updated_at();
+
+CREATE TRIGGER trigger_org_memberships_updated_at
+  BEFORE UPDATE ON public.organization_memberships
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE TRIGGER trigger_invitations_updated_at
+  BEFORE UPDATE ON public.invitations
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
 -- Cascade triggers
 CREATE TRIGGER trg_certifications_delete_cascade
@@ -443,13 +470,15 @@ CREATE OR REPLACE FUNCTION public.change_user_role(
   p_new_role        TEXT,
   p_changed_by_id   UUID,
   p_idempotency_key TEXT,
-  p_org_id          UUID DEFAULT NULL  -- explicit org context for multi-org
+  p_org_id          UUID DEFAULT NULL,  -- explicit org context for multi-org
+  p_expected_updated_at TIMESTAMPTZ DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
   v_old_role          TEXT;
+  v_current_updated_at TIMESTAMPTZ;
   v_target_org_id     UUID;
   v_caller_platform_role TEXT;
   v_caller_org_role   TEXT;
@@ -481,13 +510,18 @@ BEGIN
     RAISE EXCEPTION 'Target user not found or has no active organization';
   END IF;
 
-  SELECT org_role::TEXT INTO v_old_role
+  SELECT org_role::TEXT, updated_at INTO v_old_role, v_current_updated_at
   FROM organization_memberships
   WHERE user_id = p_target_user_id AND org_id = v_target_org_id
   FOR UPDATE;
 
   IF v_old_role IS NULL THEN
     RAISE EXCEPTION 'Target user has no membership for this organization';
+  END IF;
+
+  IF p_expected_updated_at IS NOT NULL
+     AND v_current_updated_at IS DISTINCT FROM p_expected_updated_at THEN
+    RAISE EXCEPTION 'Organization membership changed elsewhere';
   END IF;
 
   SELECT p.platform_role::TEXT
@@ -607,7 +641,8 @@ BEGIN
   INSERT INTO public.organization_memberships (user_id, org_id, org_role)
   VALUES (target_user_id, p_org_id, p_org_role)
   ON CONFLICT (user_id, org_id) DO UPDATE
-    SET org_role = EXCLUDED.org_role;
+    SET org_role = EXCLUDED.org_role,
+        updated_at = NOW();
 END;
 $$;
 
@@ -733,10 +768,13 @@ GRANT EXECUTE ON FUNCTION public.get_my_organizations() TO authenticated;
 
 -- ── publish_schedule ──────────────────────────────────────────────────────────
 
+DROP FUNCTION IF EXISTS public.publish_schedule(UUID, DATE, DATE);
+
 CREATE OR REPLACE FUNCTION public.publish_schedule(
   p_org_id     UUID,
   p_start_date DATE,
-  p_end_date   DATE
+  p_end_date   DATE,
+  p_actor_id   UUID DEFAULT NULL
 ) RETURNS UUID
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -747,24 +785,51 @@ DECLARE
   v_history_id UUID;
   v_note_new INTEGER := 0;
   v_note_deleted INTEGER := 0;
+  v_actor_id UUID := COALESCE(auth.uid(), p_actor_id);
+  v_is_gridmaster BOOLEAN := FALSE;
+  v_org_role public.org_role := 'user'::public.org_role;
   r RECORD;
 BEGIN
+  IF v_actor_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized: missing actor identity';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = v_actor_id
+      AND platform_role = 'gridmaster'
+  )
+  INTO v_is_gridmaster;
+
+  SELECT COALESCE(
+    (
+      SELECT cm.org_role
+      FROM public.organization_memberships cm
+      WHERE cm.user_id = v_actor_id
+        AND cm.org_id = p_org_id
+        AND cm.archived_at IS NULL
+      LIMIT 1
+    ),
+    'user'::public.org_role
+  )
+  INTO v_org_role;
+
   IF NOT (
-    public.is_gridmaster()
-    OR (
-      public.caller_org_id() = p_org_id
-      AND public.caller_org_role()::TEXT IN ('super_admin', 'admin')
-    )
+    v_is_gridmaster
+    OR v_org_role::TEXT IN ('super_admin', 'admin')
   ) THEN
     RAISE EXCEPTION 'Unauthorized: insufficient permissions to publish schedule';
   END IF;
 
   -- Enforce canPublishSchedule for admins (super_admin and gridmaster bypass)
-  IF public.caller_org_role()::TEXT = 'admin' AND NOT public.is_gridmaster() THEN
+  IF v_org_role::TEXT = 'admin' AND NOT v_is_gridmaster THEN
     IF NOT COALESCE(
       (SELECT (cm.admin_permissions->>'canPublishSchedule')::BOOLEAN
        FROM public.organization_memberships cm
-       WHERE cm.user_id = auth.uid() AND cm.org_id = p_org_id),
+       WHERE cm.user_id = v_actor_id
+         AND cm.org_id = p_org_id
+         AND cm.archived_at IS NULL),
       FALSE
     ) THEN
       RAISE EXCEPTION 'Unauthorized: you do not have permission to publish the schedule';
@@ -838,7 +903,7 @@ BEGIN
 
   -- Insert publish_history record
   INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count, changes)
-  VALUES (p_org_id, auth.uid(), p_start_date, p_end_date, v_change_count, v_changes)
+  VALUES (p_org_id, v_actor_id, p_start_date, p_end_date, v_change_count, v_changes)
   RETURNING id INTO v_history_id;
 
   -- Promote drafts → published (shift codes, absence types, and custom times)
@@ -865,7 +930,7 @@ BEGIN
       draft_is_delete = FALSE,
       version = version + 1,
       updated_at = NOW(),
-      updated_by = auth.uid()
+      updated_by = v_actor_id
   WHERE org_id = p_org_id
     AND date >= p_start_date AND date <= p_end_date
     AND draft_is_delete = FALSE
@@ -915,7 +980,7 @@ BEGIN
     FROM jsonb_array_elements(v_changes) AS c
     JOIN public.employees e ON e.id = (c->>'empId')::UUID
     WHERE e.user_id IS NOT NULL
-      AND e.user_id <> auth.uid()
+      AND e.user_id <> v_actor_id
   LOOP
     INSERT INTO public.notifications (user_id, org_id, type, channel, category, title, message, metadata)
     VALUES (
@@ -934,7 +999,7 @@ BEGIN
         'empId', r.emp_id,
         'date', r.change_date,
         'kind', r.kind,
-        'publishedBy', auth.uid()
+        'publishedBy', v_actor_id
       )
     );
   END LOOP;
@@ -1198,6 +1263,111 @@ $$;
 GRANT EXECUTE ON FUNCTION public.delete_shift_series(UUID, UUID) TO authenticated;
 
 
+-- ── upsert_recurring_shift ──────────────────────────────────────────────────
+-- Archives the current active recurring template for an employee/day before
+-- inserting the next one. This keeps recurring schedule saves atomic and
+-- aligned with the active-row partial unique index on recurring_shifts.
+
+CREATE OR REPLACE FUNCTION public.upsert_recurring_shift(
+  p_emp_id UUID,
+  p_org_id UUID,
+  p_day_of_week SMALLINT,
+  p_shift_code_id BIGINT DEFAULT NULL,
+  p_absence_type_id BIGINT DEFAULT NULL,
+  p_effective_from DATE DEFAULT CURRENT_DATE
+) RETURNS UUID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_recurring_shift_id UUID;
+BEGIN
+  IF NOT public.check_admin_permission('canManageRecurringShifts') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canManageRecurringShifts permission';
+  END IF;
+
+  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+    RAISE EXCEPTION 'Unauthorized: org mismatch';
+  END IF;
+
+  IF p_day_of_week < 0 OR p_day_of_week > 6 THEN
+    RAISE EXCEPTION 'Invalid day_of_week: must be between 0 and 6';
+  END IF;
+
+  IF (p_shift_code_id IS NULL AND p_absence_type_id IS NULL)
+     OR (p_shift_code_id IS NOT NULL AND p_absence_type_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Recurring shift must specify exactly one of shift_code_id or absence_type_id';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.employees e
+    WHERE e.id = p_emp_id
+      AND e.org_id = p_org_id
+      AND e.archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Employee not found in this organization';
+  END IF;
+
+  IF p_shift_code_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM public.shift_codes sc
+    WHERE sc.id = p_shift_code_id
+      AND sc.org_id = p_org_id
+      AND sc.archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Shift code not found in this organization';
+  END IF;
+
+  IF p_absence_type_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM public.absence_types at
+    WHERE at.id = p_absence_type_id
+      AND at.org_id = p_org_id
+      AND at.archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Absence type not found in this organization';
+  END IF;
+
+  UPDATE public.recurring_shifts
+  SET archived_at = NOW()
+  WHERE emp_id = p_emp_id
+    AND org_id = p_org_id
+    AND day_of_week = p_day_of_week
+    AND archived_at IS NULL;
+
+  INSERT INTO public.recurring_shifts (
+    emp_id,
+    org_id,
+    day_of_week,
+    shift_code_id,
+    absence_type_id,
+    effective_from,
+    effective_until
+  ) VALUES (
+    p_emp_id,
+    p_org_id,
+    p_day_of_week,
+    CASE
+      WHEN p_absence_type_id IS NOT NULL THEN NULL
+      ELSE p_shift_code_id
+    END,
+    CASE
+      WHEN p_absence_type_id IS NOT NULL THEN p_absence_type_id
+      ELSE NULL
+    END,
+    COALESCE(p_effective_from, CURRENT_DATE),
+    NULL
+  )
+  RETURNING id INTO v_recurring_shift_id;
+
+  RETURN v_recurring_shift_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.upsert_recurring_shift(UUID, UUID, SMALLINT, BIGINT, BIGINT, DATE) TO authenticated;
+
+
 -- ── apply_recurring_schedules (server-side, DST-safe) ────────────────────────
 -- Fills empty schedule slots from recurring shift templates.
 -- Uses PostgreSQL DATE arithmetic (immune to DST issues).
@@ -1230,6 +1400,9 @@ BEGIN
   -- Iterate dates using pure DATE arithmetic (DST-safe)
   v_current := p_start_date;
   WHILE v_current <= p_end_date LOOP
+    -- A row only blocks autofill when the scheduler grid would currently show
+    -- a live assignment there. Draft-deleted rows should be treated as empty so
+    -- the server-side fill behavior matches the grid the user sees.
     -- ── Shift-code recurring templates ──
     -- For each active recurring shift template matching this day-of-week,
     -- pick the most recent effectiveFrom per employee (DISTINCT ON + ORDER BY DESC)
@@ -1246,10 +1419,40 @@ BEGIN
         AND rs.day_of_week = EXTRACT(DOW FROM v_current)::INTEGER
         AND rs.effective_from <= v_current
         AND (rs.effective_until IS NULL OR rs.effective_until >= v_current)
-        -- Only for employees who don't already have a shift on this date
+        -- Only for employees whose grid cell is effectively empty on this date
         AND NOT EXISTS (
           SELECT 1 FROM public.shifts s
-          WHERE s.emp_id = rs.emp_id AND s.date = v_current
+          WHERE s.emp_id = rs.emp_id
+            AND s.date = v_current
+            AND (
+              (
+                (
+                  array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+                  OR s.draft_absence_type_id IS NOT NULL
+                  OR s.draft_is_delete = TRUE
+                  OR s.draft_custom_start_time IS NOT NULL
+                  OR s.draft_custom_end_time IS NOT NULL
+                )
+                AND s.draft_is_delete = FALSE
+                AND (
+                  array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+                  OR s.draft_absence_type_id IS NOT NULL
+                )
+              )
+              OR (
+                NOT (
+                  array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+                  OR s.draft_absence_type_id IS NOT NULL
+                  OR s.draft_is_delete = TRUE
+                  OR s.draft_custom_start_time IS NOT NULL
+                  OR s.draft_custom_end_time IS NOT NULL
+                )
+                AND (
+                  array_length(s.published_shift_code_ids, 1) IS NOT NULL
+                  OR s.published_absence_type_id IS NOT NULL
+                )
+              )
+            )
         )
       ORDER BY rs.emp_id, rs.effective_from DESC
     LOOP
@@ -1260,7 +1463,45 @@ BEGIN
         r.emp_id, v_current, p_org_id, ARRAY[r.shift_code_id],
         false, true, auth.uid(), auth.uid()
       )
-      ON CONFLICT (emp_id, date) DO NOTHING;
+      ON CONFLICT (emp_id, date) DO UPDATE
+      SET draft_shift_code_ids = ARRAY[r.shift_code_id],
+          draft_absence_type_id = NULL,
+          draft_is_delete = FALSE,
+          draft_custom_start_time = NULL,
+          draft_custom_end_time = NULL,
+          from_recurring = TRUE,
+          updated_by = auth.uid(),
+          updated_at = NOW(),
+          version = shifts.version + 1
+      WHERE NOT (
+        (
+          (
+            array_length(shifts.draft_shift_code_ids, 1) IS NOT NULL
+            OR shifts.draft_absence_type_id IS NOT NULL
+            OR shifts.draft_is_delete = TRUE
+            OR shifts.draft_custom_start_time IS NOT NULL
+            OR shifts.draft_custom_end_time IS NOT NULL
+          )
+          AND shifts.draft_is_delete = FALSE
+          AND (
+            array_length(shifts.draft_shift_code_ids, 1) IS NOT NULL
+            OR shifts.draft_absence_type_id IS NOT NULL
+          )
+        )
+        OR (
+          NOT (
+            array_length(shifts.draft_shift_code_ids, 1) IS NOT NULL
+            OR shifts.draft_absence_type_id IS NOT NULL
+            OR shifts.draft_is_delete = TRUE
+            OR shifts.draft_custom_start_time IS NOT NULL
+            OR shifts.draft_custom_end_time IS NOT NULL
+          )
+          AND (
+            array_length(shifts.published_shift_code_ids, 1) IS NOT NULL
+            OR shifts.published_absence_type_id IS NOT NULL
+          )
+        )
+      );
 
       IF FOUND THEN
         v_inserted := v_inserted + 1;
@@ -1288,7 +1529,37 @@ BEGIN
         AND (rs.effective_until IS NULL OR rs.effective_until >= v_current)
         AND NOT EXISTS (
           SELECT 1 FROM public.shifts s
-          WHERE s.emp_id = rs.emp_id AND s.date = v_current
+          WHERE s.emp_id = rs.emp_id
+            AND s.date = v_current
+            AND (
+              (
+                (
+                  array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+                  OR s.draft_absence_type_id IS NOT NULL
+                  OR s.draft_is_delete = TRUE
+                  OR s.draft_custom_start_time IS NOT NULL
+                  OR s.draft_custom_end_time IS NOT NULL
+                )
+                AND s.draft_is_delete = FALSE
+                AND (
+                  array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+                  OR s.draft_absence_type_id IS NOT NULL
+                )
+              )
+              OR (
+                NOT (
+                  array_length(s.draft_shift_code_ids, 1) IS NOT NULL
+                  OR s.draft_absence_type_id IS NOT NULL
+                  OR s.draft_is_delete = TRUE
+                  OR s.draft_custom_start_time IS NOT NULL
+                  OR s.draft_custom_end_time IS NOT NULL
+                )
+                AND (
+                  array_length(s.published_shift_code_ids, 1) IS NOT NULL
+                  OR s.published_absence_type_id IS NOT NULL
+                )
+              )
+            )
         )
       ORDER BY rs.emp_id, rs.effective_from DESC
     LOOP
@@ -1299,7 +1570,45 @@ BEGIN
         r.emp_id, v_current, p_org_id, '{}', r.absence_type_id,
         false, true, auth.uid(), auth.uid()
       )
-      ON CONFLICT (emp_id, date) DO NOTHING;
+      ON CONFLICT (emp_id, date) DO UPDATE
+      SET draft_shift_code_ids = '{}'::BIGINT[],
+          draft_absence_type_id = r.absence_type_id,
+          draft_is_delete = FALSE,
+          draft_custom_start_time = NULL,
+          draft_custom_end_time = NULL,
+          from_recurring = TRUE,
+          updated_by = auth.uid(),
+          updated_at = NOW(),
+          version = shifts.version + 1
+      WHERE NOT (
+        (
+          (
+            array_length(shifts.draft_shift_code_ids, 1) IS NOT NULL
+            OR shifts.draft_absence_type_id IS NOT NULL
+            OR shifts.draft_is_delete = TRUE
+            OR shifts.draft_custom_start_time IS NOT NULL
+            OR shifts.draft_custom_end_time IS NOT NULL
+          )
+          AND shifts.draft_is_delete = FALSE
+          AND (
+            array_length(shifts.draft_shift_code_ids, 1) IS NOT NULL
+            OR shifts.draft_absence_type_id IS NOT NULL
+          )
+        )
+        OR (
+          NOT (
+            array_length(shifts.draft_shift_code_ids, 1) IS NOT NULL
+            OR shifts.draft_absence_type_id IS NOT NULL
+            OR shifts.draft_is_delete = TRUE
+            OR shifts.draft_custom_start_time IS NOT NULL
+            OR shifts.draft_custom_end_time IS NOT NULL
+          )
+          AND (
+            array_length(shifts.published_shift_code_ids, 1) IS NOT NULL
+            OR shifts.published_absence_type_id IS NOT NULL
+          )
+        )
+      );
 
       IF FOUND THEN
         v_inserted := v_inserted + 1;
@@ -2071,6 +2380,7 @@ RETURNS TABLE (
   admin_permissions JSONB,
   created_at        TIMESTAMPTZ,
   last_sign_in_at   TIMESTAMPTZ,
+  updated_at        TIMESTAMPTZ,
   department_ids    BIGINT[],
   dept_admin_ids    BIGINT[]
 )
@@ -2091,7 +2401,7 @@ BEGIN
   RETURN QUERY
   SELECT p.id, u.email::TEXT, p.first_name, p.last_name, p.platform_role,
     cm.org_role, cm.admin_permissions, p.created_at,
-    u.last_sign_in_at, cm.department_ids, cm.dept_admin_ids
+    u.last_sign_in_at, cm.updated_at, cm.department_ids, cm.dept_admin_ids
   FROM public.organization_memberships cm
   JOIN public.profiles p ON p.id = cm.user_id
   JOIN auth.users u ON u.id = cm.user_id
@@ -2556,7 +2866,7 @@ BEGIN
   END IF;
 
   -- Validate claimer is active employee in same org
-  SELECT id, user_id, certification_id, status INTO v_claimer
+  SELECT id, user_id, certification_id, status, focus_area_ids INTO v_claimer
   FROM public.employees
   WHERE id = p_claimer_emp_id AND org_id = v_request.org_id AND archived_at IS NULL;
 
@@ -2587,6 +2897,15 @@ BEGIN
       )
   ) THEN
     RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.shift_codes sc
+    WHERE sc.id = ANY(v_request.requester_shift_code_ids)
+      AND sc.focus_area_id IS NOT NULL
+      AND NOT (sc.focus_area_id = ANY(COALESCE(v_claimer.focus_area_ids, '{}'::BIGINT[])))
+  ) THEN
+    RAISE EXCEPTION 'You are not assigned to the focus area required for this shift';
   END IF;
 
   -- Block if claimer has a shift on the same date with overlapping time
@@ -3269,7 +3588,7 @@ BEGIN
   END IF;
 
   -- Validate employee is active in this org
-  SELECT id, user_id, certification_id, status INTO v_employee
+  SELECT id, user_id, certification_id, status, focus_area_ids INTO v_employee
   FROM public.employees
   WHERE id = p_emp_id AND org_id = p_org_id AND archived_at IS NULL;
 
@@ -3299,6 +3618,15 @@ BEGIN
       )
   ) THEN
     RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.shift_codes sc
+    WHERE sc.id = ANY(p_shift_code_ids)
+      AND sc.focus_area_id IS NOT NULL
+      AND NOT (sc.focus_area_id = ANY(COALESCE(v_employee.focus_area_ids, '{}'::BIGINT[])))
+  ) THEN
+    RAISE EXCEPTION 'You are not assigned to the focus area required for this shift';
   END IF;
 
   -- Check time conflicts: volunteer must not have an overlapping shift on this date
@@ -3798,6 +4126,13 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.get_tenant_stats IS 'Returns per-org user and employee counts aggregated server-side.';
+
+UPDATE public.organizations
+SET
+  address_line_1 = address
+WHERE
+  COALESCE(address, '') <> ''
+  AND COALESCE(address_line_1, '') = '';
 
 
 -- Batch remove a focus area ID from all employee focus_area_ids arrays (replaces N+1 loop)

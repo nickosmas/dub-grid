@@ -9,7 +9,7 @@ export default function DashboardLoading() {
           gap: 12,
           padding: "20px",
           background: "var(--color-surface)",
-          borderRadius: 16,
+          borderRadius: "var(--dg-radius-md)",
           border: "1px solid var(--color-border)",
         }}
       >

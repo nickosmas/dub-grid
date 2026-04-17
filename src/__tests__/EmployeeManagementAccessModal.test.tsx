@@ -2,27 +2,48 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
-import type { Department, DirectoryPerson, Employee, OrganizationUser } from "@/types";
+import type { Department, DirectoryPerson, Employee, Invitation, OrganizationUser } from "@/types";
 import {
-  changeOrganizationUserRole,
   fetchOrganizationUsers,
   linkEmployeeToUser,
-  resendInvitation,
-  revokeInvitation,
+  reconcileEmployeeNameAndLinkUser,
+  resendOrganizationInvitationGuarded,
   sendInvitation,
+  revokeOrganizationInvitationGuarded,
+  updateOrganizationInvitationGuarded,
+  updateOrganizationMembershipGuarded,
   updateAppOnlyUser,
-  updatePendingInvitation,
 } from "@/lib/db";
+import { NameMismatchError } from "@/lib/account-linking";
 
 vi.mock("@/lib/db", () => ({
-  changeOrganizationUserRole: vi.fn(),
   fetchOrganizationUsers: vi.fn(),
   linkEmployeeToUser: vi.fn(),
-  resendInvitation: vi.fn(),
-  revokeInvitation: vi.fn(),
+  reconcileEmployeeNameAndLinkUser: vi.fn(),
+  resendOrganizationInvitationGuarded: vi.fn(),
+  revokeOrganizationInvitationGuarded: vi.fn(),
   sendInvitation: vi.fn(),
+  updateOrganizationInvitationGuarded: vi.fn(),
+  updateOrganizationMembershipGuarded: vi.fn(),
   updateAppOnlyUser: vi.fn(),
-  updatePendingInvitation: vi.fn(),
+  OrganizationAccessConflictError: class OrganizationAccessConflictError extends Error {
+    latestUser: OrganizationUser;
+
+    constructor(latestUser: OrganizationUser) {
+      super("Organization access changed elsewhere.");
+      this.latestUser = latestUser;
+      this.name = "OrganizationAccessConflictError";
+    }
+  },
+  InvitationAccessConflictError: class InvitationAccessConflictError extends Error {
+    latestInvitation: Invitation;
+
+    constructor(latestInvitation: Invitation) {
+      super("Invitation changed elsewhere.");
+      this.latestInvitation = latestInvitation;
+      this.name = "InvitationAccessConflictError";
+    }
+  },
 }));
 
 vi.mock("sonner", () => ({
@@ -34,12 +55,13 @@ vi.mock("sonner", () => ({
 
 const fetchOrganizationUsersMock = vi.mocked(fetchOrganizationUsers);
 const linkEmployeeToUserMock = vi.mocked(linkEmployeeToUser);
+const reconcileEmployeeNameAndLinkUserMock = vi.mocked(reconcileEmployeeNameAndLinkUser);
 const updateAppOnlyUserMock = vi.mocked(updateAppOnlyUser);
-const changeOrganizationUserRoleMock = vi.mocked(changeOrganizationUserRole);
 const sendInvitationMock = vi.mocked(sendInvitation);
-const updatePendingInvitationMock = vi.mocked(updatePendingInvitation);
-const resendInvitationMock = vi.mocked(resendInvitation);
-const revokeInvitationMock = vi.mocked(revokeInvitation);
+const updateOrganizationInvitationGuardedMock = vi.mocked(updateOrganizationInvitationGuarded);
+const resendOrganizationInvitationGuardedMock = vi.mocked(resendOrganizationInvitationGuarded);
+const revokeOrganizationInvitationGuardedMock = vi.mocked(revokeOrganizationInvitationGuarded);
+const updateOrganizationMembershipGuardedMock = vi.mocked(updateOrganizationMembershipGuarded);
 
 const employee: Employee = {
   id: "emp-1",
@@ -110,23 +132,74 @@ function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): Director
   };
 }
 
+function makeOrganizationUser(overrides: Partial<OrganizationUser> = {}): OrganizationUser {
+  return {
+    id: "user-1",
+    email: "alice@example.com",
+    firstName: "Alice",
+    lastName: "Smith",
+    orgRole: "user",
+    platformRole: "none",
+    adminPermissions: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastSignInAt: null,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    departmentIds: [],
+    deptAdminIds: [],
+    ...overrides,
+  };
+}
+
+function makePendingInvitation(overrides: Partial<Invitation> = {}): Invitation {
+  return {
+    id: "inv-1",
+    orgId: "org-1",
+    invitedBy: "user-2",
+    email: "alice@example.com",
+    roleToAssign: "user",
+    expiresAt: "2026-12-31T00:00:00.000Z",
+    acceptedAt: null,
+    revokedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    employeeId: "emp-1",
+    firstName: "Alice",
+    lastName: "Smith",
+    phone: "555-0100",
+    departmentIds: [10],
+    deptAdminIds: [],
+    ...overrides,
+  };
+}
+
 describe("EmployeeManagementAccessModal", () => {
   beforeEach(() => {
     fetchOrganizationUsersMock.mockResolvedValue([]);
     linkEmployeeToUserMock.mockResolvedValue({ status: "linked" });
+    reconcileEmployeeNameAndLinkUserMock.mockResolvedValue({ status: "linked" });
     updateAppOnlyUserMock.mockResolvedValue(undefined);
-    changeOrganizationUserRoleMock.mockResolvedValue(undefined);
+    updateOrganizationMembershipGuardedMock.mockResolvedValue(makeOrganizationUser());
     sendInvitationMock.mockResolvedValue({
       invitationId: "inv-1",
       token: "token-1",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
-    updatePendingInvitationMock.mockResolvedValue(undefined);
-    resendInvitationMock.mockResolvedValue({
+    updateOrganizationInvitationGuardedMock.mockResolvedValue(makePendingInvitation({
+      updatedAt: "2026-01-02T00:00:00.000Z",
+      departmentIds: [10],
+    }));
+    resendOrganizationInvitationGuardedMock.mockResolvedValue({
+      invitation: makePendingInvitation({
+        updatedAt: "2026-01-03T00:00:00.000Z",
+        departmentIds: [10],
+      }),
       token: "resent-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
-    revokeInvitationMock.mockResolvedValue(undefined);
+    revokeOrganizationInvitationGuardedMock.mockResolvedValue(makePendingInvitation({
+      revokedAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    }));
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -145,22 +218,7 @@ describe("EmployeeManagementAccessModal", () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onCompleted = vi.fn();
-    const orgUsers: OrganizationUser[] = [
-      {
-        id: "user-1",
-        email: "alice@example.com",
-        firstName: "Alice",
-        lastName: "Smith",
-        orgRole: "user",
-        platformRole: "none",
-        adminPermissions: null,
-        createdAt: "2026-01-01T00:00:00.000Z",
-        lastSignInAt: null,
-        departmentIds: [],
-        deptAdminIds: [],
-      },
-    ];
-    fetchOrganizationUsersMock.mockResolvedValue(orgUsers);
+    fetchOrganizationUsersMock.mockResolvedValue([makeOrganizationUser()]);
 
     render(
       <EmployeeManagementAccessModal
@@ -185,7 +243,7 @@ describe("EmployeeManagementAccessModal", () => {
       expect(updateAppOnlyUserMock).toHaveBeenCalledWith("user-1", "org-1", {
         departmentIds: [10],
       });
-      expect(changeOrganizationUserRoleMock).not.toHaveBeenCalled();
+      expect(updateOrganizationMembershipGuardedMock).not.toHaveBeenCalled();
       expect(onCompleted).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
     });
@@ -203,23 +261,7 @@ describe("EmployeeManagementAccessModal", () => {
         orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [10], invitationStatus: "pending" })}
-        pendingInvitation={{
-          id: "inv-1",
-          orgId: "org-1",
-          invitedBy: "user-2",
-          email: "alice@example.com",
-          roleToAssign: "user",
-          expiresAt: "2026-12-31T00:00:00.000Z",
-          acceptedAt: null,
-          revokedAt: null,
-          createdAt: "2026-01-01T00:00:00.000Z",
-          employeeId: "emp-1",
-          firstName: "Alice",
-          lastName: "Smith",
-          phone: "555-0100",
-          departmentIds: [10],
-          deptAdminIds: [],
-        }}
+        pendingInvitation={makePendingInvitation()}
         onClose={onClose}
         onCompleted={onCompleted}
       />,
@@ -234,7 +276,10 @@ describe("EmployeeManagementAccessModal", () => {
     await user.click(screen.getByRole("button", { name: /save access/i }));
 
     await waitFor(() => {
-      expect(updatePendingInvitationMock).toHaveBeenCalledWith("inv-1", "org-1", {
+      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
+        orgId: "org-1",
+        invitationId: "inv-1",
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
         firstName: "Alice",
         lastName: "Smith",
         phone: "555-0100",
@@ -242,8 +287,147 @@ describe("EmployeeManagementAccessModal", () => {
         roleToAssign: "admin",
         departmentIds: [11],
       });
-      expect(resendInvitationMock).toHaveBeenCalledWith("inv-1", "org-1");
+      expect(resendOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
+        orgId: "org-1",
+        invitationId: "inv-1",
+        expectedUpdatedAt: "2026-01-02T00:00:00.000Z",
+      });
       expect(onCompleted).toHaveBeenCalledOnce();
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("allows removing management departments from an employee-backed invite and keeps the invite linked to the employee", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onCompleted = vi.fn();
+
+    render(
+      <EmployeeManagementAccessModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [10], invitationStatus: "pending" })}
+        pendingInvitation={makePendingInvitation()}
+        onClose={onClose}
+        onCompleted={onCompleted}
+      />,
+    );
+
+    await screen.findByRole("dialog", { name: /edit management access/i });
+
+    await user.click(screen.getByRole("button", { name: /remove from management/i }));
+    expect(screen.getByText(/keep them on the schedule/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /save access/i }));
+
+    await waitFor(() => {
+      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
+        orgId: "org-1",
+        invitationId: "inv-1",
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+        firstName: "Alice",
+        lastName: "Smith",
+        phone: "555-0100",
+        email: "alice@example.com",
+        roleToAssign: "user",
+        departmentIds: [],
+      });
+      expect(resendOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
+        orgId: "org-1",
+        invitationId: "inv-1",
+        expectedUpdatedAt: "2026-01-02T00:00:00.000Z",
+      });
+      expect(onCompleted).toHaveBeenCalledOnce();
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("shows a reconcile step when the matched org member name differs and confirms with account name", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onCompleted = vi.fn();
+
+    fetchOrganizationUsersMock.mockResolvedValue([
+      makeOrganizationUser({
+        firstName: "Alicia",
+        lastName: "Smith",
+      }),
+    ]);
+    linkEmployeeToUserMock.mockRejectedValue(
+      new NameMismatchError({
+        employeeId: "emp-1",
+        userId: "user-1",
+        employeeFirstName: "Alice",
+        employeeLastName: "Smith",
+        accountFirstName: "Alicia",
+        accountLastName: "Smith",
+      }),
+    );
+
+    render(
+      <EmployeeManagementAccessModal
+        employee={{ ...employee, email: "" }}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        onClose={onClose}
+        onCompleted={onCompleted}
+      />,
+    );
+
+    const emailInput = await screen.findByRole("textbox");
+    await user.type(emailInput, "alice@example.com");
+    await screen.findByText(/existing org member found for this email/i);
+    await user.click(screen.getByRole("button", { name: "Leadership" }));
+    await user.click(screen.getByRole("button", { name: /save access/i }));
+
+    expect(await screen.findByText("Name mismatch found")).toBeInTheDocument();
+    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    expect(screen.getByText("Alicia Smith")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Use Account Name and Link" }));
+
+    await waitFor(() => {
+      expect(reconcileEmployeeNameAndLinkUserMock).toHaveBeenCalledWith("emp-1", "user-1", "org-1");
+      expect(updateAppOnlyUserMock).toHaveBeenCalledWith("user-1", "org-1", {
+        departmentIds: [10],
+      });
+      expect(onCompleted).toHaveBeenCalledOnce();
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("prompts before dismissing dirty access edits from the modal chrome", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <EmployeeManagementAccessModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [10], invitationStatus: "pending" })}
+        pendingInvitation={makePendingInvitation()}
+        onClose={onClose}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole("dialog", { name: /edit management access/i });
+
+    await user.click(screen.getByRole("button", { name: "Operations" }));
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close modal" }));
+
+    expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+    await waitFor(() => {
       expect(onClose).toHaveBeenCalledOnce();
     });
   });

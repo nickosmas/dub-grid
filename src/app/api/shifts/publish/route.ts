@@ -3,8 +3,12 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { publishSchedule } from "@/lib/db/schedule";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { draftBreakdownsEqual } from "@/lib/draft-utils";
+import {
+  fetchScheduleDraftBreakdown,
+  publishScheduleDirect,
+} from "@/lib/server/schedule-draft-safety";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -14,6 +18,14 @@ const bodySchema = z.object({
   orgId: z.string().uuid(),
   startDate: z.string(),
   endDate: z.string(),
+  expectedSummary: z.object({
+    newShifts: z.number().int().nonnegative(),
+    modifiedShifts: z.number().int().nonnegative(),
+    deletedShifts: z.number().int().nonnegative(),
+    newNotes: z.number().int().nonnegative(),
+    deletedNotes: z.number().int().nonnegative(),
+    totalChanges: z.number().int().nonnegative(),
+  }).optional(),
 });
 
 /**
@@ -55,7 +67,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { orgId, startDate, endDate } = parsed.data;
+  const { orgId, startDate, endDate, expectedSummary } = parsed.data;
 
   try {
     // ── Permission check ──────────────────────────────────────────────
@@ -88,10 +100,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    // ── Execute publish ─────────────────────────────────────────────
-    await publishSchedule(orgId, new Date(startDate), new Date(endDate));
+    const latestSummary = await fetchScheduleDraftBreakdown({
+      orgId,
+      startDate,
+      endDate,
+      serviceClient,
+    });
 
-    return NextResponse.json({ success: true });
+    if (expectedSummary && !draftBreakdownsEqual(expectedSummary, latestSummary)) {
+      return NextResponse.json(
+        {
+          error: "Schedule drafts changed elsewhere. Review the latest summary and try again.",
+          code: "SCHEDULE_DRAFT_CONFLICT",
+          summary: latestSummary,
+        },
+        { status: 409 },
+      );
+    }
+
+    // ── Execute publish ─────────────────────────────────────────────
+    await publishScheduleDirect({
+      orgId,
+      startDate,
+      endDate,
+      actorId: user.id,
+      client: serviceClient,
+    });
+
+    await serviceClient.from("audit_log").insert({
+      org_id: orgId,
+      actor_id: user.id,
+      actor_email: user.email ?? null,
+      action: "schedule.published",
+      resource_type: "schedule",
+      resource_id: orgId,
+      details: {
+        startDate,
+        endDate,
+        summary: latestSummary,
+      },
+    });
+
+    return NextResponse.json({ success: true, summary: latestSummary });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "shifts/publish", orgId } });
     logger.error({ error: err, orgId }, "Schedule publish failed");

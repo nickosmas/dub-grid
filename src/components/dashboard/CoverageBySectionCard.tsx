@@ -1,6 +1,8 @@
 import React from "react";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
+import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
+import DashboardEmptyState from "./DashboardEmptyState";
 
 const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
@@ -19,6 +21,7 @@ interface CoverageBySectionCardProps {
   focusAreaLabel: string;
   isMobile: boolean;
   hasRequirements: boolean;
+  publishedWindowState?: PublishedWindowState;
   onExpand?: () => void;
 }
 
@@ -27,30 +30,51 @@ export default function CoverageBySectionCard({
   focusAreaLabel,
   isMobile,
   hasRequirements,
+  publishedWindowState = "published",
   onExpand,
 }: CoverageBySectionCardProps) {
+  const isUnpublished = hasRequirements && publishedWindowState === "unpublished";
+  const isPartial = hasRequirements && publishedWindowState === "partial";
+  const subtitle = !hasRequirements
+    ? "No coverage requirements configured"
+    : isUnpublished
+      ? "Not published yet"
+      : isPartial
+        ? "Published dates only · required vs scheduled"
+        : "This week · required vs scheduled";
+
   if (sections.length === 0) {
     return (
       <div className="dg-card">
         <div className="dg-card-header">
           <div>
             <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
-            <div className="dg-card-subtitle">
-              {hasRequirements
-                ? "All sections fully covered this week"
-                : "No coverage requirements configured"}
-            </div>
+            <div className="dg-card-subtitle">{subtitle}</div>
           </div>
         </div>
-        {!hasRequirements && (
-          <div style={{ padding: "24px 16px", textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "var(--color-text-subtle)", lineHeight: 1.6 }}>
-              Set up coverage requirements in Settings to track
-              <br />
-              how well each {focusAreaLabel.toLowerCase()} is staffed.
-            </div>
-          </div>
-        )}
+        <div className="dg-card-body">
+          <DashboardEmptyState
+            variant="inline"
+            title={
+              !hasRequirements
+                ? undefined
+                : isUnpublished
+                  ? "Not published yet"
+                  : isPartial
+                    ? "All published dates covered"
+                    : "All coverage requirements met this week"
+            }
+            description={
+              !hasRequirements
+                ? `Set up coverage requirements in Settings to track how well each ${focusAreaLabel.toLowerCase()} is staffed.`
+                : isUnpublished
+                  ? "Coverage details will appear after this period is published."
+                  : isPartial
+                    ? "Coverage is only shown for dates that have been published."
+                    : undefined
+            }
+          />
+        </div>
       </div>
     );
   }
@@ -61,7 +85,7 @@ export default function CoverageBySectionCard({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
-          <div className="dg-card-subtitle">This week &middot; required vs scheduled</div>
+          <div className="dg-card-subtitle">{subtitle}</div>
         </div>
         {onExpand && <ExpandButton onClick={onExpand} label="Expand coverage" />}
       </div>
@@ -79,7 +103,7 @@ export default function CoverageBySectionCard({
                   flexDirection: "column",
                   gap: 7,
                   padding: "14px 16px",
-                  borderRadius: 14,
+                  borderRadius: "var(--dg-radius-md)",
                   background: "var(--color-bg)",
                   border: "1px solid var(--color-border)",
                 }}

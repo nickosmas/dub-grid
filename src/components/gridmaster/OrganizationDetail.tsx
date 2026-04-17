@@ -1,10 +1,45 @@
 "use client";
 import CustomSelect from "@/components/CustomSelect";
+import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
+import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import { getEmployeeDisplayName } from "@/lib/utils";
+import { useEmployeeCount } from "@/hooks";
+import {
+  getOrganizationAddressFields,
+  withComposedOrganizationAddress,
+} from "@/lib/organization-profile";
+import {
+  buildOrganizationSettingsChanges,
+  pickOrganizationSettings,
+} from "@/lib/organization-settings";
+import { formatTimezoneLabel } from "@/lib/timezones";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { fetchOrganizationUsers, fetchEmployees, fetchFocusAreas, fetchShiftCodes, fetchCertifications, fetchOrganizationRoles, fetchIndicatorTypes, fetchAbsenceTypes, updateOrganization, restoreOrganization, archiveOrganization, suspendOrganization, unsuspendOrganization, changeOrganizationUserRole, removeUserFromOrganization, assignOrgRoleByEmail, updateAdminPermissions } from "@/lib/db";
+import {
+  fetchOrganizationUsers,
+  fetchEmployees,
+  fetchFocusAreas,
+  fetchShiftCodes,
+  fetchCertifications,
+  fetchOrganizationRoles,
+  fetchIndicatorTypes,
+  fetchAbsenceTypes,
+  OrganizationSettingsConflictError,
+  updateOrganizationSettings,
+  restoreOrganization,
+  archiveOrganization,
+  suspendOrganization,
+  unsuspendOrganization,
+  assignOrgRoleByEmail,
+  updateOrganizationMembershipGuarded,
+  removeOrganizationMembershipGuarded,
+  OrganizationAccessConflictError,
+  revokeOrganizationInvitationGuarded,
+  InvitationAccessConflictError,
+} from "@/lib/db";
 import { queueNotification } from "@/lib/notify";
 import type { TenantStats } from "@/lib/db";
 import type {
@@ -19,16 +54,22 @@ import type {
   AdminPermissions,
   OrganizationRole,
 } from "@/types";
+import { buildMembershipAccessChanges } from "@/lib/access-management";
 
 /** Raw invitation row from supabase (snake_case columns). */
 interface InvitationRow {
   id: string;
+  org_id: string;
   email: string;
   role_to_assign: string;
+  invited_by?: string | null;
+  token?: string | null;
   created_at: string;
   expires_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
+  updated_at: string | null;
+  employee_id?: string | null;
 }
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PermissionsEditor from "@/components/PermissionsEditor";
@@ -64,30 +105,6 @@ function StatusDot({ status }: { status: string }) {
       <span style={{ textTransform: "capitalize", color: "var(--color-text-secondary)" }}>{status}</span>
     </span>
   );
-}
-
-function shortTz(iana: string | null): string {
-  if (!iana) return "Not set";
-  try {
-    return new Intl.DateTimeFormat("en-US", { timeZone: iana, timeZoneName: "short" })
-      .formatToParts(new Date())
-      .find((p) => p.type === "timeZoneName")?.value ?? iana;
-  } catch {
-    return iana;
-  }
-}
-
-function normalizeOverviewText(value: string): string {
-  return value.trim();
-}
-
-function normalizeOverviewNullableText(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function normalizeOverviewLabel(value: string, fallback: string): string {
-  return value.trim() || fallback;
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -192,7 +209,7 @@ export default function OrganizationDetail({
         if (tab === "invitations" && invitations === null) {
           const { data, error } = await supabase
             .from("invitations")
-            .select("id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, employee_id")
+            .select("id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id")
             .eq("org_id", organization.id)
             .order("created_at", { ascending: false });
           if (error) throw error;
@@ -281,7 +298,7 @@ export default function OrganizationDetail({
       </div>
       {organization.timezone && (
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 20 }}>
-          {organization.timezone} ({shortTz(organization.timezone)})
+          {formatTimezoneLabel(organization.timezone)} · {organization.timezone}
         </div>
       )}
 
@@ -328,7 +345,7 @@ export default function OrganizationDetail({
             padding: "12px 16px",
             background: "var(--color-danger-bg)",
             color: "var(--color-danger)",
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
             marginBottom: 16,
@@ -396,15 +413,23 @@ function OverviewTab({
   stats: TenantStats | undefined;
   onOrgUpdated?: (updated: Organization) => void;
 }) {
+  const { employeeCount, loading: employeeCountLoading } = useEmployeeCount(organization.id);
+  const initialAddress = getOrganizationAddressFields(organization);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(organization.name);
-  const [editAddress, setEditAddress] = useState(organization.address);
   const [editPhone, setEditPhone] = useState(organization.phone);
   const [editTimezone, setEditTimezone] = useState(organization.timezone ?? "");
+  const [editAddressLine1, setEditAddressLine1] = useState(initialAddress.addressLine1);
+  const [editAddressLine2, setEditAddressLine2] = useState(initialAddress.addressLine2);
+  const [editAddressCity, setEditAddressCity] = useState(initialAddress.addressCity);
+  const [editAddressState, setEditAddressState] = useState(initialAddress.addressState);
+  const [editAddressPostalCode, setEditAddressPostalCode] = useState(initialAddress.addressPostalCode);
+  const [editAddressCountry, setEditAddressCountry] = useState(initialAddress.addressCountry);
   const [editFocusAreaLabel, setEditFocusAreaLabel] = useState(organization.focusAreaLabel);
   const [editCertLabel, setEditCertLabel] = useState(organization.certificationLabel);
   const [editRoleLabel, setEditRoleLabel] = useState(organization.roleLabel);
   const [saving, setSaving] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [editShiftDisplayMode, setEditShiftDisplayMode] = useState(organization.shiftDisplayMode);
   const [editEnforceConflictPrevention, setEditEnforceConflictPrevention] = useState(organization.enforceConflictPrevention);
   const [editDataRetentionDays, setEditDataRetentionDays] = useState(organization.dataRetentionDays ?? 365);
@@ -413,58 +438,147 @@ function OverviewTab({
   const [suspendConfirm, setSuspendConfirm] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
-  const hasChanges =
-    normalizeOverviewText(editName) !== organization.name ||
-    normalizeOverviewText(editAddress) !== organization.address ||
-    normalizeOverviewText(editPhone) !== organization.phone ||
-    normalizeOverviewNullableText(editTimezone) !== (organization.timezone ?? null) ||
-    normalizeOverviewLabel(editFocusAreaLabel, "Focus Areas") !== organization.focusAreaLabel ||
-    normalizeOverviewLabel(editCertLabel, "Certifications") !== organization.certificationLabel ||
-    normalizeOverviewLabel(editRoleLabel, "Roles") !== organization.roleLabel ||
-    editShiftDisplayMode !== organization.shiftDisplayMode ||
-    editEnforceConflictPrevention !== organization.enforceConflictPrevention ||
-    editDataRetentionDays !== (organization.dataRetentionDays ?? 365);
 
-  // Reset edit state when switching to a different organization
-  useEffect(() => {
-    setEditing(false);
-    setEditName(organization.name);
-    setEditAddress(organization.address);
-    setEditPhone(organization.phone);
-    setEditTimezone(organization.timezone ?? "");
-    setEditFocusAreaLabel(organization.focusAreaLabel);
-    setEditCertLabel(organization.certificationLabel);
-    setEditRoleLabel(organization.roleLabel);
-    setEditShiftDisplayMode(organization.shiftDisplayMode);
-    setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
-    setEditDataRetentionDays(organization.dataRetentionDays ?? 365);
-  }, [organization.id]); // eslint-disable-line react-hooks/exhaustive-deps -- only reset when org identity changes, not individual fields
-
-  async function handleSave() {
-    setSaving(true);
-    try {
+  const nextOrganization = useMemo<Organization>(
+    () => {
       const updated: Organization = {
         ...organization,
         name: editName.trim(),
-        address: editAddress.trim(),
         phone: editPhone.trim(),
+        ...withComposedOrganizationAddress({
+          addressLine1: editAddressLine1.trim(),
+          addressLine2: editAddressLine2.trim(),
+          addressCity: editAddressCity.trim(),
+          addressState: editAddressState.trim(),
+          addressPostalCode: editAddressPostalCode.trim(),
+          addressCountry: editAddressCountry.trim(),
+        }),
         timezone: editTimezone || null,
         focusAreaLabel: editFocusAreaLabel.trim() || "Focus Areas",
         certificationLabel: editCertLabel.trim() || "Certifications",
         roleLabel: editRoleLabel.trim() || "Roles",
         shiftDisplayMode: editShiftDisplayMode,
         enforceConflictPrevention: editEnforceConflictPrevention,
+        dataRetentionDays: editDataRetentionDays,
       };
-      updated.dataRetentionDays = editDataRetentionDays;
-      await updateOrganization(updated);
+      return updated;
+    },
+    [
+      editAddressCity,
+      editAddressCountry,
+      editAddressLine1,
+      editAddressLine2,
+      editAddressPostalCode,
+      editAddressState,
+      editCertLabel,
+      editDataRetentionDays,
+      editEnforceConflictPrevention,
+      editFocusAreaLabel,
+      editName,
+      editPhone,
+      editRoleLabel,
+      editShiftDisplayMode,
+      editTimezone,
+      organization,
+    ],
+  );
+
+  const reviewChanges = useMemo(
+    () =>
+      buildOrganizationSettingsChanges(
+        pickOrganizationSettings(organization),
+        pickOrganizationSettings(nextOrganization),
+      ),
+    [nextOrganization, organization],
+  );
+
+  const hasChanges = reviewChanges.length > 0;
+
+  function resetEditState() {
+    setEditName(organization.name);
+    setEditPhone(organization.phone);
+    setEditTimezone(organization.timezone ?? "");
+    setEditAddressLine1(initialAddress.addressLine1);
+    setEditAddressLine2(initialAddress.addressLine2);
+    setEditAddressCity(initialAddress.addressCity);
+    setEditAddressState(initialAddress.addressState);
+    setEditAddressPostalCode(initialAddress.addressPostalCode);
+    setEditAddressCountry(initialAddress.addressCountry);
+    setEditFocusAreaLabel(organization.focusAreaLabel);
+    setEditCertLabel(organization.certificationLabel);
+    setEditRoleLabel(organization.roleLabel);
+    setEditShiftDisplayMode(organization.shiftDisplayMode);
+    setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
+    setEditDataRetentionDays(organization.dataRetentionDays ?? 365);
+    setReviewOpen(false);
+  }
+
+  // Reset edit state when switching to a different organization
+  useEffect(() => {
+    setEditing(false);
+    resetEditState();
+  }, [organization.id, organization.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps -- reset when persisted org state changes
+
+  async function handleSave() {
+    if (!nextOrganization.name) return;
+    if (!organization.updatedAt) {
+      toast.error("Organization data is out of date. Refresh and try again.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await updateOrganizationSettings({
+        orgId: organization.id,
+        expectedUpdatedAt: organization.updatedAt,
+        name: nextOrganization.name,
+        phone: nextOrganization.phone,
+        addressLine1: nextOrganization.addressLine1,
+        addressLine2: nextOrganization.addressLine2,
+        addressCity: nextOrganization.addressCity,
+        addressState: nextOrganization.addressState,
+        addressPostalCode: nextOrganization.addressPostalCode,
+        addressCountry: nextOrganization.addressCountry,
+        timezone: nextOrganization.timezone ?? "",
+        focusAreaLabel: nextOrganization.focusAreaLabel,
+        certificationLabel: nextOrganization.certificationLabel,
+        roleLabel: nextOrganization.roleLabel,
+        shiftDisplayMode: nextOrganization.shiftDisplayMode,
+        enforceConflictPrevention: nextOrganization.enforceConflictPrevention,
+        dataRetentionDays: nextOrganization.dataRetentionDays,
+      });
       toast.success("Organization updated");
+      setReviewOpen(false);
       setEditing(false);
       onOrgUpdated?.(updated);
     } catch (err: unknown) {
+      if (err instanceof OrganizationSettingsConflictError) {
+        toast.error(
+          "Organization details changed elsewhere. Review the latest values and try again.",
+        );
+        setReviewOpen(false);
+        setEditing(false);
+        onOrgUpdated?.(err.latestOrganization);
+        return;
+      }
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to update");
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleReview() {
+    if (!hasChanges || saving) return;
+    setReviewOpen(true);
+  }
+
+  function handleCancelEditing() {
+    resetEditState();
+    setEditing(false);
+  }
+
+  function handleDiscardEditing() {
+    resetEditState();
   }
 
   async function handleArchive() {
@@ -504,7 +618,7 @@ function OverviewTab({
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <MiniStat label="Users" value={stats?.userCount ?? 0} />
-        <MiniStat label="Employees" value={stats?.employeeCount ?? 0} />
+        <MiniStat label="Employees" value={employeeCount} />
       </div>
 
       {/* Organization info */}
@@ -513,16 +627,7 @@ function OverviewTab({
           <span>Organization Details</span>
           {!editing && (
             <button className="dg-btn dg-btn-ghost" style={{ fontSize: "var(--dg-fs-caption)" }} onClick={() => {
-                setEditName(organization.name);
-                setEditAddress(organization.address);
-                setEditPhone(organization.phone);
-                setEditTimezone(organization.timezone ?? "");
-                setEditFocusAreaLabel(organization.focusAreaLabel);
-                setEditCertLabel(organization.certificationLabel);
-                setEditRoleLabel(organization.roleLabel);
-                setEditShiftDisplayMode(organization.shiftDisplayMode);
-                setEditEnforceConflictPrevention(organization.enforceConflictPrevention);
-                setEditDataRetentionDays(organization.dataRetentionDays ?? 365);
+                resetEditState();
                 setEditing(true);
               }}>
               Edit
@@ -531,55 +636,79 @@ function OverviewTab({
         </div>
         <div style={sectionBodyStyle}>
           {editing ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label style={labelStyle}>Name</label>
                 <input className="dg-input" value={editName} onChange={(e) => setEditName(e.target.value)} />
               </div>
-              <div>
-                <label style={labelStyle}>Address</label>
-                <input className="dg-input" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
+              <OrganizationLocationFields
+                value={{
+                  phone: editPhone,
+                  timezone: editTimezone,
+                  addressLine1: editAddressLine1,
+                  addressLine2: editAddressLine2,
+                  addressCity: editAddressCity,
+                  addressState: editAddressState,
+                  addressPostalCode: editAddressPostalCode,
+                  addressCountry: editAddressCountry,
+                }}
+                onChange={(patch) => {
+                  if (patch.phone !== undefined) setEditPhone(patch.phone);
+                  if (patch.timezone !== undefined) setEditTimezone(patch.timezone);
+                  if (patch.addressLine1 !== undefined) setEditAddressLine1(patch.addressLine1);
+                  if (patch.addressLine2 !== undefined) setEditAddressLine2(patch.addressLine2);
+                  if (patch.addressCity !== undefined) setEditAddressCity(patch.addressCity);
+                  if (patch.addressState !== undefined) setEditAddressState(patch.addressState);
+                  if (patch.addressPostalCode !== undefined) setEditAddressPostalCode(patch.addressPostalCode);
+                  if (patch.addressCountry !== undefined) setEditAddressCountry(patch.addressCountry);
+                }}
+                employeeCount={employeeCount}
+                employeeCountLoading={employeeCountLoading}
+                gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))"
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+                <div>
+                  <label style={labelStyle}>Shift Display</label>
+                  <CustomSelect
+                    value={editShiftDisplayMode}
+                    options={[
+                      { value: "code", label: "Short Labels" },
+                      { value: "name", label: "Full Names" },
+                    ]}
+                    onChange={(val) => setEditShiftDisplayMode(val as "code" | "name")}
+                  />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 22 }}>
+                  <input
+                    type="checkbox"
+                    id="editConflictPrevention"
+                    checked={editEnforceConflictPrevention}
+                    onChange={(e) => setEditEnforceConflictPrevention(e.target.checked)}
+                  />
+                  <label htmlFor="editConflictPrevention" style={{ ...labelStyle, marginBottom: 0, cursor: "pointer" }}>Conflict Prevention</label>
+                </div>
+                <div>
+                  <label style={labelStyle}>Data Retention (days)</label>
+                  <input className="dg-input" type="number" min={1} value={editDataRetentionDays} onChange={(e) => setEditDataRetentionDays(Number(e.target.value))} />
+                </div>
               </div>
-              <div>
-                <label style={labelStyle}>Phone</label>
-                <input className="dg-input" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
-              </div>
-              <div>
-                <label style={labelStyle}>Timezone</label>
-                <input className="dg-input" value={editTimezone} onChange={(e) => setEditTimezone(e.target.value)} placeholder="America/New_York" />
-              </div>
-              <div>
-                <label style={labelStyle}>Shift Display</label>
-                <CustomSelect
-                  value={editShiftDisplayMode}
-                  options={[
-                    { value: "code", label: "Short Labels" },
-                    { value: "name", label: "Full Names" },
-                  ]}
-                  onChange={(val) => setEditShiftDisplayMode(val as "code" | "name")}
-                />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 22 }}>
-                <input
-                  type="checkbox"
-                  id="editConflictPrevention"
-                  checked={editEnforceConflictPrevention}
-                  onChange={(e) => setEditEnforceConflictPrevention(e.target.checked)}
-                />
-                <label htmlFor="editConflictPrevention" style={{ ...labelStyle, marginBottom: 0, cursor: "pointer" }}>Conflict Prevention</label>
-              </div>
-              <div>
-                <label style={labelStyle}>Data Retention (days)</label>
-                <input className="dg-input" type="number" min={1} value={editDataRetentionDays} onChange={(e) => setEditDataRetentionDays(Number(e.target.value))} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
-                <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
-                  {saving ? "Saving…" : "Save"}
-                </button>
-                <button className="dg-btn dg-btn-secondary" onClick={() => setEditing(false)} disabled={saving}>
-                  Cancel
-                </button>
-              </div>
+              <EditorActionRow
+                style={{ gridColumn: "1 / -1", marginTop: 8 }}
+                secondaryAction={(
+                  <button
+                    className="dg-btn dg-btn-secondary"
+                    onClick={hasChanges ? handleDiscardEditing : handleCancelEditing}
+                    disabled={saving}
+                  >
+                    {getEditorDismissLabel(hasChanges)}
+                  </button>
+                )}
+                primaryAction={(
+                  <button className="dg-btn dg-btn-primary" onClick={handleReview} disabled={saving || !hasChanges}>
+                    Review &amp; Save
+                  </button>
+                )}
+              />
             </div>
           ) : (
             <>
@@ -587,8 +716,8 @@ function OverviewTab({
               <InfoRow label="Slug" value={organization.slug} />
               <InfoRow label="Address" value={organization.address} />
               <InfoRow label="Phone" value={organization.phone} />
-              <InfoRow label="Timezone" value={organization.timezone ? `${organization.timezone} (${shortTz(organization.timezone)})` : null} />
-              <InfoRow label="Employee count" value={organization.employeeCount?.toString()} />
+              <InfoRow label="Timezone" value={organization.timezone ? `${formatTimezoneLabel(organization.timezone)} · ${organization.timezone}` : null} />
+              <InfoRow label="Employee count" value={employeeCountLoading ? "Loading…" : employeeCount.toString()} />
             </>
           )}
         </div>
@@ -799,6 +928,19 @@ function OverviewTab({
           onCancel={() => { setSuspendConfirm(false); setSuspendReason(""); }}
         />
       )}
+
+      {reviewOpen ? (
+        <OrganizationChangeReviewModal
+          changes={reviewChanges}
+          saving={saving}
+          onCancel={() => {
+            if (!saving) setReviewOpen(false);
+          }}
+          onConfirm={() => {
+            void handleSave();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -840,8 +982,17 @@ function UsersTab({
     setChangingRole(userId);
     try {
       const target = users.find((u) => u.id === userId);
+      if (!target?.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
       const oldRole = target?.orgRole ?? "user";
-      await changeOrganizationUserRole(userId, newRole, orgId, target?.email ?? undefined);
+      await updateOrganizationMembershipGuarded({
+        orgId,
+        userId,
+        expectedUpdatedAt: target.updatedAt,
+        orgRole: newRole,
+        adminPermissions: newRole === "admin" ? target.adminPermissions : null,
+      });
       toast.success("Role updated");
       queueNotification({
         action: "role_changed",
@@ -852,7 +1003,12 @@ function UsersTab({
       });
       onUsersChanged();
     } catch (err: unknown) {
+      if (err instanceof OrganizationAccessConflictError) {
+        toast.error("User access changed elsewhere. Review the latest values and try again.");
+        onUsersChanged();
+      } else {
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to change role");
+      }
     } finally {
       setChangingRole(null);
     }
@@ -862,12 +1018,24 @@ function UsersTab({
     if (!removeConfirm) return;
     setRemoving(true);
     try {
-      await removeUserFromOrganization(removeConfirm.id, orgId);
+      if (!removeConfirm.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
+      await removeOrganizationMembershipGuarded({
+        orgId,
+        userId: removeConfirm.id,
+        expectedUpdatedAt: removeConfirm.updatedAt,
+      });
       toast.success("User removed from organization");
       setRemoveConfirm(null);
       onUsersChanged();
     } catch (err: unknown) {
+      if (err instanceof OrganizationAccessConflictError) {
+        toast.error("User access changed elsewhere. Review the latest values and try again.");
+        onUsersChanged();
+      } else {
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to remove user");
+      }
     } finally {
       setRemoving(false);
     }
@@ -1069,10 +1237,42 @@ function UsersTab({
           title={`Admin Permissions \u2014 ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
           subtitle={<>Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.</>}
           initialPermissions={editingPerms.adminPermissions}
+          buildReview={(perms) => {
+            const changes = buildMembershipAccessChanges(editingPerms, {
+              orgRole: editingPerms.orgRole,
+              adminPermissions: perms,
+            });
+            return changes.length > 0
+              ? {
+                  title: "Review Permission Changes",
+                  description: "Review these permission changes before saving. Admin access changes affect what this person can see and do across the organization.",
+                  changes,
+                  confirmLabel: "Confirm Save",
+                  warningText: "This save updates sensitive admin permissions.",
+                }
+              : null;
+          }}
           onSave={async (perms) => {
-            await updateAdminPermissions(editingPerms.id, perms, orgId, editingPerms.email ?? undefined);
-            toast.success("Permissions updated");
-            onUsersChanged();
+            if (!editingPerms.updatedAt) {
+              throw new Error("User access data is out of date. Refresh and try again.");
+            }
+            try {
+              await updateOrganizationMembershipGuarded({
+                orgId,
+                userId: editingPerms.id,
+                expectedUpdatedAt: editingPerms.updatedAt,
+                adminPermissions: perms,
+              });
+              toast.success("Permissions updated");
+              onUsersChanged();
+            } catch (err) {
+              if (err instanceof OrganizationAccessConflictError) {
+                toast.error("Permissions changed elsewhere. Review the latest values and try again.");
+                onUsersChanged();
+                throw err;
+              }
+              throw err;
+            }
           }}
           onClose={() => setEditingPerms(null)}
         />
@@ -1563,6 +1763,7 @@ function InvitationsTab({
   onRefresh: () => void;
 }) {
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [revokeConfirm, setRevokeConfirm] = useState<InvitationRow | null>(null);
 
   function getStatus(inv: InvitationRow): { label: string; color: string; bg: string } {
     if (inv.accepted_at) return { label: "Accepted", color: "var(--color-success)", bg: "var(--color-success-bg)" };
@@ -1571,21 +1772,30 @@ function InvitationsTab({
     return { label: "Pending", color: "var(--color-today-text)", bg: "var(--color-today-bg)" };
   }
 
-  async function handleRevoke(invId: string) {
-    setRevoking(invId);
+  async function handleRevoke(inv: InvitationRow) {
+    if (!inv.updated_at) {
+      toast.error("Invitation data is out of date. Refresh and try again.");
+      return;
+    }
+    setRevoking(inv.id);
     try {
-      const { error } = await supabase
-        .from("invitations")
-        .update({ revoked_at: new Date().toISOString() })
-        .eq("id", invId)
-        .eq("org_id", orgId);
-      if (error) throw error;
+      await revokeOrganizationInvitationGuarded({
+        orgId,
+        invitationId: inv.id,
+        expectedUpdatedAt: inv.updated_at,
+      });
       toast.success("Invitation revoked");
       onRefresh();
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to revoke invitation");
+      if (err instanceof InvitationAccessConflictError) {
+        toast.error("Invitation changed elsewhere. Review the latest values and try again.");
+        onRefresh();
+      } else {
+        toast.error((err instanceof Error ? err.message : null) ?? "Failed to revoke invitation");
+      }
     } finally {
       setRevoking(null);
+      setRevokeConfirm(null);
     }
   }
 
@@ -1651,7 +1861,7 @@ function InvitationsTab({
                           <button
                             className="dg-btn dg-btn-ghost"
                             style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px", color: "var(--color-danger)" }}
-                            onClick={() => handleRevoke(inv.id)}
+                            onClick={() => setRevokeConfirm(inv)}
                             disabled={revoking === inv.id}
                           >
                             {revoking === inv.id ? "Revoking..." : "Revoke"}
@@ -1666,6 +1876,20 @@ function InvitationsTab({
           </table>
         </div>
       </div>
+
+      {revokeConfirm && (
+        <ConfirmDialog
+          title="Revoke Invitation"
+          message={`Revoke the invitation for "${revokeConfirm.email}"? They will not be able to use the current invite link after this change.`}
+          confirmLabel="Revoke Invitation"
+          variant="danger"
+          isLoading={revoking === revokeConfirm.id}
+          onConfirm={() => {
+            void handleRevoke(revokeConfirm);
+          }}
+          onCancel={() => setRevokeConfirm(null)}
+        />
+      )}
     </div>
   );
 }

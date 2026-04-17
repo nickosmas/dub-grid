@@ -1,20 +1,21 @@
 import {
   supabase, cacheThrough, cacheDel, CacheKey, TTL,
   FOCUS_AREA_COLS, SHIFT_CODE_COLS, SHIFT_CATEGORY_COLS, NAMED_ITEM_COLS,
-  COVERAGE_REQ_COLS, ABSENCE_TYPE_COLS, INDICATOR_TYPE_COLS,
+  COVERAGE_REQ_COLS, COVERAGE_RULE_CONFIG_COLS, COVERAGE_RULE_CONFIG_CODE_COLS,
+  ABSENCE_TYPE_COLS, INDICATOR_TYPE_COLS,
   logAudit,
 } from "./shared";
 import type {
   DbFocusArea, DbShiftCode, DbShiftCategory, DbNamedItem,
-  DbCoverageRequirement, DbAbsenceType, DbIndicatorType,
+  DbCoverageRequirement, DbCoverageRuleConfig, DbCoverageRuleConfigCode, DbAbsenceType, DbIndicatorType,
 } from "./types";
 import {
   rowToFocusArea, rowToShiftCode, rowToShiftCategory, rowToNamedItem,
-  rowToCoverageRequirement, rowToAbsenceType, rowToIndicatorType,
+  rowToCoverageRequirement, rowsToCoverageRuleConfig, rowToAbsenceType, rowToIndicatorType,
 } from "./mappers";
 import type {
   FocusArea, ShiftCode, ShiftCategory, NamedItem,
-  CoverageRequirement, AbsenceType, IndicatorType,
+  CoverageRequirement, CoverageRuleConfig, AbsenceType, IndicatorType,
 } from "@/types";
 
 // ── Dependency Checks ────────────────────────────────────────────────────────
@@ -570,6 +571,35 @@ export async function fetchCoverageRequirements(orgId: string): Promise<Coverage
   });
 }
 
+export async function fetchCoverageRuleConfigs(orgId: string): Promise<CoverageRuleConfig[]> {
+  return cacheThrough(CacheKey.coverageRuleConfigs(orgId), TTL.STABLE, async () => {
+    const [{ data: configRows, error: configError }, { data: codeRows, error: codeError }] = await Promise.all([
+      supabase
+        .from("coverage_rule_configs")
+        .select(COVERAGE_RULE_CONFIG_COLS)
+        .eq("org_id", orgId),
+      supabase
+        .from("coverage_rule_config_codes")
+        .select(COVERAGE_RULE_CONFIG_CODE_COLS)
+        .eq("org_id", orgId),
+    ]);
+
+    if (configError) throw configError;
+    if (codeError) throw codeError;
+
+    const codesByConfigId = new Map<number, DbCoverageRuleConfigCode[]>();
+    for (const row of (codeRows as DbCoverageRuleConfigCode[] | null) ?? []) {
+      const group = codesByConfigId.get(row.config_id) ?? [];
+      group.push(row);
+      codesByConfigId.set(row.config_id, group);
+    }
+
+    return ((configRows as DbCoverageRuleConfig[] | null) ?? []).map((row) =>
+      rowsToCoverageRuleConfig(row, codesByConfigId.get(row.id) ?? []),
+    );
+  });
+}
+
 /**
  * Batch save coverage requirements for a (focus_area, shift_code) combo.
  * Replaces all existing rows for that combo (delete + insert).
@@ -614,6 +644,126 @@ export async function saveCoverageRequirements(
   await cacheDel(CacheKey.coverageReqs(orgId));
   void logAudit("coverage_requirements.saved", "coverage_requirement", `${focusAreaId}_${shiftCodeId}`, { count: rows.length }, orgId);
   return (data as DbCoverageRequirement[]).map(rowToCoverageRequirement);
+}
+
+function sortNumberArray(values: number[]): number[] {
+  return [...values].sort((left, right) => left - right);
+}
+
+export async function saveCoverageRuleConfig(
+  orgId: string,
+  focusAreaId: number,
+  requirementShiftCodeId: number,
+  config: {
+    eligibleShiftCodeIds: number[];
+    preferredOpenShiftCodeId: number;
+  },
+): Promise<CoverageRuleConfig | null> {
+  const normalizedEligible = Array.from(new Set(sortNumberArray(config.eligibleShiftCodeIds)));
+  const isLegacyDefault =
+    normalizedEligible.length === 1 &&
+    normalizedEligible[0] === requirementShiftCodeId &&
+    config.preferredOpenShiftCodeId === requirementShiftCodeId;
+
+  const { data: existingRows, error: fetchError } = await supabase
+    .from("coverage_rule_configs")
+    .select(COVERAGE_RULE_CONFIG_COLS)
+    .eq("org_id", orgId)
+    .eq("focus_area_id", focusAreaId)
+    .eq("requirement_shift_code_id", requirementShiftCodeId)
+    .limit(1);
+  if (fetchError) throw fetchError;
+
+  const existing = (existingRows as DbCoverageRuleConfig[] | null)?.[0] ?? null;
+
+  if (isLegacyDefault) {
+    if (existing) {
+      const { error: deleteCodesError } = await supabase
+        .from("coverage_rule_config_codes")
+        .delete()
+        .eq("org_id", orgId)
+        .eq("config_id", existing.id);
+      if (deleteCodesError) throw deleteCodesError;
+
+      const { error: deleteConfigError } = await supabase
+        .from("coverage_rule_configs")
+        .delete()
+        .eq("org_id", orgId)
+        .eq("id", existing.id);
+      if (deleteConfigError) throw deleteConfigError;
+    }
+
+    await cacheDel(CacheKey.coverageReqs(orgId), CacheKey.coverageRuleConfigs(orgId));
+    void logAudit(
+      "coverage_rule_config.saved",
+      "coverage_rule_config",
+      `${focusAreaId}_${requirementShiftCodeId}`,
+      { deleted: !!existing },
+      orgId,
+    );
+    return null;
+  }
+
+  let savedConfig: DbCoverageRuleConfig;
+  if (existing) {
+    const { data, error } = await supabase
+      .from("coverage_rule_configs")
+      .update({
+        preferred_open_shift_code_id: config.preferredOpenShiftCodeId,
+      })
+      .eq("org_id", orgId)
+      .eq("id", existing.id)
+      .select(COVERAGE_RULE_CONFIG_COLS)
+      .single();
+    if (error) throw error;
+    savedConfig = data as DbCoverageRuleConfig;
+  } else {
+    const { data, error } = await supabase
+      .from("coverage_rule_configs")
+      .insert({
+        org_id: orgId,
+        focus_area_id: focusAreaId,
+        requirement_shift_code_id: requirementShiftCodeId,
+        preferred_open_shift_code_id: config.preferredOpenShiftCodeId,
+      })
+      .select(COVERAGE_RULE_CONFIG_COLS)
+      .single();
+    if (error) throw error;
+    savedConfig = data as DbCoverageRuleConfig;
+  }
+
+  const { error: deleteCodesError } = await supabase
+    .from("coverage_rule_config_codes")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("config_id", savedConfig.id);
+  if (deleteCodesError) throw deleteCodesError;
+
+  const codeRows = normalizedEligible.map((eligibleShiftCodeId) => ({
+    config_id: savedConfig.id,
+    org_id: orgId,
+    eligible_shift_code_id: eligibleShiftCodeId,
+  }));
+
+  const { data: insertedCodes, error: insertCodesError } = await supabase
+    .from("coverage_rule_config_codes")
+    .insert(codeRows)
+    .select(COVERAGE_RULE_CONFIG_CODE_COLS);
+  if (insertCodesError) throw insertCodesError;
+
+  await cacheDel(CacheKey.coverageReqs(orgId), CacheKey.coverageRuleConfigs(orgId));
+  void logAudit(
+    "coverage_rule_config.saved",
+    "coverage_rule_config",
+    `${focusAreaId}_${requirementShiftCodeId}`,
+    {
+      eligibleShiftCodeIds: normalizedEligible,
+      preferredOpenShiftCodeId: config.preferredOpenShiftCodeId,
+    },
+    orgId,
+  );
+
+  return rowsToCoverageRuleConfig(savedConfig, (insertedCodes as DbCoverageRuleConfigCode[] | null) ?? []);
 }
 
 export async function upsertShiftCode(

@@ -9,13 +9,17 @@ import type {
   Employee,
   FocusArea,
   CoverageRequirement,
+  CoverageRuleConfig,
   ShiftCategory,
   ShiftRequest,
   PublishHistoryEntry,
   PublishHistoryEntryWithName,
   Invitation,
 } from "@/types";
-import { resolveRequirement } from "@/lib/schedule-logic";
+import {
+  buildShiftCodeIdsByFocusArea,
+  computeCoverageCategorySnapshots,
+} from "@/lib/schedule-logic";
 
 // ─── Exported Types ─────────────────────────────────────
 
@@ -61,6 +65,10 @@ export interface OpenShift {
   date: Date;
   dayOfWeek: string;
   dayOfMonth: number;
+  requirementShiftCodeId: number;
+  eligibleShiftCodeIds: number[];
+  preferredOpenShiftCodeId: number;
+  ruleLabel: string;
   shiftCodeLabel: string;
   focusAreaName: string;
   timeRange: string;
@@ -387,6 +395,7 @@ export function computeCoveragePctAndSlots(
   focusAreas: FocusArea[],
   shiftCodes: ShiftCode[],
   requirements: CoverageRequirement[],
+  coverageRuleConfigs: CoverageRuleConfig[],
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
@@ -400,41 +409,24 @@ export function computeCoveragePctAndSlots(
     empsByFa.set(fa.id, employees.filter((e) => e.focusAreaIds.includes(fa.id)));
   }
 
-  const codesByFa = new Map<number, Set<number>>();
-  for (const fa of focusAreas) {
-    const ids = new Set<number>();
-    for (const sc of shiftCodes) {
-      if (sc.focusAreaId === fa.id || sc.focusAreaId == null) ids.add(sc.id);
-    }
-    codesByFa.set(fa.id, ids);
-  }
-
-  const requiredCodeIds = new Set(requirements.map((r) => r.shiftCodeId));
+  const codesByFa = buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes);
+  void coverageRuleConfigs;
+  const snapshots = computeCoverageCategorySnapshots(
+    focusAreas,
+    [],
+    shiftCodes,
+    requirements,
+    weekDates,
+    empsByFa,
+    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.shiftCodeIds ?? [],
+    codesByFa,
+  );
   let totalRequired = 0;
   let totalFilled = 0;
 
-  for (const fa of focusAreas) {
-    const faEmps = empsByFa.get(fa.id) ?? [];
-    const faCodes = codesByFa.get(fa.id) ?? new Set();
-
-    for (const codeId of requiredCodeIds) {
-      if (!faCodes.has(codeId)) continue;
-
-      for (const date of weekDates) {
-        const req = resolveRequirement(requirements, fa.id, codeId, date.getDay());
-        if (!req || req.minStaff <= 0) continue;
-
-        const dateKey = formatDateKey(date);
-        let actual = 0;
-        for (const emp of faEmps) {
-          const shift = shifts[`${emp.id}_${dateKey}`];
-          if (shift && shift.shiftCodeIds.includes(codeId)) actual++;
-        }
-
-        totalRequired += req.minStaff;
-        totalFilled += Math.min(actual, req.minStaff);
-      }
-    }
+  for (const snapshot of snapshots) {
+    totalRequired += snapshot.status.required;
+    totalFilled += Math.min(snapshot.status.actual, snapshot.status.required);
   }
 
   const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
@@ -493,6 +485,7 @@ export function computeCoverageBySection(
   shifts: ShiftMap,
   employees: Employee[],
   coverageRequirements: CoverageRequirement[],
+  coverageRuleConfigs: CoverageRuleConfig[],
   shiftCodes: ShiftCode[],
 ): SectionCoverage[] {
   const empsByFa = new Map<number, Employee[]>();
@@ -500,42 +493,35 @@ export function computeCoverageBySection(
     empsByFa.set(fa.id, employees.filter((e) => e.focusAreaIds.includes(fa.id)));
   }
 
-  const codesByFa = new Map<number, Set<number>>();
-  for (const fa of focusAreas) {
-    const ids = new Set<number>();
-    for (const sc of shiftCodes) {
-      if (sc.focusAreaId === fa.id || sc.focusAreaId == null) ids.add(sc.id);
-    }
-    codesByFa.set(fa.id, ids);
-  }
-
-  const requiredCodeIds = new Set(coverageRequirements.map((r) => r.shiftCodeId));
+  const codesByFa = buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes);
+  void coverageRuleConfigs;
+  const snapshots = computeCoverageCategorySnapshots(
+    focusAreas,
+    [],
+    shiftCodes,
+    coverageRequirements,
+    weekDates,
+    empsByFa,
+    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.shiftCodeIds ?? [],
+    codesByFa,
+  );
 
   const allSections = focusAreas.map((fa) => {
     const faEmps = empsByFa.get(fa.id) ?? [];
     const faCodes = codesByFa.get(fa.id) ?? new Set();
+    const faSnapshots = snapshots.filter((snapshot) => snapshot.focusAreaId === fa.id);
     let totalFilled = 0;
     let totalRequired = 0;
 
     const daily: SectionCoverage["daily"] = weekDates.map((date) => {
       const dateKey = formatDateKey(date);
-      const dow = date.getDay();
       let dayFilled = 0;
       let dayRequired = 0;
 
-      for (const codeId of requiredCodeIds) {
-        if (!faCodes.has(codeId)) continue;
-        const req = resolveRequirement(coverageRequirements, fa.id, codeId, dow);
-        if (!req || req.minStaff <= 0) continue;
-
-        let actual = 0;
-        for (const emp of faEmps) {
-          const shift = shifts[`${emp.id}_${dateKey}`];
-          if (shift && shift.shiftCodeIds.includes(codeId)) actual++;
-        }
-
-        dayRequired += req.minStaff;
-        dayFilled += Math.min(actual, req.minStaff);
+      for (const snapshot of faSnapshots) {
+        if (formatDateKey(snapshot.date) !== dateKey) continue;
+        dayRequired += snapshot.status.required;
+        dayFilled += Math.min(snapshot.status.actual, snapshot.status.required);
       }
 
       totalFilled += dayFilled;
@@ -556,9 +542,9 @@ export function computeCoverageBySection(
       const ratio = dayRequired > 0 ? dayFilled / dayRequired : 1;
       return {
         dateKey,
-        dayLabel: DAY_LABELS[dow],
+        dayLabel: DAY_LABELS[date.getDay()],
         staffCount,
-        status: ratio >= 0.9 ? "green" : ratio >= 0.7 ? "amber" : "red",
+        status: ratio >= 1 ? "green" : "red",
       };
     });
 
@@ -587,6 +573,7 @@ export function computeOpenShifts(
   focusAreas: FocusArea[],
   shiftCodes: ShiftCode[],
   coverageRequirements: CoverageRequirement[],
+  coverageRuleConfigs: CoverageRuleConfig[],
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
@@ -600,71 +587,60 @@ export function computeOpenShifts(
     empsByFa.set(fa.id, employees.filter((e) => e.focusAreaIds.includes(fa.id)));
   }
 
-  const codesByFa = new Map<number, Set<number>>();
-  for (const fa of focusAreas) {
-    const ids = new Set<number>();
-    for (const sc of shiftCodes) {
-      if (sc.focusAreaId === fa.id || sc.focusAreaId == null) ids.add(sc.id);
-    }
-    codesByFa.set(fa.id, ids);
-  }
-
-  const requiredCodeIds = new Set(coverageRequirements.map((r) => r.shiftCodeId));
+  const codesByFa = buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes);
+  void coverageRuleConfigs;
+  const snapshots = computeCoverageCategorySnapshots(
+    focusAreas,
+    [],
+    shiftCodes,
+    coverageRequirements,
+    weekDates,
+    empsByFa,
+    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.shiftCodeIds ?? [],
+    codesByFa,
+    shiftCodeDisplayMap,
+  );
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  for (const fa of focusAreas) {
-    const faEmps = empsByFa.get(fa.id) ?? [];
-    const faCodes = codesByFa.get(fa.id) ?? new Set();
+  for (const snapshot of snapshots) {
+    const needed = snapshot.status.required - snapshot.status.actual;
+    if (needed <= 0) continue;
 
-    for (const codeId of requiredCodeIds) {
-      if (!faCodes.has(codeId)) continue;
-      const sc = shiftCodeById.get(codeId);
-      if (!sc) continue;
+    const sc = shiftCodeById.get(snapshot.preferredOpenShiftCodeId);
+    if (!sc) continue;
 
-      for (const date of weekDates) {
-        const req = resolveRequirement(
-          coverageRequirements,
-          fa.id,
-          codeId,
-          date.getDay(),
-        );
-        if (!req || req.minStaff <= 0) continue;
+    const daysUntil = Math.floor(
+      (snapshot.date.getTime() - today.getTime()) / 86400000,
+    );
+    const urgency: OpenShift["urgency"] =
+      daysUntil < 0 ? "low" : daysUntil <= 1 ? "high" : daysUntil <= 3 ? "medium" : "low";
 
-        const dateKey = formatDateKey(date);
-        let actual = 0;
-        for (const emp of faEmps) {
-          const shift = shifts[`${emp.id}_${dateKey}`];
-          if (shift && shift.shiftCodeIds.includes(codeId)) actual++;
-        }
-
-        const needed = req.minStaff - actual;
-        if (needed <= 0) continue;
-
-        const daysUntil = Math.floor(
-          (date.getTime() - today.getTime()) / 86400000,
-        );
-        const urgency: OpenShift["urgency"] =
-          daysUntil < 0 ? "low" : daysUntil <= 1 ? "high" : daysUntil <= 3 ? "medium" : "low";
-
-        let timeRange = "";
-        if (sc.defaultStartTime && sc.defaultEndTime) {
-          timeRange = `${formatTime12h(sc.defaultStartTime)}\u2013${formatTime12h(sc.defaultEndTime)}`;
-        }
-
-        openShifts.push({
-          id: `${fa.id}_${codeId}_${dateKey}`,
-          date,
-          dayOfWeek: SHORT_DAYS[date.getDay()],
-          dayOfMonth: date.getDate(),
-          shiftCodeLabel: shiftCodeDisplayMap?.get(codeId) ?? (sc.name || sc.label),
-          focusAreaName: fa.name,
-          timeRange,
-          needed,
-          urgency,
-        });
-      }
+    let timeRange = "";
+    if (sc.defaultStartTime && sc.defaultEndTime) {
+      timeRange = `${formatTime12h(sc.defaultStartTime)}\u2013${formatTime12h(sc.defaultEndTime)}`;
     }
+
+    const label =
+      snapshot.shiftCategoryName !== "Uncategorized"
+        ? snapshot.shiftCategoryName
+        : (shiftCodeDisplayMap?.get(sc.id) ?? sc.name ?? sc.label);
+
+    openShifts.push({
+      id: `${snapshot.focusAreaId}_${snapshot.shiftCategoryId}_${formatDateKey(snapshot.date)}`,
+      date: snapshot.date,
+      dayOfWeek: SHORT_DAYS[snapshot.date.getDay()],
+      dayOfMonth: snapshot.date.getDate(),
+      requirementShiftCodeId: snapshot.preferredOpenShiftCodeId,
+      eligibleShiftCodeIds: snapshot.eligibleShiftCodeIds,
+      preferredOpenShiftCodeId: snapshot.preferredOpenShiftCodeId,
+      ruleLabel: label,
+      shiftCodeLabel: label,
+      focusAreaName: snapshot.focusAreaName,
+      timeRange,
+      needed,
+      urgency,
+    });
   }
 
   return openShifts.sort((a, b) => {
@@ -856,6 +832,7 @@ export function computeCoverageTrendData(
   focusAreas: FocusArea[],
   shiftCodes: ShiftCode[],
   coverageRequirements: CoverageRequirement[],
+  coverageRuleConfigs: CoverageRuleConfig[],
   allEmployees: Employee[],
   allShifts: ShiftMap,
   periodStart: Date,
@@ -880,6 +857,7 @@ export function computeCoverageTrendData(
       focusAreas,
       shiftCodes,
       coverageRequirements,
+      coverageRuleConfigs,
       periodDates,
       activeEmployees,
       periodShifts,

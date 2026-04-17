@@ -37,6 +37,12 @@ CREATE TABLE public.organizations (
       )
     ),
   address              TEXT NOT NULL DEFAULT '',
+  address_line_1       TEXT NOT NULL DEFAULT '',
+  address_line_2       TEXT NOT NULL DEFAULT '',
+  address_city         TEXT NOT NULL DEFAULT '',
+  address_state        TEXT NOT NULL DEFAULT '',
+  address_postal_code  TEXT NOT NULL DEFAULT '',
+  address_country      TEXT NOT NULL DEFAULT '',
   phone                TEXT NOT NULL DEFAULT '',
   employee_count       INTEGER,
   logo_url             TEXT,
@@ -130,6 +136,7 @@ CREATE TABLE public.organization_memberships (
   phone                      TEXT,
   onboarding_completed_at    TIMESTAMPTZ,
   tooltip_tours_completed    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   UNIQUE (user_id, org_id)
 );
@@ -460,6 +467,7 @@ CREATE TABLE public.invitations (
   accepted_at    TIMESTAMPTZ,
   revoked_at     TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   /** Employee record this invitation is for. Set when inviting from staff page. */
   employee_id    UUID,
   /** For app-only invitations: store invitee details before account creation. */
@@ -672,6 +680,41 @@ CREATE UNIQUE INDEX coverage_req_per_day_unique
 CREATE UNIQUE INDEX coverage_req_every_day_unique
   ON public.coverage_requirements(org_id, focus_area_id, shift_code_id)
   WHERE day_of_week IS NULL;
+
+
+-- ── coverage_rule_configs ───────────────────────────────────────────────────
+
+CREATE TABLE public.coverage_rule_configs (
+  id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id                       UUID NOT NULL,
+  focus_area_id                BIGINT NOT NULL,
+  requirement_shift_code_id    BIGINT NOT NULL,
+  preferred_open_shift_code_id BIGINT NOT NULL,
+  created_by                   UUID,
+  updated_by                   UUID,
+  created_at                   TIMESTAMPTZ DEFAULT now(),
+  updated_at                   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX coverage_rule_configs_unique
+  ON public.coverage_rule_configs(org_id, focus_area_id, requirement_shift_code_id);
+
+
+-- ── coverage_rule_config_codes ──────────────────────────────────────────────
+
+CREATE TABLE public.coverage_rule_config_codes (
+  id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  config_id             BIGINT NOT NULL,
+  org_id                UUID NOT NULL,
+  eligible_shift_code_id BIGINT NOT NULL,
+  created_by            UUID,
+  updated_by            UUID,
+  created_at            TIMESTAMPTZ DEFAULT now(),
+  updated_at            TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX coverage_rule_config_codes_unique
+  ON public.coverage_rule_config_codes(config_id, eligible_shift_code_id);
 
 
 -- ── shift_requests ──────────────────────────────────────────────────────────
@@ -909,6 +952,23 @@ ALTER TABLE public.coverage_requirements
   ADD CONSTRAINT coverage_requirements_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT coverage_requirements_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
+-- coverage_rule_configs
+ALTER TABLE public.coverage_rule_configs
+  ADD CONSTRAINT coverage_rule_configs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_configs_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_configs_requirement_shift_code_id_fkey FOREIGN KEY (requirement_shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_configs_preferred_open_shift_code_id_fkey FOREIGN KEY (preferred_open_shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_configs_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT coverage_rule_configs_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- coverage_rule_config_codes
+ALTER TABLE public.coverage_rule_config_codes
+  ADD CONSTRAINT coverage_rule_config_codes_config_id_fkey FOREIGN KEY (config_id) REFERENCES public.coverage_rule_configs(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_config_codes_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_config_codes_eligible_shift_code_id_fkey FOREIGN KEY (eligible_shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_rule_config_codes_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT coverage_rule_config_codes_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
 -- publish_history
 ALTER TABLE public.publish_history
   ADD CONSTRAINT publish_history_org_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -1050,6 +1110,14 @@ CREATE INDEX idx_user_sessions_user_last_active ON public.user_sessions(user_id,
 CREATE INDEX idx_coverage_requirements_org ON public.coverage_requirements(org_id);
 CREATE INDEX idx_coverage_requirements_lookup ON public.coverage_requirements(org_id, focus_area_id, shift_code_id);
 
+-- coverage_rule_configs
+CREATE INDEX idx_coverage_rule_configs_org ON public.coverage_rule_configs(org_id);
+CREATE INDEX idx_coverage_rule_configs_lookup ON public.coverage_rule_configs(org_id, focus_area_id, requirement_shift_code_id);
+
+-- coverage_rule_config_codes
+CREATE INDEX idx_coverage_rule_config_codes_org ON public.coverage_rule_config_codes(org_id);
+CREATE INDEX idx_coverage_rule_config_codes_config ON public.coverage_rule_config_codes(config_id);
+
 -- shift_requests
 CREATE INDEX idx_shift_requests_org_status ON public.shift_requests(org_id, status);
 CREATE INDEX idx_shift_requests_requester ON public.shift_requests(requester_emp_id, status);
@@ -1157,5 +1225,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_codes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.absence_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_requirements;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_rule_configs;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_rule_config_codes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.organization_memberships;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.departments;

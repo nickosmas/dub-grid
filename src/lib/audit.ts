@@ -65,6 +65,7 @@ export type AuditAction =
   | "org_roles.saved"
   | "org_role.restored"
   | "coverage_requirements.saved"
+  | "coverage_rule_config.saved"
   // Departments
   | "departments.saved"
   | "department.restored"
@@ -107,6 +108,7 @@ export type AuditResourceType =
   | "certification"
   | "org_role"
   | "coverage_requirement"
+  | "coverage_rule_config"
   | "department"
   | "recurring_shift"
   | "shift_series"

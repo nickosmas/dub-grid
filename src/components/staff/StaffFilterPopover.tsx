@@ -61,7 +61,7 @@ export function StaffFilterPopover({
               <div className="flex flex-wrap gap-1.5">
                 <button
                   onClick={() => onFilterFocusAreaChange(null)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--dg-radius-sm)] text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
                     filterFocusArea === null
                       ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
                       : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
@@ -75,7 +75,7 @@ export function StaffFilterPopover({
                     <button
                       key={fa.id}
                       onClick={() => onFilterFocusAreaChange(fa.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--dg-radius-sm)] text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
                         active
                           ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
                           : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
@@ -102,7 +102,7 @@ export function StaffFilterPopover({
               <div className="flex flex-wrap gap-1.5">
                 <button
                   onClick={() => onFilterRoleChange(null)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--dg-radius-sm)] text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
                     filterRole === null
                       ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
                       : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
@@ -116,7 +116,7 @@ export function StaffFilterPopover({
                     <button
                       key={r.id}
                       onClick={() => onFilterRoleChange(r.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--dg-radius-sm)] text-xs font-semibold transition-all duration-150 border-[1.5px] border-transparent ${
                         active
                           ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
                           : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
@@ -136,7 +136,7 @@ export function StaffFilterPopover({
         {/* Unlinked toggle */}
         {unlinkedCount > 0 && (
           <>
-            <label className="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer hover:bg-[var(--color-bg-secondary)] transition-colors">
+            <label className="flex items-center gap-2.5 px-2 py-2 rounded-[var(--dg-radius-sm)] cursor-pointer hover:bg-[var(--color-bg-secondary)] transition-colors">
               <input
                 type="checkbox"
                 checked={showOnlyUnlinked}
@@ -170,7 +170,7 @@ export function StaffFilterPopover({
         </button>
         <button
           onClick={onClose}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity"
+          className="px-3 py-1.5 rounded-[var(--dg-radius-sm)] text-xs font-semibold bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity"
         >
           Done
         </button>
@@ -208,7 +208,7 @@ export function StaffFilterPopover({
           className="isolate z-50"
         >
           <PopoverPrimitive.Popup
-            className="w-96 max-h-[600px] flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-[var(--shadow-float)] outline-hidden"
+            className="w-96 max-h-[600px] flex flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-float)] outline-hidden"
           >
             {content}
           </PopoverPrimitive.Popup>

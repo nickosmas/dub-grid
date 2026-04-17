@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
+import DashboardEmptyState from "./DashboardEmptyState";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
   success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
@@ -56,62 +57,12 @@ function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
 
 function EmptyActivityState() {
   return (
-    <div
-      style={{
-        padding: "32px 20px",
-        background: "var(--color-bg)",
-        border: "1px dashed var(--color-border)",
-        borderRadius: 14,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        gap: 12,
-        minHeight: 134,
-      }}
-    >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 999,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          color: "var(--color-text-subtle)",
-        }}
-      >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="10" cy="10" r="6.5" strokeDasharray="1.5 3" />
-        </svg>
-      </div>
-
-      <div>
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-          }}
-        >
-          No recent activity
-        </div>
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 12,
-            lineHeight: 1.5,
-            color: "var(--color-text-subtle)",
-            maxWidth: 300,
-          }}
-        >
-          Published updates, shift changes, requests, and new user sign-ups will appear here.
-        </div>
-      </div>
-    </div>
+    <DashboardEmptyState
+      variant="panel"
+      minHeight={134}
+      title="No recent activity"
+      description="Published updates, shift changes, requests, and new user sign-ups will appear here."
+    />
   );
 }
 
