@@ -6,6 +6,9 @@ import { saveDepartments, upsertFocusArea, deleteFocusArea, checkDepartmentDepen
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { ExplainerSection, PreviewFrame, WorkflowStrip } from "@/components/ui/explainer-section";
 import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import type { DependencyInfo } from "@/lib/db";
@@ -88,7 +91,6 @@ function DepartmentSection({
   const [localDepts, setLocalDepts] = useState<Department[]>([]);
   const [localFAs, setLocalFAs] = useState<FocusArea[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; dept: Department; deps: DependencyInfo | null } | null>(null);
   const [faDeleteConfirm, setFaDeleteConfirm] = useState<{ faId: number; fa: FocusArea } | null>(null);
@@ -159,12 +161,9 @@ function DepartmentSection({
   );
 
   // ── Enter / Cancel / Save ───────────────────────────────────────────────────
-  const handleEnterEdit = () => {
+  const syncDraftFromProps = useCallback(() => {
     setLocalDepts([...depts]);
     setLocalFAs([...propFAs]);
-    setIsEditing(true);
-    setError(null);
-    // Auto-expand all depts with 2+ FAs in scheduled mode
     if (type === "scheduled") {
       const toExpand = new Set<number>();
       for (const d of depts) {
@@ -172,19 +171,31 @@ function DepartmentSection({
         if (fas.length > 1) toExpand.add(d.id);
       }
       setExpandedIds(toExpand);
+    } else {
+      setExpandedIds(new Set());
     }
-  };
-
-  const handleCancel = () => {
-    setLocalDepts([]);
-    setLocalFAs([]);
-    setIsEditing(false);
     setDraggedIdx(null);
     setDragOverIdx(null);
     setFaDragDeptId(null);
     setFaDragIdx(null);
     setFaDragOverIdx(null);
     setError(null);
+    setDeleteConfirm(null);
+    setFaDeleteConfirm(null);
+  }, [depts, faByDept, propFAs, type]);
+
+  const handleEnterEdit = () => {
+    syncDraftFromProps();
+    setIsEditing(true);
+  };
+
+  const handleDiscard = () => {
+    syncDraftFromProps();
+  };
+
+  const handleClose = () => {
+    syncDraftFromProps();
+    setIsEditing(false);
   };
 
   const handleSave = async () => {
@@ -263,11 +274,9 @@ function DepartmentSection({
       }
 
       onDepartmentsChange(savedDepts);
-      setSaved(true);
       setIsEditing(false);
       setLocalDepts([]);
       setLocalFAs([]);
-      setTimeout(() => setSaved(false), 2000);
       toast.success(`${title} saved`);
     } catch (err) {
       const msg = err && typeof err === "object" && "message" in err
@@ -453,24 +462,26 @@ function DepartmentSection({
   };
 
   // ── Action buttons ────────────────────────────────────────────────────────
-  const actionButtons = (
-    <>
-      {!isEditing && canEdit && displayList.length > 0 && (
-        <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">Edit</button>
+  const footerActions = isEditing ? (
+    <EditorActionRow
+      secondaryAction={(
+        <button onClick={isDirty ? handleDiscard : handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
+          {getEditorDismissLabel(isDirty)}
+        </button>
       )}
-      {isEditing && (
-        <>
-          <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
-            {saving ? "Saving\u2026" : "Save All"}
-          </button>
-          <button onClick={handleCancel} className="dg-btn dg-btn-secondary dg-btn-sm">Cancel</button>
-        </>
+      primaryAction={(
+        <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+          {getEditorSaveLabel(saving)}
+        </button>
       )}
-      {saved && (
-        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-success)", fontWeight: 600 }}>Saved!</span>
-      )}
-    </>
-  );
+      style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
+    />
+  ) : canEdit && displayList.length > 0 ? (
+    <EditorActionRow
+      primaryAction={<button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">Edit</button>}
+      style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
+    />
+  ) : null;
 
   return (
     <SectionCard noPadding>
@@ -483,9 +494,6 @@ function DepartmentSection({
           <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
             {description}
           </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {actionButtons}
         </div>
       </div>
 
@@ -730,10 +738,12 @@ function DepartmentSection({
 
       {/* Error banner */}
       {error && (
-        <div style={{ margin: "0 16px 12px", padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: 8, color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        <div style={{ margin: "0 16px 12px", padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--dg-radius-md)", color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           <strong>Save Error:</strong> {error}
         </div>
       )}
+
+      {footerActions}
 
       {/* Delete confirmation dialogs */}
       {deleteConfirm && (
@@ -805,9 +815,132 @@ export default function DepartmentsSettings({
   const managementDepts = departments
     .filter(d => d.type === "management" && !d.archivedAt)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+  const exampleScheduledDept = scheduledDepts[0]?.name || `Scheduled ${departmentLabel.replace(/s$/i, "")}`;
+  const exampleManagementDept = managementDepts[0]?.name || `Management ${departmentLabel.replace(/s$/i, "")}`;
+  const exampleFocusAreas = focusAreas
+    .filter((focusArea) => !focusArea.archivedAt && scheduledDepts.some((department) => department.id === focusArea.departmentId))
+    .slice(0, 2)
+    .map((focusArea) => focusArea.name);
+  const infoPoints = [
+    {
+      title: "Departments are the top-level structure",
+      description: `A ${departmentLabel.replace(/s$/i, "").toLowerCase()} groups related teams. Scheduled and management ${departmentLabel.toLowerCase()} serve different parts of the app.`,
+    },
+    {
+      title: `${focusAreaLabel} live inside scheduled departments`,
+      description: `Scheduled ${departmentLabel.toLowerCase()} can contain one or more ${focusAreaLabel.toLowerCase()}. Those ${focusAreaLabel.toLowerCase()} are the groups that actually appear on the schedule grid.`,
+    },
+    {
+      title: "Management departments are for app access, not staffing rows",
+      description: `Use management ${departmentLabel.toLowerCase()} for people who need org access without appearing as scheduled staff.`,
+    },
+    {
+      title: "Moving or archiving items changes grouping everywhere",
+      description: `Reordering, renaming, moving, or archiving a ${departmentLabel.replace(/s$/i, "").toLowerCase()} or ${focusAreaLabel.replace(/s$/i, "").toLowerCase()} changes how people and schedule sections are organized across the app.`,
+    },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <ExplainerSection
+        title="Department structure"
+        defaultOpen
+        storageKey="dg-explainer-departments"
+        points={infoPoints}
+        preview={(
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <PreviewFrame
+              title="Scheduled hierarchy"
+              subtitle="How staff reach the schedule grid"
+            >
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "var(--dg-radius-sm)",
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border-light)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Example scheduled {departmentLabel.replace(/s$/i, "").toLowerCase()}
+                </div>
+                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                  {exampleScheduledDept}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {(exampleFocusAreas.length > 0 ? exampleFocusAreas : ["East Wing", "West Wing"]).map((name) => (
+                    <span
+                      key={name}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: "var(--color-brand-bg)",
+                        border: "1px solid var(--color-brand-border)",
+                        color: "var(--color-brand)",
+                      }}
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <WorkflowStrip
+                steps={[
+                  {
+                    label: exampleScheduledDept,
+                    description: `Scheduled ${departmentLabel.replace(/s$/i, "").toLowerCase()}`,
+                    tone: "default",
+                  },
+                  {
+                    label: exampleFocusAreas[0] || `${focusAreaLabel.replace(/s$/i, "")} A`,
+                    description: `${focusAreaLabel.replace(/s$/i, "")} on the grid`,
+                    tone: "info",
+                  },
+                  {
+                    label: "Schedule grouping",
+                    description: "Staff rows and coverage rollups",
+                    tone: "success",
+                  },
+                ]}
+              />
+            </PreviewFrame>
+
+            <PreviewFrame
+              title="Management hierarchy"
+              subtitle="App access without schedule rows"
+            >
+              <WorkflowStrip
+                steps={[
+                  {
+                    label: exampleManagementDept,
+                    description: `Management ${departmentLabel.replace(/s$/i, "").toLowerCase()}`,
+                    tone: "default",
+                  },
+                  {
+                    label: "Org access",
+                    description: "Permissions and membership",
+                    tone: "info",
+                  },
+                  {
+                    label: "No grid row",
+                    description: "Does not create a scheduled staff row",
+                    tone: "warning",
+                  },
+                ]}
+              />
+            </PreviewFrame>
+          </div>
+        )}
+      />
+
       <DepartmentSection
         title={`Scheduled ${departmentLabel}`}
         description="Scheduled departments appear on the grid. Each department has one or more focus areas that define how staff are grouped on the schedule."

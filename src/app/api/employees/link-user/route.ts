@@ -3,10 +3,12 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { hasCompleteName, namesMatch } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
 import { cacheDel, CacheKey } from "@/lib/cache";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { canManageEmployees, fetchProfileName, nameMismatchResponse } from "@/app/api/employees/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -15,32 +17,6 @@ const bodySchema = z.object({
   userId: z.string().uuid(),
   orgId: z.string().uuid(),
 });
-
-async function canManageEmployees(
-  serviceClient: ReturnType<typeof getServiceClient>,
-  actorId: string,
-  orgId: string,
-): Promise<boolean> {
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role, admin_permissions")
-      .eq("user_id", actorId)
-      .eq("org_id", orgId)
-      .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", actorId)
-      .single(),
-  ]);
-
-  const isGridmaster = profile?.platform_role === "gridmaster";
-  const isSuperAdmin = membership?.org_role === "super_admin";
-  const isAdmin = membership?.org_role === "admin";
-  const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-  return isGridmaster || isSuperAdmin || (isAdmin && adminPerms?.canManageEmployees === true);
-}
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
@@ -82,10 +58,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    const [{ data: employee }, { data: membership }, { data: otherEmployees }] = await Promise.all([
+    const [{ data: employee }, { data: membership }, { data: otherEmployees }, profileName] = await Promise.all([
       serviceClient
         .from("employees")
-        .select("id, user_id")
+        .select("id, user_id, first_name, last_name")
         .eq("id", employeeId)
         .eq("org_id", orgId)
         .is("archived_at", null)
@@ -104,6 +80,7 @@ export async function POST(req: NextRequest) {
         .eq("user_id", userId)
         .neq("id", employeeId)
         .limit(1),
+      fetchProfileName(serviceClient, userId),
     ]);
 
     if (!employee) {
@@ -120,6 +97,35 @@ export async function POST(req: NextRequest) {
     }
     if (employee.user_id === userId) {
       return NextResponse.json({ status: "linked" });
+    }
+    if (!hasCompleteName(profileName)) {
+      return nameMismatchResponse(
+        {
+          employeeId,
+          userId,
+          employeeFirstName: (employee.first_name as string | null) ?? "",
+          employeeLastName: (employee.last_name as string | null) ?? "",
+          accountFirstName: profileName.firstName ?? "",
+          accountLastName: profileName.lastName ?? "",
+        },
+        "The user account must have a first and last name before it can be linked.",
+      );
+    }
+    if (!namesMatch(
+      {
+        firstName: (employee.first_name as string | null) ?? "",
+        lastName: (employee.last_name as string | null) ?? "",
+      },
+      profileName,
+    )) {
+      return nameMismatchResponse({
+        employeeId,
+        userId,
+        employeeFirstName: (employee.first_name as string | null) ?? "",
+        employeeLastName: (employee.last_name as string | null) ?? "",
+        accountFirstName: profileName.firstName ?? "",
+        accountLastName: profileName.lastName ?? "",
+      });
     }
 
     const { error } = await serviceClient

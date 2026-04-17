@@ -3,11 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import type { Department, Employee } from "@/types";
-import { fetchOrganizationUsers, sendInvitation } from "@/lib/db";
+import { fetchOrganizationUsers, linkEmployeeToUser, reconcileEmployeeNameAndLinkUser, sendInvitation } from "@/lib/db";
+import { NameMismatchError } from "@/lib/account-linking";
 
 vi.mock("@/lib/db", () => ({
   fetchOrganizationUsers: vi.fn(),
   linkEmployeeToUser: vi.fn(),
+  reconcileEmployeeNameAndLinkUser: vi.fn(),
   sendInvitation: vi.fn(),
 }));
 
@@ -19,6 +21,8 @@ vi.mock("sonner", () => ({
 }));
 
 const fetchOrganizationUsersMock = vi.mocked(fetchOrganizationUsers);
+const linkEmployeeToUserMock = vi.mocked(linkEmployeeToUser);
+const reconcileEmployeeNameAndLinkUserMock = vi.mocked(reconcileEmployeeNameAndLinkUser);
 const sendInvitationMock = vi.mocked(sendInvitation);
 
 const employee: Employee = {
@@ -67,6 +71,8 @@ describe("InviteEmployeeModal", () => {
       token: "invite-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
+    linkEmployeeToUserMock.mockResolvedValue({ status: "linked" });
+    reconcileEmployeeNameAndLinkUserMock.mockResolvedValue({ status: "linked" });
     fetchOrganizationUsersMock.mockResolvedValue([]);
     vi.stubGlobal(
       "fetch",
@@ -237,6 +243,64 @@ describe("InviteEmployeeModal", () => {
         "emp-1",
         undefined,
       );
+    });
+  });
+
+  it("shows a reconcile step when the existing org member name does not match and confirms with account name", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onInvited = vi.fn();
+
+    fetchOrganizationUsersMock.mockResolvedValue([
+      {
+        id: "user-1",
+        email: "alice@example.com",
+        firstName: "Alicia",
+        lastName: "Smith",
+        orgRole: "user",
+        platformRole: "none",
+        adminPermissions: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        lastSignInAt: null,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        departmentIds: [],
+        deptAdminIds: [],
+      },
+    ]);
+    linkEmployeeToUserMock.mockRejectedValue(
+      new NameMismatchError({
+        employeeId: "emp-1",
+        userId: "user-1",
+        employeeFirstName: "Alice",
+        employeeLastName: "Smith",
+        accountFirstName: "Alicia",
+        accountLastName: "Smith",
+      }),
+    );
+
+    render(
+      <InviteEmployeeModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={onClose}
+        onInvited={onInvited}
+      />,
+    );
+
+    await screen.findByText(/existing user found/i);
+    await user.click(screen.getByRole("button", { name: /link to/i }));
+
+    expect(await screen.findByText("Name mismatch found")).toBeInTheDocument();
+    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    expect(screen.getByText("Alicia Smith")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Use Account Name and Link" }));
+
+    await waitFor(() => {
+      expect(reconcileEmployeeNameAndLinkUserMock).toHaveBeenCalledWith("emp-1", "user-1", "org-1");
+      expect(onInvited).toHaveBeenCalledOnce();
+      expect(onClose).toHaveBeenCalledOnce();
     });
   });
 });

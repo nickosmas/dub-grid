@@ -467,6 +467,40 @@ function id(val: unknown): number {
   return Number(val);
 }
 
+interface ParsedSeedAddress {
+  address: string;
+  addressLine1: string;
+  addressLine2: string;
+  addressCity: string;
+  addressState: string;
+  addressPostalCode: string;
+  addressCountry: string;
+}
+
+function parseUsSeedAddress(address: string): ParsedSeedAddress {
+  const normalized = address.replace(/\s*\n\s*/g, ", ").trim();
+  const match = normalized.match(
+    /^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/,
+  );
+
+  if (!match) {
+    throw new Error(`Unable to parse seed address: ${address}`);
+  }
+
+  const [, addressLine1, addressCity, addressState, addressPostalCode] = match;
+  const addressCountry = "United States";
+
+  return {
+    address: `${addressLine1}, ${addressCity}, ${addressState} ${addressPostalCode}, ${addressCountry}`,
+    addressLine1,
+    addressLine2: "",
+    addressCity,
+    addressState,
+    addressPostalCode,
+    addressCountry,
+  };
+}
+
 async function main() {
   let connectionString: string;
 
@@ -525,20 +559,52 @@ async function main() {
     END $$;
   `);
 
-  console.log("Seeding 6 tenants...\n");
+  console.log("Seeding 7 tenants...\n");
   let globalNameIdx = 0;
 
   for (let t = 0; t < TENANTS.length; t++) {
     const tenant = TENANTS[t];
-    console.log(`  [${t + 1}/6] ${tenant.name}...`);
+    console.log(`  [${t + 1}/7] ${tenant.name}...`);
 
     // 1. Organization
+    const addressFields = parseUsSeedAddress(tenant.address);
     const { rows: [org] } = await db.query(
-      `INSERT INTO public.organizations (name, slug, address, phone, timezone, focus_area_label, certification_label, role_label, employee_count)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO public.organizations (
+         name,
+         slug,
+         address,
+         address_line_1,
+         address_line_2,
+         address_city,
+         address_state,
+         address_postal_code,
+         address_country,
+         phone,
+         timezone,
+         focus_area_label,
+         certification_label,
+         role_label,
+         employee_count
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id`,
-      [tenant.name, tenant.slug, tenant.address, tenant.phone, tenant.timezone,
-       tenant.focus_area_label, tenant.certification_label, tenant.role_label, tenant.employeeCount]
+      [
+        tenant.name,
+        tenant.slug,
+        addressFields.address,
+        addressFields.addressLine1,
+        addressFields.addressLine2,
+        addressFields.addressCity,
+        addressFields.addressState,
+        addressFields.addressPostalCode,
+        addressFields.addressCountry,
+        tenant.phone,
+        tenant.timezone,
+        tenant.focus_area_label,
+        tenant.certification_label,
+        tenant.role_label,
+        tenant.employeeCount,
+      ]
     );
     const orgId: string = org.id;
 
@@ -797,31 +863,28 @@ async function main() {
   }
 
   // ── Calm Haven (6th tenant) — from SQL seed file ────────────────────
-  console.log(`\n  [6/6] Calm Haven...`);
+  console.log(`\n  [6/7] Calm Haven...`);
 
   const calmHavenSql = readFileSync('supabase/seed_calm_haven.sql', 'utf8');
   await db.query(calmHavenSql);
 
+  console.log(`    ✓ 4 focus areas, 6 certs, 8 roles, 17 codes, 28 employees, shifts seeded`);
+
+  // ── Arden Wood (7th tenant) — Calm Haven config + PDF-derived roster ──────
+  console.log(`\n  [7/7] Arden Wood...`);
+
+  const ardenWoodSql = readFileSync('supabase/seed_arden_wood.sql', 'utf8');
+  await db.query(ardenWoodSql);
+
   const gridmasterSql = readFileSync('supabase/seed_gridmaster.sql', 'utf8');
   await db.query(gridmasterSql);
 
-  console.log(`    ✓ 4 focus areas, 6 certs, 8 roles, 17 codes, 28 employees, shifts seeded (along with gridmaster user)`);
+  console.log(`    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees and seeded shifts`);
 
   // ── Auth Users & Profiles ──────────────────────────────────────────────
-  // Create 4 test users, all assigned to the first seeded organization.
+  // Create 3 test users, all assigned to a seeded organization.
   // Uses a DO $$ block (same pattern as seed_calm_haven.sql) to avoid
   // pg driver prepared-statement type inference issues.
-
-  // ── Bare Arden Wood org (for onboarding testing) ─────────────────────
-  // No departments, focus areas, shift codes, certifications, roles, or employees.
-  // The onboarding wizard will fire for users assigned to this org.
-  console.log("\n  Creating bare Arden Wood org (onboarding test)...");
-  await db.query(
-    `INSERT INTO public.organizations (name, slug, address, phone, timezone, employee_count)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    ["Arden Wood", "ardenwood", "445 Wawona Street\nSan Francisco, CA 94116", "(415) 425-3334", "America/Los_Angeles", 50]
-  );
-  console.log("    ✓ Arden Wood (bare org — no config data)");
 
   console.log("\n  Creating test users...");
 
@@ -922,7 +985,7 @@ async function main() {
   }
 
   // ── Organization Memberships ─────────────────────────────────────────
-  // Create memberships for each non-gridmaster user across ALL 6 organizations.
+  // Create memberships for each non-gridmaster user across all seeded organizations.
   // Gridmaster bypasses RLS globally and doesn't need memberships.
 
   console.log("\n  Creating organization memberships...");
@@ -954,7 +1017,7 @@ async function main() {
     console.log(`    ✓ ${user.label}: ${allOrgs.length} organizations`);
   }
 
-  console.log("\n✅ All 7 tenants (6 configured + 1 bare) + 3 test users + memberships seeded successfully!");
+  console.log("\n✅ All 7 tenants + 3 test users + memberships seeded successfully!");
   await db.end();
   process.exit(0);
 }

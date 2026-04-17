@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Printer, X } from "lucide-react";
 import { FocusArea } from "@/types";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 export interface PrintConfig {
   fontSize: number;
@@ -42,6 +44,20 @@ export default function PrintOptionsModal({
   const [fontSizeKey, setFontSizeKey] = useState<FontSizeKey>("medium");
 
   const allSelected = selectedFocusAreas.length === focusAreas.length;
+  const hasUnsavedChanges =
+    spanWeeks !== currentSpanWeeks
+    || fontSizeKey !== "medium"
+    || JSON.stringify([...selectedFocusAreas].sort()) !== JSON.stringify([...focusAreas.map((focusArea) => focusArea.name)].sort());
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+
+  function handleRequestClose() {
+    if (requestClose()) {
+      onClose();
+    }
+  }
 
   function toggleFocusArea(name: string) {
     setSelectedFocusAreas((prev) =>
@@ -59,111 +75,114 @@ export default function PrintOptionsModal({
   }
 
   return (
-    <div
-      className="dg-modal-overlay"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="dg-modal" style={{ maxWidth: 400 }}>
-        {/* Header */}
-        <div className="dg-modal-header">
-          <div className="dg-modal-title">Print / Export Options</div>
-          <button
-            onClick={onClose}
-            aria-label="Close print options"
-            className="dg-modal-close"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* View */}
-        <div className="dg-modal-section">
-          <div className="dg-modal-section-label">VIEW</div>
-          <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
-            {([1, 2, "month"] as const).map((n) => (
-              <button
-                key={n}
-                onClick={() => setSpanWeeks(n)}
-                className={`dg-span-tab${spanWeeks === n ? " active" : ""}`}
-                style={{ minWidth: 72 }}
-              >
-                {n === "month" ? "Month" : n === 1 ? "1 Week" : "2 Weeks"}
-              </button>
-            ))}
+    <>
+      <div
+        className="dg-modal-overlay"
+        onClick={(e) => e.target === e.currentTarget && handleRequestClose()}
+      >
+        <div className="dg-modal" style={{ maxWidth: 400 }}>
+          {/* Header */}
+          <div className="dg-modal-header">
+            <div className="dg-modal-title">Print / Export Options</div>
+            <button
+              onClick={handleRequestClose}
+              aria-label="Close print options"
+              className="dg-modal-close"
+            >
+              <X size={16} />
+            </button>
           </div>
-          {spanWeeks === "month" && (
-            <div className="dg-form-hint" style={{ marginTop: 6 }}>
-              Tip: Small font works best for month view
-            </div>
-          )}
-        </div>
 
-        {/* Font Size */}
-        <div className="dg-modal-section">
-          <div className="dg-modal-section-label">FONT SIZE</div>
-          <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
-            {FONT_SIZES.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFontSizeKey(f.key)}
-                className={`dg-span-tab${fontSizeKey === f.key ? " active" : ""}`}
-                style={{ minWidth: 72 }}
-              >
-                {f.label}
-              </button>
-            ))}
+          {/* View */}
+          <div className="dg-modal-section">
+            <div className="dg-modal-section-label">VIEW</div>
+            <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
+              {([1, 2, "month"] as const).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setSpanWeeks(n)}
+                  className={`dg-span-tab${spanWeeks === n ? " active" : ""}`}
+                  style={{ minWidth: 72 }}
+                >
+                  {n === "month" ? "Month" : n === 1 ? "1 Week" : "2 Weeks"}
+                </button>
+              ))}
+            </div>
+            {spanWeeks === "month" && (
+              <div className="dg-form-hint" style={{ marginTop: 6 }}>
+                Tip: Small font works best for month view
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Focus Areas */}
-        {focusAreas.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <div className="dg-modal-section-label">
-              {focusAreaLabel.toUpperCase()}
-            </div>
-            <div className="dg-checklist">
-              {/* All toggle */}
-              <label className="dg-checkbox-row dg-checkbox-row--header">
-                <input
-                  type="checkbox"
-                  className="dg-checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                />
-                All {focusAreaLabel}
-              </label>
-              {/* Individual focus areas */}
-              {focusAreas.map((w) => (
-                <label key={w.name} className="dg-checkbox-row">
-                  <input
-                    type="checkbox"
-                    className="dg-checkbox"
-                    checked={selectedFocusAreas.includes(w.name)}
-                    onChange={() => toggleFocusArea(w.name)}
-                  />
-                  {w.name}
-                </label>
+          {/* Font Size */}
+          <div className="dg-modal-section">
+            <div className="dg-modal-section-label">FONT SIZE</div>
+            <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
+              {FONT_SIZES.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFontSizeKey(f.key)}
+                  className={`dg-span-tab${fontSizeKey === f.key ? " active" : ""}`}
+                  style={{ minWidth: 72 }}
+                >
+                  {f.label}
+                </button>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="dg-modal-actions">
-          <button onClick={onClose} className="dg-btn dg-btn-secondary">
-            Cancel
-          </button>
-          <button
-            onClick={handlePrint}
-            disabled={focusAreas.length > 0 && selectedFocusAreas.length === 0}
-            className="dg-btn dg-btn-primary"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            <Printer size={13} />
-            Preview & Print
-          </button>
+          {/* Focus Areas */}
+          {focusAreas.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div className="dg-modal-section-label">
+                {focusAreaLabel.toUpperCase()}
+              </div>
+              <div className="dg-checklist">
+                {/* All toggle */}
+                <label className="dg-checkbox-row dg-checkbox-row--header">
+                  <input
+                    type="checkbox"
+                    className="dg-checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                  />
+                  All {focusAreaLabel}
+                </label>
+                {/* Individual focus areas */}
+                {focusAreas.map((w) => (
+                  <label key={w.name} className="dg-checkbox-row">
+                    <input
+                      type="checkbox"
+                      className="dg-checkbox"
+                      checked={selectedFocusAreas.includes(w.name)}
+                      onChange={() => toggleFocusArea(w.name)}
+                    />
+                    {w.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="dg-modal-actions">
+            <button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
+              {EDITOR_ACTION_LABELS.close}
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={focusAreas.length > 0 && selectedFocusAreas.length === 0}
+              className="dg-btn dg-btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Printer size={13} />
+              Preview & Print
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+      {unsavedChangesDialog}
+    </>
   );
 }

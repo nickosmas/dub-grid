@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import ChangeReviewModal, { type ReviewChange } from "@/components/review/ChangeReviewModal";
 import type { AdminPermissions } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
@@ -30,6 +34,14 @@ export interface PermissionModule {
   viewKeys: (keyof AdminPermissions)[];
   editKeys: (keyof AdminPermissions)[];
   alwaysOnView?: boolean;
+}
+
+export interface PermissionReviewConfig {
+  title: string;
+  description: string;
+  changes: ReviewChange[];
+  confirmLabel?: string;
+  warningText?: string;
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -291,6 +303,7 @@ interface PermissionsEditorProps {
   lockedFalse?: (keyof AdminPermissions)[];
   onSave: (perms: AdminPermissions) => Promise<void>;
   onClose: () => void;
+  buildReview?: (perms: AdminPermissions) => PermissionReviewConfig | null;
 }
 
 export default function PermissionsEditor({
@@ -301,6 +314,7 @@ export default function PermissionsEditor({
   lockedFalse,
   onSave,
   onClose,
+  buildReview,
 }: PermissionsEditorProps) {
   const lockedFalseKeys = lockedFalse ?? EMPTY_LOCKED_FALSE;
   const lockedFalseSet = useMemo(() => new Set(lockedFalseKeys), [lockedFalseKeys]);
@@ -310,6 +324,7 @@ export default function PermissionsEditor({
   );
   const [perms, setPerms] = useState<AdminPermissions>(initialPerms);
   const [saving, setSaving] = useState(false);
+  const [reviewConfig, setReviewConfig] = useState<PermissionReviewConfig | null>(null);
 
   useEffect(() => {
     setPerms(initialPerms);
@@ -345,6 +360,15 @@ export default function PermissionsEditor({
   const allKeys = PERMISSION_MODULES.flatMap((m) => [...m.viewKeys, ...m.editKeys])
     .filter((k) => !lockedFalseSet.has(k) && !ALWAYS_ON_KEYS.has(k));
   const hasChanges = allKeys.some((key) => perms[key] !== initialPerms[key]);
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: hasChanges,
+    onDiscard: onClose,
+  });
+  const handleRequestClose = () => {
+    if (!saving && requestClose()) {
+      onClose();
+    }
+  };
 
   function selectAll() {
     setPerms((prev) => {
@@ -362,16 +386,33 @@ export default function PermissionsEditor({
     });
   }
 
-  async function handleSave() {
+  async function performSave() {
     setSaving(true);
     try {
       await onSave(perms);
+      setReviewConfig(null);
       onClose();
     } catch (err: unknown) {
       toast.error((err instanceof Error ? err.message : null) ?? "Failed to update permissions");
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleSave() {
+    if (!hasChanges) return;
+    if (!buildReview) {
+      void performSave();
+      return;
+    }
+
+    const nextReview = buildReview(perms);
+    if (!nextReview || nextReview.changes.length === 0) {
+      void performSave();
+      return;
+    }
+
+    setReviewConfig(nextReview);
   }
 
   const enabledCount = allKeys.filter((k) => perms[k] === true).length;
@@ -388,7 +429,13 @@ export default function PermissionsEditor({
   }));
 
   return (
-    <Modal title={title} onClose={onClose} style={{ maxWidth: 680 }}>
+    <>
+      <Modal
+        title={title}
+        onClose={onClose}
+        onRequestClose={() => !saving && requestClose()}
+        style={{ maxWidth: 680 }}
+      >
       <div className="flex flex-col flex-1 min-h-0">
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="px-6 py-4 border-b border-[var(--color-border-light)] bg-[var(--color-bg)] shrink-0">
@@ -436,14 +483,39 @@ export default function PermissionsEditor({
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────── */}
-        <div className="flex gap-2 justify-end px-6 py-4 shrink-0 border-t border-[var(--color-border-light)]">
-          <button className="dg-btn dg-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
-            <ButtonLoading loading={saving} spinnerSize={16}>Save Permissions</ButtonLoading>
-          </button>
-        </div>
+        <EditorActionRow
+          className="px-6 py-4 shrink-0 border-t border-[var(--color-border-light)]"
+          secondaryAction={(
+            <button className="dg-btn dg-btn-secondary" onClick={handleRequestClose} disabled={saving}>
+              {EDITOR_ACTION_LABELS.close}
+            </button>
+          )}
+          primaryAction={(
+            <button className="dg-btn dg-btn-primary" onClick={handleSave} disabled={saving || !hasChanges}>
+              <ButtonLoading loading={saving} spinnerSize={16}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
+            </button>
+          )}
+        />
       </div>
-    </Modal>
+      </Modal>
+      {unsavedChangesDialog}
+      {reviewConfig ? (
+        <ChangeReviewModal
+          title={reviewConfig.title}
+          description={reviewConfig.description}
+          changes={reviewConfig.changes}
+          saving={saving}
+          confirmLabel={reviewConfig.confirmLabel}
+          warningText={reviewConfig.warningText}
+          onCancel={() => {
+            if (!saving) setReviewConfig(null);
+          }}
+          onConfirm={() => {
+            void performSave();
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

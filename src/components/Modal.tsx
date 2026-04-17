@@ -26,10 +26,20 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   style?: React.CSSProperties;
+  onRequestClose?: () => boolean;
+  showCloseButton?: boolean;
   "aria-describedby"?: string;
 }
 
-export default function Modal({ title, onClose, children, style, "aria-describedby": ariaDescribedby }: ModalProps) {
+export default function Modal({
+  title,
+  onClose,
+  children,
+  style,
+  onRequestClose,
+  showCloseButton = true,
+  "aria-describedby": ariaDescribedby,
+}: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -62,10 +72,11 @@ export default function Modal({ title, onClose, children, style, "aria-described
   // Animated close — ref guard prevents double-fire race condition
   const handleClose = useCallback(() => {
     if (closingRef.current) return;
+    if (onRequestClose && !onRequestClose()) return;
     closingRef.current = true;
     setClosing(true);
     timeoutRef.current = setTimeout(() => onClose(), 150);
-  }, [onClose]);
+  }, [onClose, onRequestClose]);
 
   // Keyboard: Escape to close + focus trap
   const handleKeyDown = useCallback(
@@ -125,14 +136,16 @@ export default function Modal({ title, onClose, children, style, "aria-described
           <span style={titleStyle}>
             {title}
           </span>
-          <button
-            onClick={handleClose}
-            aria-label="Close modal"
-            className="dg-btn dg-btn-ghost"
-            style={{ fontSize: "var(--dg-fs-card-title)", lineHeight: 1, padding: isMobile ? "8px 10px" : "2px 6px", minWidth: isMobile ? 44 : undefined, minHeight: isMobile ? 44 : undefined }}
-          >
-            &times;
-          </button>
+          {showCloseButton ? (
+            <button
+              onClick={handleClose}
+              aria-label="Close modal"
+              className="dg-btn dg-btn-ghost"
+              style={{ fontSize: "var(--dg-fs-card-title)", lineHeight: 1, padding: isMobile ? "8px 10px" : "2px 6px", minWidth: isMobile ? 44 : undefined, minHeight: isMobile ? 44 : undefined }}
+            >
+              &times;
+            </button>
+          ) : null}
         </div>
         {children}
       </div>

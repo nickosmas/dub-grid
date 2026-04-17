@@ -6,6 +6,7 @@ import type {
   FocusArea,
   Employee,
   CoverageRequirement,
+  CoverageRuleConfig,
 } from "@/types";
 import {
   getDatesInRange,
@@ -40,6 +41,7 @@ interface ExpandedStatsProps {
   shiftCodeById: Map<number, ShiftCode>;
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
+  coverageRuleConfigs: CoverageRuleConfig[];
   categoryById: Map<number, ShiftCategory>;
   showOT: boolean;
   hasRequirements: boolean;
@@ -55,6 +57,7 @@ export default function ExpandedStats({
   shiftCodes,
   shiftCodeById,
   coverageRequirements,
+  coverageRuleConfigs,
   categoryById,
   showOT,
   hasRequirements,
@@ -76,7 +79,7 @@ export default function ExpandedStats({
       const staffScheduled = countStaffScheduled(periodShifts, shiftCodeById);
 
       const coverage = computeCoveragePctAndSlots(
-        focusAreas, shiftCodes, coverageRequirements,
+        focusAreas, shiftCodes, coverageRequirements, coverageRuleConfigs,
         pDates, activeEmployees, periodShifts,
       );
 
@@ -97,7 +100,7 @@ export default function ExpandedStats({
     return rows;
   }, [
     allShifts, currentWeekStart, periodDays, activeEmployees, focusAreas, shiftCodes,
-    shiftCodeById, coverageRequirements, categoryById,
+    shiftCodeById, coverageRequirements, coverageRuleConfigs, categoryById,
   ]);
 
   const columns = [
@@ -113,7 +116,7 @@ export default function ExpandedStats({
   return (
     <Modal title={`${periodLabel}ly stats comparison`} onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 12, color: "var(--color-text-subtle)", padding: "14px 16px", borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+        <div style={{ fontSize: 12, color: "var(--color-text-subtle)", padding: "14px 16px", borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           Last {NUM_PERIODS} {periodLabelPlural} &middot; most recent first
         </div>
 

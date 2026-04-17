@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType } from "@/types";
+import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, Department, CoverageRequirement, CoverageRuleConfig, AbsenceType } from "@/types";
 import { saveCertifications, saveOrganizationRoles, checkCertificationDependencies, checkRoleDependencies } from "@/lib/db";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { PreviewFrame } from "@/components/ui/explainer-section";
 
 import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
 import { SectionCard } from "./shared";
@@ -69,6 +70,8 @@ export interface SettingsPageProps {
   canManageOrgSettings: boolean;
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
+  coverageRuleConfigs: CoverageRuleConfig[];
+  onCoverageRuleConfigsChange: (configs: CoverageRuleConfig[]) => void;
   canManageCoverageRequirements: boolean;
   canViewCoverageRequirements: boolean;
   absenceTypes: AbsenceType[];
@@ -108,6 +111,8 @@ export default function SettingsPage({
   canManageOrgSettings,
   coverageRequirements,
   onCoverageRequirementsChange,
+  coverageRuleConfigs,
+  onCoverageRuleConfigsChange,
   canManageCoverageRequirements,
   canViewCoverageRequirements,
   absenceTypes,
@@ -139,6 +144,200 @@ export default function SettingsPage({
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
   const departmentLabel = organization.departmentLabel || "Departments";
+  const certificationsExplainer = {
+    title: `How ${certificationLabel.toLowerCase()} work`,
+    defaultOpen: true,
+    storageKey: "dg-explainer-certifications",
+    points: [
+      {
+        title: "These show on staff and schedule surfaces",
+        description: `${certificationLabel} help people quickly see qualifications in schedule and staffing views.`,
+      },
+      {
+        title: "Shift codes can require them",
+        description: `When a shift requires a ${certificationLabel.replace(/s$/i, "").toLowerCase()}, only qualified staff can be assigned to that shift.`,
+      },
+      {
+        title: "Use them for true qualifications",
+        description: `Reserve ${certificationLabel.toLowerCase()} for real assignment rules. Use ${roleLabel.toLowerCase()} for visible responsibilities that should not block assignment.`,
+      },
+    ],
+    preview: (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        <PreviewFrame
+          title="Visible on the schedule"
+          subtitle={`Staff badges and shift requirements`}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-border-light)",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                Jordan Smith
+              </div>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                Day Shift
+              </div>
+            </div>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "3px 8px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                background: "var(--color-brand-bg)",
+                border: "1px solid var(--color-brand-border)",
+                color: "var(--color-brand)",
+              }}
+            >
+              Level 2
+            </span>
+          </div>
+        </PreviewFrame>
+
+        <PreviewFrame
+          title="Assignment gate"
+          subtitle="Required qualification on a shift"
+        >
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-border-light)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
+              Day Shift
+            </div>
+            <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+              Requires Level 2
+            </div>
+            <div style={{ fontSize: 11, color: "var(--color-success-text)" }}>
+              Qualified staff can be assigned
+            </div>
+          </div>
+        </PreviewFrame>
+      </div>
+    ),
+  };
+  const rolesExplainer = {
+    title: `How ${roleLabel.toLowerCase()} work`,
+    defaultOpen: true,
+    storageKey: "dg-explainer-roles",
+    points: [
+      {
+        title: "Roles are visible tags",
+        description: `${roleLabel} help identify responsibilities like director, supervisor, or mentor on the schedule.`,
+      },
+      {
+        title: "Roles do not grant permissions",
+        description: `A ${roleLabel.replace(/s$/i, "").toLowerCase()} tag does not make someone an app admin or change what they can access.`,
+      },
+      {
+        title: "Keep them focused on responsibilities",
+        description: `Use ${roleLabel.toLowerCase()} for what someone is doing during a shift, not for qualifications or login rights.`,
+      },
+    ],
+    preview: (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        <PreviewFrame
+          title="Visible responsibility tag"
+          subtitle="What teammates see on the schedule"
+        >
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-border-light)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
+              Jordan Smith
+            </div>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "3px 8px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                background: "var(--color-bg-secondary)",
+                border: "1px solid var(--color-border-light)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              Supervisor
+            </span>
+          </div>
+        </PreviewFrame>
+
+        <PreviewFrame
+          title="Permissions stay separate"
+          subtitle="Roles do not control app access"
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 8,
+            }}
+          >
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: "var(--dg-radius-sm)",
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border-light)",
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                {roleLabel.replace(/s$/i, "")}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)", marginTop: 4 }}>
+                Supervisor
+              </div>
+            </div>
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: "var(--dg-radius-sm)",
+                background: "var(--color-brand-bg)",
+                border: "1px solid var(--color-brand-border)",
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-brand)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                App access
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)", marginTop: 4 }}>
+                Managed elsewhere
+              </div>
+            </div>
+          </div>
+        </PreviewFrame>
+      </div>
+    ),
+  };
 
   const navGroups = useMemo(() => buildNavGroups(perms, {
     shiftCodesLabel: organization.shiftDisplayMode === "name" ? "Shifts" : "Schedule Codes",
@@ -291,25 +490,21 @@ export default function SettingsPage({
 
         {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
           <div style={{ width: "100%", maxWidth }}>
-            <SectionCard>
-              <OrganizationLabels
-                organization={organization}
-                onSave={onOrganizationSave}
-                readOnly={!isSuperAdmin && !canManageOrgLabels}
-              />
-            </SectionCard>
+            <OrganizationLabels
+              organization={organization}
+              onSave={onOrganizationSave}
+              readOnly={!isSuperAdmin && !canManageOrgLabels}
+            />
           </div>
         )}
 
         {activeSection === "org-display" && canManageOrgSettings && (
           <div style={{ width: "100%", maxWidth }}>
-            <SectionCard>
-              <DisplayMode
-                organization={organization}
-                shiftCodes={shiftCodes}
-                onSave={onOrganizationSave}
-              />
-            </SectionCard>
+            <DisplayMode
+              organization={organization}
+              shiftCodes={shiftCodes}
+              onSave={onOrganizationSave}
+            />
           </div>
         )}
 
@@ -368,6 +563,8 @@ export default function SettingsPage({
               shiftCodes={shiftCodes}
               coverageRequirements={coverageRequirements}
               onCoverageRequirementsChange={onCoverageRequirementsChange}
+              coverageRuleConfigs={coverageRuleConfigs}
+              onCoverageRuleConfigsChange={onCoverageRuleConfigsChange}
               canEdit={canManageCoverageRequirements}
               shiftDisplayMode={organization.shiftDisplayMode}
             />
@@ -383,6 +580,7 @@ export default function SettingsPage({
             <StringListSettings
               label={certificationLabel}
               sectionTitle={certificationLabel}
+              explainer={certificationsExplainer}
               items={certifications}
               placeholder="e.g. RN"
               onSave={async (updated) => {
@@ -407,6 +605,7 @@ export default function SettingsPage({
             <StringListSettings
               label={roleLabel}
               sectionTitle={roleLabel}
+              explainer={rolesExplainer}
               items={orgRoles}
               placeholder="e.g. Charge Nurse"
               onSave={async (updated) => {

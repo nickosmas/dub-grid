@@ -760,6 +760,53 @@ CREATE POLICY "admin_delete_coverage_requirements"
   USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
 
 
+ALTER TABLE public.coverage_rule_configs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "gridmaster_all_coverage_rule_configs"
+  ON public.coverage_rule_configs FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_coverage_rule_configs"
+  ON public.coverage_rule_configs FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_coverage_rule_configs"
+  ON public.coverage_rule_configs FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
+
+CREATE POLICY "admin_update_coverage_rule_configs"
+  ON public.coverage_rule_configs FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_coverage_rule_configs"
+  ON public.coverage_rule_configs FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
+
+ALTER TABLE public.coverage_rule_config_codes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "gridmaster_all_coverage_rule_config_codes"
+  ON public.coverage_rule_config_codes FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_coverage_rule_config_codes"
+  ON public.coverage_rule_config_codes FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_coverage_rule_config_codes"
+  ON public.coverage_rule_config_codes FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
+
+CREATE POLICY "admin_update_coverage_rule_config_codes"
+  ON public.coverage_rule_config_codes FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_coverage_rule_config_codes"
+  ON public.coverage_rule_config_codes FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 15. SHIFT REQUESTS (org members can read; all mutations via SECURITY DEFINER RPCs)
 -- ══════════════════════════════════════════════════════════════════════════════

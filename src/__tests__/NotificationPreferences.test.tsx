@@ -64,4 +64,22 @@ describe("NotificationPreferences", () => {
       expect(saveButton).toBeDisabled();
     });
   });
+
+  it("centers the notification channel headers over the checkbox columns", async () => {
+    render(<NotificationPreferences />);
+
+    const inAppHeader = await screen.findByLabelText("In-App");
+    const emailHeader = screen.getByLabelText("Email");
+
+    expect(inAppHeader).toHaveStyle({
+      display: "flex",
+      justifyContent: "center",
+      width: "100%",
+    });
+    expect(emailHeader).toHaveStyle({
+      display: "flex",
+      justifyContent: "center",
+      width: "100%",
+    });
+  });
 });

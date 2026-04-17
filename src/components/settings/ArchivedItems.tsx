@@ -14,6 +14,7 @@ import {
 } from "@/lib/db";
 import type { NamedItem, FocusArea, ShiftCode, ShiftCategory, Department, AbsenceType, IndicatorType } from "@/types";
 import { EmptyState } from "@/components/EmptyState";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface ArchivedGroup {
   label: string;
@@ -25,6 +26,11 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
   const [groups, setGroups] = useState<ArchivedGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [restoreConfirm, setRestoreConfirm] = useState<{
+    group: ArchivedGroup;
+    itemId: number;
+    itemName: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,7 +102,7 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {groups.map((group) => (
-        <div key={group.label} style={{ borderRadius: 10, border: "1px solid var(--color-border)", overflow: "hidden", background: "var(--color-bg-card, white)" }}>
+        <div key={group.label} style={{ borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden", background: "var(--color-bg-card, white)" }}>
           <div style={{ padding: "10px 16px", background: "var(--color-bg-secondary, #F8F9FA)", borderBottom: "1px solid var(--color-border-light)" }}>
             <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
               {group.label}
@@ -118,7 +124,7 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
                 </span>
                 <button
                   className="dg-btn dg-btn-ghost"
-                  onClick={() => handleRestore(group, item.id, item.name)}
+                  onClick={() => setRestoreConfirm({ group, itemId: item.id, itemName: item.name })}
                   disabled={restoring === key}
                   style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px", color: "var(--color-brand)" }}
                 >
@@ -129,6 +135,25 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
           })}
         </div>
       ))}
+
+      {restoreConfirm && (
+        <ConfirmDialog
+          title="Restore Archived Item"
+          message={`Restore "${restoreConfirm.itemName}"? This can affect downstream scheduling and reporting if the item is referenced elsewhere.`}
+          confirmLabel="Restore"
+          variant="warning"
+          isLoading={restoring === `${restoreConfirm.group.label}:${restoreConfirm.itemId}`}
+          onConfirm={() => {
+            void handleRestore(
+              restoreConfirm.group,
+              restoreConfirm.itemId,
+              restoreConfirm.itemName,
+            );
+            setRestoreConfirm(null);
+          }}
+          onCancel={() => setRestoreConfirm(null)}
+        />
+      )}
     </div>
   );
 }

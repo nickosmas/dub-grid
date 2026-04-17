@@ -12,6 +12,7 @@ import type {
   ShiftCode,
   ShiftCategory,
   CoverageRequirement,
+  CoverageRuleConfig,
   Employee,
   AbsenceType,
   ShiftMap,
@@ -29,7 +30,12 @@ import {
   fetchInvitations,
   fetchShiftRequests,
 } from "@/lib/db";
-import { buildPublishedDateSet } from "@/lib/schedule-logic";
+import {
+  buildPublishedDateSet,
+  filterPublishedDates,
+  getPublishedWindowState,
+} from "@/lib/schedule-logic";
+import type { PublishedWindowState } from "@/lib/schedule-logic";
 import {
   getWeekStart,
   getDatesInRange,
@@ -97,6 +103,7 @@ interface DashboardViewProps {
   shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
+  coverageRuleConfigs: CoverageRuleConfig[];
   shiftCodeMap: Map<number, string>;
   shiftCodeById: Map<number, ShiftCode>;
   absenceTypeMap: Map<number, string>;
@@ -114,6 +121,7 @@ export default function DashboardView({
   shiftCodes,
   shiftCategories,
   coverageRequirements,
+  coverageRuleConfigs,
   shiftCodeMap,
   shiftCodeById,
   absenceTypeMap,
@@ -223,10 +231,10 @@ export default function DashboardView({
   >([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [activityRequests, setActivityRequests] = useState<ShiftRequest[]>([]);
+  const [shiftsLoading, setShiftsLoading] = useState(true);
   const [publishedDateRanges, setPublishedDateRanges] = useState<
     { startDate: string; endDate: string }[]
   >([]);
-  const [shiftsLoading, setShiftsLoading] = useState(true);
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
@@ -259,21 +267,31 @@ export default function DashboardView({
         fetchStart,
         fetchEnd,
       ),
+      fetchPublishedDateRanges(orgId, periodStartKey, periodEndKey).catch(
+        () => [],
+      ),
       fetchPublishHistory(orgId, 20, 0).catch(() => []),
-      fetchPublishedDateRanges(orgId, fetchStart, fetchEnd).catch(() => []),
       fetchInvitations(orgId).catch(() => []),
       fetchShiftRequests(orgId, shiftCodeMapRef.current).catch(() => []),
     ])
-      .then(([shifts, publishRows, pubDateRanges, invitationRows, requestRows]) => {
+      .then(
+        ([
+          shifts,
+          publishedRanges,
+          publishRows,
+          invitationRows,
+          requestRows,
+        ]) => {
         if (cancelled) return;
         setAllShifts(shifts);
+        setPublishedDateRanges(publishedRanges);
         setPublishHistory(publishRows[0] ?? null);
         setActivityPublishHistory(publishRows);
-        setPublishedDateRanges(pubDateRanges);
         setInvitations(invitationRows);
         setActivityRequests(requestRows);
         setShiftsLoading(false);
-      })
+      },
+    )
       .catch(() => {
         if (!cancelled) setShiftsLoading(false);
       });
@@ -281,7 +299,14 @@ export default function DashboardView({
     return () => {
       cancelled = true;
     };
-  }, [orgId, isScheduler, prevPeriodStart, periodEnd]);
+  }, [
+    orgId,
+    isScheduler,
+    periodEnd,
+    periodEndKey,
+    periodStartKey,
+    prevPeriodStart,
+  ]);
 
   // Shift requests
   const currentEmpId = useMemo(
@@ -314,6 +339,21 @@ export default function DashboardView({
   const prevPeriodShifts = useMemo(
     () => filterShiftsByWeek(allShifts, prevPeriodStartKey, prevPeriodEndKey),
     [allShifts, prevPeriodStartKey, prevPeriodEndKey],
+  );
+  const publishedDateSet = useMemo(
+    () => buildPublishedDateSet(publishedDateRanges),
+    [publishedDateRanges],
+  );
+  const publishedWindowState = useMemo<PublishedWindowState>(() => {
+    if (coverageRequirements.length === 0) return "published";
+    return getPublishedWindowState(periodDates, publishedDateSet);
+  }, [coverageRequirements.length, periodDates, publishedDateSet]);
+  const publishedPeriodDates = useMemo(
+    () =>
+      coverageRequirements.length === 0
+        ? periodDates
+        : filterPublishedDates(periodDates, publishedDateSet),
+    [coverageRequirements.length, periodDates, publishedDateSet],
   );
 
   // ─── Computations ───────────────────────────────────────
@@ -387,18 +427,20 @@ export default function DashboardView({
     () =>
       computeCoverageBySection(
         focusAreas,
-        periodDates,
+        publishedPeriodDates,
         currentPeriodShifts,
         activeEmployees,
         coverageRequirements,
+        coverageRuleConfigs,
         shiftCodes,
       ),
     [
       focusAreas,
-      periodDates,
+      publishedPeriodDates,
       currentPeriodShifts,
       activeEmployees,
       coverageRequirements,
+      coverageRuleConfigs,
       shiftCodes,
     ],
   );
@@ -411,6 +453,7 @@ export default function DashboardView({
       focusAreas,
       shiftCodes,
       coverageRequirements,
+      coverageRuleConfigs,
       prevPeriodDates,
       activeEmployees,
       prevPeriodShifts,
@@ -440,6 +483,7 @@ export default function DashboardView({
     focusAreas,
     shiftCodes,
     coverageRequirements,
+    coverageRuleConfigs,
     prevPeriodStart,
     periodDays,
     activeEmployees,
@@ -447,36 +491,30 @@ export default function DashboardView({
     prevOtCount,
   ]);
 
-  // Dates that have been published at least once — coverage-gap open shifts
-  // are only shown for these dates.
-  const publishedDates = useMemo(
-    () => buildPublishedDateSet(publishedDateRanges),
-    [publishedDateRanges],
-  );
-
-  // Open shifts (filtered to only include published dates)
+  // Open shifts compare the current schedule directly against coverage requirements.
   const openShifts = useMemo(
     () =>
       computeOpenShifts(
         focusAreas,
         shiftCodes,
         coverageRequirements,
-        periodDates,
+        coverageRuleConfigs,
+        publishedPeriodDates,
         activeEmployees,
         currentPeriodShifts,
         shiftCodeById,
         shiftCodeMap,
-      ).filter((s) => publishedDates.has(formatDateKey(s.date))),
+      ),
     [
       focusAreas,
       shiftCodes,
       coverageRequirements,
-      periodDates,
+      coverageRuleConfigs,
+      publishedPeriodDates,
       activeEmployees,
       currentPeriodShifts,
       shiftCodeById,
       shiftCodeMap,
-      publishedDates,
     ],
   );
 
@@ -513,6 +551,7 @@ export default function DashboardView({
         focusAreas,
         shiftCodes,
         coverageRequirements,
+        coverageRuleConfigs,
         activeEmployees,
         allShifts,
         periodStart,
@@ -522,6 +561,7 @@ export default function DashboardView({
       focusAreas,
       shiftCodes,
       coverageRequirements,
+      coverageRuleConfigs,
       activeEmployees,
       allShifts,
       periodStart,
@@ -553,6 +593,8 @@ export default function DashboardView({
   const urgentGapCount = openShifts.filter((s) => s.urgency === "high").length;
   const draftTotal = draftNewCount + draftModifiedCount + draftDeletedCount;
   const coveragePct = periodStats.coverage?.pct ?? 100;
+  const isCoverageUnpublished = publishedWindowState === "unpublished";
+  const isCoveragePartial = publishedWindowState === "partial";
   const showOT = permissions.canEditShifts;
   const heroSummary = useMemo(() => {
     if (urgentGapCount > 0) {
@@ -601,6 +643,17 @@ export default function DashboardView({
       };
     }
 
+    if (isCoverageUnpublished) {
+      return {
+        statusLabel: "Pending publish",
+        title: "This period has not been published yet",
+        description:
+          "Coverage and open-gap metrics will appear after the first publish.",
+        actionLabel: "Open schedule",
+        actionHref: "/schedule",
+      };
+    }
+
     if (coveragePct < 90) {
       return {
         statusLabel: "Coverage",
@@ -627,20 +680,31 @@ export default function DashboardView({
     showOT,
     otAlerts.length,
     draftTotal,
+    isCoverageUnpublished,
     coveragePct,
   ]);
 
   const heroMetrics = useMemo(() => {
+    const coverageDetail = isCoverageUnpublished
+      ? "Not published yet"
+      : isCoveragePartial
+        ? "Published dates only"
+        : "Current staffing coverage";
+    const openGapDetail = isCoverageUnpublished
+      ? "Not published yet"
+      : isCoveragePartial
+        ? "Published dates only"
+        : "Staffing gaps this period";
     const metrics = [
       {
         label: "Coverage",
-        value: `${coveragePct}%`,
-        detail: "Current staffing coverage",
+        value: isCoverageUnpublished ? "\u2014" : `${coveragePct}%`,
+        detail: coverageDetail,
       },
       {
         label: "Open gaps",
-        value: `${openShifts.length}`,
-        detail: "Staffing gaps this period",
+        value: isCoverageUnpublished ? "\u2014" : `${openShifts.length}`,
+        detail: openGapDetail,
       },
       {
         label: "Draft shifts",
@@ -660,6 +724,8 @@ export default function DashboardView({
     return metrics;
   }, [
     coveragePct,
+    isCoveragePartial,
+    isCoverageUnpublished,
     openShifts.length,
     draftTotal,
     permissions.canApproveShiftRequests,
@@ -708,6 +774,7 @@ export default function DashboardView({
     shiftCodes,
     shiftCategories,
     coverageRequirements,
+    coverageRuleConfigs,
     shiftCodeMap,
     shiftCodeById,
     employees,
@@ -729,6 +796,7 @@ export default function DashboardView({
     shiftBreakdown,
     activityItems,
     trendData,
+    publishedWindowState,
     shiftRequests,
     currentEmpId,
     currentEmployee,
@@ -849,6 +917,7 @@ export default function DashboardView({
             shiftCodeById={shiftCodeById}
             shiftCategories={shiftCategories}
             coverageRequirements={coverageRequirements}
+            coverageRuleConfigs={coverageRuleConfigs}
             categoryById={categoryById}
             showOT={showOT}
             hasRequirements={coverageRequirements.length > 0}
@@ -860,11 +929,17 @@ export default function DashboardView({
             sections={sectionCoverage}
             focusAreas={focusAreas}
             focusAreaLabel={org.focusAreaLabel || "section"}
+            hasRequirements={coverageRequirements.length > 0}
+            publishedWindowState={publishedWindowState}
             onClose={closeExpanded}
           />
         )}
         {expandedPanel === "openShifts" && (
-          <ExpandedOpenShifts openShifts={openShifts} onClose={closeExpanded} />
+          <ExpandedOpenShifts
+            openShifts={openShifts}
+            publishedWindowState={publishedWindowState}
+            onClose={closeExpanded}
+          />
         )}
         {expandedPanel === "staffHours" && (
           <ExpandedStaffHours

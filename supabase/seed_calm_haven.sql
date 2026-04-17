@@ -9,9 +9,52 @@ DECLARE
   org uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
 BEGIN
   -- Organization
-  INSERT INTO organizations (id, name, slug, address, phone, timezone, focus_area_label, certification_label, role_label, employee_count)
-  VALUES (org, 'Calm Haven', 'calmhaven', '320 Eucalyptus Dr. Santa Cruz, CA 95060', '(831) 555-0700', 'America/Los_Angeles', 'Wings', 'Certifications', 'Roles', 50)
-  ON CONFLICT (id) DO UPDATE SET name = 'Calm Haven', slug = 'calmhaven', address = '320 Eucalyptus Dr. Santa Cruz, CA 95060';
+  INSERT INTO organizations (
+    id,
+    name,
+    slug,
+    address,
+    address_line_1,
+    address_line_2,
+    address_city,
+    address_state,
+    address_postal_code,
+    address_country,
+    phone,
+    timezone,
+    focus_area_label,
+    certification_label,
+    role_label,
+    employee_count
+  )
+  VALUES (
+    org,
+    'Calm Haven',
+    'calmhaven',
+    '320 Eucalyptus Dr., Santa Cruz, CA 95060, United States',
+    '320 Eucalyptus Dr.',
+    '',
+    'Santa Cruz',
+    'CA',
+    '95060',
+    'United States',
+    '(831) 555-0700',
+    'America/Los_Angeles',
+    'Wings',
+    'Certifications',
+    'Roles',
+    50
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET name = 'Calm Haven',
+        slug = 'calmhaven',
+        address = '320 Eucalyptus Dr., Santa Cruz, CA 95060, United States',
+        address_line_1 = '320 Eucalyptus Dr.',
+        address_line_2 = '',
+        address_city = 'Santa Cruz',
+        address_state = 'CA',
+        address_postal_code = '95060',
+        address_country = 'United States';
 
   RAISE NOTICE 'Calm Haven organization created.';
 END $$;

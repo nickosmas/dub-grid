@@ -68,7 +68,7 @@ export default function ExpandedStaffHours({
     <Modal title="Staff hours" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Controls row */}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           {/* Sort buttons */}
           <div style={{ display: "flex", gap: 4 }}>
             {([["hours", "By hours"], ["name", "By name"], ["ot", "OT only"]] as const).map(([key, label]) => {
@@ -133,7 +133,7 @@ export default function ExpandedStaffHours({
                     gap: 12,
                     padding: "14px 16px",
                     border: "1px solid var(--color-border)",
-                    borderRadius: 14,
+                    borderRadius: "var(--dg-radius-md)",
                     background: "var(--color-bg)",
                     marginBottom: 8,
                   }}
@@ -143,7 +143,7 @@ export default function ExpandedStaffHours({
                     style={{
                       width: 34,
                       height: 34,
-                      borderRadius: 8,
+                      borderRadius: "var(--dg-radius-md)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",

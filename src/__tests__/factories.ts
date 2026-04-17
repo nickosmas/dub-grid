@@ -8,6 +8,7 @@ import type {
   FocusArea,
   ShiftCategory,
   CoverageRequirement,
+  CoverageRuleConfig,
   Department,
   AdminPermissions,
 } from "@/types";
@@ -81,6 +82,18 @@ export function makeCoverageRequirement(overrides: Partial<CoverageRequirement> 
     shiftCodeId: 1,
     dayOfWeek: null,
     minStaff: 3,
+    ...overrides,
+  };
+}
+
+export function makeCoverageRuleConfig(overrides: Partial<CoverageRuleConfig> = {}): CoverageRuleConfig {
+  return {
+    id: 1,
+    orgId: "org1",
+    focusAreaId: 1,
+    requirementShiftCodeId: 1,
+    eligibleShiftCodeIds: [1],
+    preferredOpenShiftCodeId: 1,
     ...overrides,
   };
 }

@@ -20,6 +20,7 @@ function DashboardContent() {
     shiftCodes,
     shiftCategories,
     coverageRequirements,
+    coverageRuleConfigs,
     shiftCodeMap,
     absenceTypeMap,
     absenceTypes,
@@ -68,6 +69,7 @@ function DashboardContent() {
           shiftCodes={shiftCodes}
           shiftCategories={shiftCategories}
           coverageRequirements={coverageRequirements}
+          coverageRuleConfigs={coverageRuleConfigs}
           shiftCodeMap={shiftCodeMap}
           shiftCodeById={shiftCodeById}
           absenceTypeMap={absenceTypeMap}

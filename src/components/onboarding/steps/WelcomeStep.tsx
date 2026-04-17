@@ -159,7 +159,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
             style={{
               padding: "16px 18px",
               background: "var(--color-bg-card, white)",
-              borderRadius: 14,
+              borderRadius: "var(--dg-radius-md)",
               border: "1px solid var(--color-border)",
               display: "flex",
               gap: 14,
@@ -170,7 +170,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
               style={{
                 width: 36,
                 height: 36,
-                borderRadius: 10,
+                borderRadius: "var(--dg-radius-sm)",
                 background: "var(--color-brand-bg, #eff6ff)",
                 color: "var(--color-brand)",
                 display: "flex",

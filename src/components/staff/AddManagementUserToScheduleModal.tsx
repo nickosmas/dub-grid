@@ -1,14 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { createEmployeeFromOrgUser } from "@/lib/db";
+import { createEmployeeFromOrgUser, reconcileEmployeeFromOrgUser } from "@/lib/db";
+import { NameMismatchError } from "@/lib/account-linking";
 import { validateEmail, validateRequired } from "@/components/FormField";
 import { toast } from "sonner";
-import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
+import type { DirectoryPerson, Employee, FocusArea, NameMismatchDetails, NamedItem } from "@/types";
+import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 interface AddManagementUserToScheduleModalProps {
   orgId: string;
@@ -45,6 +49,41 @@ export function AddManagementUserToScheduleModal({
   const [contactNotes, setContactNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [nameMismatch, setNameMismatch] = useState<NameMismatchDetails | null>(null);
+  const initialDraftSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        firstName: person.firstName,
+        lastName: person.lastName,
+        email: person.email,
+        phone: person.phone,
+        certificationId: person.certificationId,
+        focusAreaIds: [...person.focusAreaIds].sort((left, right) => left - right),
+        roleIds: [...person.roleIds].sort((left, right) => left - right),
+        contactNotes: "",
+      }),
+    [person],
+  );
+  const hasUnsavedChanges =
+    JSON.stringify({
+      firstName,
+      lastName,
+      email,
+      phone,
+      certificationId,
+      focusAreaIds: [...focusAreaIds].sort((left, right) => left - right),
+      roleIds: [...roleIds].sort((left, right) => left - right),
+      contactNotes,
+    }) !== initialDraftSnapshot;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+  const handleRequestClose = useCallback(() => {
+    if (!saving && requestClose()) {
+      onClose();
+    }
+  }, [onClose, requestClose, saving]);
 
   const fieldErrors = useMemo(
     () => ({
@@ -89,6 +128,21 @@ export function AddManagementUserToScheduleModal({
     );
   }
 
+  function buildInput() {
+    return {
+      orgId,
+      userId: person.userId!,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      certificationId,
+      focusAreaIds,
+      roleIds,
+      contactNotes: contactNotes.trim(),
+    };
+  }
+
   async function handleSubmit() {
     if (!person.userId || !canSubmit) {
       setTouched({
@@ -102,18 +156,27 @@ export function AddManagementUserToScheduleModal({
 
     setSaving(true);
     try {
-      const employee = await createEmployeeFromOrgUser({
-        orgId,
-        userId: person.userId,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        certificationId,
-        focusAreaIds,
-        roleIds,
-        contactNotes: contactNotes.trim(),
-      });
+      const employee = await createEmployeeFromOrgUser(buildInput());
+      toast.success("Management user added to the schedule");
+      onAdded(employee);
+      onClose();
+    } catch (err) {
+      if (err instanceof NameMismatchError) {
+        setNameMismatch(err.details);
+        return;
+      }
+      toast.error(err instanceof Error ? err.message : "Failed to add management user to the schedule");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReconcile() {
+    if (!person.userId || !nameMismatch) return;
+
+    setSaving(true);
+    try {
+      const employee = await reconcileEmployeeFromOrgUser(buildInput());
       toast.success("Management user added to the schedule");
       onAdded(employee);
       onClose();
@@ -125,16 +188,30 @@ export function AddManagementUserToScheduleModal({
   }
 
   return (
-    <Modal
-      title="Add to Schedule"
-      onClose={onClose}
-      style={{ maxWidth: 560, width: "100%" }}
-    >
+    <>
+      <Modal
+        title="Add to Schedule"
+        onClose={onClose}
+        onRequestClose={() => !saving && requestClose()}
+        style={{ maxWidth: 560, width: "100%" }}
+      >
+      {nameMismatch ? (
+        <AccountNameMismatchPanel
+          details={nameMismatch}
+          title="Name mismatch found"
+          description="The schedule record you entered does not match this user account name. If the account name is correct, you can use it for the employee record and continue."
+          confirmLabel="Use Account Name and Add to Schedule"
+          dismissLabel={EDITOR_ACTION_LABELS.close}
+          onCancel={handleRequestClose}
+          onConfirm={handleReconcile}
+          confirming={saving}
+        />
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div
           style={{
             padding: "12px 16px",
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             background: "var(--color-bg-secondary)",
             color: "var(--color-text-secondary)",
             fontSize: "var(--dg-fs-label)",
@@ -264,8 +341,8 @@ export function AddManagementUserToScheduleModal({
         </div>
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="dg-btn dg-btn-ghost" onClick={onClose}>
-            Cancel
+          <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            {EDITOR_ACTION_LABELS.close}
           </button>
           <button
             className="dg-btn dg-btn-primary"
@@ -279,7 +356,10 @@ export function AddManagementUserToScheduleModal({
           </button>
         </div>
       </div>
-    </Modal>
+      )}
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }
 

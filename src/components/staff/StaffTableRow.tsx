@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { getEmployeeProfileHref } from "@/lib/profile-links";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
@@ -61,6 +62,7 @@ export function StaffTableRow({
   const displayName = getEmployeeDisplayName(emp);
   const initials = getInitials(displayName);
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
+  const profileHref = getEmployeeProfileHref(emp.id, emp.userId, currentUser?.id ?? null);
 
   return (
     <TableRow
@@ -122,7 +124,7 @@ export function StaffTableRow({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--color-text-primary)] truncate">
               <Link
-                href={`/people/${emp.id}`}
+                href={profileHref}
                 onClick={(e) => e.stopPropagation()}
                 className="hover:underline truncate"
                 style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}

@@ -98,7 +98,7 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
         <div
           style={{
             padding: 24,
-            borderRadius: 12,
+            borderRadius: "var(--dg-radius-md)",
             border: "1px solid var(--color-border)",
             background: "var(--color-surface)",
             color: "var(--color-text-muted)",
@@ -114,7 +114,7 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
               <div style={{
                 background: "var(--color-surface)",
                 border: "1px solid var(--color-border)",
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-md)",
                 padding: 20,
               }}>
                 <h3 style={{
@@ -153,7 +153,7 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
               <div style={{
                 background: "var(--color-surface)",
                 border: "1px solid var(--color-border)",
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-md)",
                 padding: 20,
               }}>
                 <h3 style={{

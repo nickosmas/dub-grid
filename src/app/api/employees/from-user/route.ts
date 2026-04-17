@@ -3,12 +3,14 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { hasCompleteName, namesMatch } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
 import { cacheDel, CacheKey } from "@/lib/cache";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { canManageEmployees, fetchProfileName, nameMismatchResponse } from "@/app/api/employees/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -24,32 +26,6 @@ const bodySchema = z.object({
   roleIds: z.array(z.number().int()).default([]),
   contactNotes: z.string().trim().optional().default(""),
 });
-
-async function canManageEmployees(
-  serviceClient: ReturnType<typeof getServiceClient>,
-  actorId: string,
-  orgId: string,
-): Promise<boolean> {
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role, admin_permissions")
-      .eq("user_id", actorId)
-      .eq("org_id", orgId)
-      .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", actorId)
-      .single(),
-  ]);
-
-  const isGridmaster = profile?.platform_role === "gridmaster";
-  const isSuperAdmin = membership?.org_role === "super_admin";
-  const isAdmin = membership?.org_role === "admin";
-  const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-  return isGridmaster || isSuperAdmin || (isAdmin && adminPerms?.canManageEmployees === true);
-}
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
@@ -103,7 +79,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    const [{ data: membership }, { data: existingLinkedEmployees }, { data: seniorityRow }] = await Promise.all([
+    const [{ data: membership }, { data: existingLinkedEmployees }, { data: seniorityRow }, profileName] = await Promise.all([
       serviceClient
         .from("organization_memberships")
         .select("user_id")
@@ -125,6 +101,7 @@ export async function POST(req: NextRequest) {
         .order("seniority", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      fetchProfileName(serviceClient, userId),
     ]);
 
     if (!membership) {
@@ -133,6 +110,29 @@ export async function POST(req: NextRequest) {
     if ((existingLinkedEmployees?.length ?? 0) > 0) {
       return NextResponse.json({ error: "User is already linked to a schedule employee in this organization" }, { status: 409 });
     }
+    if (!hasCompleteName(profileName)) {
+      return nameMismatchResponse(
+        {
+          employeeId: null,
+          userId,
+          employeeFirstName: firstName,
+          employeeLastName: lastName,
+          accountFirstName: profileName.firstName ?? "",
+          accountLastName: profileName.lastName ?? "",
+        },
+        "The user account must have a first and last name before it can be added to the schedule.",
+      );
+    }
+    if (!namesMatch({ firstName, lastName }, profileName)) {
+      return nameMismatchResponse({
+        employeeId: null,
+        userId,
+        employeeFirstName: firstName,
+        employeeLastName: lastName,
+        accountFirstName: profileName.firstName ?? "",
+        accountLastName: profileName.lastName ?? "",
+      });
+    }
 
     const nextSeniority = (seniorityRow?.seniority as number | null ?? 0) + 1;
     const { data: row, error } = await serviceClient
@@ -140,8 +140,8 @@ export async function POST(req: NextRequest) {
       .insert({
         org_id: orgId,
         user_id: userId,
-        first_name: firstName,
-        last_name: lastName,
+        first_name: profileName.firstName,
+        last_name: profileName.lastName,
         email,
         phone,
         certification_id: certificationId,
@@ -175,8 +175,8 @@ export async function POST(req: NextRequest) {
         resource_type: "employee",
         resource_id: (row as DbEmployee).id,
         details: {
-          firstName,
-          lastName,
+          firstName: profileName.firstName ?? "",
+          lastName: profileName.lastName ?? "",
           linkedUserId: userId,
           createdFrom: "org_user",
         },

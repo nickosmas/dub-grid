@@ -3,10 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
-import { createEmployeeFromOrgUser } from "@/lib/db";
+import { createEmployeeFromOrgUser, reconcileEmployeeFromOrgUser } from "@/lib/db";
+import { NameMismatchError } from "@/lib/account-linking";
 
 vi.mock("@/lib/db", () => ({
   createEmployeeFromOrgUser: vi.fn(),
+  reconcileEmployeeFromOrgUser: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -17,6 +19,7 @@ vi.mock("sonner", () => ({
 }));
 
 const createEmployeeFromOrgUserMock = vi.mocked(createEmployeeFromOrgUser);
+const reconcileEmployeeFromOrgUserMock = vi.mocked(reconcileEmployeeFromOrgUser);
 
 const focusAreas: FocusArea[] = [
   {
@@ -77,6 +80,25 @@ describe("AddManagementUserToScheduleModal", () => {
   beforeEach(() => {
     createEmployeeFromOrgUserMock.mockResolvedValue({
       id: "emp-99",
+      firstName: "Jordan",
+      lastName: "Lee",
+      status: "active",
+      statusChangedAt: null,
+      statusNote: "",
+      certificationId: null,
+      roleIds: [],
+      seniority: 1,
+      focusAreaIds: [1],
+      phone: "555-0100",
+      email: "jordan@example.com",
+      contactNotes: "",
+      userId: "user-1",
+      departmentIds: [],
+      deptAdminIds: [],
+      version: 0,
+    });
+    reconcileEmployeeFromOrgUserMock.mockResolvedValue({
+      id: "emp-100",
       firstName: "Jordan",
       lastName: "Lee",
       status: "active",
@@ -168,6 +190,62 @@ describe("AddManagementUserToScheduleModal", () => {
         contactNotes: "Internal note",
       });
       expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ id: "emp-99" }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("shows a reconcile step when the entered name does not match the user account and confirms with account name", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onAdded = vi.fn();
+
+    createEmployeeFromOrgUserMock.mockRejectedValue(
+      new NameMismatchError({
+        employeeId: null,
+        userId: "user-1",
+        employeeFirstName: "Jordyn",
+        employeeLastName: "Lane",
+        accountFirstName: "Jordan",
+        accountLastName: "Lee",
+      }),
+    );
+
+    render(
+      <AddManagementUserToScheduleModal
+        orgId="org-1"
+        person={makePerson()}
+        focusAreas={focusAreas}
+        certifications={certifications}
+        roles={roles}
+        onClose={onClose}
+        onAdded={onAdded}
+      />,
+    );
+
+    const firstNameInput = screen.getByDisplayValue("Jordan");
+    const lastNameInput = screen.getByDisplayValue("Lee");
+
+    await user.clear(firstNameInput);
+    await user.type(firstNameInput, "Jordyn");
+    await user.clear(lastNameInput);
+    await user.type(lastNameInput, "Lane");
+    await user.click(screen.getByRole("button", { name: "North" }));
+    await user.click(screen.getByRole("button", { name: /add to schedule/i }));
+
+    expect(await screen.findByText("Name mismatch found")).toBeInTheDocument();
+    expect(screen.getByText("Jordyn Lane")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Use Account Name and Add to Schedule" }));
+
+    await waitFor(() => {
+      expect(reconcileEmployeeFromOrgUserMock).toHaveBeenCalledWith(expect.objectContaining({
+        orgId: "org-1",
+        userId: "user-1",
+        firstName: "Jordyn",
+        lastName: "Lane",
+      }));
+      expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ id: "emp-100" }));
       expect(onClose).toHaveBeenCalledOnce();
     });
   });

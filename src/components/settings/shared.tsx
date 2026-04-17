@@ -15,7 +15,7 @@ export const inputStyle: React.CSSProperties = {
   height: 36,
   padding: "0 10px",
   border: "1px solid var(--color-border)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-btn-radius)",
   fontSize: 13,
   fontWeight: 500,
   fontFamily: "inherit",
@@ -23,27 +23,6 @@ export const inputStyle: React.CSSProperties = {
   background: "var(--color-surface)",
   outline: "none",
 };
-
-// ── Common IANA timezones ─────────────────────────────────────────────────────
-export const TIMEZONES = [
-  { value: "America/New_York",    label: "Eastern (ET) — New York" },
-  { value: "America/Chicago",     label: "Central (CT) — Chicago" },
-  { value: "America/Denver",      label: "Mountain (MT) — Denver" },
-  { value: "America/Phoenix",     label: "Mountain (no DST) — Phoenix" },
-  { value: "America/Los_Angeles", label: "Pacific (PT) — Los Angeles" },
-  { value: "America/Anchorage",   label: "Alaska (AKT) — Anchorage" },
-  { value: "Pacific/Honolulu",    label: "Hawaii (HT) — Honolulu" },
-  { value: "America/Toronto",     label: "Eastern (ET) — Toronto" },
-  { value: "America/Vancouver",   label: "Pacific (PT) — Vancouver" },
-  { value: "America/Winnipeg",    label: "Central (CT) — Winnipeg" },
-  { value: "America/Halifax",     label: "Atlantic (AT) — Halifax" },
-  { value: "America/St_Johns",    label: "Newfoundland (NT) — St. John's" },
-  { value: "Europe/London",       label: "GMT/BST — London" },
-  { value: "Europe/Paris",        label: "CET/CEST — Paris" },
-  { value: "Australia/Sydney",    label: "AEST/AEDT — Sydney" },
-  { value: "Australia/Melbourne", label: "AEST/AEDT — Melbourne" },
-  { value: "Pacific/Auckland",    label: "NZST/NZDT — Auckland" },
-];
 
 /** Normalize a time string to "HH:MM" for comparison (handles "HH:MM:SS" and null). */
 export function normalizeTimeCompare(t: string | null | undefined): string | null {

@@ -81,7 +81,7 @@ export default function ExpandedActivity({
     <Modal title="Recent activity" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Type filter tabs */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: 16, borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: 16, borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.value;
             return (

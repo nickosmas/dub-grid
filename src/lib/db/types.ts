@@ -7,6 +7,12 @@ export interface DbOrganization {
   name: string;
   slug: string | null;
   address: string;
+  address_line_1: string;
+  address_line_2: string;
+  address_city: string;
+  address_state: string;
+  address_postal_code: string;
+  address_country: string;
   phone: string;
   employee_count: number | null;
   focus_area_label: string | null;
@@ -25,6 +31,7 @@ export interface DbOrganization {
   subscription_seats: number | null;
   data_retention_days: number;
   feature_overrides: Record<string, boolean>;
+  updated_at: string | null;
 }
 
 export interface DbFocusArea {
@@ -47,6 +54,43 @@ export interface DbDepartment {
   permissions: Record<string, boolean> | null;
 }
 
+export interface DbOrganizationMembership {
+  id: number;
+  user_id: string;
+  org_id: string;
+  org_role: string;
+  admin_permissions: Record<string, boolean> | null;
+  joined_at: string;
+  updated_at: string | null;
+  archived_at: string | null;
+  archived_by: string | null;
+  department_ids: number[];
+  dept_admin_ids: number[];
+  phone: string | null;
+  onboarding_completed_at: string | null;
+  tooltip_tours_completed: Record<string, string>;
+}
+
+export interface DbInvitation {
+  id: string;
+  org_id: string;
+  invited_by: string | null;
+  email: string;
+  role_to_assign: string;
+  token?: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+  employee_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  department_ids: number[];
+  dept_admin_ids: number[];
+}
+
 export interface DbShiftCategory {
   id: number;
   org_id: string;
@@ -67,6 +111,21 @@ export interface DbCoverageRequirement {
   shift_code_id: number;
   day_of_week: number | null;
   min_staff: number;
+}
+
+export interface DbCoverageRuleConfig {
+  id: number;
+  org_id: string;
+  focus_area_id: number;
+  requirement_shift_code_id: number;
+  preferred_open_shift_code_id: number;
+}
+
+export interface DbCoverageRuleConfigCode {
+  id: number;
+  config_id: number;
+  org_id: string;
+  eligible_shift_code_id: number;
 }
 
 export interface DbShiftCode {

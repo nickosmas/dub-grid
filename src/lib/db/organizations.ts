@@ -1,7 +1,20 @@
 import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, parseHost, ORGANIZATION_COLS } from "./shared";
-import type { DbOrganization } from "./types";
-import { rowToOrganization } from "./mappers";
-import type { Organization, OrganizationUser, OrganizationRole, PlatformRole, AdminPermissions, DirectoryPerson, EmployeeStatus } from "@/types";
+import type { DbInvitation, DbOrganization } from "./types";
+import { rowToInvitation, rowToOrganization, rowToOrganizationUser } from "./mappers";
+import type {
+  AdminPermissions,
+  DirectoryPerson,
+  EmployeeStatus,
+  Organization,
+  OrganizationRole,
+  OrganizationUser,
+} from "@/types";
+import { composeOrganizationAddress } from "@/lib/organization-profile";
+import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
+import {
+  updateOrganizationInvitationGuarded,
+  updateOrganizationMembershipGuarded,
+} from "./access";
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
   let query = supabase.from("organizations").select(ORGANIZATION_COLS);
@@ -45,13 +58,19 @@ export async function fetchOrganizationById(orgId: string): Promise<Organization
 }
 
 export async function updateOrganization(org: Organization): Promise<void> {
+  const address = composeOrganizationAddress(org);
   const { error } = await supabase
     .from("organizations")
     .update({
       name: org.name,
-      address: org.address,
+      address,
+      address_line_1: org.addressLine1,
+      address_line_2: org.addressLine2,
+      address_city: org.addressCity,
+      address_state: org.addressState,
+      address_postal_code: org.addressPostalCode,
+      address_country: org.addressCountry,
       phone: org.phone,
-      employee_count: org.employeeCount,
       focus_area_label: org.focusAreaLabel || null,
       certification_label: org.certificationLabel || null,
       role_label: org.roleLabel || null,
@@ -65,7 +84,79 @@ export async function updateOrganization(org: Organization): Promise<void> {
     .eq("id", org.id);
   if (error) throw error;
   await cacheDel(CacheKey.organization(org.id), CacheKey.allOrganizations());
-  void logAudit("org.updated", "organization", org.id, { name: org.name }, org.id);
+  void logAudit("org.updated", "organization", org.id, { name: org.name, address }, org.id);
+}
+
+export interface UpdateOrganizationSettingsInput
+  extends Partial<OrganizationSettingsEditable> {
+  orgId: string;
+  expectedUpdatedAt: string;
+}
+
+export class OrganizationSettingsConflictError extends Error {
+  constructor(public readonly latestOrganization: Organization) {
+    super("Organization settings were updated by someone else.");
+    this.name = "OrganizationSettingsConflictError";
+  }
+}
+
+export async function updateOrganizationSettings(
+  input: UpdateOrganizationSettingsInput,
+): Promise<Organization> {
+  const response = await fetch("/api/organizations/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  if (response.status === 409) {
+    const latestOrganization =
+      body &&
+      typeof body === "object" &&
+      "organization" in body &&
+      body.organization &&
+      typeof body.organization === "object"
+        ? (body.organization as Organization)
+        : null;
+
+    if (latestOrganization) {
+      throw new OrganizationSettingsConflictError(latestOrganization);
+    }
+  }
+
+  if (!response.ok) {
+    const message =
+      body &&
+      typeof body === "object" &&
+      "error" in body &&
+      typeof body.error === "string"
+        ? body.error
+        : "Failed to update organization settings";
+    throw new Error(message);
+  }
+
+  const organization =
+    body &&
+    typeof body === "object" &&
+    "organization" in body &&
+    body.organization &&
+    typeof body.organization === "object"
+      ? (body.organization as Organization)
+      : null;
+
+  if (!organization) {
+    throw new Error("Organization settings response did not include organization data");
+  }
+
+  await cacheDel(CacheKey.organization(input.orgId), CacheKey.allOrganizations());
+  return organization;
 }
 
 export async function fetchOrganizationUsers(orgId: string): Promise<OrganizationUser[]> {
@@ -74,19 +165,9 @@ export async function fetchOrganizationUsers(orgId: string): Promise<Organizatio
       p_org_id: orgId,
     });
     if (error) throw error;
-    return (data ?? []).map((row: Record<string, unknown>) => ({
-      id: row.id as string,
-      email: (row.email as string | null) ?? null,
-      firstName: (row.first_name as string | null) ?? null,
-      lastName: (row.last_name as string | null) ?? null,
-      orgRole: (row.org_role as string ?? "user") as OrganizationRole,
-      platformRole: (row.platform_role as string) as PlatformRole,
-      adminPermissions: (row.admin_permissions ?? null) as AdminPermissions | null,
-      createdAt: row.created_at as string,
-      lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
-      departmentIds: (row.department_ids as number[]) ?? [],
-      deptAdminIds: (row.dept_admin_ids as number[]) ?? [],
-    }));
+    return (data ?? []).map((row: Record<string, unknown>) =>
+      rowToOrganizationUser(row),
+    );
   });
 }
 
@@ -193,24 +274,30 @@ export async function updatePendingInvitation(
     deptAdminIds?: number[];
   },
 ): Promise<void> {
-  const update: Record<string, unknown> = {};
-  if (data.firstName !== undefined) update.first_name = data.firstName;
-  if (data.lastName !== undefined) update.last_name = data.lastName;
-  if (data.phone !== undefined) update.phone = data.phone;
-  if (data.email !== undefined) update.email = data.email.toLowerCase();
-  if (data.roleToAssign !== undefined) update.role_to_assign = data.roleToAssign;
-  if (data.departmentIds !== undefined) {
-    update.department_ids = data.departmentIds;
-    // Auto-prune dept_admin_ids to remain a subset of department_ids
-    if (data.deptAdminIds !== undefined) {
-      const deptSet = new Set(data.departmentIds);
-      update.dept_admin_ids = data.deptAdminIds.filter(id => deptSet.has(id));
-    }
-  } else if (data.deptAdminIds !== undefined) {
-    update.dept_admin_ids = data.deptAdminIds;
-  }
-  const { error } = await supabase.from("invitations").update(update).eq("id", invitationId).eq("org_id", orgId);
+  const { data: invitationRow, error } = await supabase
+    .from("invitations")
+    .select("updated_at")
+    .eq("id", invitationId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
   if (error) throw error;
+  if (!invitationRow?.updated_at) {
+    throw new Error("Invitation data is out of date. Refresh and try again.");
+  }
+
+  await updateOrganizationInvitationGuarded({
+    orgId,
+    invitationId,
+    expectedUpdatedAt: invitationRow.updated_at,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    phone: data.phone,
+    email: data.email?.toLowerCase(),
+    roleToAssign: data.roleToAssign,
+    departmentIds: data.departmentIds,
+    deptAdminIds: data.deptAdminIds,
+  });
   await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));
 }
 
@@ -220,14 +307,26 @@ export async function updateAdminPermissions(
   orgId: string,
   targetEmail?: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data: membershipRow, error } = await supabase
     .from("organization_memberships")
-    .update({ admin_permissions: permissions })
+    .select("updated_at")
     .eq("user_id", userId)
-    .eq("org_id", orgId);
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .maybeSingle();
+
   if (error) throw error;
+  if (!membershipRow?.updated_at) {
+    throw new Error("User access data is out of date. Refresh and try again.");
+  }
+
+  await updateOrganizationMembershipGuarded({
+    orgId,
+    userId,
+    expectedUpdatedAt: membershipRow.updated_at,
+    adminPermissions: permissions,
+  });
   await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("permissions.updated", "permissions", userId, { permissions, targetEmail: targetEmail ?? null }, orgId);
 }
 
 export async function changeOrganizationUserRole(
@@ -236,20 +335,33 @@ export async function changeOrganizationUserRole(
   orgId?: string,
   targetEmail?: string,
 ): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-  const { error } = await supabase.rpc("change_user_role", {
-    p_target_user_id: targetUserId,
-    p_new_role: newRole,
-    p_changed_by_id: user.id,
-    p_idempotency_key: `${targetUserId}-${newRole}-${Date.now()}`,
-    p_org_id: orgId ?? null,
-  });
+  if (!orgId) {
+    throw new Error("Organization context is required to update roles safely.");
+  }
+
+  const { data: membershipRow, error } = await supabase
+    .from("organization_memberships")
+    .select("updated_at, admin_permissions")
+    .eq("user_id", targetUserId)
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .maybeSingle();
+
   if (error) throw error;
-  const keys = [CacheKey.allUsers(), CacheKey.mwProfile(targetUserId)];
-  if (orgId) keys.push(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
-  await cacheDel(...keys);
-  void logAudit("role.changed", "role", targetUserId, { newRole, targetEmail: targetEmail ?? null }, orgId);
+  if (!membershipRow?.updated_at) {
+    throw new Error("User access data is out of date. Refresh and try again.");
+  }
+
+  await updateOrganizationMembershipGuarded({
+    orgId,
+    userId: targetUserId,
+    expectedUpdatedAt: membershipRow.updated_at,
+    orgRole: newRole,
+    adminPermissions: newRole === "admin"
+      ? ((membershipRow.admin_permissions as AdminPermissions | null) ?? null)
+      : null,
+  });
+  await cacheDel(CacheKey.allUsers(), CacheKey.mwProfile(targetUserId), CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
 }
 
 export async function assignOrgRoleByEmail(

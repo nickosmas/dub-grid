@@ -87,7 +87,7 @@ export default function RootLayout({
           duration={6000}
           toastOptions={{
             className:
-              "text-[15px] font-semibold rounded-xl w-[min(calc(100vw-48px),720px)] max-w-full",
+              "text-[15px] font-semibold rounded-[var(--dg-radius-lg)] w-[min(calc(100vw-48px),720px)] max-w-full",
           }}
         />
         <CookieConsent />

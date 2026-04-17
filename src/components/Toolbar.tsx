@@ -379,13 +379,13 @@ export default function Toolbar({
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
               style={{
-                width: 44,
-                height: 44,
+                width: "var(--dg-toolbar-h)",
+                height: "var(--dg-toolbar-h)",
                 padding: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to previous period"
@@ -413,13 +413,13 @@ export default function Toolbar({
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
               style={{
-                width: 44,
-                height: 44,
+                width: "var(--dg-toolbar-h)",
+                height: "var(--dg-toolbar-h)",
                 padding: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to next period"
@@ -433,11 +433,11 @@ export default function Toolbar({
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
             style={{
-              height: 44,
+              height: "var(--dg-toolbar-h)",
               padding: "0 14px",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              borderRadius: 10,
+              borderRadius: "var(--dg-btn-radius)",
               flexShrink: 0,
             }}
           >
@@ -472,7 +472,7 @@ export default function Toolbar({
                 value={staffSearch}
                 onChange={(e) => onStaffSearchChange(e.target.value)}
                 className="dg-input"
-                style={{ paddingLeft: 30, width: "100%", borderRadius: 10 }}
+                style={{ paddingLeft: 30, width: "100%", borderRadius: "var(--dg-btn-radius)" }}
               />
               {staffSearch && (
                 <Hint content={hint("Clear search")} side="bottom">
@@ -481,7 +481,7 @@ export default function Toolbar({
                     className="dg-btn-ghost"
                     style={{
                       position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                      padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 8,
+                      padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: "var(--dg-btn-radius)",
                     }}
                   >
                     ×
@@ -500,8 +500,8 @@ export default function Toolbar({
               data-tour="toolbar-tools-btn"
               style={{
                 border: toolsOpen ? "1px solid var(--color-brand-border)" : "1px solid var(--color-border)",
-                borderRadius: 10,
-                height: 44,
+                borderRadius: "var(--dg-btn-radius)",
+                height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
                 background: toolsOpen ? "var(--color-brand-bg)" : undefined,
                 color: toolsOpen ? "var(--color-brand)" : undefined,
@@ -579,7 +579,7 @@ export default function Toolbar({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to previous period"
@@ -613,7 +613,7 @@ export default function Toolbar({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 flexShrink: 0,
               }}
               aria-label="Go to next period"
@@ -634,7 +634,7 @@ export default function Toolbar({
             padding: "0 14px",
             fontSize: "var(--dg-fs-caption)",
             fontWeight: 600,
-            borderRadius: 10,
+            borderRadius: "var(--dg-btn-radius)",
           }}
         >
           Today
@@ -705,7 +705,7 @@ export default function Toolbar({
             value={staffSearch}
             onChange={(e) => onStaffSearchChange(e.target.value)}
             className="dg-input"
-            style={{ paddingLeft: 30, width: isTablet ? 180 : 160, borderRadius: 10 }}
+            style={{ paddingLeft: 30, width: isTablet ? 180 : 160, borderRadius: "var(--dg-btn-radius)" }}
           />
           {staffSearch && (
             <Hint content={hint("Clear search")} side="bottom">
@@ -714,7 +714,7 @@ export default function Toolbar({
                 className="dg-btn-ghost"
                 style={{
                   position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                  padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: 8,
+                  padding: "2px 5px", fontSize: "var(--dg-fs-body-sm)", lineHeight: 1, borderRadius: "var(--dg-btn-radius)",
                 }}
               >
                 ×
@@ -736,7 +736,7 @@ export default function Toolbar({
               className="dg-btn dg-btn-ghost"
               style={{
                 border: "1px solid var(--color-border)",
-                borderRadius: 10,
+                borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
                 position: "relative",
@@ -767,7 +767,7 @@ export default function Toolbar({
             data-tour="toolbar-tools-btn"
             style={{
               border: toolsOpen ? "1px solid var(--color-brand-border)" : "1px solid var(--color-border)",
-              borderRadius: 10,
+              borderRadius: "var(--dg-btn-radius)",
               height: "var(--dg-toolbar-h)",
               padding: "0 12px",
               background: toolsOpen ? "var(--color-brand-bg)" : undefined,

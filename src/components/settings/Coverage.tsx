@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { CoverageRequirement, FocusArea, ShiftCategory, ShiftCode, ShiftDisplayMode } from "@/types";
-import { saveCoverageRequirements } from "@/lib/db";
+import { CoverageRequirement, CoverageRuleConfig, FocusArea, ShiftCategory, ShiftCode, ShiftDisplayMode } from "@/types";
+import { saveCoverageRequirements, saveCoverageRuleConfig } from "@/lib/db";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
 import { EmptyState } from "@/components/EmptyState";
 
 // ── Coverage Requirements Settings ────────────────────────────────────────────
@@ -18,6 +21,8 @@ export default function CoverageRequirementsSettings({
   shiftCodes,
   coverageRequirements,
   onCoverageRequirementsChange,
+  coverageRuleConfigs = [],
+  onCoverageRuleConfigsChange = () => {},
   canEdit,
   shiftDisplayMode = "code",
 }: {
@@ -27,6 +32,8 @@ export default function CoverageRequirementsSettings({
   shiftCodes: ShiftCode[];
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
+  coverageRuleConfigs?: CoverageRuleConfig[];
+  onCoverageRuleConfigsChange?: (configs: CoverageRuleConfig[]) => void;
   canEdit: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
 }) {
@@ -38,7 +45,15 @@ export default function CoverageRequirementsSettings({
   // Draft edits keyed by "focusAreaId-categoryId"
   type CodeReq = { shiftCodeId: number; minStaff: number };
   type DraftRow = { dayOfWeek: number | null; codeRequirements: CodeReq[] };
-  type DraftEntry = { everyDay: boolean; rows: DraftRow[] };
+  type DraftRuleConfig = {
+    eligibleShiftCodeIds: number[];
+    preferredOpenShiftCodeId: number;
+  };
+  type DraftEntry = {
+    everyDay: boolean;
+    rows: DraftRow[];
+    ruleConfigs: Record<number, DraftRuleConfig>;
+  };
   const [drafts, setDrafts] = useState<Record<string, DraftEntry>>({});
 
   // Get the shift codes belonging to a (focusArea, category) group
@@ -58,6 +73,26 @@ export default function CoverageRequirementsSettings({
   const buildDraftFromRequirements = useCallback(
     (focusAreaId: number, categoryId: number): DraftEntry => {
       const codes = getCodesForGroup(focusAreaId, categoryId);
+      const buildRuleConfigs = (): Record<number, DraftRuleConfig> =>
+        Object.fromEntries(
+          codes.map((sc) => {
+            const existingConfig = coverageRuleConfigs.find(
+              (config) =>
+                config.focusAreaId === focusAreaId &&
+                config.requirementShiftCodeId === sc.id,
+            );
+
+            return [
+              sc.id,
+              {
+                eligibleShiftCodeIds: existingConfig?.eligibleShiftCodeIds?.length
+                  ? [...existingConfig.eligibleShiftCodeIds].sort((left, right) => left - right)
+                  : [sc.id],
+                preferredOpenShiftCodeId: existingConfig?.preferredOpenShiftCodeId ?? sc.id,
+              },
+            ];
+          }),
+        );
       const makeEmptyCodeReqs = (): CodeReq[] =>
         codes.map((sc) => ({ shiftCodeId: sc.id, minStaff: 0 }));
 
@@ -67,7 +102,11 @@ export default function CoverageRequirementsSettings({
       );
 
       if (existing.length === 0) {
-        return { everyDay: true, rows: [{ dayOfWeek: null, codeRequirements: makeEmptyCodeReqs() }] };
+        return {
+          everyDay: true,
+          rows: [{ dayOfWeek: null, codeRequirements: makeEmptyCodeReqs() }],
+          ruleConfigs: buildRuleConfigs(),
+        };
       }
 
       const hasEveryDay = existing.some((r) => r.dayOfWeek === null);
@@ -76,7 +115,11 @@ export default function CoverageRequirementsSettings({
           const match = existing.find((r) => r.shiftCodeId === sc.id && r.dayOfWeek === null);
           return { shiftCodeId: sc.id, minStaff: match?.minStaff ?? 0 };
         });
-        return { everyDay: true, rows: [{ dayOfWeek: null, codeRequirements: codeReqs }] };
+        return {
+          everyDay: true,
+          rows: [{ dayOfWeek: null, codeRequirements: codeReqs }],
+          ruleConfigs: buildRuleConfigs(),
+        };
       }
 
       // Per-day mode: fill all 7 days
@@ -88,9 +131,9 @@ export default function CoverageRequirementsSettings({
         });
         rows.push({ dayOfWeek: d, codeRequirements: codeReqs });
       }
-      return { everyDay: false, rows };
+      return { everyDay: false, rows, ruleConfigs: buildRuleConfigs() };
     },
-    [coverageRequirements, getCodesForGroup],
+    [coverageRequirements, coverageRuleConfigs, getCodesForGroup],
   );
 
   // Get the current draft for a section (only exists while editing)
@@ -123,7 +166,7 @@ export default function CoverageRequirementsSettings({
     [buildDraftFromRequirements],
   );
 
-  const handleCancel = useCallback(
+  const handleClose = useCallback(
     (focusAreaId: number, categoryId: number) => {
       const key = `${focusAreaId}-${categoryId}`;
       setDrafts((prev) => {
@@ -136,6 +179,13 @@ export default function CoverageRequirementsSettings({
     [],
   );
 
+  const handleDiscard = useCallback(
+    (focusAreaId: number, categoryId: number) => {
+      setDraft(focusAreaId, categoryId, buildDraftFromRequirements(focusAreaId, categoryId));
+    },
+    [buildDraftFromRequirements, setDraft],
+  );
+
   const handleToggleEveryDay = useCallback(
     (focusAreaId: number, categoryId: number) => {
       const current = getDraft(focusAreaId, categoryId);
@@ -146,7 +196,7 @@ export default function CoverageRequirementsSettings({
         for (let d = 0; d < 7; d++) {
           rows.push({ dayOfWeek: d, codeRequirements: val.map((c) => ({ ...c })) });
         }
-        setDraft(focusAreaId, categoryId, { everyDay: false, rows });
+        setDraft(focusAreaId, categoryId, { ...current, everyDay: false, rows });
       } else {
         const allValues = current.rows.map((r) => JSON.stringify(r.codeRequirements.map((c) => c.minStaff)));
         const hasDifferentDays = new Set(allValues).size > 1;
@@ -156,6 +206,7 @@ export default function CoverageRequirementsSettings({
         const mon = current.rows.find((r) => r.dayOfWeek === 1) ?? current.rows[0];
         const codeReqs = mon?.codeRequirements.map((c) => ({ ...c })) ?? [];
         setDraft(focusAreaId, categoryId, {
+          ...current,
           everyDay: true,
           rows: [{ dayOfWeek: null, codeRequirements: codeReqs }],
         });
@@ -191,6 +242,7 @@ export default function CoverageRequirementsSettings({
       setSavingKey(key);
       try {
         const allSaved: CoverageRequirement[] = [];
+        const savedRuleConfigs: CoverageRuleConfig[] = [];
         for (const code of codes) {
           const rows = draft.rows.map((r) => {
             const cr = r.codeRequirements.find((c) => c.shiftCodeId === code.id);
@@ -198,11 +250,26 @@ export default function CoverageRequirementsSettings({
           });
           const saved = await saveCoverageRequirements(orgId, focusAreaId, code.id, rows);
           allSaved.push(...saved);
+
+          const ruleConfig = draft.ruleConfigs[code.id] ?? {
+            eligibleShiftCodeIds: [code.id],
+            preferredOpenShiftCodeId: code.id,
+          };
+          const savedRuleConfig = await saveCoverageRuleConfig(orgId, focusAreaId, code.id, {
+            eligibleShiftCodeIds: ruleConfig.eligibleShiftCodeIds,
+            preferredOpenShiftCodeId: ruleConfig.preferredOpenShiftCodeId,
+          });
+          if (savedRuleConfig) savedRuleConfigs.push(savedRuleConfig);
         }
         const remaining = coverageRequirements.filter(
           (r) => !(r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId)),
         );
+        const remainingRuleConfigs = coverageRuleConfigs.filter(
+          (config) =>
+            !(config.focusAreaId === focusAreaId && codeIds.has(config.requirementShiftCodeId)),
+        );
         onCoverageRequirementsChange([...remaining, ...allSaved]);
+        onCoverageRuleConfigsChange([...remainingRuleConfigs, ...savedRuleConfigs]);
         // Clear draft and exit editing
         setDrafts((prev) => {
           const next = { ...prev };
@@ -218,7 +285,15 @@ export default function CoverageRequirementsSettings({
         setSavingKey(null);
       }
     },
-    [getDraft, getCodesForGroup, orgId, coverageRequirements, onCoverageRequirementsChange],
+    [
+      getDraft,
+      getCodesForGroup,
+      orgId,
+      coverageRequirements,
+      coverageRuleConfigs,
+      onCoverageRequirementsChange,
+      onCoverageRuleConfigsChange,
+    ],
   );
 
   const activeCategories = shiftCategories.filter((c) => !c.archivedAt);
@@ -248,15 +323,209 @@ export default function CoverageRequirementsSettings({
   };
 
   const codeLabel = (sc: ShiftCode) => isNameMode ? (sc.name || sc.label) : sc.label;
+  const sortCodes = (left: ShiftCode, right: ShiftCode) =>
+    left.sortOrder - right.sortOrder || left.id - right.id;
+  const activeShiftCodes = shiftCodes.filter((code) => !code.archivedAt).sort(sortCodes);
+  const previewCategory = activeCategories.find((category) =>
+    activeShiftCodes.some((code) => code.categoryId === category.id),
+  );
+  const previewCodes = previewCategory
+    ? activeShiftCodes.filter((code) => code.categoryId === previewCategory.id).slice(0, 3)
+    : activeShiftCodes.slice(0, 3);
+  const fallbackLabels = isNameMode
+    ? ["Day Shift", "Day Supervisor", "Day Mentoring"]
+    : ["D", "Ds", "(D)"];
+  const exampleLabels = fallbackLabels.map((fallbackLabel, index) =>
+    previewCodes[index] ? codeLabel(previewCodes[index]) : fallbackLabel,
+  );
+  const previewCategoryLabel = previewCategory?.name ?? "Day";
+  const shortageExample = `${exampleLabels[0]} short 1, ${exampleLabels[1]} short 1`;
+  const infoPoints = [
+    {
+      title: "Enter the minimum by shift line",
+      description: `Set the required count for each shift line in the category, such as ${exampleLabels[0]}, ${exampleLabels[1]}, and ${exampleLabels[2]}. These values describe the staffing mix you want on the schedule.`,
+    },
+    {
+      title: "Coverage is judged by the category total",
+      description: `For each focus area, date, and ${previewCategoryLabel} category, DubGrid adds those shift-line minimums together and compares that total to the number of unique staff scheduled anywhere in the category.`,
+    },
+    {
+      title: "Green means the category total is covered",
+      description: `If the scheduled total is equal to or greater than the category total required, coverage stays green even if one shift line is lighter than planned. A person is counted once toward the category total.`,
+    },
+    {
+      title: "Red shows what mix is still missing",
+      description: `If the scheduled total is below the category total required, coverage turns red and the shortage detail explains which lines are still short, for example ${shortageExample}.`,
+    },
+  ];
+
+  const renderCoveragePreview = (
+    title: string,
+    tone: "green" | "red",
+    actualTotal: number,
+    requiredTotal: number,
+    rowCounts: number[],
+    detail: string,
+  ) => {
+    const palette = tone === "green"
+      ? {
+          bg: "rgba(16, 185, 129, 0.08)",
+          border: "var(--color-success-border)",
+          text: "var(--color-success-text)",
+          badge: "Covered",
+        }
+      : {
+          bg: "rgba(220, 38, 38, 0.06)",
+          border: "var(--color-danger-border)",
+          text: "var(--color-danger-dark)",
+          badge: "Short",
+        };
+
+    return (
+      <PreviewFrame
+        key={title}
+        title={title}
+        subtitle={`${previewCategoryLabel} category`}
+        badge={(
+          <span
+            style={{
+              padding: "3px 8px",
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 700,
+              background: palette.bg,
+              color: palette.text,
+              border: `1px solid ${palette.border}`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {palette.badge}
+          </span>
+        )}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: 8,
+            padding: "10px 12px",
+            borderRadius: "var(--dg-radius-sm)",
+            background: "var(--color-bg)",
+            border: "1px solid var(--color-border-light)",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {exampleLabels.map((label) => (
+              <div key={`${title}-${label}`} style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+                {label}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "right" }}>
+            {rowCounts.map((count, index) => (
+              <div key={`${title}-count-${exampleLabels[index] ?? index}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                {count}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-border-light)",
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Required Total
+            </div>
+            <div style={{ marginTop: 3, fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              {requiredTotal}
+            </div>
+          </div>
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-sm)",
+              background: palette.bg,
+              border: `1px solid ${palette.border}`,
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Scheduled
+            </div>
+            <div style={{ marginTop: 3, fontSize: "var(--dg-fs-label)", fontWeight: 700, color: palette.text }}>
+              {actualTotal}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: "var(--dg-radius-sm)",
+            background: tone === "green" ? "var(--color-bg)" : "rgba(255,255,255,0.6)",
+            border: `1px dashed ${palette.border}`,
+            fontSize: 11,
+            lineHeight: 1.45,
+            color: tone === "green" ? "var(--color-text-muted)" : palette.text,
+          }}
+        >
+          {detail}
+        </div>
+      </PreviewFrame>
+    );
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ExplainerSection
+        title="Coverage logic"
+        points={infoPoints}
+        defaultOpen
+        storageKey="dg-explainer-coverage-settings"
+        preview={(
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            {renderCoveragePreview(
+              "Green example",
+              "green",
+              5,
+              4,
+              [2, 1, 2],
+              `Category total met. Even if one line is lighter than planned, the ${previewCategoryLabel} category stays green because 5 scheduled is at least 4 required.`,
+            )}
+            {renderCoveragePreview(
+              "Red example",
+              "red",
+              3,
+              4,
+              [2, 0, 1],
+              `Category total is short, so coverage turns red and the shortage detail calls out the missing mix: ${shortageExample}.`,
+            )}
+          </div>
+        )}
+      />
       {activeFocusAreas.map((fa) => (
         <div
           key={fa.id}
           style={{
             background: "var(--color-surface)",
-            borderRadius: 12,
+            borderRadius: "var(--dg-radius-md)",
             border: "1px solid var(--color-border)",
             overflow: "hidden",
           }}
@@ -355,24 +624,6 @@ export default function CoverageRequirementsSettings({
                       Edit
                     </button>
                   )}
-                  {isEditing && (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => handleCancel(fa.id, cat.id)}
-                        disabled={isSaving}
-                        className="dg-btn dg-btn-secondary dg-btn-sm"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSave(fa.id, cat.id)}
-                        disabled={isSaving || !hasChanges}
-                        className="dg-btn dg-btn-primary dg-btn-sm"
-                      >
-                        {isSaving ? "Saving..." : "Save"}
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* Content — always visible */}
@@ -426,7 +677,7 @@ export default function CoverageRequirementsSettings({
                               alignItems: "center",
                               justifyContent: "space-between",
                               padding: "6px 10px",
-                              borderRadius: 8,
+                              borderRadius: "var(--dg-radius-md)",
                               background: "var(--color-bg)",
                             }}
                           >
@@ -479,7 +730,7 @@ export default function CoverageRequirementsSettings({
                       display: "grid",
                       gridTemplateColumns: `auto repeat(7, 1fr)`,
                       gap: 0,
-                      borderRadius: 8,
+                      borderRadius: "var(--dg-radius-md)",
                       overflow: "hidden",
                       border: "1px solid var(--color-border-light)",
                     }}>
@@ -580,6 +831,29 @@ export default function CoverageRequirementsSettings({
                     }}>
                       {data.everyDay ? "Same every day" : "Per-day schedule"}
                     </span>
+                  )}
+                  {isEditing && (
+                    <EditorActionRow
+                      gap={6}
+                      secondaryAction={(
+                        <button
+                          onClick={() => hasChanges ? handleDiscard(fa.id, cat.id) : handleClose(fa.id, cat.id)}
+                          disabled={isSaving}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          {getEditorDismissLabel(hasChanges)}
+                        </button>
+                      )}
+                      primaryAction={(
+                        <button
+                          onClick={() => handleSave(fa.id, cat.id)}
+                          disabled={isSaving || !hasChanges}
+                          className="dg-btn dg-btn-primary dg-btn-sm"
+                        >
+                          {getEditorSaveLabel(isSaving)}
+                        </button>
+                      )}
+                    />
                   )}
                 </div>
               </div>

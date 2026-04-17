@@ -14,7 +14,7 @@ export default function ExpandButton({ onClick, label = "Expand" }: ExpandButton
         justifyContent: "center",
         width: 28,
         height: 28,
-        borderRadius: 8,
+        borderRadius: "var(--dg-btn-radius)",
         border: "none",
         background: "transparent",
         color: "var(--color-text-secondary)",

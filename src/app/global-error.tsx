@@ -38,7 +38,7 @@ export default function GlobalError({
               background: "var(--color-brand)",
               color: "var(--color-text-inverse)",
               border: "none",
-              borderRadius: 8,
+              borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-body-sm)",
               fontWeight: 600,
               cursor: "pointer",

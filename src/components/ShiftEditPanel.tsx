@@ -5,7 +5,8 @@ import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@
 import { EditModalState, ShiftCode, ShiftCategory, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode } from "@/types";
 import ShiftPicker from "./ShiftPicker";
 import ConfirmDialog from "./ConfirmDialog";
-import RepeatForm from "./RepeatForm";
+import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
+import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -33,7 +34,10 @@ interface ShiftEditPanelProps {
     startDate: string,
     endDate: string | null,
     maxOccurrences: number | null,
+    previewTotal: number,
   ) => void;
+  /** True while a repeating series is being created. */
+  isCreatingRepeatSeries?: boolean;
   /** Employee ID — needed for repeat form overwrite checks */
   empId?: string;
   /** Current custom start time override for this shift (e.g. "07:30") */
@@ -162,7 +166,7 @@ const MINUTES = ["00","05","10","15","20","25","30","35","40","45","50","55"];
 const triggerStyle: React.CSSProperties = {
   padding: "6px 8px",
   border: "1.5px solid var(--color-border)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-btn-radius)",
   fontSize: "var(--dg-fs-caption)",
   fontWeight: 600,
   fontFamily: "inherit",
@@ -186,7 +190,7 @@ const dropdownStyle: React.CSSProperties = {
   transform: "translateX(-50%)",
   background: "var(--color-surface)",
   border: "1.5px solid var(--color-border)",
-  borderRadius: 10,
+  borderRadius: "var(--dg-radius-lg)",
   boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
   zIndex: 100,
   maxHeight: 180,
@@ -205,7 +209,7 @@ const optionStyle: React.CSSProperties = {
   cursor: "pointer",
   textAlign: "center",
   whiteSpace: "nowrap",
-  borderRadius: 8,
+  borderRadius: "var(--dg-radius-sm)",
 };
 
 function TimeDropdown({
@@ -409,7 +413,7 @@ function PillTimeEditor({
           style={{
             display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
             color: "var(--color-text-subtle)", background: "none",
-            border: "1px dashed var(--color-border)", borderRadius: 8,
+            border: "1px dashed var(--color-border)", borderRadius: "var(--dg-radius-md)",
             padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
             width: "100%", justifyContent: "center", marginTop: 8,
           }}
@@ -428,7 +432,7 @@ function PillTimeEditor({
   if (hasCustomTime && !editing) {
     const duration = calcTimeDuration(customStart ?? null, customEnd ?? null);
     return (
-      <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
+      <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)", padding: "10px", marginTop: 8 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
         </div>
@@ -460,7 +464,7 @@ function PillTimeEditor({
 
   // State 3: Editing — show the dropdowns
   return (
-    <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "10px", marginTop: 8 }}>
+    <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)", padding: "10px", marginTop: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
         <div style={{ display: "flex", gap: 6 }}>
@@ -538,6 +542,7 @@ export default function ShiftEditPanel({
   onNoteToggle,
   seriesId,
   onRepeatConfirm,
+  isCreatingRepeatSeries = false,
   empId,
   customStartTime,
   customEndTime,
@@ -571,6 +576,7 @@ export default function ShiftEditPanel({
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
   const [showRepeatForm, setShowRepeatForm] = useState(false);
   const [showCallOffPicker, setShowCallOffPicker] = useState(false);
+  const repeatFormRef = useRef<RepeatFormHandle | null>(null);
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
@@ -915,7 +921,7 @@ export default function ShiftEditPanel({
             border: isCellNew
               ? `2px dashed ${darkenColor(at.color, 0.35)}`
               : `1.5px solid ${at.border === 'transparent' ? darkenColor(at.color, 0.25) : at.border}`,
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
             padding: "12px 16px",
             display: "flex",
@@ -990,7 +996,7 @@ export default function ShiftEditPanel({
             border: isCellNew
               ? `2px dashed ${darkenColor(s.color, 0.35)}`
               : `1.5px solid ${darkenColor(s.color, 0.25)}`,
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
             padding: isNameMode ? "12px 16px" : "10px 16px",
             display: "flex",
@@ -1082,7 +1088,7 @@ export default function ShiftEditPanel({
                 border: isNewPill
                   ? `2px dashed ${darkenColor(s.color, 0.35)}`
                   : `1.5px solid ${darkenColor(s.color, 0.25)}`,
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-md)",
                 overflow: "visible",
                 position: "relative",
               }}
@@ -1417,7 +1423,7 @@ export default function ShiftEditPanel({
                   width: "100%",
                   fontSize: "var(--dg-fs-body)",
                   padding: "12px 16px",
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-btn-radius)",
                   border: `1.5px solid ${at.border || "var(--color-border)"}`,
                   background: at.color || "var(--color-surface)",
                   color: at.text || "var(--color-text-primary)",
@@ -1557,6 +1563,7 @@ export default function ShiftEditPanel({
           {showRepeatForm && onRepeatConfirm && empId ? (
             // ── Repeat form mode ─────────────────────────────────────────────
             <RepeatForm
+              ref={repeatFormRef}
               empId={empId}
               shiftLabel={currentLabels[0] ?? ""}
               shiftCodeId={currentShiftCodeIds[0] ?? 0}
@@ -1598,7 +1605,7 @@ export default function ShiftEditPanel({
                 <div
                   style={{
                     border: "1px solid var(--color-border)",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     padding: "12px",
                     fontSize: "var(--dg-fs-label)",
                     color: "var(--color-text-muted)",
@@ -2127,6 +2134,45 @@ export default function ShiftEditPanel({
             </>
           )}
         </div>
+
+        {showRepeatForm && onRepeatConfirm && empId && (
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "12px 20px",
+              borderTop: "1px solid var(--color-border)",
+              display: "flex",
+              gap: 8,
+              background: "var(--color-surface)",
+            }}
+          >
+            <button
+              onClick={() => setShowRepeatForm(false)}
+              className="dg-btn dg-btn-ghost"
+              disabled={isCreatingRepeatSeries}
+              style={{
+                flex: 1,
+                fontSize: "var(--dg-fs-caption)",
+                padding: "9px 12px",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              Back
+            </button>
+            <button
+              onClick={() => repeatFormRef.current?.submit()}
+              className="dg-btn dg-btn-primary"
+              style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+              disabled={isCreatingRepeatSeries}
+            >
+              <ButtonLoading loading={isCreatingRepeatSeries} spinnerSize={16}>
+                {isAbsence
+                  ? "Create Repeating Off Day"
+                  : "Create Repeating Shift"}
+              </ButtonLoading>
+            </button>
+          </div>
+        )}
 
         {/* Sticky footer — only shown when edits exist */}
         {hasEdits && !showRepeatForm && (

@@ -1,0 +1,137 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getServiceClient } from "@/lib/supabase-service";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { draftBreakdownsEqual } from "@/lib/draft-utils";
+import {
+  discardScheduleDraftsDirect,
+  fetchScheduleDraftBreakdown,
+} from "@/lib/server/schedule-draft-safety";
+import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+
+export const dynamic = "force-dynamic";
+
+const bodySchema = z.object({
+  orgId: z.string().uuid(),
+  scope: z.enum(["mine", "all"]),
+  expectedSummary: z.object({
+    newShifts: z.number().int().nonnegative(),
+    modifiedShifts: z.number().int().nonnegative(),
+    deletedShifts: z.number().int().nonnegative(),
+    newNotes: z.number().int().nonnegative(),
+    deletedNotes: z.number().int().nonnegative(),
+    totalChanges: z.number().int().nonnegative(),
+  }).optional(),
+});
+
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
+
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  if (misconfigured) {
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+  }
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const { orgId, scope, expectedSummary } = parsed.data;
+
+  try {
+    const serviceClient = getServiceClient();
+    const [{ data: membership }, { data: profile }] = await Promise.all([
+      serviceClient
+        .from("organization_memberships")
+        .select("org_role, admin_permissions")
+        .eq("user_id", user.id)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+      serviceClient
+        .from("profiles")
+        .select("platform_role")
+        .eq("id", user.id)
+        .single(),
+    ]);
+
+    const isGridmaster = profile?.platform_role === "gridmaster";
+    const isSuperAdmin = membership?.org_role === "super_admin";
+    const isAdmin = membership?.org_role === "admin";
+    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
+
+    const canDiscardOwnDrafts =
+      isGridmaster
+      || isSuperAdmin
+      || (isAdmin && (adminPerms?.canEditShifts === true || adminPerms?.canPublishSchedule === true));
+
+    const canDiscardAllDrafts = isGridmaster || isSuperAdmin;
+
+    if ((scope === "mine" && !canDiscardOwnDrafts) || (scope === "all" && !canDiscardAllDrafts)) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+
+    const latestSummary = await fetchScheduleDraftBreakdown({
+      orgId,
+      updatedBy: scope === "mine" ? user.id : undefined,
+      serviceClient,
+    });
+
+    if (expectedSummary && !draftBreakdownsEqual(expectedSummary, latestSummary)) {
+      return NextResponse.json(
+        {
+          error: "Schedule drafts changed elsewhere. Review the latest summary and try again.",
+          code: "SCHEDULE_DRAFT_CONFLICT",
+          summary: latestSummary,
+        },
+        { status: 409 },
+      );
+    }
+
+    await discardScheduleDraftsDirect({
+      orgId,
+      userId: scope === "mine" ? user.id : undefined,
+      serviceClient,
+    });
+
+    await serviceClient.from("audit_log").insert({
+      org_id: orgId,
+      actor_id: user.id,
+      actor_email: user.email ?? null,
+      action: "schedule.drafts_discarded",
+      resource_type: "schedule",
+      resource_id: orgId,
+      details: {
+        scope,
+        summary: latestSummary,
+      },
+    });
+
+    return NextResponse.json({ success: true, summary: latestSummary });
+  } catch (err) {
+    Sentry.captureException(err, { extra: { context: "shifts/discard", orgId } });
+    logger.error({ error: err, orgId }, "Schedule discard failed");
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}

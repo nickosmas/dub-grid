@@ -413,19 +413,46 @@ describe("ShiftEditPanel", () => {
       expect(createRepeatingShiftButton).toBeInTheDocument();
       expect(createRepeatingShiftButton).toBeEnabled();
       const backButtons = screen.getAllByRole("button", { name: "Back" });
-      expect(backButtons).toHaveLength(2);
+      expect(backButtons).toHaveLength(1);
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Monday" }));
-      expect(screen.getByRole("button", { name: "Create Repeating Shift" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Create Repeating Shift" }));
+      expect(screen.getByText("Select at least one day.")).toBeInTheDocument();
 
-      await user.click(backButtons[1]);
+      await user.click(backButtons[0]);
 
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Make this a repeating shift" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Create Repeating Shift" })).not.toBeInTheDocument();
+    });
+
+    it("uses the custom repeat calendar", async () => {
+      const user = userEvent.setup();
+      const { container } = render(<RepeatFlowPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+
+      expect(container.querySelector('input[type="date"]')).toBeNull();
+      expect(screen.getByText("January 2024")).toBeInTheDocument();
+      expect(screen.getByLabelText("Start date calendar")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Selected Monday, January 15, 2024/i }));
+      expect(screen.getByRole("button", { name: "Start date" })).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("shows an end-date error when ending on a date without selecting one", async () => {
+      const user = userEvent.setup();
+
+      render(<RepeatFlowPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByLabelText("On date"));
+      await user.click(screen.getByRole("button", { name: "Create Repeating Shift" }));
+
+      expect(screen.getByText("Select an end date.")).toBeInTheDocument();
     });
 
     it("shows the absence repeat flow for off days", async () => {

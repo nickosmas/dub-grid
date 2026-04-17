@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { supabase } from "@/lib/supabase";
 import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -33,6 +33,23 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   schedule: "Shift changes, published schedules",
   shift_requests: "New, approved, or rejected shift requests",
   system: "Impersonation notices and system updates",
+};
+
+const preferenceGridTemplate = "minmax(0, 1fr) 60px 60px";
+
+const centeredChannelCellStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "100%",
+  minHeight: 20,
+};
+
+const checkboxStyle: CSSProperties = {
+  width: 16,
+  height: 16,
+  accentColor: "var(--color-brand)",
+  cursor: "pointer",
 };
 
 function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
@@ -127,7 +144,7 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
       {/* Header row */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1fr 60px 60px",
+        gridTemplateColumns: preferenceGridTemplate,
         gap: 8,
         alignItems: "center",
         paddingBottom: 8,
@@ -137,12 +154,12 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
           Category
         </span>
         <MaybeHint content="In-App" side="top">
-          <span style={{ textAlign: "center" }} aria-label="In-App">
+          <span style={centeredChannelCellStyle} aria-label="In-App">
             <Bell size={14} style={{ color: "var(--color-text-muted)" }} />
           </span>
         </MaybeHint>
         <MaybeHint content="Email" side="top">
-          <span style={{ textAlign: "center" }} aria-label="Email">
+          <span style={centeredChannelCellStyle} aria-label="Email">
             <Mail size={14} style={{ color: "var(--color-text-muted)" }} />
           </span>
         </MaybeHint>
@@ -154,7 +171,7 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
           key={category}
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 60px 60px",
+            gridTemplateColumns: preferenceGridTemplate,
             gap: 8,
             alignItems: "center",
           }}
@@ -167,20 +184,20 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
               {CATEGORY_DESCRIPTIONS[category]}
             </span>
           </div>
-          <div style={{ textAlign: "center" }}>
+          <div style={centeredChannelCellStyle}>
             <input
               type="checkbox"
               checked={prefs[category]?.in_app ?? true}
               onChange={() => toggle(category, "in_app")}
-              style={{ width: 16, height: 16, accentColor: "var(--color-brand)", cursor: "pointer" }}
+              style={checkboxStyle}
             />
           </div>
-          <div style={{ textAlign: "center" }}>
+          <div style={centeredChannelCellStyle}>
             <input
               type="checkbox"
               checked={prefs[category]?.email ?? false}
               onChange={() => toggle(category, "email")}
-              style={{ width: 16, height: 16, accentColor: "var(--color-brand)", cursor: "pointer" }}
+              style={checkboxStyle}
             />
           </div>
         </div>

@@ -19,7 +19,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
       style={{
         padding: "32px 24px",
         background: "var(--color-surface)",
-        borderRadius: 14,
+        borderRadius: "var(--dg-radius-md)",
         border: "1px dashed var(--color-border)",
         marginBottom: 16,
       }}
@@ -100,7 +100,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
               alignItems: "center",
               gap: 12,
               padding: "10px 14px",
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               background: step.done
                 ? "var(--color-success-bg)"
                 : "var(--color-bg)",

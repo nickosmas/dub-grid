@@ -8,6 +8,9 @@ import { fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { labelStyle, inputStyle, normalizeTimeCompare, TimeInput12h } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -52,8 +55,14 @@ function ShiftCategoriesSettings({
     originalRef.current = new Map(shiftCategories.map((c) => [c.id, c]));
   }, [shiftCategories]);
   const nextTmpId = useRef(-1);
+  const newCategoryDefaultsRef = useRef<Map<number, ShiftCategory & { isNew: boolean }>>(new Map());
+  const pendingExitRef = useRef<
+    | { type: "open"; categoryId: number }
+    | { type: "add"; focusAreaId: number | null }
+    | null
+  >(null);
 
-  const handleAdd = (focusAreaId: number | null) => {
+  const createDraftCategory = (focusAreaId: number | null) => {
     const tmpId = nextTmpId.current--;
     const tmp: ShiftCategory & { isNew: boolean } = {
       id: tmpId,
@@ -66,6 +75,7 @@ function ShiftCategoriesSettings({
       focusAreaId,
       isNew: true,
     };
+    newCategoryDefaultsRef.current.set(tmpId, tmp);
     setLocal((prev) => [...prev, tmp]);
     setEditingId(tmpId);
   };
@@ -74,13 +84,94 @@ function ShiftCategoriesSettings({
     setLocal((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
   };
 
-  const handleCancel = (cat: ShiftCategory & { isNew?: boolean }) => {
+  const isCategoryDirty = (cat: ShiftCategory & { isNew?: boolean }) => {
+    const orig = originalRef.current.get(cat.id);
+    return cat.isNew || !orig ||
+      cat.name !== orig.name ||
+      (cat.color ?? null) !== (orig.color ?? null) ||
+      (cat.startTime ?? null) !== (orig.startTime ?? null) ||
+      (cat.endTime ?? null) !== (orig.endTime ?? null) ||
+      (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null);
+  };
+
+  const resetCategoryDraft = (cat: ShiftCategory & { isNew?: boolean }) => {
     if (cat.isNew) {
-      setLocal((prev) => prev.filter((c) => c.id !== cat.id));
-      onChange(local.filter((c) => c.id !== cat.id));
+      const initialDraft = newCategoryDefaultsRef.current.get(cat.id);
+      if (!initialDraft) return;
+      setLocal((prev) => prev.map((entry) => (entry.id === cat.id ? { ...initialDraft } : entry)));
+      return;
+    }
+
+    const orig = originalRef.current.get(cat.id);
+    if (!orig) return;
+    setLocal((prev) => prev.map((entry) => (entry.id === cat.id ? orig : entry)));
+  };
+
+  const discardCategoryChanges = (cat: ShiftCategory & { isNew?: boolean }, closeAfter: boolean) => {
+    if (cat.isNew) {
+      if (closeAfter) {
+        newCategoryDefaultsRef.current.delete(cat.id);
+        setLocal((prev) => prev.filter((entry) => entry.id !== cat.id));
+      } else {
+        resetCategoryDraft(cat);
+      }
     } else {
-      const orig = originalRef.current.get(cat.id);
-      if (orig) setLocal((prev) => prev.map((c) => (c.id === cat.id ? orig : c)));
+      resetCategoryDraft(cat);
+    }
+
+    if (closeAfter) {
+      setEditingId(null);
+    }
+  };
+
+  const completePendingExit = () => {
+    const pending = pendingExitRef.current;
+    pendingExitRef.current = null;
+    if (!pending) return;
+    if (pending.type === "open") {
+      setEditingId(pending.categoryId);
+      return;
+    }
+    createDraftCategory(pending.focusAreaId);
+  };
+
+  const currentEditingCategory = editingId == null
+    ? null
+    : local.find((category) => category.id === editingId) ?? null;
+  const hasUnsavedEditingChanges = currentEditingCategory ? isCategoryDirty(currentEditingCategory) : false;
+
+  const { requestClose: requestEditorClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: hasUnsavedEditingChanges,
+    onDiscard: () => {
+      if (!currentEditingCategory) return;
+      discardCategoryChanges(currentEditingCategory, true);
+      completePendingExit();
+    },
+  });
+
+  const attemptOpenCategory = (categoryId: number) => {
+    if (editingId === categoryId) return;
+    if (hasUnsavedEditingChanges) {
+      pendingExitRef.current = { type: "open", categoryId };
+      if (!requestEditorClose()) return;
+      pendingExitRef.current = null;
+    }
+    setEditingId(categoryId);
+  };
+
+  const handleAdd = (focusAreaId: number | null) => {
+    if (hasUnsavedEditingChanges) {
+      pendingExitRef.current = { type: "add", focusAreaId };
+      if (!requestEditorClose()) return;
+      pendingExitRef.current = null;
+    }
+    createDraftCategory(focusAreaId);
+  };
+
+  const handleClose = (cat: ShiftCategory & { isNew?: boolean }) => {
+    if (cat.isNew) {
+      newCategoryDefaultsRef.current.delete(cat.id);
+      setLocal((prev) => prev.filter((entry) => entry.id !== cat.id));
     }
     setEditingId(null);
   };
@@ -103,6 +194,9 @@ function ShiftCategoriesSettings({
         focusAreaId: cat.focusAreaId ?? null,
         breakMinutes: cat.breakMinutes ?? null,
       });
+      if (cat.isNew) {
+        newCategoryDefaultsRef.current.delete(cat.id);
+      }
       originalRef.current.set(saved.id, saved);
       const updated = local.map((c) => (c.id === cat.id ? saved : c));
       setLocal(updated);
@@ -145,9 +239,9 @@ function ShiftCategoriesSettings({
 
   const handleDelete = async (cat: ShiftCategory & { isNew?: boolean }) => {
     if (cat.isNew) {
+      newCategoryDefaultsRef.current.delete(cat.id);
       const updated = local.filter((c) => c.id !== cat.id);
       setLocal(updated);
-      onChange(updated);
       setEditingId(null);
       return;
     }
@@ -174,13 +268,7 @@ function ShiftCategoriesSettings({
     const isEditing = editingId === cat.id;
     const isSavingThis = saving === cat.id;
     const isDeletingThis = deleting === cat.id;
-    const orig = originalRef.current.get(cat.id);
-    const isDirty = cat.isNew || !orig ||
-      cat.name !== orig.name ||
-      (cat.color ?? null) !== (orig.color ?? null) ||
-      (cat.startTime ?? null) !== (orig.startTime ?? null) ||
-      (cat.endTime ?? null) !== (orig.endTime ?? null) ||
-      (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null);
+    const isDirty = isCategoryDirty(cat);
 
     if (!isEditing) {
       return (
@@ -193,11 +281,11 @@ function ShiftCategoriesSettings({
             justifyContent: "space-between",
             gap: 12,
             padding: "10px 8px",
-            borderRadius: 8,
+            borderRadius: "var(--dg-radius-md)",
             transition: "background 0.15s",
             cursor: canManageShiftCodes ? "pointer" : undefined,
           }}
-          onClick={canManageShiftCodes ? () => setEditingId(cat.id) : undefined}
+          onClick={canManageShiftCodes ? () => attemptOpenCategory(cat.id) : undefined}
         >
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -223,7 +311,10 @@ function ShiftCategoriesSettings({
           </div>
           {canManageShiftCodes && (
             <button
-              onClick={(e) => { e.stopPropagation(); setEditingId(cat.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                attemptOpenCategory(cat.id);
+              }}
               className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Edit
@@ -238,7 +329,7 @@ function ShiftCategoriesSettings({
         key={cat.id}
         style={{
           background: "var(--color-bg-secondary)",
-          borderRadius: 10,
+          borderRadius: "var(--dg-radius-lg)",
           padding: "14px 16px",
           margin: "8px 0",
           border: "1px solid var(--color-border-light)",
@@ -328,32 +419,35 @@ function ShiftCategoriesSettings({
           </div>
         )}
         {/* Actions */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => handleSave(cat)}
-            disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
-            className="dg-btn dg-btn-primary dg-btn-sm"
-          >
-            {isSavingThis ? "…" : "Save"}
-          </button>
-          <button
-            onClick={() => handleCancel(cat)}
-            disabled={isSavingThis}
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-          >
-            Cancel
-          </button>
-          {canManageShiftCodes && (
+        <EditorActionRow
+          destructiveAction={canManageShiftCodes ? (
             <button
               onClick={() => cat.isNew ? handleDelete(cat) : handleDeleteClick(cat.id)}
               disabled={isDeletingThis}
               className="dg-btn dg-btn-danger dg-btn-sm"
-              style={{ marginLeft: "auto" }}
             >
               {isDeletingThis ? "…" : "Delete"}
             </button>
+          ) : undefined}
+          secondaryAction={(
+            <button
+              onClick={() => isDirty ? discardCategoryChanges(cat, false) : handleClose(cat)}
+              disabled={isSavingThis}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
+              {getEditorDismissLabel(isDirty)}
+            </button>
           )}
-        </div>
+          primaryAction={(
+            <button
+              onClick={() => handleSave(cat)}
+              disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
+              className="dg-btn dg-btn-primary dg-btn-sm"
+            >
+              {getEditorSaveLabel(isSavingThis)}
+            </button>
+          )}
+        />
       </div>
     );
   };
@@ -379,7 +473,7 @@ function ShiftCategoriesSettings({
             key={focusArea.id}
             style={{
               background: "var(--color-surface)",
-              borderRadius: 12,
+              borderRadius: "var(--dg-radius-md)",
               border: "1px solid var(--color-border)",
               overflow: "hidden",
             }}
@@ -431,6 +525,8 @@ function ShiftCategoriesSettings({
           </div>
         );
       })}
+
+      {unsavedChangesDialog}
 
 
       {confirmDeleteId !== null && (() => {

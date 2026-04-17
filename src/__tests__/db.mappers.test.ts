@@ -10,6 +10,12 @@ describe("rowToOrganization", () => {
       id: "org-123",
       name: "Sunrise Care",
       address: "123 Main St",
+      address_line_1: "123 Main St",
+      address_line_2: "Suite 100",
+      address_city: "San Francisco",
+      address_state: "CA",
+      address_postal_code: "94108",
+      address_country: "United States",
       phone: "555-1234",
       employee_count: 42,
       slug: null,
@@ -29,13 +35,20 @@ describe("rowToOrganization", () => {
       subscription_seats: null,
       data_retention_days: 365,
       feature_overrides: {},
+      updated_at: null,
     };
 
     const result = rowToOrganization(row);
 
     expect(result.id).toBe("org-123");
     expect(result.name).toBe("Sunrise Care");
-    expect(result.address).toBe("123 Main St");
+    expect(result.address).toBe("123 Main St, Suite 100, San Francisco, CA 94108, United States");
+    expect(result.addressLine1).toBe("123 Main St");
+    expect(result.addressLine2).toBe("Suite 100");
+    expect(result.addressCity).toBe("San Francisco");
+    expect(result.addressState).toBe("CA");
+    expect(result.addressPostalCode).toBe("94108");
+    expect(result.addressCountry).toBe("United States");
     expect(result.phone).toBe("555-1234");
     expect(result.employeeCount).toBe(42);
   });
@@ -45,6 +58,12 @@ describe("rowToOrganization", () => {
       id: "org-456",
       name: "Sunset Clinic",
       address: "456 Oak Ave",
+      address_line_1: "",
+      address_line_2: "",
+      address_city: "",
+      address_state: "",
+      address_postal_code: "",
+      address_country: "",
       phone: "555-5678",
       employee_count: null,
       slug: null,
@@ -64,11 +83,14 @@ describe("rowToOrganization", () => {
       subscription_seats: null,
       data_retention_days: 365,
       feature_overrides: {},
+      updated_at: null,
     };
 
     const result = rowToOrganization(row);
 
     expect(result.employeeCount).toBeNull();
+    expect(result.addressLine1).toBe("456 Oak Ave");
+    expect(result.address).toBe("456 Oak Ave");
   });
 });
 

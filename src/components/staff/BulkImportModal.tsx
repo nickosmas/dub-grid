@@ -4,6 +4,8 @@ import { useState, useCallback, useRef } from "react";
 import { Upload, FileText, AlertTriangle, CheckCircle, X } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 interface ParsedRow {
   firstName: string;
@@ -135,6 +137,18 @@ export function BulkImportModal({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const hasUnsavedChanges = step === "preview" && rows.length > 0;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onClose,
+  });
+
+  const handleRequestClose = useCallback(() => {
+    if (importing) return;
+    if (requestClose()) {
+      onClose();
+    }
+  }, [importing, onClose, requestClose]);
 
   const handleFile = useCallback((file: File) => {
     if (!file.name.endsWith(".csv")) {
@@ -201,11 +215,11 @@ export function BulkImportModal({
         backdropFilter: "blur(var(--dg-overlay-blur))",
         WebkitBackdropFilter: "blur(var(--dg-overlay-blur))",
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleRequestClose(); }}
     >
       <div style={{
         background: "var(--color-surface)",
-        borderRadius: 16,
+        borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--shadow-overlay)",
         width: "100%",
         maxWidth: 640,
@@ -228,7 +242,7 @@ export function BulkImportModal({
             {step === "result" && "Import Results"}
           </span>
           <button
-            onClick={onClose}
+            onClick={handleRequestClose}
             style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", padding: 4 }}
           >
             <X size={20} />
@@ -245,7 +259,7 @@ export function BulkImportModal({
                 onClick={() => fileRef.current?.click()}
                 style={{
                   border: "2px dashed var(--color-border)",
-                  borderRadius: 12,
+                  borderRadius: "var(--dg-radius-md)",
                   padding: "48px 24px",
                   textAlign: "center",
                   cursor: "pointer",
@@ -274,7 +288,7 @@ export function BulkImportModal({
                 />
               </div>
 
-              <div style={{ marginTop: 20, padding: 16, background: "var(--color-bg)", borderRadius: 10, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+              <div style={{ marginTop: 20, padding: 16, background: "var(--color-bg)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
                 <p style={{ margin: "0 0 8px", fontWeight: 600 }}>Expected CSV format:</p>
                 <code style={{ fontSize: "var(--dg-fs-footnote)", display: "block", whiteSpace: "pre-wrap" }}>
                   {EXPECTED_HEADERS.join(",")}{"\n"}
@@ -294,7 +308,7 @@ export function BulkImportModal({
                 <div style={{
                   padding: 12,
                   background: "var(--color-warning-bg)",
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   marginBottom: 16,
                   fontSize: "var(--dg-fs-caption)",
                   color: "var(--color-warning-text)",
@@ -350,7 +364,7 @@ export function BulkImportModal({
                 gap: 12,
                 padding: 16,
                 background: result.inserted > 0 ? "var(--color-success-bg)" : "var(--color-danger-bg)",
-                borderRadius: 10,
+                borderRadius: "var(--dg-radius-lg)",
               }}>
                 {result.inserted > 0
                   ? <CheckCircle size={24} style={{ color: "var(--color-success-text)" }} />
@@ -410,12 +424,13 @@ export function BulkImportModal({
             </button>
           )}
           {step === "upload" && (
-            <button className="dg-btn dg-btn-secondary" onClick={onClose}>
-              Cancel
+            <button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
             </button>
           )}
         </div>
       </div>
+      {unsavedChangesDialog}
     </div>
   );
 }

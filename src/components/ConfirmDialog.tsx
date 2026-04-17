@@ -15,6 +15,10 @@ interface ConfirmDialogProps {
   secondaryConfirmLabel?: string;
   onSecondaryConfirm?: () => void;
   isSecondaryLoading?: boolean;
+  maxWidth?: number;
+  wrapActions?: boolean;
+  confirmDisabled?: boolean;
+  secondaryConfirmDisabled?: boolean;
 }
 
 export default function ConfirmDialog({
@@ -29,6 +33,10 @@ export default function ConfirmDialog({
   secondaryConfirmLabel,
   onSecondaryConfirm,
   isSecondaryLoading = false,
+  maxWidth = 420,
+  wrapActions = false,
+  confirmDisabled = false,
+  secondaryConfirmDisabled = false,
 }: ConfirmDialogProps) {
   const confirmClass =
     variant === "danger"
@@ -41,9 +49,24 @@ export default function ConfirmDialog({
       : undefined;
 
   const descId = "confirm-dialog-desc";
+  const actionDisabled = isLoading || isSecondaryLoading;
+  const cancelButtonStyle = wrapActions
+    ? { marginRight: "auto", minWidth: 120 }
+    : undefined;
+  const confirmButtonStyle = wrapActions
+    ? {
+        ...confirmStyle,
+        minWidth: secondaryConfirmLabel && onSecondaryConfirm ? 170 : 148,
+      }
+    : confirmStyle;
 
   return (
-    <Modal title={title} onClose={onCancel} style={{ maxWidth: 420 }} aria-describedby={descId}>
+    <Modal
+      title={title}
+      onClose={onCancel}
+      style={{ maxWidth }}
+      aria-describedby={descId}
+    >
       <div
         id={descId}
         style={{
@@ -55,28 +78,37 @@ export default function ConfirmDialog({
       >
         {message}
       </div>
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: wrapActions ? "wrap" : "nowrap",
+          gap: 12,
+          justifyContent: "flex-end",
+          alignItems: "stretch",
+        }}
+      >
         <button
           className="dg-btn dg-btn-secondary"
           onClick={onCancel}
-          disabled={isLoading || isSecondaryLoading}
+          disabled={actionDisabled}
+          style={cancelButtonStyle}
         >
           {cancelLabel}
         </button>
         <button
           className={confirmClass}
-          style={confirmStyle}
+          style={confirmButtonStyle}
           onClick={onConfirm}
-          disabled={isLoading || isSecondaryLoading}
+          disabled={actionDisabled || confirmDisabled}
         >
           <ButtonLoading loading={isLoading} spinnerSize={16}>{confirmLabel}</ButtonLoading>
         </button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
           <button
             className={confirmClass}
-            style={confirmStyle}
+            style={confirmButtonStyle}
             onClick={onSecondaryConfirm}
-            disabled={isLoading || isSecondaryLoading}
+            disabled={actionDisabled || secondaryConfirmDisabled}
           >
             <ButtonLoading loading={isSecondaryLoading} spinnerSize={16}>{secondaryConfirmLabel}</ButtonLoading>
           </button>

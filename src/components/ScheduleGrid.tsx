@@ -12,10 +12,7 @@ import React, {
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey } from "@/lib/utils";
-import {
-  resolveRequirement,
-  computeCoverageStatus,
-} from "@/lib/schedule-logic";
+import { computeDailyTallies, resolveRequirement } from "@/lib/schedule-logic";
 import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
 import {
   Employee,
@@ -28,7 +25,6 @@ import {
   DraftKind,
   PublishChange,
   CoverageRequirement,
-  CoverageStatus,
   AbsenceType,
   ShiftDisplayMode,
   GridOpenShift,
@@ -160,7 +156,7 @@ interface ScheduleGridProps {
     date: Date,
     focusAreaName: string,
   ) => void;
-  /** Coverage requirements for inline tally status display */
+  /** Retained for compatibility; detailed coverage remains in the separate coverage panel. */
   coverageRequirements?: CoverageRequirement[];
   /** Map from absence type ID to AbsenceType for color resolution */
   absenceTypeMap?: Map<number, AbsenceType>;
@@ -174,6 +170,8 @@ interface ScheduleGridProps {
   openShifts?: GridOpenShift[];
   /** Callback when a user clicks to claim an open shift */
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
+  /** Cell key for the schedule cell currently open in the shift editor. */
+  selectedCellKey?: string | null;
 }
 
 interface SectionBlockProps {
@@ -241,6 +239,7 @@ interface SectionBlockProps {
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
+  selectedCellKey?: string | null;
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -287,6 +286,7 @@ const SectionBlock = memo(function SectionBlock({
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
+  selectedCellKey,
 }: SectionBlockProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
@@ -456,156 +456,109 @@ const SectionBlock = memo(function SectionBlock({
     ],
   );
 
-  // Only count home employees (those assigned to this section) in tallies.
-  // Guest employees are displayed in the grid but excluded from section counts.
   const sectionFocusArea = focusAreas.find((fa) => fa.name === sectionName);
-  const homeEmployees = useMemo(
-    () =>
-      sectionFocusArea
-        ? employees.filter((e) => e.focusAreaIds.includes(sectionFocusArea.id))
-        : [],
-    [employees, sectionFocusArea],
-  );
 
-  // Set of shift code IDs that belong to this section's focus area
-  const sectionCodeIds = useMemo(() => {
-    if (!sectionFocusArea) return new Set<number>();
-    return new Set(
-      shiftCodes
-        .filter((sc) => sc.focusAreaId === sectionFocusArea.id)
-        .map((sc) => sc.id),
+  const countableShiftCodes = useMemo(() => {
+    if (!sectionFocusArea) return [];
+    return shiftCodes.filter(
+      (sc) => sc.focusAreaId === sectionFocusArea.id || sc.focusAreaId == null,
     );
   }, [shiftCodes, sectionFocusArea]);
 
-  // Coverage status per (date, category, shiftCode)
-  // Shape: Record<categoryId, Record<shiftCodeLabel, CoverageStatus>>[]
-  const dailyCoverageStatus = useMemo(() => {
-    if (!coverageRequirements?.length || !sectionFocusArea) return null;
+  const countableSectionCodeIds = useMemo(
+    () => new Set(countableShiftCodes.map((sc) => sc.id)),
+    [countableShiftCodes],
+  );
+
+  const dailyTotals = useMemo(() => {
     const fn = shiftCodeIdsForKey ?? (() => []);
+    return weekDates.map((date) =>
+      computeDailyTallies(
+        employees,
+        date,
+        fn,
+        shiftCodeById,
+        countableSectionCodeIds,
+      ),
+    );
+  }, [
+    weekDates,
+    employees,
+    shiftCodeIdsForKey,
+    shiftCodeById,
+    countableSectionCodeIds,
+  ]);
+
+  const totalRows = useMemo(() => {
+    const countsByCategory = new Map<number, number[]>();
+
+    for (const [dayIndex, dayTotals] of dailyTotals.entries()) {
+      for (const [categoryIdValue, categoryTotals] of Object.entries(dayTotals)) {
+        const categoryId = Number(categoryIdValue);
+        const counts =
+          countsByCategory.get(categoryId) ?? Array(weekDates.length).fill(0);
+        counts[dayIndex] = Object.values(categoryTotals).reduce(
+          (sum, count) => sum + count,
+          0,
+        );
+        countsByCategory.set(categoryId, counts);
+      }
+    }
+
+    return Array.from(countsByCategory.entries())
+      .sort(([leftCategoryId], [rightCategoryId]) => {
+        const leftOrder =
+          categoryById.get(leftCategoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder =
+          categoryById.get(rightCategoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+        const leftLabel =
+          categoryById.get(leftCategoryId)?.name ?? `Category ${leftCategoryId}`;
+        const rightLabel =
+          categoryById.get(rightCategoryId)?.name ?? `Category ${rightCategoryId}`;
+        return leftLabel.localeCompare(rightLabel);
+      })
+      .map(([categoryId, counts]) => ({
+        categoryId,
+        label:
+          categoryById.get(categoryId)?.name ?? `Category ${categoryId}`,
+        counts,
+      }));
+  }, [dailyTotals, categoryById, weekDates.length]);
+
+  const hasAnyTotals = totalRows.length > 0;
+
+  const categoryRequirementsByDay = useMemo(() => {
+    if (!coverageRequirements?.length || !sectionFocusArea) {
+      return weekDates.map(() => ({} as Record<number, number>));
+    }
+
     return weekDates.map((date) => {
-      const dow = date.getDay();
-      const statusByCategory: Record<
-        number,
-        Record<string, CoverageStatus>
-      > = {};
-      for (const req of coverageRequirements) {
-        if (req.focusAreaId !== sectionFocusArea.id) continue;
-        const code = shiftCodeById.get(req.shiftCodeId);
-        if (!code || code.categoryId == null || !sectionCodeIds.has(code.id))
-          continue;
+      const dayOfWeek = date.getDay();
+      const requirementsByCategory: Record<number, number> = {};
+
+      for (const code of countableShiftCodes) {
+        if (code.categoryId == null) continue;
         const resolved = resolveRequirement(
           coverageRequirements,
           sectionFocusArea.id,
           code.id,
-          dow,
+          dayOfWeek,
         );
-        if (!resolved) continue;
-        statusByCategory[code.categoryId] ??= {};
-        const displayLabel = isNameMode ? code.name || code.label : code.label;
-        // Only compute once per code (skip if already computed for this label)
-        if (statusByCategory[code.categoryId][displayLabel]) continue;
-        statusByCategory[code.categoryId][displayLabel] = computeCoverageStatus(
-          homeEmployees,
-          date,
-          fn,
-          sectionCodeIds,
-          code.id,
-          resolved,
-        );
+        if (!resolved || resolved.minStaff <= 0) continue;
+
+        requirementsByCategory[code.categoryId] =
+          (requirementsByCategory[code.categoryId] ?? 0) + resolved.minStaff;
       }
-      return statusByCategory;
+
+      return requirementsByCategory;
     });
   }, [
-    weekDates,
     coverageRequirements,
     sectionFocusArea,
-    homeEmployees,
-    shiftCodeIdsForKey,
-    shiftCodeById,
-    sectionCodeIds,
-    isNameMode,
+    weekDates,
+    countableShiftCodes,
   ]);
-
-  const renderCoverage = (coverageByLabel?: Record<string, CoverageStatus>) => {
-    if (!coverageByLabel) return "-";
-    const entries = Object.entries(coverageByLabel).filter(
-      ([, c]) => c.hasRequirement,
-    );
-    if (entries.length === 0) return "-";
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
-        {entries.map(([label, cov], ei) => (
-          <MaybeHint
-            key={label}
-            content={
-              isNameMode ? `${label}: ${cov.actual}/${cov.required}` : undefined
-            }
-            side="top"
-          >
-            <span
-              style={{
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: isNameMode ? 120 : undefined,
-              }}
-            >
-              {ei > 0 && (
-                <span
-                  style={{ color: "var(--color-text-faint)", margin: "0 0.3em" }}
-                >
-                  |
-                </span>
-              )}
-              <span
-              style={{
-                color: cov.isMet
-                  ? "var(--color-success-text)"
-                  : "var(--color-danger-dark)",
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
-                fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              }}
-            >
-              {cov.isMet ? (
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M8 0a8 8 0 110 16A8 8 0 018 0zm3.78 5.22a.75.75 0 00-1.06 0L7 8.94 5.28 7.22a.75.75 0 10-1.06 1.06l2.25 2.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 000-1.06z" />
-                </svg>
-              ) : (
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 3.5a.75.75 0 00-.75.75v4a.75.75 0 001.5 0v-4A.75.75 0 008 3.5zM8 12a1 1 0 100-2 1 1 0 000 2z" />
-                </svg>
-              )}
-              {label}: {cov.actual}/{cov.required}
-              </span>
-            </span>
-          </MaybeHint>
-        ))}
-      </div>
-    );
-  };
 
   // For cross-focus-area pill detection: map label → home focus area name for
   // labels that belong to another area but NOT this one (or globally).
@@ -632,23 +585,7 @@ const SectionBlock = memo(function SectionBlock({
     return map;
   }, [shiftCodes, sectionName, focusAreas, isNameMode]);
 
-  // Coverage rows — only show categories that have coverage requirements configured
-  const coverageRows = useMemo(() => {
-    if (!dailyCoverageStatus) return [];
-    const allCatIds = new Set<number>();
-    for (const dayCov of dailyCoverageStatus) {
-      for (const catId of Object.keys(dayCov).map(Number)) {
-        allCatIds.add(catId);
-      }
-    }
-    if (allCatIds.size === 0) return [];
-    return shiftCategories
-      .filter((cat) => allCatIds.has(cat.id))
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((cat) => ({ id: cat.id, name: cat.name }));
-  }, [dailyCoverageStatus, shiftCategories]);
-
-  if (employees.length === 0) {
+  if (employees.length === 0 && (!openShifts || openShifts.length === 0)) {
     return (
       <div style={{ marginBottom: 24 }}>
         <div
@@ -718,7 +655,7 @@ const SectionBlock = memo(function SectionBlock({
         style={{
           position: "relative",
           background: "var(--color-surface)",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-md)",
           border: "1px solid var(--color-border)",
           overflow: "hidden",
           boxShadow: BOX_SHADOW_CARD,
@@ -1201,6 +1138,7 @@ const SectionBlock = memo(function SectionBlock({
 
                   return weekDates.map((date, di) => {
                   const dateKey = formatDateKey(date);
+                  const cellKey = `${emp.id}_${dateKey}`;
                   const isToday = dateKey === todayKey;
                   const isSplit =
                     splitAtIndex !== undefined && di === splitAtIndex;
@@ -1222,8 +1160,9 @@ const SectionBlock = memo(function SectionBlock({
                     ) ?? [];
                   const customTimes =
                     getCustomShiftTimes?.(emp.id, date) ?? null;
-                  const cellLock = cellLocks?.get(`${emp.id}_${dateKey}`);
+                  const cellLock = cellLocks?.get(cellKey);
                   const isLocked = !!cellLock;
+                  const isSelectedPreview = selectedCellKey === cellKey;
                   const auditName = createdByNameForKey?.(emp.id, date) ?? null;
                   const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
                   const hasStackedLayout = cellNeedsStackedLayout({
@@ -1255,6 +1194,19 @@ const SectionBlock = memo(function SectionBlock({
                         cellCodeIds[0],
                       )
                     : null;
+                  const baseBoxShadow =
+                    isSplit && ri > 0
+                      ? "inset 0 1px 0 var(--color-border-light)"
+                      : undefined;
+                  const selectedPreviewBoxShadow = isSelectedPreview
+                    ? "inset 0 0 0 2px var(--color-border-focus), 0 0 0 1px rgba(37, 99, 235, 0.32)"
+                    : undefined;
+                  const cellBoxShadow = [
+                    selectedPreviewBoxShadow,
+                    baseBoxShadow,
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
 
                   return (
                     <DroppableCell
@@ -1279,6 +1231,7 @@ const SectionBlock = memo(function SectionBlock({
                       data-date-key={dateKey}
                       data-interactive={isCellInteractive ? "true" : "false"}
                       data-locked={isLocked ? "true" : "false"}
+                      data-selected-preview={isSelectedPreview ? "true" : "false"}
                       data-empty={
                         !shiftCode || shiftCode === "OFF" ? "true" : "false"
                       }
@@ -1295,10 +1248,7 @@ const SectionBlock = memo(function SectionBlock({
                         borderLeft: isSplit
                           ? "2px solid var(--color-dark)"
                           : "1px solid var(--color-border-light)",
-                        boxShadow:
-                          isSplit && ri > 0
-                            ? "inset 0 1px 0 var(--color-border-light)"
-                            : undefined,
+                        boxShadow: cellBoxShadow || undefined,
                         background: isLocked
                           ? "rgba(37, 99, 235, 0.08)"
                           : isToday
@@ -1306,6 +1256,7 @@ const SectionBlock = memo(function SectionBlock({
                             : isRecentlyPublished
                               ? "rgba(59, 130, 246, 0.06)"
                               : "transparent",
+                        zIndex: isSelectedPreview ? 2 : undefined,
                       }}
                       onMouseEnter={(e) => {
                         onCellHover?.(emp.id, date, sectionName);
@@ -2505,90 +2456,122 @@ const SectionBlock = memo(function SectionBlock({
             );
           })}
 
-          {/* Coverage rows — one per category with configured requirements */}
-          {coverageRows.map((row, ci) => {
-            const isLastRow = ci === coverageRows.length - 1;
-            return (
-              <div
-                key={row.id}
-                className="dg-row-enter"
-                style={{
-                  ...rowGrid,
-                  borderTop:
-                    ci === 0 ? "2px solid var(--color-dark)" : undefined,
-                  background: "var(--color-bg-secondary)",
-                }}
-              >
+          {hasAnyTotals &&
+            totalRows.map((row, rowIndex) => {
+              const isLastRow = rowIndex === totalRows.length - 1;
+              return (
                 <div
+                  key={`total-row-${row.label}`}
+                  className="dg-row-enter"
+                  data-tally-row={`category-${row.categoryId}`}
                   style={{
-                    position: "sticky",
-                    left: 0,
-                    zIndex: 1,
-                    background: "var(--color-bg-secondary)",
-                    padding: "6px 14px",
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 700,
-                    color: "var(--color-text-secondary)",
-                    letterSpacing: "0.05em",
-                    display: "flex",
-                    alignItems: "center",
-                    borderRight: "1px solid var(--color-border)",
-                    borderBottom: isLastRow
-                      ? undefined
-                      : "1px solid var(--color-border)",
-                    boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
+                    ...rowGrid,
+                    borderTop:
+                      rowIndex === 0 ? "1px solid var(--color-border)" : undefined,
+                    background: "var(--color-surface)",
                   }}
                 >
-                  {row.name}
-                </div>
-                {weekDates.map((d, i) => {
-                  const coverageByLabel = dailyCoverageStatus?.[i]?.[row.id];
-                  const coverageValues = coverageByLabel
-                    ? Object.values(coverageByLabel)
-                    : [];
-                  const allMet = coverageValues.every(
-                    (c) => !c.hasRequirement || c.isMet,
-                  );
-                  const cellBg = allMet
-                    ? "rgba(22, 163, 74, 0.10)"
-                    : "rgba(220, 38, 38, 0.10)";
-                  return (
-                    <div
-                      key={`${row.id}-${d.toISOString()}`}
-                      style={{
-                        textAlign: "center",
-                        padding: "8px 4px",
-                        borderLeft:
-                          splitAtIndex !== undefined && i === splitAtIndex
-                            ? "2px solid var(--color-dark)"
-                            : "1px solid var(--color-border)",
-                        borderBottom: isLastRow
-                          ? undefined
-                          : splitAtIndex !== undefined && i === splitAtIndex
-                            ? undefined
-                            : "1px solid var(--color-border)",
-                        boxShadow: isLastRow
-                          ? undefined
-                          : splitAtIndex !== undefined && i === splitAtIndex
-                            ? "inset 0 -1px 0 var(--color-border)"
-                            : undefined,
-                        fontSize: "var(--dg-fs-badge)",
-                        lineHeight: 1.3,
-                        fontWeight: 700,
-                        background: cellBg,
-                        display: "flex",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
+                  <div
+                    data-tally-label={row.label}
+                    style={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 1,
+                      background: "var(--color-surface)",
+                      padding: "6px 14px",
+                      fontSize: "var(--dg-fs-badge)",
+                      fontWeight: 700,
+                      color: "var(--color-text-muted)",
+                      letterSpacing: "0.04em",
+                      display: "flex",
+                      alignItems: "center",
+                      borderRight: "1px solid var(--color-border-light)",
+                      borderBottom: isLastRow
+                        ? undefined
+                        : "1px solid var(--color-border-light)",
+                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
+                    }}
+                  >
+                    <MaybeHint
+                      content={isNameMode ? row.label : undefined}
+                      side="top"
                     >
-                      {renderCoverage(coverageByLabel)}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                      <span
+                        style={{
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {row.label}
+                      </span>
+                    </MaybeHint>
+                  </div>
+                  {weekDates.map((date, index) => {
+                    const count = row.counts[index] ?? 0;
+                    const required =
+                      categoryRequirementsByDay[index]?.[row.categoryId] ?? 0;
+                    const hasRequirement = required > 0;
+                    const isMet = count >= required;
+                    const displayValue =
+                      count > 0 || hasRequirement ? String(count) : "-";
+                    const hintContent = hasRequirement
+                      ? `${row.label}: ${count}/${required}`
+                      : count > 0
+                        ? `${row.label}: ${count}`
+                        : undefined;
+                    return (
+                      <div
+                        key={`${row.label}-${date.toISOString()}`}
+                        data-tally-count={`${row.categoryId}-${index}`}
+                        data-tally-status={
+                          hasRequirement ? (isMet ? "covered" : "short") : "none"
+                        }
+                        style={{
+                          textAlign: "center",
+                          padding: "8px 6px",
+                          borderLeft:
+                            splitAtIndex !== undefined && index === splitAtIndex
+                              ? "2px solid var(--color-dark)"
+                              : "1px solid var(--color-border-light)",
+                          borderBottom: isLastRow
+                            ? undefined
+                            : "1px solid var(--color-border-light)",
+                          fontSize: "var(--dg-fs-badge)",
+                          lineHeight: 1.4,
+                          color: hasRequirement
+                            ? isMet
+                              ? "var(--color-success-text)"
+                              : "var(--color-danger-dark)"
+                            : "var(--color-text-muted)",
+                          background: hasRequirement
+                            ? isMet
+                              ? "rgba(22, 163, 74, 0.12)"
+                              : "rgba(220, 38, 38, 0.12)"
+                            : "var(--color-surface)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 600,
+                          fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                        }}
+                      >
+                        {hintContent ? (
+                          <MaybeHint
+                            content={hintContent}
+                            side="top"
+                          >
+                            <span>{displayValue}</span>
+                          </MaybeHint>
+                        ) : (
+                          displayValue
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
         </div>
         </div>
       </div>
@@ -2639,6 +2622,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
+  selectedCellKey,
 }: ScheduleGridProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const tooltipTextRef = useRef<HTMLSpanElement>(null);
@@ -2770,12 +2754,21 @@ const ScheduleGrid = memo(function ScheduleGrid({
     );
   }, [sections, shiftCodes, focusAreaIdByName]);
 
-  // Helper: check if a focus area (by name) has any employees to show
-  const sectionHasEmployees = useCallback(
+  const openShiftSectionIds = useMemo(
+    () => new Set((openShifts ?? []).map((shift) => shift.focusAreaId)),
+    [openShifts],
+  );
+
+  // Keep sections visible when they have employee rows or open shifts to claim.
+  const sectionHasVisibleContent = useCallback(
     (section: string) => {
+      const sectionId = focusAreaIdByName[section];
+      if (sectionId != null && openShiftSectionIds.has(sectionId)) {
+        return true;
+      }
+
       const exclusiveCodeIds =
         exclusiveCodeIdsPerSection[section] ?? new Set<number>();
-      const sectionId = focusAreaIdByName[section];
       const rawHomeEmps = filteredEmployees.filter(
         (e) => sectionId != null && e.focusAreaIds.includes(sectionId),
       );
@@ -2805,6 +2798,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
     [
       exclusiveCodeIdsPerSection,
       focusAreaIdByName,
+      openShiftSectionIds,
       filteredEmployees,
       allEmployees,
       isCellInteractive,
@@ -2820,10 +2814,10 @@ const ScheduleGrid = memo(function ScheduleGrid({
       departmentSections
         .map(({ department, focusAreas: fas }) => ({
           department,
-          focusAreas: fas.filter((fa) => sectionHasEmployees(fa.name)),
+          focusAreas: fas.filter((fa) => sectionHasVisibleContent(fa.name)),
         }))
         .filter(({ focusAreas: fas }) => fas.length > 0),
-    [departmentSections, sectionHasEmployees],
+    [departmentSections, sectionHasVisibleContent],
   );
 
   const hasOpenShifts = (openShifts?.length ?? 0) > 0;
@@ -2926,7 +2920,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
             padding: "48px 20px",
             textAlign: "center",
             background: "var(--color-surface)",
-            borderRadius: 12,
+            borderRadius: "var(--dg-radius-md)",
             border: "1px dashed var(--color-border)",
             color: "var(--color-text-muted)",
             marginTop: 34,
@@ -3022,7 +3016,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
               transform: "translate(-50%, -100%)",
               background: "var(--color-surface)",
               padding: "8px 14px",
-              borderRadius: "10px",
+              borderRadius: "var(--dg-radius-lg)",
               boxShadow: `
                 0 10px 25px -5px rgba(0, 0, 0, 0.1),
                 0 8px 10px -6px rgba(0, 0, 0, 0.1),
@@ -3135,6 +3129,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
                       absenceTypeIdForKey={absenceTypeIdForKey}
                       shiftDisplayMode={shiftDisplayMode}
                       resolvePublisherName={resolvePublisherName}
+                      selectedCellKey={selectedCellKey}
                       openShifts={openShifts?.filter(
                         (os) =>
                           sectionId != null && os.focusAreaId === sectionId,

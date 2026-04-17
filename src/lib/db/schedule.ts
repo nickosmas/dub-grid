@@ -1,36 +1,98 @@
 import {
-  supabase, logAudit, formatDateKey, arraysEqual, assertSafeFilterValue,
+  supabase, logAudit, formatDateKey,
   RECURRING_SHIFT_COLS,
 } from "./shared";
 import type { DbRecurringShift, DbShift, DbScheduleNote, RecurringDraft } from "./types";
 import { rowToRecurringShift, generateSeriesDates } from "./mappers";
+import type { DraftBreakdown } from "@/lib/draft-utils";
 import type {
   ScheduleNote, RecurringShift, ShiftSeries, SeriesFrequency,
   PublishHistoryEntry, PublishHistoryEntryWithName, PublishChange,
 } from "@/types";
 
-const DISCARD_DELETE_BATCH_SIZE = 50;
+const SHIFT_SERIES_UPSERT_BATCH_SIZE = 25;
+
+interface ScheduleDraftSummaryResponse {
+  summary?: DraftBreakdown;
+  error?: string;
+  code?: string;
+}
+
+export class ScheduleDraftConflictError extends Error {
+  constructor(public readonly latestSummary: DraftBreakdown) {
+    super("Schedule drafts changed elsewhere.");
+    this.name = "ScheduleDraftConflictError";
+  }
+}
+
+async function parseScheduleSummaryResponse(
+  response: Response,
+): Promise<ScheduleDraftSummaryResponse | null> {
+  try {
+    return (await response.json()) as ScheduleDraftSummaryResponse;
+  } catch {
+    return null;
+  }
+}
+
+type CreateShiftSeriesOptions = {
+  onProgress?: (progress: number) => void;
+  batchSize?: number;
+};
 
 // ── Publish ──────────────────────────────────────────────────────────────────
 
 export async function publishSchedule(
   orgId: string,
   startDate: Date,
-  endDate: Date
-): Promise<string | null> {
+  endDate: Date,
+  expectedSummary?: DraftBreakdown,
+): Promise<DraftBreakdown> {
   const startKey = formatDateKey(startDate);
   const endKey = formatDateKey(endDate);
-  const { data, error } = await supabase.rpc("publish_schedule", {
-    p_org_id: orgId,
-    p_start_date: startKey,
-    p_end_date: endKey,
+  const response = await fetch("/api/shifts/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orgId,
+      startDate: startKey,
+      endDate: endKey,
+      expectedSummary,
+    }),
   });
-  if (error) throw error;
-  void logAudit("schedule.published", "schedule", orgId, {
-    startDate: startKey,
-    endDate: endKey,
-  }, orgId);
-  return data as string | null;
+
+  const body = await parseScheduleSummaryResponse(response);
+
+  if (response.status === 409 && body?.summary) {
+    throw new ScheduleDraftConflictError(body.summary);
+  }
+
+  if (!response.ok || !body?.summary) {
+    throw new Error(body?.error || "Failed to publish schedule");
+  }
+
+  return body.summary;
+}
+
+export async function fetchScheduleDraftSummary(input: {
+  orgId: string;
+  scope?: "all" | "mine";
+  startDate?: string;
+  endDate?: string;
+}): Promise<DraftBreakdown> {
+  const params = new URLSearchParams({ orgId: input.orgId });
+  if (input.scope) params.set("scope", input.scope);
+  if (input.startDate) params.set("startDate", input.startDate);
+  if (input.endDate) params.set("endDate", input.endDate);
+
+  const response = await fetch(`/api/shifts/draft-summary?${params.toString()}`);
+  const body = await parseScheduleSummaryResponse(response);
+
+  if (!response.ok || !body?.summary) {
+    throw new Error(body?.error || "Failed to load schedule draft summary");
+  }
+
+  return body.summary;
 }
 
 /**
@@ -133,107 +195,29 @@ export async function fetchPublishHistory(
 export async function discardScheduleDrafts(
   orgId: string,
   userId?: string,
-): Promise<void> {
-  // 1. Fetch shifts — scoped to this user if userId provided, otherwise all org drafts
-  let query = supabase
-    .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, version, employees!inner(org_id)")
-    .eq("employees.org_id", orgId);
-  if (userId) query = query.eq("updated_by", userId);
-  const { data: shifts, error: fetchError } = await query;
+  expectedSummary?: DraftBreakdown,
+): Promise<DraftBreakdown> {
+  const response = await fetch("/api/shifts/discard", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orgId,
+      scope: userId ? "mine" : "all",
+      expectedSummary,
+    }),
+  });
 
-  if (fetchError) throw fetchError;
-  if (!shifts || shifts.length === 0) return;
+  const body = await parseScheduleSummaryResponse(response);
 
-  // 2. Identify which rows need updating or deleting
-  const toUpsert: { emp_id: string; date: string; draft_shift_code_ids: number[]; published_shift_code_ids: number[]; draft_absence_type_id: number | null; published_absence_type_id: number | null; draft_is_delete: boolean; draft_custom_start_time: string | null; draft_custom_end_time: string | null; version: number }[] = [];
-  const toDelete: { emp_id: string; date: string }[] = [];
-
-  for (const shift of shifts as DbShift[]) {
-    const draftIds = shift.draft_shift_code_ids ?? [];
-    const pubIds = shift.published_shift_code_ids ?? [];
-    const draftAbsId = shift.draft_absence_type_id ?? null;
-    const pubAbsId = shift.published_absence_type_id ?? null;
-    const draftStartTime = shift.draft_custom_start_time ?? null;
-    const draftEndTime = shift.draft_custom_end_time ?? null;
-    const pubStartTime = shift.published_custom_start_time ?? null;
-    const pubEndTime = shift.published_custom_end_time ?? null;
-    const hasDraftChange = shift.draft_is_delete ||
-      (draftIds.length > 0 && !arraysEqual(draftIds, pubIds)) ||
-      (draftAbsId != null && draftAbsId !== pubAbsId) ||
-      (draftStartTime != null && draftStartTime !== pubStartTime) ||
-      (draftEndTime != null && draftEndTime !== pubEndTime);
-
-    if (hasDraftChange) {
-      if (pubIds.length > 0 || pubAbsId != null) {
-        // Was edited from an existing published shift, restore the original
-        toUpsert.push({
-          emp_id: shift.emp_id,
-          date: shift.date,
-          draft_shift_code_ids: pubIds,
-          published_shift_code_ids: pubIds,
-          draft_absence_type_id: pubAbsId,
-          published_absence_type_id: pubAbsId,
-          draft_is_delete: false,
-          draft_custom_start_time: pubStartTime,
-          draft_custom_end_time: pubEndTime,
-          version: (shift.version ?? 0) + 1,
-        });
-      } else {
-        // Was created as a draft but never published
-        toDelete.push({ emp_id: shift.emp_id, date: shift.date });
-      }
-    }
+  if (response.status === 409 && body?.summary) {
+    throw new ScheduleDraftConflictError(body.summary);
   }
 
-  // 3. Execute bulk operations
-  if (toUpsert.length > 0) {
-    const { error: upsertError } = await supabase
-      .from("shifts")
-      .upsert(toUpsert, { onConflict: "emp_id,date" });
-    if (upsertError) throw upsertError;
+  if (!response.ok || !body?.summary) {
+    throw new Error(body?.error || "Failed to discard schedule drafts");
   }
 
-  if (toDelete.length > 0) {
-    for (const d of toDelete) {
-      assertSafeFilterValue(d.emp_id, "emp_id");
-      assertSafeFilterValue(d.date, "date");
-    }
-    for (let i = 0; i < toDelete.length; i += DISCARD_DELETE_BATCH_SIZE) {
-      const batch = toDelete.slice(i, i + DISCARD_DELETE_BATCH_SIZE);
-      const orClauses = batch
-        .map((d) => `and(emp_id.eq.${d.emp_id},date.eq.${d.date})`)
-        .join(",");
-      const { error: deleteError } = await supabase
-        .from("shifts")
-        .delete()
-        .or(orClauses);
-      if (deleteError) throw deleteError;
-    }
-  }
-
-  // 4. Handle Schedule Notes Drafts
-  let noteDeleteQuery = supabase
-    .from("schedule_notes")
-    .delete()
-    .eq("org_id", orgId)
-    .eq("status", "draft");
-  if (userId) noteDeleteQuery = noteDeleteQuery.eq("updated_by", userId);
-  const { error: noteDeleteError } = await noteDeleteQuery;
-
-  if (noteDeleteError) throw noteDeleteError;
-
-  let noteRevertQuery = supabase
-    .from("schedule_notes")
-    .update({ status: "published" })
-    .eq("org_id", orgId)
-    .eq("status", "draft_deleted");
-  if (userId) noteRevertQuery = noteRevertQuery.eq("updated_by", userId);
-  const { error: noteRevertError } = await noteRevertQuery;
-
-  if (noteRevertError) throw noteRevertError;
-
-  void logAudit("schedule.drafts_discarded", "schedule", null, { shiftsReverted: toUpsert.length, shiftsDeleted: toDelete.length, scope: userId ? "mine" : "all" }, orgId);
+  return body.summary;
 }
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────
@@ -366,7 +350,12 @@ export async function upsertRecurringShift(
     p_absence_type_id: absenceTypeId ?? null,
     p_effective_from: effectiveFrom,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === "PGRST202" || error.message.includes("upsert_recurring_shift")) {
+      throw new Error("Recurring schedule saves require the latest database migration. Apply the current Supabase migrations and try again.");
+    }
+    throw new Error(error.message);
+  }
   void logAudit("recurring_shift.upserted", "recurring_shift", empId, { dayOfWeek, shiftCodeId, absenceTypeId, effectiveFrom }, orgId);
 }
 
@@ -485,11 +474,15 @@ export async function createShiftSeries(
   endDate: string | null,
   maxOccurrences: number | null,
   absenceTypeId?: number | null,
+  options?: CreateShiftSeriesOptions,
 ): Promise<ShiftSeries> {
   // Pre-generate the UUID so we can link occurrence rows without needing RETURNING.
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const isAbsence = absenceTypeId != null;
+  const reportProgress = options?.onProgress;
+
+  reportProgress?.(5);
 
   // 1. Create the series master record
   const { error } = await supabase
@@ -510,6 +503,7 @@ export async function createShiftSeries(
 
   // 2. Generate and upsert occurrence rows
   const dates = generateSeriesDates(frequency, daysOfWeek, startDate, endDate, maxOccurrences);
+  reportProgress?.(dates.length > 0 ? 15 : 100);
   if (dates.length > 0) {
     const rows = dates.map(date => ({
       emp_id: empId,
@@ -520,10 +514,18 @@ export async function createShiftSeries(
       org_id: orgId,
       series_id: id,
     }));
-    const { error: insertError } = await supabase
-      .from("shifts")
-      .upsert(rows, { onConflict: "emp_id,date" });
-    if (insertError) throw new Error(insertError.message);
+    const batchSize = options?.batchSize ?? SHIFT_SERIES_UPSERT_BATCH_SIZE;
+
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const { error: insertError } = await supabase
+        .from("shifts")
+        .upsert(batch, { onConflict: "emp_id,date" });
+      if (insertError) throw new Error(insertError.message);
+
+      const inserted = Math.min(rows.length, i + batch.length);
+      reportProgress?.(15 + Math.round((inserted / rows.length) * 85));
+    }
   }
 
   void logAudit("shift_series.created", "shift_series", id, { empId, shiftCodeId, absenceTypeId, frequency, startDate, endDate, occurrences: dates.length }, orgId);

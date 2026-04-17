@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "fs";
 import { relative, resolve } from "path";
 
 import { buttonVariants } from "@/components/ui/button";
+import { tabsListVariants } from "@/components/ui/tabs";
 
 const globalsCss = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf-8");
 const settingsPage = readFileSync(resolve(process.cwd(), "src/components/settings/SettingsPage.tsx"), "utf-8");
@@ -10,6 +11,19 @@ const gridmasterPortal = readFileSync(resolve(process.cwd(), "src/components/gri
 const staffView = readFileSync(resolve(process.cwd(), "src/components/StaffView.tsx"), "utf-8");
 const shiftCodes = readFileSync(resolve(process.cwd(), "src/components/settings/ShiftCodes.tsx"), "utf-8");
 const toolbar = readFileSync(resolve(process.cwd(), "src/components/Toolbar.tsx"), "utf-8");
+const dashboardHeader = readFileSync(resolve(process.cwd(), "src/components/dashboard/DashboardHeader.tsx"), "utf-8");
+const printOptionsModal = readFileSync(resolve(process.cwd(), "src/components/PrintOptionsModal.tsx"), "utf-8");
+const repeatForm = readFileSync(resolve(process.cwd(), "src/components/RepeatForm.tsx"), "utf-8");
+const shiftPicker = readFileSync(resolve(process.cwd(), "src/components/ShiftPicker.tsx"), "utf-8");
+const staffDetailPage = readFileSync(resolve(process.cwd(), "src/components/staff-detail/StaffDetailPage.tsx"), "utf-8");
+const userManagement = readFileSync(resolve(process.cwd(), "src/components/settings/UserManagement.tsx"), "utf-8");
+const tabsSource = readFileSync(resolve(process.cwd(), "src/components/ui/tabs.tsx"), "utf-8");
+const cardPrimitive = readFileSync(resolve(process.cwd(), "src/components/ui/card.tsx"), "utf-8");
+const inputPrimitive = readFileSync(resolve(process.cwd(), "src/components/ui/input.tsx"), "utf-8");
+const sidebarPrimitive = readFileSync(resolve(process.cwd(), "src/components/ui/sidebar.tsx"), "utf-8");
+const tooltipPrimitive = readFileSync(resolve(process.cwd(), "src/components/ui/tooltip.tsx"), "utf-8");
+const skeletonPrimitive = readFileSync(resolve(process.cwd(), "src/components/ui/skeleton.tsx"), "utf-8");
+const appLayout = readFileSync(resolve(process.cwd(), "src/app/layout.tsx"), "utf-8");
 
 function collectSourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -31,6 +45,9 @@ describe("shared chrome theming", () => {
     expect(buttonVariants({ variant: "default" })).toContain(
       "hover:bg-[var(--color-brand-light)]",
     );
+    expect(buttonVariants({ variant: "default" })).toContain(
+      "sm:h-[var(--dg-btn-h)]",
+    );
   });
 
   it("exposes an explicit blue brand button variant", () => {
@@ -43,6 +60,81 @@ describe("shared chrome theming", () => {
     expect(globalsCss).toContain("--color-control-primary: #0F172A;");
     expect(globalsCss).toContain("--color-control-active-bg: #F1F5F9;");
     expect(globalsCss).toContain("--color-control-active-border: #CBD5E1;");
+    expect(globalsCss).toContain("--dg-btn-radius: 6px;");
+    expect(globalsCss).toContain("--dg-btn-h: 38px;");
+    expect(globalsCss).toContain("--dg-toolbar-h: 38px;");
+    expect(globalsCss).toContain("--dg-radius-sm: 6px;");
+    expect(globalsCss).toContain("--dg-radius-md: 8px;");
+    expect(globalsCss).toContain("--dg-radius-lg: 10px;");
+    expect(globalsCss).toContain("--dg-radius-xl: 12px;");
+    expect(globalsCss).toContain("--dg-tab-shell-radius: var(--dg-radius-md);");
+    expect(globalsCss).toContain("--dg-tab-shell-pad: 2px;");
+    expect(globalsCss).toContain("--dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));");
+    expect(globalsCss).toContain(".dg-btn-warning-filled");
+  });
+
+  it("maps compact and filled button variants to the shared button tokens", () => {
+    expect(buttonVariants({ size: "sm" })).toContain(
+      "sm:h-[var(--dg-btn-h-sm)]",
+    );
+    expect(buttonVariants({ size: "sm" })).toContain(
+      "px-[var(--dg-btn-px-sm)]",
+    );
+    expect(buttonVariants({ variant: "warningFilled" })).toContain(
+      "bg-[var(--color-warning)]",
+    );
+    expect(buttonVariants({ variant: "dangerFilled" })).toContain(
+      "bg-[var(--color-danger)]",
+    );
+  });
+
+  it("uses the shared toolbar height and radius for tabs and toolbar controls", () => {
+    expect(globalsCss).toMatch(
+      /\.dg-span-tabs\s*\{[\s\S]*height: var\(--dg-toolbar-h\);[\s\S]*border-radius: var\(--dg-tab-shell-radius\);[\s\S]*\}/,
+    );
+    expect(globalsCss).toMatch(
+      /\.dg-span-tab\s*\{[\s\S]*border-radius: var\(--dg-tab-inner-radius\);[\s\S]*\}/,
+    );
+    expect(globalsCss).toMatch(
+      /\.dg-span-tabs--light \.dg-span-tab\s*\{[\s\S]*border-radius: var\(--dg-tab-inner-radius\);[\s\S]*\}/,
+    );
+    expect(globalsCss).toMatch(
+      /\.dg-nav-tab\s*\{[\s\S]*min-height: var\(--dg-toolbar-h\);[\s\S]*border-radius: var\(--dg-btn-radius\);[\s\S]*\}/,
+    );
+    expect(tabsListVariants()).toContain("rounded-[var(--dg-tab-shell-radius)]");
+    expect(tabsListVariants()).toContain("p-[var(--dg-tab-shell-pad)]");
+    expect(tabsListVariants()).toContain(
+      "group-data-horizontal/tabs:h-[var(--dg-toolbar-h)]",
+    );
+    expect(tabsSource).toContain("rounded-[var(--dg-tab-inner-radius)]");
+    expect(globalsCss).toMatch(
+      /\.dg-scroll-inner\s*\{[\s\S]*height: 100%;[\s\S]*\}/,
+    );
+  });
+
+  it("maps shared surface primitives onto the radius tokens", () => {
+    expect(cardPrimitive).toContain("rounded-[var(--dg-radius-md)]");
+    expect(inputPrimitive).toContain("rounded-[var(--dg-btn-radius)]");
+    expect(sidebarPrimitive).toContain("rounded-[var(--dg-radius-lg)]");
+    expect(tooltipPrimitive).toContain("rounded-[var(--tooltip-border-radius)]");
+    expect(skeletonPrimitive).toContain("rounded-[var(--dg-radius-sm)]");
+    expect(appLayout).toContain("rounded-[var(--dg-radius-lg)]");
+  });
+
+  it("routes current inset tab consumers through the shared shell classes", () => {
+    for (const source of [
+      dashboardHeader,
+      printOptionsModal,
+      repeatForm,
+      shiftPicker,
+      staffDetailPage,
+      staffView,
+      toolbar,
+      userManagement,
+    ]) {
+      expect(source).toContain("dg-span-tabs");
+      expect(source).toContain("dg-span-tab");
+    }
   });
 
   it("uses soft blue tokens for shared active navigation chrome", () => {

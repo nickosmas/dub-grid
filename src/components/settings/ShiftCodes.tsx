@@ -13,7 +13,11 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { PresetColorPicker, TimeInput12h, labelStyle, inputStyle, normalizeTimeCompare } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
 import { SelectableTag } from "@/components/ui/selectable-tag";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 type ShiftCodeFormState = {
   label: string;
@@ -196,6 +200,49 @@ function ShiftCodeRow({
 
   const canSave = isDirty && (isNameMode || !!form.label.trim()) && !!form.name.trim();
 
+  const resetDraft = useCallback(() => {
+    setForm(buildShiftCodeFormState(st, shiftCategories));
+    setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
+    setSaveError(null);
+  }, [st, shiftCategories]);
+
+  const discardDraft = useCallback((closeAfter: boolean) => {
+    if (st.isNew && closeAfter) {
+      onDeleted(st.id);
+      return;
+    }
+    resetDraft();
+    if (closeAfter) {
+      setExpanded(false);
+    }
+  }, [onDeleted, resetDraft, st.id, st.isNew]);
+
+  const closeEditor = useCallback(() => {
+    if (st.isNew) {
+      onDeleted(st.id);
+      return;
+    }
+    setSaveError(null);
+    setExpanded(false);
+  }, [onDeleted, st.id, st.isNew]);
+
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: expanded && isDirty,
+    onDiscard: () => discardDraft(true),
+  });
+
+  const toggleExpanded = useCallback(() => {
+    if (!expanded) {
+      setExpanded(true);
+      return;
+    }
+    if (isDirty) {
+      requestClose();
+      return;
+    }
+    closeEditor();
+  }, [closeEditor, expanded, isDirty, requestClose]);
+
   const handleSave = useCallback(async () => {
     if ((!isNameMode && !form.label.trim()) || !form.name.trim()) return;
     setSaving(true);
@@ -293,7 +340,7 @@ function ShiftCodeRow({
           cursor: "pointer",
           transition: "background 0.15s",
         }}
-        onClick={() => setExpanded((e) => !e)}
+        onClick={toggleExpanded}
       >
         {!isNameMode && (
           <span
@@ -381,7 +428,7 @@ function ShiftCodeRow({
         <div
           style={{
             background: "var(--color-bg-secondary)",
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             border: "1px solid var(--color-border-light)",
             margin: "0 0 8px",
             padding: "14px 16px",
@@ -571,6 +618,11 @@ function ShiftCodeRow({
                       Duration: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{calcTimeDuration(form.defaultStartTime, form.defaultEndTime)}</span>
                     </div>
                   )}
+                  <p style={{ margin: "6px 0 0", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.45 }}>
+                    {hasCategoryTime
+                      ? `This shift now uses its own saved time instead of the ${selectedCategory?.name} default. Later changes to the category time will not update this shift unless you revert it.`
+                      : "This shift now uses its own saved time because there is no category default to inherit."}
+                  </p>
                   <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
                     {hasCategoryTime && canManageShiftCodes && (
                       <button
@@ -609,26 +661,31 @@ function ShiftCodeRow({
               <div>
                 <label style={labelStyle}>DEFAULT TIME</label>
                 {hasCategoryTime ? (
-                  <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{
-                      fontSize: "var(--dg-fs-label)",
-                      color: "var(--color-text-secondary)",
-                      fontWeight: 600,
-                      padding: "4px 10px",
-                      background: "var(--color-surface)",
-                      borderRadius: 6,
-                      border: "1px solid var(--color-border)",
-                    }}>
-                      {fmt12h(categoryStart)} – {fmt12h(categoryEnd)}
-                    </span>
-                    <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                      from {selectedCategory?.name}
-                    </span>
-                    {calcTimeDuration(categoryStart, categoryEnd) && (
-                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                        ({calcTimeDuration(categoryStart, categoryEnd)})
+                  <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{
+                        fontSize: "var(--dg-fs-label)",
+                        color: "var(--color-text-secondary)",
+                        fontWeight: 600,
+                        padding: "4px 10px",
+                        background: "var(--color-surface)",
+                        borderRadius: 6,
+                        border: "1px solid var(--color-border)",
+                      }}>
+                        {fmt12h(categoryStart)} – {fmt12h(categoryEnd)}
                       </span>
-                    )}
+                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                        from {selectedCategory?.name}
+                      </span>
+                      {calcTimeDuration(categoryStart, categoryEnd) && (
+                        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                          ({calcTimeDuration(categoryStart, categoryEnd)})
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.45 }}>
+                      Custom times are currently blank, so this shift follows the category default. If the category time changes later, this shift updates automatically.
+                    </p>
                   </div>
                 ) : (
                   <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
@@ -732,30 +789,8 @@ function ShiftCodeRow({
               <strong>Error:</strong> {saveError}
             </p>
           )}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              onClick={handleSave}
-              disabled={saving || !canSave || !canManageShiftCodes}
-              className="dg-btn dg-btn-primary dg-btn-sm"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button
-              onClick={() => {
-                if (st.isNew) {
-                  onDeleted(st.id);
-                } else {
-                  setForm(buildShiftCodeFormState(st, shiftCategories));
-                  setCustomizeTime(shouldUseCustomShiftCodeTime(st, shiftCategories));
-                  setExpanded(false);
-                }
-              }}
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-            >
-              Cancel
-            </button>
-            <div style={{ flex: 1 }} />
-            {canManageShiftCodes && !st.isNew && (
+          <EditorActionRow
+            destructiveAction={canManageShiftCodes && !st.isNew ? (
               <button
                 onClick={handleDeleteClick}
                 disabled={deleting}
@@ -763,10 +798,28 @@ function ShiftCodeRow({
               >
                 {deleting ? "…" : "Delete"}
               </button>
+            ) : undefined}
+            secondaryAction={(
+              <button
+                onClick={() => isDirty ? discardDraft(false) : closeEditor()}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                {getEditorDismissLabel(isDirty)}
+              </button>
             )}
-          </div>
+            primaryAction={(
+              <button
+                onClick={handleSave}
+                disabled={saving || !canSave || !canManageShiftCodes}
+                className="dg-btn dg-btn-primary dg-btn-sm"
+              >
+                {getEditorSaveLabel(saving)}
+              </button>
+            )}
+          />
         </div>
       )}
+      {unsavedChangesDialog}
       {showDeleteConfirm && (
         depInfo?.hasDependencies ? (
           <ConfirmDialog
@@ -841,6 +894,48 @@ function AbsenceTypeRow({
 
   const canSave = isDirty && (isNameMode || !!form.label.trim()) && !!form.name.trim() && !isDuplicateLabel;
 
+  const resetDraft = useCallback(() => {
+    setForm(resolveForm(at));
+    setSaveError(null);
+  }, [at, resolveForm]);
+
+  const discardDraft = useCallback((closeAfter: boolean) => {
+    if (at.isNew && closeAfter) {
+      onDeleted(at.id);
+      return;
+    }
+    resetDraft();
+    if (closeAfter) {
+      setExpanded(false);
+    }
+  }, [at.id, at.isNew, onDeleted, resetDraft]);
+
+  const closeEditor = useCallback(() => {
+    if (at.isNew) {
+      onDeleted(at.id);
+      return;
+    }
+    setSaveError(null);
+    setExpanded(false);
+  }, [at.id, at.isNew, onDeleted]);
+
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: expanded && isDirty,
+    onDiscard: () => discardDraft(true),
+  });
+
+  const toggleExpanded = useCallback(() => {
+    if (!expanded) {
+      setExpanded(true);
+      return;
+    }
+    if (isDirty) {
+      requestClose();
+      return;
+    }
+    closeEditor();
+  }, [closeEditor, expanded, isDirty, requestClose]);
+
   const handleSave = useCallback(async () => {
     if ((!isNameMode && !form.label.trim()) || !form.name.trim()) return;
     setSaving(true);
@@ -908,8 +1003,8 @@ function AbsenceTypeRow({
     <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
       <div
         className="dg-hover-row"
-        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: 8, cursor: "pointer", transition: "background 0.15s" }}
-        onClick={() => setExpanded((e) => !e)}
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: "var(--dg-radius-md)", cursor: "pointer", transition: "background 0.15s" }}
+        onClick={toggleExpanded}
       >
         {!isNameMode && (
           <span style={{ display: "inline-block", minWidth: 44, padding: "3px 8px", background: form.color, border: `1px solid ${borderColor(form.text)}`, color: form.text, borderRadius: 8, fontSize: "var(--dg-fs-caption)", fontWeight: 700, textAlign: "center" }}>
@@ -926,7 +1021,7 @@ function AbsenceTypeRow({
       </div>
 
       {expanded && (
-        <div style={{ background: "var(--color-bg-secondary)", borderRadius: 10, border: "1px solid var(--color-border-light)", margin: "0 0 8px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ background: "var(--color-bg-secondary)", borderRadius: "var(--dg-radius-lg)", border: "1px solid var(--color-border-light)", margin: "0 0 8px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }} onClick={(e) => e.stopPropagation()}>
           <div style={{ display: "grid", gridTemplateColumns: isNameMode ? "1fr" : (isMobile ? "1fr" : "120px 1fr"), gap: 10 }}>
             {!isNameMode && (
               <div>
@@ -953,22 +1048,26 @@ function AbsenceTypeRow({
               <strong>Error:</strong> {saveError}
             </p>
           )}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary dg-btn-sm">
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button onClick={() => { if (at.isNew) { onDeleted(at.id); } else { setForm(resolveForm(at)); setSaveError(null); setExpanded(false); } }} className="dg-btn dg-btn-secondary dg-btn-sm">
-              Cancel
-            </button>
-            <div style={{ flex: 1 }} />
-            {canEdit && !at.isNew && (
+          <EditorActionRow
+            destructiveAction={canEdit && !at.isNew ? (
               <button onClick={handleDeleteClick} disabled={deleting} className="dg-btn dg-btn-danger dg-btn-sm">
                 {deleting ? "…" : "Delete"}
               </button>
+            ) : undefined}
+            secondaryAction={(
+              <button onClick={() => isDirty ? discardDraft(false) : closeEditor()} className="dg-btn dg-btn-secondary dg-btn-sm">
+                {getEditorDismissLabel(isDirty)}
+              </button>
             )}
-          </div>
+            primaryAction={(
+              <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary dg-btn-sm">
+                {getEditorSaveLabel(saving)}
+              </button>
+            )}
+          />
         </div>
       )}
+      {unsavedChangesDialog}
       {showDeleteConfirm && (
         atDepInfo?.hasDependencies ? (
           <ConfirmDialog
@@ -1053,7 +1152,7 @@ function AbsenceTypesSettings({
   };
 
   return (
-    <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+    <div style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
         Off Days
       </div>
@@ -1186,8 +1285,214 @@ function ShiftCodesSettings({
       />
     ));
 
+  const isNameMode = shiftDisplayMode === "name";
+  const shiftText = useCallback(
+    (shift: ShiftCode | null | undefined, fallbackLabel: string, fallbackName: string) =>
+      isNameMode ? (shift?.name || fallbackName) : (shift?.label || fallbackLabel),
+    [isNameMode],
+  );
+  const exampleArea = focusAreas.find((focusArea) => !focusArea.archivedAt) ?? null;
+  const exampleCategory = shiftCategories.find((category) => !category.archivedAt) ?? null;
+  const exampleCertification = certifications[0]?.name || certificationLabel.replace(/s$/i, "") || "Certification";
+  const areaSpecificLabel = shiftText(undefined, "Ds", "Day Supervisor");
+  const generalLabel = shiftText(undefined, "Ofc", "Office");
+  const distinctShiftLabel = shiftText(undefined, "EDU", "Education");
+  const inheritedLabel = shiftText(undefined, "Ds", "Day Supervisor");
+  const customTimeLabel = shiftText(undefined, "Ds", "Day Supervisor");
+  const singularFocusAreaLabel = focusAreaLabel.replace(/s$/i, "") || focusAreaLabel;
+  const exampleAreaName = exampleArea?.name || focusAreaLabel.replace(/s$/i, "") || "Area";
+  const exampleCategoryName = "Day Shift";
+  const categoryDefaultTime = "7:00 AM - 3:30 PM";
+  const inheritedTime = categoryDefaultTime;
+  const customTime = "6:15 AM - 3:00 PM";
+  const shiftCodePoints = [
+    {
+      title: "Each shift code is an assignable shift",
+      description: `A shift code is the actual worked shift people pick up on the grid. Use one row for each distinct shift, such as ${areaSpecificLabel} or ${distinctShiftLabel}.`,
+    },
+    {
+      title: "Categories group similar shifts",
+      description: `${exampleCategoryName} is the category. The shift codes inside it are the assignable options. Categories help you group related shifts and share default timing.`,
+    },
+    {
+      title: "General / Cross-Area codes work across the schedule",
+      description: `Area-specific codes belong to one ${singularFocusAreaLabel.toLowerCase()} only. General / Cross-Area codes are available without tying the shift to a single ${singularFocusAreaLabel.toLowerCase()}.`,
+    },
+    {
+      title: "Shift times can inherit or override category defaults",
+      description: `Leave custom times blank when a shift should follow the category default. Save custom start and end times only when that shift needs its own schedule, because saved custom times stop following later category time changes until you revert them.`,
+    },
+    {
+      title: `${certificationLabel} affect who can be assigned`,
+      description: `When a shift requires ${exampleCertification}, only qualified staff can be assigned to it. Use this for real qualification rules, not for cosmetic tagging.`,
+    },
+    {
+      title: "Absence types are off-days, not worked shifts",
+      description: "Use absence types for PTO, calloff, sick, and other non-worked days. They live in the same settings area for convenience, but they are not scheduled shifts.",
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ExplainerSection
+        title="Shift code logic"
+        defaultOpen
+        storageKey="dg-explainer-shift-codes"
+        points={shiftCodePoints}
+        preview={(
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <PreviewFrame
+              title="Area-specific vs cross-area"
+              subtitle="Where the shift can be used"
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {exampleAreaName}
+                  </div>
+                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                    {areaSpecificLabel}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", lineHeight: 1.45 }}>
+                    Shows inside one {singularFocusAreaLabel.toLowerCase()} only.
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "var(--color-brand-bg)",
+                    border: "1px solid var(--color-brand-border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-brand)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    General / Cross-Area
+                  </div>
+                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                    {generalLabel}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
+                    Available without locking the shift to one {singularFocusAreaLabel.toLowerCase()}.
+                  </div>
+                </div>
+              </div>
+            </PreviewFrame>
+
+            <PreviewFrame
+              title="Inherited time vs custom time"
+              subtitle="How shift timing is resolved"
+            >
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "var(--dg-radius-sm)",
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border-light)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {exampleCategoryName} category default
+                  </div>
+                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                    {categoryDefaultTime}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "3px 8px",
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: "var(--color-bg-secondary)",
+                    border: "1px solid var(--color-border-light)",
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  Shared default
+                </span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border-light)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                      {inheritedLabel}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                      Inherits category time
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                    {inheritedTime}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "var(--color-brand-bg)",
+                    border: "1px solid var(--color-brand-border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                      {customTimeLabel}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+                      {`Custom override saved on shift ${isNameMode ? "name" : "code"}`}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-brand)" }}>
+                    {customTime}
+                  </span>
+                </div>
+              </div>
+            </PreviewFrame>
+          </div>
+        )}
+      />
       <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
         Click any row to expand and edit.{shiftDisplayMode !== "name" && " The label (code) is used in the schedule grid."}
       </p>
@@ -1198,7 +1503,7 @@ function ShiftCodesSettings({
           (s) => s.focusAreaId === focusArea.id,
         );
         return (
-          <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+          <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
               {focusArea.name}
             </div>
@@ -1235,7 +1540,7 @@ function ShiftCodesSettings({
           (s) => s.focusAreaId == null,
         );
         return (
-          <div style={{ background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", overflow: "hidden" }}>
+          <div style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
               General / Cross-Area
             </div>
@@ -1245,7 +1550,7 @@ function ShiftCodesSettings({
               </div>
             ) : (
               <div style={{
-                border: "1px dashed var(--color-border)", borderRadius: 10,
+                border: "1px dashed var(--color-border)", borderRadius: "var(--dg-radius-lg)",
                 padding: "28px 16px", textAlign: "center", color: "var(--color-text-muted)",
                 fontSize: "var(--dg-fs-label)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
                 margin: "12px 16px",

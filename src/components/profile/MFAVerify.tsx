@@ -130,7 +130,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
               width: 200,
               padding: "14px 16px",
               border: `2px solid ${error ? "var(--color-danger)" : "var(--color-brand)"}`,
-              borderRadius: 10,
+              borderRadius: "var(--dg-btn-radius)",
               fontSize: 24,
               fontFamily: "monospace",
               letterSpacing: "0.25em",

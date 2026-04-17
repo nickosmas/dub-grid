@@ -1,10 +1,11 @@
 import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, ORGANIZATION_COLS } from "./shared";
-import type { DbOrganization, TenantStats } from "./types";
-import { rowToOrganization } from "./mappers";
+import type { DbInvitation, DbOrganization, TenantStats } from "./types";
+import { rowToInvitation, rowToOrganization } from "./mappers";
+import { removeOrganizationMembershipGuarded, revokeOrganizationInvitationGuarded } from "./access";
+import { composeOrganizationAddress } from "@/lib/organization-profile";
 import type {
   Organization,
   Invitation,
-  AssignableOrganizationRole,
   OrgActivityMetrics,
   UserMembership,
   Subscription,
@@ -36,12 +37,19 @@ export async function fetchAllOrganizations(
 }
 
 export async function createOrganization(data: Omit<Organization, 'id'>): Promise<Organization> {
+  const address = composeOrganizationAddress(data);
   const { data: row, error } = await supabase
     .from("organizations")
     .insert({
       name: data.name,
       slug: data.slug || null,
-      address: data.address || '',
+      address: address || '',
+      address_line_1: data.addressLine1 || '',
+      address_line_2: data.addressLine2 || '',
+      address_city: data.addressCity || '',
+      address_state: data.addressState || '',
+      address_postal_code: data.addressPostalCode || '',
+      address_country: data.addressCountry || '',
       phone: data.phone || '',
       employee_count: data.employeeCount ?? null,
       focus_area_label: data.focusAreaLabel || null,
@@ -209,36 +217,25 @@ export async function removeUserFromOrganization(
   userId: string,
   orgId: string,
 ): Promise<void> {
-  // Prevent removing the sole super_admin — would lock the org out of admin access
-  const { data: membership } = await supabase
+  const { data: membershipRow, error } = await supabase
     .from("organization_memberships")
-    .select("org_role")
+    .select("updated_at")
     .eq("user_id", userId)
     .eq("org_id", orgId)
     .is("archived_at", null)
-    .single();
+    .maybeSingle();
 
-  if (membership?.org_role === "super_admin") {
-    const { count } = await supabase
-      .from("organization_memberships")
-      .select("*", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .eq("org_role", "super_admin")
-      .is("archived_at", null);
-    if ((count ?? 0) <= 1) {
-      throw new Error("Cannot remove the only super admin. Transfer ownership first.");
-    }
+  if (error) throw error;
+  if (!membershipRow?.updated_at) {
+    throw new Error("User access data is out of date. Refresh and try again.");
   }
 
-  const { data: { user: actor } } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from("organization_memberships")
-    .update({ archived_at: new Date().toISOString(), archived_by: actor?.id ?? null })
-    .eq("user_id", userId)
-    .eq("org_id", orgId);
-  if (error) throw error;
+  await removeOrganizationMembershipGuarded({
+    orgId,
+    userId,
+    expectedUpdatedAt: membershipRow.updated_at,
+  });
   await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.employees(orgId), CacheKey.allUsers(), CacheKey.tenantStats());
-  void logAudit("user.removed_from_org", "role", userId, {}, orgId);
 }
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {
@@ -256,39 +253,36 @@ export async function fetchTenantStats(): Promise<TenantStats[]> {
 export async function fetchInvitationsForOrg(orgId: string): Promise<Invitation[]> {
   const { data, error } = await supabase
     .from("invitations")
-    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, employee_id")
+    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    orgId: row.org_id as string,
-    invitedBy: (row.invited_by as string) ?? null,
-    email: row.email as string,
-    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
-    expiresAt: row.expires_at as string,
-    acceptedAt: (row.accepted_at as string) ?? null,
-    revokedAt: (row.revoked_at as string) ?? null,
-    createdAt: row.created_at as string,
-    employeeId: (row.employee_id as string) ?? null,
-  }));
+  return (data ?? []).map((row: DbInvitation) => rowToInvitation(row));
 }
 
 export async function revokeInvitationAsGridmaster(invitationId: string, orgId: string): Promise<void> {
-  const { error } = await supabase
+  const { data: invitationRow, error } = await supabase
     .from("invitations")
-    .update({ revoked_at: new Date().toISOString() })
+    .select("updated_at")
     .eq("org_id", orgId)
-    .eq("id", invitationId);
+    .eq("id", invitationId)
+    .maybeSingle();
   if (error) throw error;
+  if (!invitationRow?.updated_at) {
+    throw new Error("Invitation data is out of date. Refresh and try again.");
+  }
+  await revokeOrganizationInvitationGuarded({
+    orgId,
+    invitationId,
+    expectedUpdatedAt: invitationRow.updated_at,
+  });
   await cacheDel(CacheKey.invitations(orgId));
-  void logAudit("invitation.revoked", "invitation", invitationId, { revokedBy: "gridmaster" }, orgId);
 }
 
 export async function fetchUserMemberships(userId: string): Promise<UserMembership[]> {
   const { data, error } = await supabase
     .from("organization_memberships")
-    .select("org_id, org_role, joined_at, admin_permissions, organizations(name, slug)")
+    .select("org_id, org_role, joined_at, updated_at, admin_permissions, organizations(name, slug)")
     .eq("user_id", userId)
     .is("archived_at", null);
   if (error) throw error;
@@ -300,6 +294,7 @@ export async function fetchUserMemberships(userId: string): Promise<UserMembersh
       orgSlug: org?.slug ?? null,
       orgRole: row.org_role as OrganizationRole,
       joinedAt: row.joined_at as string,
+      updatedAt: (row.updated_at as string | null) ?? null,
       adminPermissions: (row.admin_permissions as UserMembership["adminPermissions"]) ?? null,
     };
   });

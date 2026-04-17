@@ -167,7 +167,7 @@ function PrintSection({
         style={{
           background: "#fff",
           border: "1px solid #9EB4D4",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-md)",
           overflow: "hidden",
           boxShadow: BOX_SHADOW_CARD,
         }}

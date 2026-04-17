@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
@@ -30,5 +30,33 @@ describe("PrintOptionsModal", () => {
         selectedFocusAreas: ["North", "South"],
       }),
     );
+  });
+
+  it("confirms before closing dirty print settings from the footer Close action", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <PrintOptionsModal
+        focusAreas={focusAreas}
+        currentSpanWeeks={1}
+        onPrint={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Month" }));
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^close$/i }));
+
+    expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledOnce();
+    });
   });
 });

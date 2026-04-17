@@ -4,10 +4,16 @@ import type {
   FocusArea,
   ShiftCategory,
   CoverageRequirement,
+  CoverageRuleConfig,
   CoverageStatus,
   CoverageGap,
+  CoverageShortageDetail,
+  ResolvedCoverageRule,
+  ShiftMap,
 } from "@/types";
-import { iterateDateRange } from "@/lib/utils";
+import { formatDateKey, iterateDateRange } from "@/lib/utils";
+
+export type PublishedWindowState = "unpublished" | "partial" | "published";
 
 /**
  * Checks whether an employee is qualified for a given shift code based on
@@ -46,6 +52,21 @@ export function getDisqualificationReasons(
     }
   }
   return reasons;
+}
+
+/**
+ * Returns true when the scheduler grid should treat the cell as occupied.
+ * Draft-deleted rows are intentionally treated as empty because they no longer
+ * represent an active visible assignment in the draft schedule.
+ */
+export function hasVisibleGridShiftEntry(
+  shift?: ShiftMap[string] | null,
+): boolean {
+  return !!(
+    shift &&
+    (shift.shiftCodeIds.length > 0 || shift.absenceTypeId != null) &&
+    !shift.isDelete
+  );
 }
 
 // ── Time Overlap Helpers ──────────────────────────────────────────────────────
@@ -235,6 +256,67 @@ export function resolveRequirement(
   return null;
 }
 
+export function resolveCoverageRules(
+  requirements: CoverageRequirement[],
+  coverageRuleConfigs: CoverageRuleConfig[],
+  shiftCodes: ShiftCode[],
+  shiftCodeDisplayMap?: Map<number, string>,
+): ResolvedCoverageRule[] {
+  const activeShiftCodeById = new Map(
+    shiftCodes
+      .filter((shiftCode) => !shiftCode.archivedAt)
+      .map((shiftCode) => [shiftCode.id, shiftCode]),
+  );
+  const configByKey = new Map(
+    coverageRuleConfigs.map((config) => [
+      `${config.focusAreaId}:${config.requirementShiftCodeId}`,
+      config,
+    ]),
+  );
+  const requirementKeys = new Set(
+    requirements.map((requirement) => `${requirement.focusAreaId}:${requirement.shiftCodeId}`),
+  );
+
+  const resolved: ResolvedCoverageRule[] = [];
+
+  for (const key of requirementKeys) {
+    const [focusAreaIdRaw, requirementShiftCodeIdRaw] = key.split(":");
+    const focusAreaId = Number(focusAreaIdRaw);
+    const requirementShiftCodeId = Number(requirementShiftCodeIdRaw);
+    const baseShiftCode = activeShiftCodeById.get(requirementShiftCodeId);
+    if (!baseShiftCode) continue;
+
+    const config = configByKey.get(key);
+    const eligibleShiftCodeIds = new Set<number>([requirementShiftCodeId]);
+
+    for (const eligibleShiftCodeId of config?.eligibleShiftCodeIds ?? []) {
+      const eligibleShiftCode = activeShiftCodeById.get(eligibleShiftCodeId);
+      if (!eligibleShiftCode) continue;
+      if (eligibleShiftCode.focusAreaId !== baseShiftCode.focusAreaId) continue;
+      if ((eligibleShiftCode.categoryId ?? null) !== (baseShiftCode.categoryId ?? null)) continue;
+      eligibleShiftCodeIds.add(eligibleShiftCodeId);
+    }
+
+    const sortedEligibleShiftCodeIds = [...eligibleShiftCodeIds].sort((left, right) => left - right);
+    const preferredOpenShiftCodeId = sortedEligibleShiftCodeIds.includes(config?.preferredOpenShiftCodeId ?? -1)
+      ? (config?.preferredOpenShiftCodeId ?? requirementShiftCodeId)
+      : requirementShiftCodeId;
+
+    resolved.push({
+      id: key,
+      orgId: baseShiftCode.orgId,
+      focusAreaId,
+      requirementShiftCodeId,
+      eligibleShiftCodeIds: sortedEligibleShiftCodeIds,
+      preferredOpenShiftCodeId,
+      ruleLabel: shiftCodeDisplayMap?.get(requirementShiftCodeId) || baseShiftCode.label,
+      shiftCategoryId: baseShiftCode.categoryId ?? null,
+    });
+  }
+
+  return resolved;
+}
+
 /**
  * Computes coverage status for a single (focusArea, shiftCode, date) cell.
  * Counts actual headcount and qualified headcount against the requirement.
@@ -244,14 +326,18 @@ export function computeCoverageStatus(
   date: Date,
   shiftCodeIdsForKey: (empId: string, date: Date) => number[],
   sectionCodeIds: Set<number>,
-  shiftCodeId: number,
+  eligibleShiftCodeIds: number[] | Set<number>,
   requirement: { minStaff: number },
 ): CoverageStatus {
+  const eligibleShiftCodeIdSet =
+    eligibleShiftCodeIds instanceof Set
+      ? eligibleShiftCodeIds
+      : new Set(eligibleShiftCodeIds);
   let actual = 0;
 
   for (const emp of employees) {
     const codeIds = shiftCodeIdsForKey(emp.id, date);
-    if (codeIds.includes(shiftCodeId) && sectionCodeIds.has(shiftCodeId)) {
+    if (codeIds.some((codeId) => sectionCodeIds.has(codeId) && eligibleShiftCodeIdSet.has(codeId))) {
       actual++;
     }
   }
@@ -268,10 +354,58 @@ export function computeCoverageStatus(
 }
 
 /**
- * Computes all coverage gaps across all focus areas, shift codes, and dates.
- * Returns only cells where requirements are not met.
+ * Returns the shift codes each focus area can use for coverage checks.
+ * Focus areas can satisfy requirements with their own codes plus general codes.
  */
-export function computeCoverageGaps(
+export function buildShiftCodeIdsByFocusArea(
+  focusAreas: FocusArea[],
+  shiftCodes: ShiftCode[],
+): Map<number, Set<number>> {
+  const shiftCodeIdsByFocusArea = new Map<number, Set<number>>();
+
+  for (const fa of focusAreas) {
+    shiftCodeIdsByFocusArea.set(
+      fa.id,
+      new Set(
+        shiftCodes
+          .filter((sc) => sc.focusAreaId === fa.id || sc.focusAreaId == null)
+          .map((sc) => sc.id),
+      ),
+    );
+  }
+
+  return shiftCodeIdsByFocusArea;
+}
+
+export interface CoverageCategorySnapshot {
+  focusAreaId: number;
+  focusAreaName: string;
+  shiftCategoryId: number;
+  shiftCategoryName: string;
+  date: Date;
+  status: CoverageStatus;
+  eligibleShiftCodeIds: number[];
+  preferredOpenShiftCodeId: number;
+  shortageDetails: CoverageShortageDetail[];
+}
+
+function getShiftCodeDisplayLabel(
+  shiftCode: ShiftCode,
+  shiftCodeDisplayMap?: Map<number, string>,
+): string {
+  return shiftCodeDisplayMap?.get(shiftCode.id) || shiftCode.label;
+}
+
+function compareShiftCodes(left: ShiftCode, right: ShiftCode): number {
+  return left.sortOrder - right.sortOrder || left.id - right.id;
+}
+
+/**
+ * Computes category-level coverage snapshots for each focus area/date/category.
+ * Green/red status is based on total headcount in the category, while exact-code
+ * shortages remain informational detail when a category is short.
+ */
+export function computeCoverageCategorySnapshots(
   focusAreas: FocusArea[],
   shiftCategories: ShiftCategory[],
   shiftCodes: ShiftCode[],
@@ -279,55 +413,172 @@ export function computeCoverageGaps(
   dates: Date[],
   employeesByFocusArea: Map<number, Employee[]>,
   shiftCodeIdsForKey: (empId: string, date: Date) => number[],
-  shiftCodeById: Map<number, ShiftCode>,
   shiftCodeIdsByFocusArea: Map<number, Set<number>>,
   shiftCodeDisplayMap?: Map<number, string>,
-): CoverageGap[] {
-  const gaps: CoverageGap[] = [];
-  const categoryById = new Map(shiftCategories.map((c) => [c.id, c]));
-  const requiredCodeIds = new Set(requirements.map((r) => r.shiftCodeId));
+): CoverageCategorySnapshot[] {
+  const snapshots: CoverageCategorySnapshot[] = [];
+  const categoryById = new Map(shiftCategories.map((category) => [category.id, category]));
+  const activeShiftCodes = shiftCodes.filter((shiftCode) => !shiftCode.archivedAt);
+  const activeShiftCodeById = new Map(
+    activeShiftCodes.map((shiftCode) => [shiftCode.id, shiftCode]),
+  );
+  const requirementShiftCodeIdsByGroup = new Map<string, number[]>();
 
-  for (const fa of focusAreas) {
-    const employees = employeesByFocusArea.get(fa.id) ?? [];
-    const sectionCodeIds = shiftCodeIdsByFocusArea.get(fa.id) ?? new Set();
+  for (const requirement of requirements) {
+    const shiftCode = activeShiftCodeById.get(requirement.shiftCodeId);
+    if (!shiftCode) continue;
+    const groupKey = `${requirement.focusAreaId}:${shiftCode.categoryId ?? 0}`;
+    const group = requirementShiftCodeIdsByGroup.get(groupKey) ?? [];
+    if (!group.includes(requirement.shiftCodeId)) {
+      group.push(requirement.shiftCodeId);
+      requirementShiftCodeIdsByGroup.set(groupKey, group);
+    }
+  }
 
-    for (const codeId of requiredCodeIds) {
-      const code = shiftCodeById.get(codeId);
-      if (!code || !sectionCodeIds.has(codeId)) continue;
+  for (const focusArea of focusAreas) {
+    const employees = employeesByFocusArea.get(focusArea.id) ?? [];
+    const sectionCodeIds = shiftCodeIdsByFocusArea.get(focusArea.id) ?? new Set();
 
-      const cat = code.categoryId != null ? categoryById.get(code.categoryId) : undefined;
+    for (const [groupKey, requirementShiftCodeIds] of requirementShiftCodeIdsByGroup.entries()) {
+      const [groupFocusAreaIdRaw, shiftCategoryIdRaw] = groupKey.split(":");
+      if (Number(groupFocusAreaIdRaw) !== focusArea.id) continue;
+
+      const shiftCategoryId = Number(shiftCategoryIdRaw);
+      const eligibleShiftCodes = activeShiftCodes
+        .filter(
+          (shiftCode) =>
+            sectionCodeIds.has(shiftCode.id) &&
+            (shiftCode.categoryId ?? 0) === shiftCategoryId,
+        )
+        .sort(compareShiftCodes);
+      if (eligibleShiftCodes.length === 0) continue;
+
+      const sortedRequirementShiftCodeIds = [...requirementShiftCodeIds].sort((leftId, rightId) => {
+        const left = activeShiftCodeById.get(leftId);
+        const right = activeShiftCodeById.get(rightId);
+        if (!left || !right) return leftId - rightId;
+        return compareShiftCodes(left, right);
+      });
 
       for (const date of dates) {
-        const dow = date.getDay();
-        const req = resolveRequirement(requirements, fa.id, codeId, dow);
-        if (!req) continue;
+        const dayOfWeek = date.getDay();
+        let totalRequired = 0;
+        const shortageDetails: CoverageShortageDetail[] = [];
+
+        for (const shiftCodeId of sortedRequirementShiftCodeIds) {
+          const shiftCode = activeShiftCodeById.get(shiftCodeId);
+          if (!shiftCode) continue;
+
+          const requirement = resolveRequirement(
+            requirements,
+            focusArea.id,
+            shiftCodeId,
+            dayOfWeek,
+          );
+          if (!requirement || requirement.minStaff <= 0) continue;
+
+          totalRequired += requirement.minStaff;
+
+          const exactStatus = computeCoverageStatus(
+            employees,
+            date,
+            shiftCodeIdsForKey,
+            sectionCodeIds,
+            [shiftCodeId],
+            requirement,
+          );
+          const shortage = Math.max(requirement.minStaff - exactStatus.actual, 0);
+          if (shortage > 0) {
+            shortageDetails.push({
+              shiftCodeId,
+              shiftCodeLabel: getShiftCodeDisplayLabel(shiftCode, shiftCodeDisplayMap),
+              required: requirement.minStaff,
+              actual: exactStatus.actual,
+              shortage,
+            });
+          }
+        }
+
+        if (totalRequired <= 0) continue;
 
         const status = computeCoverageStatus(
           employees,
           date,
           shiftCodeIdsForKey,
           sectionCodeIds,
-          codeId,
-          req,
+          eligibleShiftCodes.map((shiftCode) => shiftCode.id),
+          { minStaff: totalRequired },
         );
+        const preferredOpenShiftCodeId =
+          shortageDetails[0]?.shiftCodeId ??
+          sortedRequirementShiftCodeIds[0] ??
+          eligibleShiftCodes[0].id;
 
-        if (status.hasRequirement && !status.isMet) {
-          gaps.push({
-            focusAreaId: fa.id,
-            focusAreaName: fa.name,
-            shiftCodeId: codeId,
-            shiftCodeLabel: shiftCodeDisplayMap?.get(codeId) ?? code.label,
-            shiftCategoryId: cat?.id ?? 0,
-            shiftCategoryName: cat?.name ?? "Uncategorized",
-            date,
-            status,
-          });
-        }
+        snapshots.push({
+          focusAreaId: focusArea.id,
+          focusAreaName: focusArea.name,
+          shiftCategoryId,
+          shiftCategoryName:
+            categoryById.get(shiftCategoryId)?.name ?? "Uncategorized",
+          date,
+          status,
+          eligibleShiftCodeIds: eligibleShiftCodes.map((shiftCode) => shiftCode.id),
+          preferredOpenShiftCodeId,
+          shortageDetails,
+        });
       }
     }
   }
 
-  return gaps;
+  return snapshots;
+}
+
+/**
+ * Computes all category-level coverage gaps across all focus areas and dates.
+ */
+export function computeCoverageGaps(
+  focusAreas: FocusArea[],
+  shiftCategories: ShiftCategory[],
+  shiftCodes: ShiftCode[],
+  requirements: CoverageRequirement[],
+  coverageRuleConfigs: CoverageRuleConfig[],
+  dates: Date[],
+  employeesByFocusArea: Map<number, Employee[]>,
+  shiftCodeIdsForKey: (empId: string, date: Date) => number[],
+  shiftCodeById: Map<number, ShiftCode>,
+  shiftCodeIdsByFocusArea: Map<number, Set<number>>,
+  shiftCodeDisplayMap?: Map<number, string>,
+): CoverageGap[] {
+  void coverageRuleConfigs;
+  void shiftCodeById;
+
+  return computeCoverageCategorySnapshots(
+    focusAreas,
+    shiftCategories,
+    shiftCodes,
+    requirements,
+    dates,
+    employeesByFocusArea,
+    shiftCodeIdsForKey,
+    shiftCodeIdsByFocusArea,
+    shiftCodeDisplayMap,
+  )
+    .filter((snapshot) => snapshot.status.hasRequirement && !snapshot.status.isMet)
+    .map((snapshot) => ({
+      focusAreaId: snapshot.focusAreaId,
+      focusAreaName: snapshot.focusAreaName,
+      requirementShiftCodeId: snapshot.preferredOpenShiftCodeId,
+      shiftCodeId: snapshot.preferredOpenShiftCodeId,
+      ruleLabel: snapshot.shiftCategoryName,
+      shiftCodeLabel: snapshot.shiftCategoryName,
+      eligibleShiftCodeIds: snapshot.eligibleShiftCodeIds,
+      preferredOpenShiftCodeId: snapshot.preferredOpenShiftCodeId,
+      shiftCategoryId: snapshot.shiftCategoryId,
+      shiftCategoryName: snapshot.shiftCategoryName,
+      date: snapshot.date,
+      status: snapshot.status,
+      shortageDetails: snapshot.shortageDetails,
+    }));
 }
 
 /**
@@ -346,4 +597,30 @@ export function buildPublishedDateSet(
     }
   }
   return set;
+}
+
+/**
+ * Returns only the visible dates that have been published at least once.
+ */
+export function filterPublishedDates(
+  dates: Date[],
+  publishedDateSet: Set<string>,
+): Date[] {
+  return dates.filter((date) => publishedDateSet.has(formatDateKey(date)));
+}
+
+/**
+ * Summarizes whether the visible window is unpublished, partially published,
+ * or fully published. Empty windows default to "published" so non-grid views
+ * (for example month view) do not show misleading unpublished messaging.
+ */
+export function getPublishedWindowState(
+  dates: Date[],
+  publishedDateSet: Set<string>,
+): PublishedWindowState {
+  if (dates.length === 0) return "published";
+  const publishedDates = filterPublishedDates(dates, publishedDateSet);
+  if (publishedDates.length === 0) return "unpublished";
+  if (publishedDates.length < dates.length) return "partial";
+  return "published";
 }

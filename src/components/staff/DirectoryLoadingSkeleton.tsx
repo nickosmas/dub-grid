@@ -12,18 +12,18 @@ export function DirectoryLoadingSkeleton() {
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-[88px] rounded-xl" />
+          <Skeleton key={i} className="h-[88px] rounded-[var(--dg-radius-md)]" />
         ))}
       </div>
 
       {/* Search */}
-      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-[var(--dg-radius-sm)]" />
 
       {/* Tabs */}
       <Skeleton className="h-8 w-80" />
 
       {/* Table */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="rounded-[var(--dg-radius-md)] border border-border overflow-hidden">
         {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
