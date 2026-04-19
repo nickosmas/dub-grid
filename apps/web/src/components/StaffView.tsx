@@ -1,0 +1,398 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { type ReactNode, type WheelEvent, useCallback, useMemo, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
+import {
+  useSetMobileSubNav,
+  type SubNavItem,
+} from "@/components/MobileSubNavContext";
+import { useMediaQuery, MOBILE } from "@/hooks";
+import type {
+  AbsenceType,
+  Department,
+  Employee,
+  FocusArea,
+  NamedItem,
+  ShiftCode,
+  ShiftDisplayMode,
+} from "@/types";
+import OrgActivityLog from "@/components/settings/ActivityLog";
+import UserManagementSettings from "@/components/settings/UserManagement";
+import { MembersSection } from "@/components/staff/MembersSection";
+import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
+
+const EMPTY_CODE_MAP = new Map<number, string>();
+
+const MEMBERS_ICON = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+const USER_MANAGEMENT_ICON = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const ACTIVITY_ICON = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 8v4l3 3" />
+    <circle cx="12" cy="12" r="10" />
+  </svg>
+);
+
+const CALENDAR_ICON = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
+type StaffSection = "directory" | "access" | "activity" | "recurring-schedule";
+
+interface StaffViewProps {
+  employees: Employee[];
+  benchedEmployees?: Employee[];
+  terminatedEmployees?: Employee[];
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
+  onSave: (emp: Employee) => void;
+  onDelete: (empId: string) => void;
+  onBench: (empId: string, note?: string) => void;
+  onActivate: (empId: string) => void;
+  onAdd: () => void;
+  orgId?: string;
+  shiftCodes?: ShiftCode[];
+  shiftCodeMap?: Map<number, string>;
+  absenceTypes?: AbsenceType[];
+  departments?: Department[];
+  departmentLabel?: string;
+  canEditShifts?: boolean;
+  canViewRecurringShifts?: boolean;
+  canManageRecurringShifts?: boolean;
+  canViewEmployeeDetails?: boolean;
+  canManageEmployees?: boolean;
+  isSuperAdmin?: boolean;
+  isGridmaster?: boolean;
+  focusAreaLabel?: string;
+  certificationLabel?: string;
+  roleLabel?: string;
+  orgName?: string;
+  shiftDisplayMode?: ShiftDisplayMode;
+  setupIncomplete?: boolean;
+}
+
+export default function StaffView({
+  employees,
+  benchedEmployees = [],
+  terminatedEmployees = [],
+  focusAreas,
+  certifications,
+  roles,
+  onSave,
+  onDelete,
+  onBench,
+  onActivate,
+  onAdd,
+  orgId,
+  shiftCodes,
+  shiftCodeMap,
+  absenceTypes,
+  departments: departmentsProp = [],
+  departmentLabel: departmentLabelProp = "Department",
+  canViewRecurringShifts,
+  canManageRecurringShifts,
+  canViewEmployeeDetails,
+  canManageEmployees,
+  isSuperAdmin = false,
+  isGridmaster = false,
+  focusAreaLabel = "Focus Areas",
+  certificationLabel = "Certifications",
+  roleLabel = "Roles",
+  orgName,
+  shiftDisplayMode = "code",
+}: StaffViewProps) {
+  const searchParams = useSearchParams();
+  const isMobile = useMediaQuery(MOBILE);
+  const { user } = useAuth();
+
+  const allowedSections: StaffSection[] = [
+    "directory",
+    ...((isSuperAdmin || isGridmaster) ? ["access" as const] : []),
+    ...(orgId && canViewRecurringShifts ? ["recurring-schedule" as const] : []),
+    ...(isSuperAdmin ? ["activity" as const] : []),
+  ];
+  const sectionParam = searchParams.get("section") as StaffSection | null;
+  const resolvedSection =
+    sectionParam === ("members" as string)
+      ? ("directory" as StaffSection)
+      : sectionParam === ("users" as string)
+        ? ("access" as StaffSection)
+        : sectionParam;
+  const activeSection: StaffSection =
+    resolvedSection && allowedSections.includes(resolvedSection)
+      ? resolvedSection
+      : "directory";
+
+  const links: { id: StaffSection; label: string; icon: ReactNode }[] = useMemo(
+    () => [
+      { id: "directory", label: "Directory", icon: MEMBERS_ICON },
+      ...((isSuperAdmin || isGridmaster)
+        ? [{ id: "access" as StaffSection, label: "User Access", icon: USER_MANAGEMENT_ICON }]
+        : []),
+      ...(orgId && canViewRecurringShifts
+        ? [
+            {
+              id: "recurring-schedule" as StaffSection,
+              label: "Recurring Shifts",
+              icon: CALENDAR_ICON,
+            },
+          ]
+        : []),
+      ...(isSuperAdmin
+        ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: ACTIVITY_ICON }]
+        : []),
+    ],
+    [canViewRecurringShifts, isGridmaster, isSuperAdmin, orgId],
+  );
+
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dg-sidebar-manual-collapse") !== "true";
+  });
+
+  const handleSidebarOpenChange = useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    localStorage.setItem("dg-sidebar-manual-collapse", String(!open));
+  }, []);
+
+  const subNavItems: SubNavItem[] = useMemo(
+    () =>
+      links.map((link) => ({
+        id: link.id,
+        label: link.label,
+        icon: link.icon,
+        href: link.id === "directory" ? "/people" : `/people?section=${link.id}`,
+        active: activeSection === link.id,
+      })),
+    [activeSection, links],
+  );
+  useSetMobileSubNav(subNavItems);
+
+  return (
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+      style={{ minHeight: "unset" }}
+    >
+      {!isMobile && (
+        <Sidebar
+          collapsible="icon"
+          className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
+          style={{
+            top: "var(--app-shell-header-h, 56px)",
+            height: "calc(100dvh - var(--app-shell-header-h, 56px))",
+          }}
+          onWheel={(event: WheelEvent) => event.preventDefault()}
+        >
+          <SidebarContent className="pt-4">
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {links.map((link) => (
+                    <SidebarMenuItem key={link.id}>
+                      <SidebarMenuButton
+                        render={
+                          <Link
+                            href={
+                              link.id === "directory"
+                                ? "/people"
+                                : `/people?section=${link.id}`
+                            }
+                            replace
+                          />
+                        }
+                        isActive={activeSection === link.id}
+                        tooltip={link.label}
+                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)]"
+                      >
+                        <span
+                          className={
+                            activeSection === link.id
+                              ? "flex shrink-0 items-center justify-center text-[var(--color-brand)] transition-colors"
+                              : "flex shrink-0 items-center justify-center text-[var(--color-text-faint)] transition-colors"
+                          }
+                        >
+                          {link.icon}
+                        </span>
+                        <span className="font-semibold">{link.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => handleSidebarOpenChange(!sidebarOpen)}
+                  tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
+                  className="h-9 text-[var(--color-text-faint)] transition-all duration-150 ease-in-out hover:text-black"
+                >
+                  <span className="flex shrink-0 items-center justify-center">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        transform: sidebarOpen ? "rotate(180deg)" : "none",
+                        transition: "transform 150ms ease",
+                      }}
+                    >
+                      <polyline points="13 17 18 12 13 7" />
+                      <polyline points="6 17 11 12 6 7" />
+                    </svg>
+                  </span>
+                  <span className="ml-2 font-semibold">Collapse Menu</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
+      )}
+
+      <SidebarInset className="dg-page-enter bg-[var(--color-bg)]">
+        {activeSection === "directory" && (
+          <MembersSection
+            employees={employees}
+            benchedEmployees={benchedEmployees}
+            terminatedEmployees={terminatedEmployees}
+            focusAreas={focusAreas}
+            certifications={certifications}
+            roles={roles}
+            onSave={onSave}
+            onDelete={onDelete}
+            onBench={onBench}
+            onActivate={onActivate}
+            onAdd={onAdd}
+            canViewEmployeeDetails={canViewEmployeeDetails ?? false}
+            canManageEmployees={canManageEmployees ?? false}
+            focusAreaLabel={focusAreaLabel}
+            certificationLabel={certificationLabel}
+            roleLabel={roleLabel}
+            orgId={orgId}
+            orgName={orgName}
+            isSuperAdmin={isSuperAdmin}
+            isGridmaster={isGridmaster}
+            departments={departmentsProp}
+            departmentLabel={departmentLabelProp}
+          />
+        )}
+
+        {activeSection !== "directory" && (
+          <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+            {activeSection === "access" &&
+              (isSuperAdmin || isGridmaster) &&
+              orgId && (
+                <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
+                  <UserManagementSettings
+                    orgId={orgId}
+                    isSuperAdmin={isSuperAdmin}
+                    departments={departmentsProp as unknown as Department[]}
+                  />
+                </div>
+              )}
+
+            {activeSection === "activity" && isSuperAdmin && orgId && (
+              <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
+                <OrgActivityLog orgId={orgId} />
+              </div>
+            )}
+
+            {activeSection === "recurring-schedule" &&
+              orgId &&
+              canViewRecurringShifts && (
+                <RecurringScheduleSection
+                  employees={employees}
+                  orgId={orgId}
+                  currentUserId={user?.id ?? null}
+                  shiftCodes={shiftCodes ?? []}
+                  shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
+                  canManage={canManageRecurringShifts ?? false}
+                  focusAreas={focusAreas}
+                  certifications={certifications}
+                  absenceTypes={absenceTypes}
+                  shiftDisplayMode={shiftDisplayMode}
+                />
+              )}
+          </div>
+        )}
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

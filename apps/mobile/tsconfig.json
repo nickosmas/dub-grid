@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@dubgrid/contracts": ["../../packages/contracts/src/index.ts"],
+      "@dubgrid/contracts/*": ["../../packages/contracts/src/*"]
+    },
+    "jsx": "react-jsx",
+    "types": ["expo-router/types", "@testing-library/jest-dom"]
+  },
+  "include": ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"]
+}

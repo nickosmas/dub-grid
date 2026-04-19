@@ -51,6 +51,12 @@ Quarterly rotation schedule. Each secret has a specific rotation procedure.
 4. Delete the old token
 5. Verify: run a build and confirm source maps upload
 
+### TURBO_TOKEN / TURBO_TEAM
+1. In Vercel, create or rotate the Turbo access token for the team that owns the remote cache
+2. Update GitHub Actions secrets: `TURBO_TOKEN` and `TURBO_TEAM`
+3. Update local shell or secret manager values used for Turbo commands
+4. Verify: run `npm run type-check` twice and confirm the second run reports cache hits
+
 ### NEXT_PUBLIC_POSTHOG_KEY / POSTHOG_PERSONAL_API_KEY
 1. Go to PostHog > Project Settings > API Keys
 2. Regenerate the key

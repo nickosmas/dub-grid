@@ -594,6 +594,23 @@ CREATE TABLE public.notification_preferences (
 COMMENT ON TABLE public.notification_preferences IS 'Per-user notification channel preferences (in_app/email toggles per category)';
 
 
+-- ── mobile_device_tokens ────────────────────────────────────────────────────
+
+CREATE TABLE public.mobile_device_tokens (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL,
+  org_id          UUID NOT NULL,
+  platform        TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+  expo_push_token TEXT NOT NULL UNIQUE,
+  last_seen_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  disabled_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.mobile_device_tokens IS 'Expo push tokens for native iOS/Android devices. One row per app install token.';
+
+
 -- ── user_sessions ─────────────────────────────────────────────────────────────
 
 CREATE TABLE public.user_sessions (
@@ -919,6 +936,11 @@ ALTER TABLE public.notifications
 ALTER TABLE public.notifications
   ADD CONSTRAINT notifications_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
+-- mobile_device_tokens
+ALTER TABLE public.mobile_device_tokens
+  ADD CONSTRAINT mobile_device_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD CONSTRAINT mobile_device_tokens_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
 -- user_sessions
 ALTER TABLE public.user_sessions
   ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
@@ -1102,6 +1124,10 @@ CREATE INDEX idx_impersonation_sessions_history ON public.impersonation_sessions
 CREATE INDEX idx_notifications_user_unread ON public.notifications(user_id, created_at DESC) WHERE read_at IS NULL;
 CREATE INDEX idx_notifications_user_all ON public.notifications(user_id, created_at DESC);
 CREATE INDEX idx_notifications_user_org ON public.notifications(user_id, org_id, created_at DESC);
+
+-- mobile_device_tokens
+CREATE INDEX idx_mobile_device_tokens_user_org ON public.mobile_device_tokens(user_id, org_id);
+CREATE INDEX idx_mobile_device_tokens_active ON public.mobile_device_tokens(org_id, user_id) WHERE disabled_at IS NULL;
 
 -- user_sessions
 CREATE INDEX idx_user_sessions_user_last_active ON public.user_sessions(user_id, last_active_at DESC);

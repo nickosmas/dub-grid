@@ -422,6 +422,10 @@ CREATE TRIGGER trigger_invitations_updated_at
   BEFORE UPDATE ON public.invitations
   FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
+CREATE TRIGGER trigger_mobile_device_tokens_updated_at
+  BEFORE UPDATE ON public.mobile_device_tokens
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
 -- Cascade triggers
 CREATE TRIGGER trg_certifications_delete_cascade
   AFTER DELETE ON public.certifications

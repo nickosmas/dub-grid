@@ -1,0 +1,95 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const requireMobileAuth = vi.fn();
+const fetchMobileScheduleEntries = vi.fn();
+const resolveMobileDateRange = vi.fn();
+
+vi.mock("@/features/mobile/server", () => ({
+  requireMobileAuth,
+  fetchMobileScheduleEntries,
+  resolveMobileDateRange,
+}));
+
+describe("mobile org-schedule route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveMobileDateRange.mockReturnValue({
+      startDate: "2026-04-16",
+      endDate: "2026-04-22",
+    });
+  });
+
+  it("rejects users who cannot view the org schedule", async () => {
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: {
+        id: "org-1",
+      },
+      permissions: {
+        level: 1,
+        canApproveShiftRequests: false,
+        canManageEmployees: false,
+      },
+      serviceClient: {},
+    });
+
+    const { GET } = await import("./org-schedule");
+    const response = await GET({
+      nextUrl: new URL("http://localhost/api/mobile/v1/org/schedule"),
+    } as never);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns published entries for authorized managers", async () => {
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: {
+        id: "org-1",
+      },
+      permissions: {
+        level: 2,
+        canApproveShiftRequests: true,
+        canManageEmployees: false,
+      },
+      serviceClient: {},
+    });
+    fetchMobileScheduleEntries.mockResolvedValue([
+      {
+        employeeId: "00000000-0000-0000-0000-000000000001",
+        employeeName: "Mina Diaz",
+        date: "2026-04-16",
+        shiftCodeIds: [1],
+        shiftLabel: "Day",
+        shiftCodeLabel: "D",
+        shiftName: "Day Shift",
+        absenceTypeId: null,
+        focusAreaId: null,
+        focusAreaName: null,
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        customStartTime: null,
+        customEndTime: null,
+        publishedAt: "2026-04-15T18:30:00.000Z",
+        publishedByName: "Mina Diaz",
+      },
+    ]);
+
+    const { GET } = await import("./org-schedule");
+    const response = await GET({
+      nextUrl: new URL("http://localhost/api/mobile/v1/org/schedule"),
+    } as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith({}, {
+      orgId: "org-1",
+      startDate: "2026-04-16",
+      endDate: "2026-04-22",
+    });
+    expect(payload.entries).toHaveLength(1);
+    expect(payload.range).toEqual({
+      startDate: "2026-04-16",
+      endDate: "2026-04-22",
+    });
+  });
+});

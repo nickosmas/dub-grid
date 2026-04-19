@@ -30,6 +30,7 @@ ALTER TABLE public.role_change_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.jwt_refresh_locks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.impersonation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mobile_device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.publish_history ENABLE ROW LEVEL SECURITY;
@@ -867,7 +868,40 @@ CREATE POLICY "notifications_delete_blocked"
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- cookie_consents
+-- 17. MOBILE DEVICE TOKENS
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE POLICY "gridmaster_all_mobile_device_tokens"
+  ON public.mobile_device_tokens FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "own_mobile_device_tokens_select"
+  ON public.mobile_device_tokens FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "own_mobile_device_tokens_insert"
+  ON public.mobile_device_tokens FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+  );
+
+CREATE POLICY "own_mobile_device_tokens_update"
+  ON public.mobile_device_tokens FOR UPDATE TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (
+    user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+  );
+
+CREATE POLICY "own_mobile_device_tokens_delete"
+  ON public.mobile_device_tokens FOR DELETE TO authenticated
+  USING (user_id = auth.uid());
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 18. cookie_consents
 -- ══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE public.cookie_consents ENABLE ROW LEVEL SECURITY;

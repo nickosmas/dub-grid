@@ -40,8 +40,8 @@ DubGrid uses a two-tier consent model: **essential** (always on) and **analytics
 
 ### Components
 
-- **`src/components/CookieConsent.tsx`** — Consent banner + settings button
-- **`src/app/api/consent/route.ts`** — Server-side consent recording endpoint
+- **`apps/web/src/components/CookieConsent.tsx`** — Consent banner + settings button
+- **`apps/web/src/app/api/consent/route.ts`** — Server-side consent recording endpoint
 - **`cookie_consents` table** — Append-only audit trail in the database
 
 ### Cookie Format
@@ -110,7 +110,7 @@ RLS policies:
 
 ### Version Invalidation
 
-When the cookie or privacy policy changes, bump `CONSENT_VERSION` in `src/components/CookieConsent.tsx`:
+When the cookie or privacy policy changes, bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx`:
 
 ```typescript
 // IMPORTANT: Bump this version when cookies, analytics providers, or the
@@ -128,7 +128,7 @@ Both analytics services are **blocked by default** and only initialized after ex
 
 ### PostHog
 
-**Component:** `src/components/PostHogProvider.tsx`
+**Component:** `apps/web/src/components/PostHogProvider.tsx`
 
 ```
 PostHogProvider mounts
@@ -143,15 +143,15 @@ PostHogProvider mounts
   → On auth change: identifyUser(userId, {email}) or resetPostHog()
 ```
 
-**Configuration:** `src/lib/posthog.ts`
+**Configuration:** `apps/web/src/lib/posthog.ts`
 - Env vars: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`
 - Exports: `initPostHog()`, `identifyUser()`, `resetPostHog()`, `captureEvent()`, `getFeatureFlag()`
 
-**Server-side:** No dedicated server-side PostHog wrapper is currently used in app code. Analytics initialization and feature flag reads run through the client-side helpers in `src/lib/posthog.ts`.
+**Server-side:** No dedicated server-side PostHog wrapper is currently used in app code. Analytics initialization and feature flag reads run through the client-side helpers in `apps/web/src/lib/posthog.ts`.
 
 ### Vercel Analytics
 
-**Component:** `src/components/ConsentGatedAnalytics.tsx`
+**Component:** `apps/web/src/components/ConsentGatedAnalytics.tsx`
 
 ```typescript
 export default function ConsentGatedAnalytics() {
@@ -167,11 +167,11 @@ Uses a lazy `useState` initializer to read consent once on mount. No consent = n
 
 Sentry runs as an essential/operational service for error monitoring. It is **not** gated behind consent because it's necessary for application reliability.
 
-**Key safety measure:** `sendDefaultPii: false` in both `src/instrumentation-client.ts` and `sentry.client.config.ts`. No emails, IPs, or user identifiers are sent to Sentry — only stack traces and request metadata.
+**Key safety measure:** `sendDefaultPii: false` in `apps/web/src/instrumentation-client.ts`. No emails, IPs, or user identifiers are sent to Sentry — only stack traces and request metadata.
 
 ### Layout Integration
 
-All providers are composed in `src/app/layout.tsx`:
+All providers are composed in `apps/web/src/app/layout.tsx`:
 
 ```tsx
 <body>
@@ -216,7 +216,7 @@ The hook also updates `profiles.last_sign_in_at` (debounced to 5-minute interval
 
 ### Middleware Processing
 
-`middleware.ts` processes auth cookies on every request:
+`apps/web/middleware.ts` processes auth cookies on every request:
 
 1. Creates a Supabase server client from request cookies
 2. Calls `supabase.auth.getSession()` to read the session
@@ -239,7 +239,7 @@ Allows gridmasters to view the app as another user for support/debugging purpose
 - **Name:** `dubgrid-impersonation`
 - **Flags:** `path=/; SameSite=Lax; Secure`
 - **Duration:** Dynamic `max-age` based on session expiry (up to 30 minutes)
-- **Library:** `src/lib/impersonation.ts`
+- **Library:** `apps/web/src/lib/impersonation.ts`
 
 ### Payload
 
@@ -284,7 +284,7 @@ A simple preference cookie for UI state.
 - **Value:** `true` or `false`
 - **Flags:** `path=/; max-age=604800; SameSite=Lax; Secure`
 - **Duration:** 7 days
-- **Set by:** `src/components/ui/sidebar.tsx` when the user toggles the sidebar
+- **Set by:** `apps/web/src/components/ui/sidebar.tsx` when the user toggles the sidebar
 
 ---
 
@@ -307,7 +307,7 @@ A simple preference cookie for UI state.
 
 ### Security Headers
 
-`next.config.ts` sets security headers on all responses:
+`apps/web/next.config.ts` sets security headers on all responses:
 - `X-Frame-Options: SAMEORIGIN`
 - `X-Content-Type-Options: nosniff`
 - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
@@ -325,7 +325,7 @@ Every consent decision is recorded in the `cookie_consents` table (see [Consent 
 ### Data Export (Article 20 — Right to Portability)
 
 **Endpoint:** `GET /api/auth/data-export`
-**File:** `src/app/api/auth/data-export/route.ts`
+**File:** `apps/web/src/app/api/auth/data-export/route.ts`
 
 Downloads all user data as a JSON file:
 
@@ -396,8 +396,8 @@ Inactive accounts are handled by two SQL functions:
 
 ### Privacy & Cookie Policy Pages
 
-- **Privacy Policy:** `src/app/privacy/page.tsx` — discloses all data collection, third-party processors (Supabase, Vercel, PostHog, Sentry, Stripe), and user rights
-- **Cookie Policy:** `src/app/cookie-policy/page.tsx` — full cookie inventory with names, purposes, durations, and categories (essential vs analytics)
+- **Privacy Policy:** `apps/web/src/app/privacy/page.tsx` — discloses all data collection, third-party processors (Supabase, Vercel, PostHog, Sentry, Stripe), and user rights
+- **Cookie Policy:** `apps/web/src/app/cookie-policy/page.tsx` — full cookie inventory with names, purposes, durations, and categories (essential vs analytics)
 
 Both are linked from the consent banner.
 
@@ -433,7 +433,7 @@ Sign in ───────────────────────►
   ◄─── sb-*-auth-token cookies   custom_access_token_hook ─────► UPDATE profiles.last_sign_in_at
                                   sets JWT claims
 
-Navigate ──────────────────────► middleware.ts
+Navigate ──────────────────────► apps/web/middleware.ts
                                   read auth cookie
                                   verify JWT
                                   read impersonation cookie
@@ -455,7 +455,7 @@ Data export ───────────────────► GET /ap
 
 ### When to bump consent version
 
-Bump `CONSENT_VERSION` in `src/components/CookieConsent.tsx` when:
+Bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx` when:
 - Adding or removing cookies
 - Adding or removing analytics/tracking services
 - Changing what data a cookie stores
@@ -464,15 +464,15 @@ Bump `CONSENT_VERSION` in `src/components/CookieConsent.tsx` when:
 ### Adding a new cookie
 
 1. Set the cookie with `SameSite=Lax; Secure` flags
-2. Add it to the cookie inventory table in `src/app/cookie-policy/page.tsx`
+2. Add it to the cookie inventory table in `apps/web/src/app/cookie-policy/page.tsx`
 3. If it's non-essential, gate it behind `getCookieConsent()?.analytics`
 4. Bump `CONSENT_VERSION`
 
 ### Adding a new third-party service
 
 1. If it sets cookies or collects data, gate it behind analytics consent
-2. Add it to the "Third-Party Data Processors" section in `src/app/privacy/page.tsx`
-3. Add it to the appropriate table in `src/app/cookie-policy/page.tsx`
+2. Add it to the "Third-Party Data Processors" section in `apps/web/src/app/privacy/page.tsx`
+3. Add it to the appropriate table in `apps/web/src/app/cookie-policy/page.tsx`
 4. Bump `CONSENT_VERSION`
 5. If it processes data server-side, execute a DPA with the provider
 
@@ -488,21 +488,22 @@ Bump `CONSENT_VERSION` in `src/components/CookieConsent.tsx` when:
 
 | File | Purpose |
 |------|---------|
-| `src/components/CookieConsent.tsx` | Consent banner, cookie read/write, version check, server sync |
-| `src/components/ConsentGatedAnalytics.tsx` | Wraps `<Analytics />` behind consent |
-| `src/components/PostHogProvider.tsx` | PostHog initialization gated on consent |
-| `src/app/api/consent/route.ts` | Records consent to DB (POST) |
-| `src/app/api/auth/data-export/route.ts` | GDPR data export (GET) |
-| `src/app/api/auth/gdpr-erase/route.ts` | GDPR data erasure (POST) |
-| `src/app/api/auth/delete-account/route.ts` | Account deletion (DELETE) |
-| `src/lib/posthog.ts` | PostHog client initialization and helpers |
-| `src/lib/impersonation.ts` | Impersonation cookie utilities |
-| `src/components/ui/sidebar.tsx` | Sidebar state cookie |
-| `src/app/cookie-policy/page.tsx` | Public cookie policy page |
-| `src/app/privacy/page.tsx` | Public privacy policy page |
-| `src/instrumentation-client.ts` | Sentry client config (sendDefaultPii: false) |
-| `sentry.client.config.ts` | Legacy Sentry client config (aligned settings) |
+| `apps/web/src/components/CookieConsent.tsx` | Consent banner, cookie read/write, version check, server sync |
+| `apps/web/src/components/ConsentGatedAnalytics.tsx` | Wraps `<Analytics />` behind consent |
+| `apps/web/src/components/PostHogProvider.tsx` | PostHog initialization gated on consent |
+| `apps/web/src/app/api/consent/route.ts` | Records consent to DB (POST) |
+| `apps/web/src/app/api/auth/data-export/route.ts` | GDPR data export (GET) |
+| `apps/web/src/app/api/auth/gdpr-erase/route.ts` | GDPR data erasure (POST) |
+| `apps/web/src/app/api/auth/delete-account/route.ts` | Account deletion (DELETE) |
+| `apps/web/src/lib/posthog.ts` | PostHog client initialization and helpers |
+| `apps/web/src/lib/impersonation.ts` | Impersonation cookie utilities |
+| `apps/web/src/components/ui/sidebar.tsx` | Sidebar state cookie |
+| `apps/web/src/app/cookie-policy/page.tsx` | Public cookie policy page |
+| `apps/web/src/app/privacy/page.tsx` | Public privacy policy page |
+| `apps/web/src/instrumentation-client.ts` | Sentry client config (sendDefaultPii: false) |
+| `apps/web/sentry.server.config.ts` | Server-side Sentry bootstrap |
+| `apps/web/sentry.edge.config.ts` | Edge runtime Sentry bootstrap |
 | `supabase/migrations/001_schema.sql` | cookie_consents + profiles schema |
 | `supabase/migrations/002_functions_triggers.sql` | Auth hook, flag/purge functions |
 | `supabase/migrations/003_rls_policies.sql` | cookie_consents RLS policies |
-| `middleware.ts` | Auth cookie verification, impersonation handling, RBAC |
+| `apps/web/middleware.ts` | Auth cookie verification, impersonation handling, RBAC |

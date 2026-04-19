@@ -31,7 +31,7 @@ If instructions conflict, follow the project-specific constraints first.
 
 - Migrations: all schema changes live in exactly 4 files (`001` through `004`).
   Do not create new migration files.
-- Routes: use simple route files such as `src/app/staff/page.tsx`, not catch-all
+- Routes: use simple route files such as `apps/web/src/app/staff/page.tsx`, not catch-all
   routes. Catch-all routes break static prerendering on Vercel.
 - Naming: `gridmaster` is the platform role and route (`/gridmaster`).
   `admin` is the organization role. Do not call the gridmaster portal the
@@ -40,7 +40,7 @@ If instructions conflict, follow the project-specific constraints first.
   and Testing Library.
 - Cookie consent: when adding or removing cookies, changing analytics
   providers, or updating cookie/privacy policy text, bump `CONSENT_VERSION` in
-  `src/components/CookieConsent.tsx`.
+  `apps/web/src/components/CookieConsent.tsx`.
 
 ## React Guidance
 
@@ -108,7 +108,7 @@ If instructions conflict, follow the project-specific constraints first.
   and maintain a strict CSP.
 - Do not expose mutating behavior through GET handlers. For mutating Route
   Handlers, validate `Origin` or use CSRF protection.
-- Configure strong security headers in `next.config.ts`.
+- Configure strong security headers in `apps/web/next.config.ts`.
 - Rate-limit all public or side-effectful endpoints, especially auth, contact,
   email, and webhook-style flows.
 - Validate uploaded files by content, enforce size limits, and store them in
