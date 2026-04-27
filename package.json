@@ -38,8 +38,16 @@
     "gen:types": "npx supabase gen types --lang=typescript --local > apps/web/src/lib/database.types.ts"
   },
   "overrides": {
-    "axios": "1.14.0",
+    "@hono/node-server": "1.19.14",
+    "@xmldom/xmldom": "0.8.13",
+    "axios": "1.15.2",
+    "dompurify": "3.4.1",
+    "follow-redirects": "1.16.0",
+    "hono": "4.12.15",
+    "postcss": "8.5.12",
+    "protobufjs": "7.5.5",
     "react-native": "0.81.5",
+    "svix": "1.92.2",
     "tar": "^7.5.13",
     "tmp": ">=0.2.3"
   },
