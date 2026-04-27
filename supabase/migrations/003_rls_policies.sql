@@ -18,9 +18,11 @@ ALTER TABLE public.certifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.shift_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.absence_types ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_cells ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_cell_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_cell_segments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.indicator_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts ENABLE ROW LEVEL SECURITY;
@@ -150,7 +152,7 @@ CREATE POLICY "super_admin_delete_memberships"
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 5. STANDARD ORG-SCOPED TABLES (gridmaster ALL + member SELECT + admin CRUD)
 --    Applies to: organization_roles, focus_areas, certifications, employees,
---                shift_categories, shift_codes, schedule_notes,
+--                shift_categories, jobs, schedule_notes,
 --                schedule_draft_sessions
 -- ══════════════════════════════════════════════════════════════════════════════
 
@@ -288,41 +290,40 @@ CREATE POLICY "members_select_shift_categories"
 
 CREATE POLICY "admin_insert_shift_categories"
   ON public.shift_categories FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
 CREATE POLICY "admin_update_shift_categories"
   ON public.shift_categories FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_shift_categories"
   ON public.shift_categories FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
 
--- ── shift_codes ───────────────────────────────────────────────────────────────
+-- ── jobs ─────────────────────────────────────────────────────────────────────
 
-CREATE POLICY "gridmaster_all_shift_codes"
-  ON public.shift_codes FOR ALL TO authenticated
+CREATE POLICY "gridmaster_all_jobs"
+  ON public.jobs FOR ALL TO authenticated
   USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
 
-CREATE POLICY "members_select_shift_codes"
-  ON public.shift_codes FOR SELECT TO authenticated
+CREATE POLICY "members_select_jobs"
+  ON public.jobs FOR SELECT TO authenticated
   USING (org_id = public.caller_org_id());
 
-CREATE POLICY "admin_insert_shift_codes"
-  ON public.shift_codes FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+CREATE POLICY "admin_insert_jobs"
+  ON public.jobs FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
-CREATE POLICY "admin_update_shift_codes"
-  ON public.shift_codes FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'))
+CREATE POLICY "admin_update_jobs"
+  ON public.jobs FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'))
   WITH CHECK (org_id = public.caller_org_id());
 
-CREATE POLICY "admin_delete_shift_codes"
-  ON public.shift_codes FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
-
+CREATE POLICY "admin_delete_jobs"
+  ON public.jobs FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
 -- ── absence_types ──────────────────────────────────────────────────────────────
 
@@ -336,16 +337,16 @@ CREATE POLICY "members_select_absence_types"
 
 CREATE POLICY "admin_insert_absence_types"
   ON public.absence_types FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
 CREATE POLICY "admin_update_absence_types"
   ON public.absence_types FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'))
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'))
   WITH CHECK (org_id = public.caller_org_id());
 
 CREATE POLICY "admin_delete_absence_types"
   ON public.absence_types FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageShiftCodes'));
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
 
 -- ── schedule_notes ────────────────────────────────────────────────────────────
@@ -447,68 +448,61 @@ CREATE POLICY "gridmaster_all_publish_history"
 CREATE POLICY "members_select_publish_history"
   ON public.publish_history FOR SELECT TO authenticated
   USING (org_id = public.caller_org_id());
-
-
--- ══════════════════════════════════════════════════════════════════════════════
--- 6. SHIFTS (employee-scoped — uses EXISTS subquery for org check)
--- ══════════════════════════════════════════════════════════════════════════════
-
-CREATE POLICY "gridmaster_all_shifts"
-  ON public.shifts FOR ALL TO authenticated
+CREATE POLICY "gridmaster_all_schedule_cells"
+  ON public.schedule_cells FOR ALL TO authenticated
   USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
 
-CREATE POLICY "members_select_shifts"
-  ON public.shifts FOR SELECT TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.id = shifts.emp_id AND e.org_id = public.caller_org_id()
-    )
-  );
+CREATE POLICY "members_select_schedule_cells"
+  ON public.schedule_cells FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
 
-CREATE POLICY "admin_insert_shifts"
-  ON public.shifts FOR INSERT TO authenticated
-  WITH CHECK (
-    public.check_admin_permission('canEditShifts')
-    AND EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.id = emp_id
-        AND e.org_id = public.caller_org_id()
-        AND e.status = 'active'
-        AND e.archived_at IS NULL
-    )
-  );
-
-CREATE POLICY "admin_update_shifts"
-  ON public.shifts FOR UPDATE TO authenticated
+CREATE POLICY "admin_write_schedule_cells"
+  ON public.schedule_cells FOR ALL TO authenticated
   USING (
-    public.check_admin_permission('canEditShifts')
-    AND EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.id = shifts.emp_id
-        AND e.org_id = public.caller_org_id()
-        AND e.status = 'active'
-        AND e.archived_at IS NULL
-    )
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canEditShifts')
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.id = emp_id
-        AND e.org_id = public.caller_org_id()
-        AND e.status = 'active'
-        AND e.archived_at IS NULL
-    )
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canEditShifts')
   );
 
-CREATE POLICY "admin_delete_shifts"
-  ON public.shifts FOR DELETE TO authenticated
+CREATE POLICY "gridmaster_all_schedule_cell_snapshots"
+  ON public.schedule_cell_snapshots FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_schedule_cell_snapshots"
+  ON public.schedule_cell_snapshots FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_write_schedule_cell_snapshots"
+  ON public.schedule_cell_snapshots FOR ALL TO authenticated
   USING (
-    public.check_admin_permission('canEditShifts')
-    AND EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.id = shifts.emp_id AND e.org_id = public.caller_org_id()
-    )
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canEditShifts')
+  )
+  WITH CHECK (
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canEditShifts')
+  );
+
+CREATE POLICY "gridmaster_all_schedule_cell_segments"
+  ON public.schedule_cell_segments FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_schedule_cell_segments"
+  ON public.schedule_cell_segments FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_write_schedule_cell_segments"
+  ON public.schedule_cell_segments FOR ALL TO authenticated
+  USING (
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canEditShifts')
+  )
+  WITH CHECK (
+    org_id = public.caller_org_id()
+    AND public.check_admin_permission('canEditShifts')
   );
 
 
@@ -760,52 +754,6 @@ CREATE POLICY "admin_delete_coverage_requirements"
   ON public.coverage_requirements FOR DELETE TO authenticated
   USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
 
-
-ALTER TABLE public.coverage_rule_configs ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "gridmaster_all_coverage_rule_configs"
-  ON public.coverage_rule_configs FOR ALL TO authenticated
-  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
-
-CREATE POLICY "members_select_coverage_rule_configs"
-  ON public.coverage_rule_configs FOR SELECT TO authenticated
-  USING (org_id = public.caller_org_id());
-
-CREATE POLICY "admin_insert_coverage_rule_configs"
-  ON public.coverage_rule_configs FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
-
-CREATE POLICY "admin_update_coverage_rule_configs"
-  ON public.coverage_rule_configs FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'))
-  WITH CHECK (org_id = public.caller_org_id());
-
-CREATE POLICY "admin_delete_coverage_rule_configs"
-  ON public.coverage_rule_configs FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
-
-ALTER TABLE public.coverage_rule_config_codes ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "gridmaster_all_coverage_rule_config_codes"
-  ON public.coverage_rule_config_codes FOR ALL TO authenticated
-  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
-
-CREATE POLICY "members_select_coverage_rule_config_codes"
-  ON public.coverage_rule_config_codes FOR SELECT TO authenticated
-  USING (org_id = public.caller_org_id());
-
-CREATE POLICY "admin_insert_coverage_rule_config_codes"
-  ON public.coverage_rule_config_codes FOR INSERT TO authenticated
-  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
-
-CREATE POLICY "admin_update_coverage_rule_config_codes"
-  ON public.coverage_rule_config_codes FOR UPDATE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'))
-  WITH CHECK (org_id = public.caller_org_id());
-
-CREATE POLICY "admin_delete_coverage_rule_config_codes"
-  ON public.coverage_rule_config_codes FOR DELETE TO authenticated
-  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageCoverageRequirements'));
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

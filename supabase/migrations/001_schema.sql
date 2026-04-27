@@ -57,6 +57,7 @@ CREATE TABLE public.organizations (
   shift_display_mode   TEXT DEFAULT 'code'
     CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
   timezone             TEXT NOT NULL DEFAULT 'UTC',
+  pay_period_start_date DATE,
   stripe_customer_id   TEXT UNIQUE,
   subscription_status  TEXT NOT NULL DEFAULT 'trialing',
   trial_ends_at        TIMESTAMPTZ,
@@ -83,6 +84,7 @@ COMMENT ON COLUMN public.organizations.meta_description IS 'Custom SEO meta desc
 COMMENT ON COLUMN public.organizations.theme_config IS 'JSON object containing primary_color, accent_color, etc.';
 COMMENT ON COLUMN public.organizations.landing_page_config IS 'JSON object containing hero_title, features, and pain_points';
 COMMENT ON COLUMN public.organizations.feature_overrides IS 'JSON object of per-org feature flag overrides. Keys are flag names, values are booleans. Checked before PostHog.';
+COMMENT ON COLUMN public.organizations.pay_period_start_date IS 'Optional biweekly pay-period anchor date. When set, the 2-week schedule view aligns to 14-day periods starting on this date.';
 
 
 -- ── profiles ──────────────────────────────────────────────────────────────────
@@ -150,6 +152,7 @@ CREATE TABLE public.organization_roles (
   department_id BIGINT,
   name          TEXT NOT NULL,
   abbr          TEXT NOT NULL,
+  is_schedule_role BOOLEAN NOT NULL DEFAULT true,
   sort_order    INTEGER NOT NULL DEFAULT 0,
   archived_at   TIMESTAMPTZ
 );
@@ -162,6 +165,7 @@ CREATE TABLE public.focus_areas (
   org_id         UUID NOT NULL,
   department_id  BIGINT,
   name           TEXT NOT NULL,
+  color          TEXT NOT NULL DEFAULT '#E2E8F0',
   sort_order     INTEGER NOT NULL DEFAULT 0,
   archived_at    TIMESTAMPTZ,
   created_by     UUID,
@@ -249,9 +253,10 @@ CREATE TABLE public.shift_categories (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   org_id        UUID NOT NULL,
   name          TEXT NOT NULL,
-  color         TEXT NOT NULL DEFAULT '#F8FAFC',
+  abbr          TEXT,
   start_time    TIME,
   end_time      TIME,
+  color         TEXT NOT NULL DEFAULT '#E2E8F0',
   sort_order    INTEGER NOT NULL DEFAULT 0,
   focus_area_id BIGINT,
   break_minutes INTEGER DEFAULT NULL,
@@ -259,34 +264,43 @@ CREATE TABLE public.shift_categories (
 );
 
 
--- ── shift_codes ───────────────────────────────────────────────────────────────
+-- ── jobs ─────────────────────────────────────────────────────────────────────
 
-CREATE TABLE public.shift_codes (
+CREATE TABLE public.jobs (
   id                         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   org_id                     UUID NOT NULL,
-  label                      TEXT NOT NULL,
   name                       TEXT NOT NULL,
-  color                      TEXT NOT NULL DEFAULT '#F8FAFC',
-  border_color               TEXT NOT NULL DEFAULT '#CBD5E1',
-  text_color                 TEXT NOT NULL DEFAULT '#64748B',
-  is_general                 BOOLEAN NOT NULL DEFAULT false,
-  sort_order                 INTEGER NOT NULL DEFAULT 0,
+  abbr                       TEXT NOT NULL,
+  show_on_grid               BOOLEAN NOT NULL DEFAULT true,
+  assignment_mode            TEXT NOT NULL DEFAULT 'with_shift',
+  eligibility_mode           TEXT NOT NULL DEFAULT 'and',
+  focus_area_ids             BIGINT[] NOT NULL DEFAULT '{}',
+  department_ids             BIGINT[] NOT NULL DEFAULT '{}',
+  applicable_shift_ids       BIGINT[] NOT NULL DEFAULT '{}',
+  eligible_role_ids          BIGINT[] NOT NULL DEFAULT '{}',
+  required_certification_ids BIGINT[] NOT NULL DEFAULT '{}',
+  color                      TEXT NOT NULL DEFAULT '#E2E8F0',
+  border_color               TEXT NOT NULL DEFAULT 'transparent',
+  text_color                 TEXT NOT NULL DEFAULT '#1E293B',
+  shift_time_overrides       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  shift_color_overrides      JSONB NOT NULL DEFAULT '{}'::jsonb,
   default_start_time         TIME,
   default_end_time           TIME,
   default_duration_hours     SMALLINT,
   default_duration_minutes   SMALLINT,
-  category_id                BIGINT,
-  focus_area_id              BIGINT,
-  required_certification_ids BIGINT[] NOT NULL DEFAULT '{}',
+  sort_order                 INTEGER NOT NULL DEFAULT 0,
+  system_key                 TEXT,
   archived_at                TIMESTAMPTZ,
   created_by                 UUID,
   updated_by                 UUID,
   created_at                 TIMESTAMPTZ DEFAULT now(),
-  updated_at                 TIMESTAMPTZ DEFAULT now()
+  updated_at                 TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT jobs_assignment_mode_check CHECK (assignment_mode IN ('with_shift', 'shiftless', 'both')),
+  CONSTRAINT jobs_eligibility_mode_check CHECK (eligibility_mode IN ('and', 'or'))
 );
 
-ALTER TABLE ONLY public.shift_codes REPLICA IDENTITY FULL;
-
+ALTER TABLE ONLY public.jobs REPLICA IDENTITY FULL;
 
 -- ── absence_types ───────────────────────────────────────────────────────────
 
@@ -309,63 +323,97 @@ CREATE TABLE public.absence_types (
 ALTER TABLE ONLY public.absence_types REPLICA IDENTITY FULL;
 
 
--- ── shifts ────────────────────────────────────────────────────────────────────
+-- ── schedule_cells ───────────────────────────────────────────────────────────
 
-CREATE TABLE public.shifts (
-  emp_id                   UUID NOT NULL,
-  date                     DATE NOT NULL,
-  org_id                   UUID,
-  user_id                  UUID,
-  version                  BIGINT NOT NULL DEFAULT 0,
-  series_id                UUID,
-  from_recurring           BOOLEAN NOT NULL DEFAULT false,
-  draft_custom_start_time      TEXT,
-  draft_custom_end_time        TEXT,
-  published_custom_start_time  TEXT,
-  published_custom_end_time    TEXT,
-  draft_shift_code_ids     BIGINT[] NOT NULL DEFAULT '{}',
-  published_shift_code_ids BIGINT[] NOT NULL DEFAULT '{}',
-  draft_absence_type_id    BIGINT,
-  published_absence_type_id BIGINT,
-  draft_is_delete          BOOLEAN NOT NULL DEFAULT false,
-  focus_area_id            BIGINT,
-  created_by               UUID,
-  updated_by               UUID,
-  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+CREATE TABLE public.schedule_cells (
+  id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  emp_id                     UUID NOT NULL,
+  date                       DATE NOT NULL,
+  org_id                     UUID NOT NULL,
+  focus_area_id              BIGINT,
+  version                    BIGINT NOT NULL DEFAULT 0,
+  series_id                  UUID,
+  from_recurring             BOOLEAN NOT NULL DEFAULT false,
+  created_by                 UUID,
+  updated_by                 UUID,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  PRIMARY KEY (emp_id, date)
+  UNIQUE (emp_id, date)
 );
 
-ALTER TABLE ONLY public.shifts REPLICA IDENTITY FULL;
+ALTER TABLE ONLY public.schedule_cells REPLICA IDENTITY FULL;
 
--- Shift data integrity constraints
-ALTER TABLE public.shifts ADD CONSTRAINT valid_draft_shift_times
+
+-- ── schedule_cell_snapshots ──────────────────────────────────────────────────
+
+CREATE TABLE public.schedule_cell_snapshots (
+  id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  cell_id                    UUID NOT NULL,
+  org_id                     UUID NOT NULL,
+  snapshot_kind              TEXT NOT NULL,
+  state_kind                 TEXT NOT NULL,
+  absence_type_id            BIGINT,
+  custom_start_time          TEXT,
+  custom_end_time            TEXT,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (cell_id, snapshot_kind)
+);
+
+ALTER TABLE ONLY public.schedule_cell_snapshots REPLICA IDENTITY FULL;
+
+ALTER TABLE public.schedule_cell_snapshots ADD CONSTRAINT schedule_cell_snapshots_snapshot_kind_check
+  CHECK (snapshot_kind IN ('draft', 'published'));
+
+ALTER TABLE public.schedule_cell_snapshots ADD CONSTRAINT schedule_cell_snapshots_state_kind_check
+  CHECK (state_kind IN ('worked', 'absence', 'deleted'));
+
+ALTER TABLE public.schedule_cell_snapshots ADD CONSTRAINT schedule_cell_snapshots_valid_times
   CHECK (
-    draft_custom_start_time IS NULL
-    OR draft_custom_end_time IS NULL
-    OR draft_custom_start_time <> draft_custom_end_time
+    custom_start_time IS NULL
+    OR custom_end_time IS NULL
+    OR custom_start_time <> custom_end_time
   );
 
-ALTER TABLE public.shifts ADD CONSTRAINT valid_published_shift_times
+ALTER TABLE public.schedule_cell_snapshots ADD CONSTRAINT schedule_cell_snapshots_valid_state
   CHECK (
-    published_custom_start_time IS NULL
-    OR published_custom_end_time IS NULL
-    OR published_custom_start_time <> published_custom_end_time
+    (state_kind = 'worked' AND absence_type_id IS NULL)
+    OR (
+      state_kind = 'absence'
+      AND absence_type_id IS NOT NULL
+      AND custom_start_time IS NULL
+      AND custom_end_time IS NULL
+    )
+    OR (
+      state_kind = 'deleted'
+      AND absence_type_id IS NULL
+      AND custom_start_time IS NULL
+      AND custom_end_time IS NULL
+    )
   );
 
-ALTER TABLE public.shifts ADD CONSTRAINT valid_draft_state
-  CHECK (
-    draft_is_delete = false
-    OR (array_length(draft_shift_code_ids, 1) IS NULL AND draft_absence_type_id IS NULL)
-  );
 
--- Shift codes and absence type are mutually exclusive
-ALTER TABLE public.shifts ADD CONSTRAINT shifts_code_or_absence_not_both
-  CHECK (
-    (array_length(draft_shift_code_ids, 1) IS NULL OR draft_absence_type_id IS NULL)
-    AND (array_length(published_shift_code_ids, 1) IS NULL OR published_absence_type_id IS NULL)
-  );
+-- ── schedule_cell_segments ───────────────────────────────────────────────────
+
+CREATE TABLE public.schedule_cell_segments (
+  id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  snapshot_id                UUID NOT NULL,
+  org_id                     UUID NOT NULL,
+  position                   INTEGER NOT NULL,
+  shift_id                   BIGINT,
+  job_id                     BIGINT NOT NULL,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (snapshot_id, position)
+);
+
+ALTER TABLE ONLY public.schedule_cell_segments REPLICA IDENTITY FULL;
+
+ALTER TABLE public.schedule_cell_segments ADD CONSTRAINT schedule_cell_segments_position_check
+  CHECK (position >= 0);
 
 
 -- ── indicator_types ───────────────────────────────────────────────────────────
@@ -413,8 +461,7 @@ CREATE TABLE public.recurring_shifts (
   emp_id          UUID NOT NULL,
   org_id          UUID NOT NULL,
   day_of_week     SMALLINT NOT NULL,
-  shift_code_id   BIGINT,
-  absence_type_id BIGINT REFERENCES public.absence_types(id),
+  state           JSONB NOT NULL,
   effective_from  DATE NOT NULL DEFAULT CURRENT_DATE,
   effective_until DATE,
   archived_at     TIMESTAMPTZ,
@@ -424,8 +471,7 @@ CREATE TABLE public.recurring_shifts (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   CONSTRAINT recurring_shifts_day_of_week_check CHECK (day_of_week >= 0 AND day_of_week <= 6),
-  CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until),
-  CONSTRAINT recurring_shifts_code_or_absence CHECK (NOT (shift_code_id IS NOT NULL AND absence_type_id IS NOT NULL))
+  CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until)
 );
 
 
@@ -435,22 +481,17 @@ CREATE TABLE public.shift_series (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   emp_id          UUID NOT NULL,
   org_id          UUID NOT NULL,
+  state           JSONB NOT NULL,
   frequency       public.shift_series_frequency NOT NULL,
   days_of_week    SMALLINT[],
   start_date      DATE NOT NULL,
   end_date        DATE,
   max_occurrences INTEGER,
-  shift_code_id   BIGINT,
-  absence_type_id BIGINT,
   archived_at     TIMESTAMPTZ,
   created_by      UUID,
   updated_by      UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-  CONSTRAINT shift_series_code_or_absence CHECK (
-    NOT (shift_code_id IS NOT NULL AND absence_type_id IS NOT NULL)
-  )
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 
@@ -677,7 +718,8 @@ CREATE TABLE public.coverage_requirements (
   id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   org_id            UUID NOT NULL,
   focus_area_id     BIGINT NOT NULL,
-  shift_code_id     BIGINT NOT NULL,
+  job_id            BIGINT NOT NULL,
+  preferred_shift_id BIGINT,
   day_of_week       SMALLINT,          -- 0=Sun..6=Sat, NULL = every day
   min_staff         INTEGER NOT NULL DEFAULT 0,
   created_by        UUID,
@@ -689,50 +731,22 @@ CREATE TABLE public.coverage_requirements (
   CONSTRAINT coverage_req_min_check CHECK (min_staff >= 0)
 );
 
--- Unique: one requirement per (org, focus_area, shift_code, day_of_week)
+-- Unique: one requirement per (org, focus_area, assignment, day_of_week)
 CREATE UNIQUE INDEX coverage_req_per_day_unique
-  ON public.coverage_requirements(org_id, focus_area_id, shift_code_id, day_of_week)
-  WHERE day_of_week IS NOT NULL;
+  ON public.coverage_requirements(org_id, focus_area_id, job_id, preferred_shift_id, day_of_week)
+  WHERE preferred_shift_id IS NOT NULL AND day_of_week IS NOT NULL;
 
 CREATE UNIQUE INDEX coverage_req_every_day_unique
-  ON public.coverage_requirements(org_id, focus_area_id, shift_code_id)
-  WHERE day_of_week IS NULL;
+  ON public.coverage_requirements(org_id, focus_area_id, job_id, preferred_shift_id)
+  WHERE preferred_shift_id IS NOT NULL AND day_of_week IS NULL;
 
+CREATE UNIQUE INDEX coverage_req_shiftless_per_day_unique
+  ON public.coverage_requirements(org_id, focus_area_id, job_id, day_of_week)
+  WHERE preferred_shift_id IS NULL AND day_of_week IS NOT NULL;
 
--- ── coverage_rule_configs ───────────────────────────────────────────────────
-
-CREATE TABLE public.coverage_rule_configs (
-  id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  org_id                       UUID NOT NULL,
-  focus_area_id                BIGINT NOT NULL,
-  requirement_shift_code_id    BIGINT NOT NULL,
-  preferred_open_shift_code_id BIGINT NOT NULL,
-  created_by                   UUID,
-  updated_by                   UUID,
-  created_at                   TIMESTAMPTZ DEFAULT now(),
-  updated_at                   TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE UNIQUE INDEX coverage_rule_configs_unique
-  ON public.coverage_rule_configs(org_id, focus_area_id, requirement_shift_code_id);
-
-
--- ── coverage_rule_config_codes ──────────────────────────────────────────────
-
-CREATE TABLE public.coverage_rule_config_codes (
-  id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  config_id             BIGINT NOT NULL,
-  org_id                UUID NOT NULL,
-  eligible_shift_code_id BIGINT NOT NULL,
-  created_by            UUID,
-  updated_by            UUID,
-  created_at            TIMESTAMPTZ DEFAULT now(),
-  updated_at            TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE UNIQUE INDEX coverage_rule_config_codes_unique
-  ON public.coverage_rule_config_codes(config_id, eligible_shift_code_id);
-
+CREATE UNIQUE INDEX coverage_req_shiftless_every_day_unique
+  ON public.coverage_requirements(org_id, focus_area_id, job_id)
+  WHERE preferred_shift_id IS NULL AND day_of_week IS NULL;
 
 -- ── shift_requests ──────────────────────────────────────────────────────────
 
@@ -743,16 +757,10 @@ CREATE TABLE public.shift_requests (
   status                      public.shift_request_status NOT NULL DEFAULT 'open',
   requester_emp_id            UUID NOT NULL,
   requester_shift_date        DATE NOT NULL,
-  requester_shift_code_ids    BIGINT[] NOT NULL DEFAULT '{}',
-  requester_focus_area_id     BIGINT,
-  requester_custom_start_time TEXT,
-  requester_custom_end_time   TEXT,
+  requester_state             JSONB NOT NULL,
   target_emp_id               UUID,
   target_shift_date           DATE,
-  target_shift_code_ids       BIGINT[],
-  target_focus_area_id        BIGINT,
-  target_custom_start_time    TEXT,
-  target_custom_end_time      TEXT,
+  target_state                JSONB,
   absence_type_id             BIGINT,
   parent_request_id           UUID,
   admin_user_id               UUID,
@@ -781,8 +789,6 @@ ALTER TABLE public.shift_requests ADD CONSTRAINT no_self_swap
 -- Expiry must be after creation
 ALTER TABLE public.shift_requests ADD CONSTRAINT valid_expiry
   CHECK (expires_at > created_at);
-
-
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 3. FOREIGN KEYS
@@ -852,31 +858,36 @@ ALTER TABLE public.shift_categories
   ADD CONSTRAINT shift_categories_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_categories_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE CASCADE;
 
+-- jobs
+ALTER TABLE public.jobs
+  ADD CONSTRAINT jobs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT jobs_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT jobs_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
 -- absence_types
 ALTER TABLE public.absence_types
   ADD CONSTRAINT absence_types_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT absence_types_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT absence_types_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+-- schedule_cells
+ALTER TABLE public.schedule_cells
+  ADD CONSTRAINT schedule_cells_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_cells_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_cells_series_id_fkey FOREIGN KEY (series_id) REFERENCES public.shift_series(id) ON DELETE SET NULL,
+  ADD CONSTRAINT schedule_cells_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
+  ADD CONSTRAINT schedule_cells_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT schedule_cells_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
--- shift_codes
-ALTER TABLE public.shift_codes
-  ADD CONSTRAINT shift_codes_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT shift_codes_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.shift_categories(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shift_codes_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shift_codes_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shift_codes_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+-- schedule_cell_snapshots
+ALTER TABLE public.schedule_cell_snapshots
+  ADD CONSTRAINT schedule_cell_snapshots_cell_id_fkey FOREIGN KEY (cell_id) REFERENCES public.schedule_cells(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_cell_snapshots_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_cell_snapshots_absence_type_id_fkey FOREIGN KEY (absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL;
 
--- shifts
-ALTER TABLE public.shifts
-  ADD CONSTRAINT shifts_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
-  ADD CONSTRAINT shifts_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT shifts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shifts_series_id_fkey FOREIGN KEY (series_id) REFERENCES public.shift_series(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shifts_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shifts_draft_absence_type_id_fkey FOREIGN KEY (draft_absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shifts_published_absence_type_id_fkey FOREIGN KEY (published_absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shifts_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shifts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+-- schedule_cell_segments
+ALTER TABLE public.schedule_cell_segments
+  ADD CONSTRAINT schedule_cell_segments_snapshot_id_fkey FOREIGN KEY (snapshot_id) REFERENCES public.schedule_cell_snapshots(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_cell_segments_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 -- schedule_notes
 ALTER TABLE public.schedule_notes
@@ -896,7 +907,6 @@ ALTER TABLE public.indicator_types
 ALTER TABLE public.recurring_shifts
   ADD CONSTRAINT recurring_shifts_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
   ADD CONSTRAINT recurring_shifts_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT recurring_shifts_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE SET NULL,
   ADD CONSTRAINT recurring_shifts_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT recurring_shifts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -904,8 +914,6 @@ ALTER TABLE public.recurring_shifts
 ALTER TABLE public.shift_series
   ADD CONSTRAINT shift_series_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_series_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT shift_series_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shift_series_absence_type_id_fkey FOREIGN KEY (absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_series_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -949,9 +957,7 @@ ALTER TABLE public.user_sessions
 ALTER TABLE public.shift_requests
   ADD CONSTRAINT shift_requests_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT shift_requests_requester_emp_id_fkey FOREIGN KEY (requester_emp_id) REFERENCES public.employees(id) ON DELETE CASCADE,
-  ADD CONSTRAINT shift_requests_requester_focus_area_id_fkey FOREIGN KEY (requester_focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_requests_target_emp_id_fkey FOREIGN KEY (target_emp_id) REFERENCES public.employees(id) ON DELETE SET NULL,
-  ADD CONSTRAINT shift_requests_target_focus_area_id_fkey FOREIGN KEY (target_focus_area_id) REFERENCES public.focus_areas(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_requests_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_requests_absence_type_id_fkey FOREIGN KEY (absence_type_id) REFERENCES public.absence_types(id) ON DELETE SET NULL,
   ADD CONSTRAINT shift_requests_parent_request_id_fkey FOREIGN KEY (parent_request_id) REFERENCES public.shift_requests(id) ON DELETE SET NULL;
@@ -970,26 +976,10 @@ ALTER TABLE public.recurring_shifts_draft_sessions
 ALTER TABLE public.coverage_requirements
   ADD CONSTRAINT coverage_requirements_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT coverage_requirements_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_requirements_shift_code_id_fkey FOREIGN KEY (shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_requirements_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE CASCADE,
+  ADD CONSTRAINT coverage_requirements_preferred_shift_id_fkey FOREIGN KEY (preferred_shift_id) REFERENCES public.shift_categories(id) ON DELETE CASCADE,
   ADD CONSTRAINT coverage_requirements_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT coverage_requirements_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- coverage_rule_configs
-ALTER TABLE public.coverage_rule_configs
-  ADD CONSTRAINT coverage_rule_configs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_configs_focus_area_id_fkey FOREIGN KEY (focus_area_id) REFERENCES public.focus_areas(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_configs_requirement_shift_code_id_fkey FOREIGN KEY (requirement_shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_configs_preferred_open_shift_code_id_fkey FOREIGN KEY (preferred_open_shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_configs_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT coverage_rule_configs_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- coverage_rule_config_codes
-ALTER TABLE public.coverage_rule_config_codes
-  ADD CONSTRAINT coverage_rule_config_codes_config_id_fkey FOREIGN KEY (config_id) REFERENCES public.coverage_rule_configs(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_config_codes_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_config_codes_eligible_shift_code_id_fkey FOREIGN KEY (eligible_shift_code_id) REFERENCES public.shift_codes(id) ON DELETE CASCADE,
-  ADD CONSTRAINT coverage_rule_config_codes_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD CONSTRAINT coverage_rule_config_codes_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- publish_history
 ALTER TABLE public.publish_history
@@ -1021,6 +1011,7 @@ CREATE INDEX idx_org_memberships_org_user ON public.organization_memberships(org
 CREATE INDEX idx_organization_roles_org_id ON public.organization_roles(org_id);
 CREATE UNIQUE INDEX organization_roles_org_name_dept_active_unique ON public.organization_roles(org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL;
 CREATE INDEX idx_organization_roles_active ON public.organization_roles(org_id) WHERE archived_at IS NULL;
+CREATE INDEX idx_organization_roles_schedule_active ON public.organization_roles(org_id) WHERE archived_at IS NULL AND is_schedule_role = true;
 CREATE INDEX idx_organization_roles_department_id ON public.organization_roles(department_id) WHERE department_id IS NOT NULL;
 
 -- focus_areas
@@ -1058,25 +1049,36 @@ CREATE UNIQUE INDEX shift_categories_global_name_unique ON public.shift_categori
 CREATE UNIQUE INDEX shift_categories_area_name_unique ON public.shift_categories(org_id, focus_area_id, name) WHERE focus_area_id IS NOT NULL AND archived_at IS NULL;
 CREATE INDEX idx_shift_categories_active ON public.shift_categories(org_id) WHERE archived_at IS NULL;
 
+-- jobs
+CREATE INDEX idx_jobs_org_id ON public.jobs(org_id);
+CREATE UNIQUE INDEX jobs_org_name_active_unique ON public.jobs(org_id, name) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX jobs_org_system_key_unique ON public.jobs(org_id, system_key) WHERE system_key IS NOT NULL;
+CREATE INDEX idx_jobs_active ON public.jobs(org_id) WHERE archived_at IS NULL;
+CREATE INDEX idx_jobs_focus_area_ids ON public.jobs USING gin(focus_area_ids);
+CREATE INDEX idx_jobs_department_ids ON public.jobs USING gin(department_ids);
+CREATE INDEX idx_jobs_applicable_shift_ids ON public.jobs USING gin(applicable_shift_ids);
+CREATE INDEX idx_jobs_required_cert_ids ON public.jobs USING gin(required_certification_ids);
+CREATE INDEX idx_jobs_eligible_role_ids ON public.jobs USING gin(eligible_role_ids);
+
 -- absence_types
 CREATE INDEX idx_absence_types_org_id ON public.absence_types(org_id);
 CREATE UNIQUE INDEX absence_types_org_label_unique ON public.absence_types(org_id, label) WHERE archived_at IS NULL;
 CREATE INDEX idx_absence_types_active ON public.absence_types(org_id) WHERE archived_at IS NULL;
+-- schedule_cells
+CREATE INDEX idx_schedule_cells_org_date ON public.schedule_cells(org_id, date);
+CREATE INDEX idx_schedule_cells_emp_date ON public.schedule_cells(emp_id, date);
+CREATE INDEX idx_schedule_cells_series_id ON public.schedule_cells(series_id);
+CREATE INDEX idx_schedule_cells_focus_area_id ON public.schedule_cells(focus_area_id) WHERE focus_area_id IS NOT NULL;
 
--- shift_codes
-CREATE INDEX idx_shift_codes_org_id ON public.shift_codes(org_id);
-CREATE UNIQUE INDEX shift_codes_org_label_global_unique ON public.shift_codes(org_id, label) WHERE focus_area_id IS NULL AND archived_at IS NULL;
-CREATE UNIQUE INDEX shift_codes_org_label_focus_area_unique ON public.shift_codes(org_id, label, focus_area_id) WHERE focus_area_id IS NOT NULL AND archived_at IS NULL;
-CREATE INDEX idx_shift_codes_active ON public.shift_codes(org_id) WHERE archived_at IS NULL;
-CREATE INDEX idx_shift_codes_required_cert_ids ON public.shift_codes USING gin(required_certification_ids);
+-- schedule_cell_snapshots
+CREATE INDEX idx_schedule_cell_snapshots_org_kind ON public.schedule_cell_snapshots(org_id, snapshot_kind);
+CREATE INDEX idx_schedule_cell_snapshots_cell_id ON public.schedule_cell_snapshots(cell_id);
 
--- shifts
-CREATE INDEX idx_shifts_emp_id ON public.shifts(emp_id);
-CREATE INDEX idx_shifts_date ON public.shifts(date);
-CREATE INDEX idx_shifts_org_date ON public.shifts(org_id, date);
-CREATE INDEX idx_shifts_series_id ON public.shifts(series_id);
-CREATE INDEX idx_shifts_draft_code_ids ON public.shifts USING gin(draft_shift_code_ids);
-CREATE INDEX idx_shifts_published_code_ids ON public.shifts USING gin(published_shift_code_ids);
+-- schedule_cell_segments
+CREATE INDEX idx_schedule_cell_segments_snapshot_id ON public.schedule_cell_segments(snapshot_id);
+CREATE INDEX idx_schedule_cell_segments_org_id ON public.schedule_cell_segments(org_id);
+CREATE INDEX idx_schedule_cell_segments_job_id ON public.schedule_cell_segments(job_id);
+CREATE INDEX idx_schedule_cell_segments_shift_id ON public.schedule_cell_segments(shift_id) WHERE shift_id IS NOT NULL;
 
 -- schedule_notes
 CREATE INDEX idx_schedule_notes_org ON public.schedule_notes(org_id);
@@ -1091,16 +1093,12 @@ CREATE INDEX idx_indicator_types_active ON public.indicator_types(org_id) WHERE 
 -- recurring_shifts
 CREATE INDEX idx_recurring_shifts_org ON public.recurring_shifts(org_id);
 CREATE INDEX idx_recurring_shifts_emp ON public.recurring_shifts(emp_id);
-CREATE INDEX idx_recurring_shifts_code_id ON public.recurring_shifts(shift_code_id);
-CREATE INDEX idx_recurring_shifts_absence_type_id ON public.recurring_shifts(absence_type_id);
 CREATE UNIQUE INDEX recurring_shifts_emp_day_from_active_unique ON public.recurring_shifts(emp_id, day_of_week, effective_from) WHERE archived_at IS NULL;
 CREATE INDEX idx_recurring_shifts_active ON public.recurring_shifts(org_id) WHERE archived_at IS NULL;
 
 -- shift_series
 CREATE INDEX idx_shift_series_org ON public.shift_series(org_id);
 CREATE INDEX idx_shift_series_emp ON public.shift_series(emp_id);
-CREATE INDEX idx_shift_series_code_id ON public.shift_series(shift_code_id);
-CREATE INDEX idx_shift_series_absence_type_id ON public.shift_series(absence_type_id);
 CREATE INDEX idx_shift_series_active ON public.shift_series(org_id) WHERE archived_at IS NULL;
 
 -- invitations
@@ -1134,15 +1132,7 @@ CREATE INDEX idx_user_sessions_user_last_active ON public.user_sessions(user_id,
 
 -- coverage_requirements
 CREATE INDEX idx_coverage_requirements_org ON public.coverage_requirements(org_id);
-CREATE INDEX idx_coverage_requirements_lookup ON public.coverage_requirements(org_id, focus_area_id, shift_code_id);
-
--- coverage_rule_configs
-CREATE INDEX idx_coverage_rule_configs_org ON public.coverage_rule_configs(org_id);
-CREATE INDEX idx_coverage_rule_configs_lookup ON public.coverage_rule_configs(org_id, focus_area_id, requirement_shift_code_id);
-
--- coverage_rule_config_codes
-CREATE INDEX idx_coverage_rule_config_codes_org ON public.coverage_rule_config_codes(org_id);
-CREATE INDEX idx_coverage_rule_config_codes_config ON public.coverage_rule_config_codes(config_id);
+CREATE INDEX idx_coverage_requirements_lookup ON public.coverage_requirements(org_id, focus_area_id, job_id, preferred_shift_id);
 
 -- shift_requests
 CREATE INDEX idx_shift_requests_org_status ON public.shift_requests(org_id, status);
@@ -1243,15 +1233,15 @@ COMMENT ON TABLE public.audit_log IS 'Comprehensive audit trail for all mutation
 -- 5. REALTIME
 -- ══════════════════════════════════════════════════════════════════════════════
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.shifts;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_cells;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_cell_snapshots;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_cell_segments;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_notes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.focus_areas;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_codes;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.jobs;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.absence_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_requirements;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_rule_configs;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_rule_config_codes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.organization_memberships;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.departments;
