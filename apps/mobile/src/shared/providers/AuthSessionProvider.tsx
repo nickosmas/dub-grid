@@ -44,7 +44,13 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         if (!isMounted) return;
         writeSession(data.session ?? null);
       })
-      .catch(() => {
+      .catch(async () => {
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch {
+          // Ignore cleanup failures; the provider still needs to recover locally.
+        }
+
         if (!isMounted) return;
         writeSession(null);
       });

@@ -130,6 +130,19 @@ describe("ShiftDetailScreen", () => {
       invalidateQueries: vi.fn(),
     });
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[1] === "requests") {
+        return {
+          data: {
+            requests: [],
+            openShifts: [],
+          },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
       if (queryKey[2] === "team") {
         return {
           data: {
@@ -138,9 +151,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-2",
                 employeeName: "Bri Shaw",
                 date: "2026-04-16",
-                shiftCodeIds: [1],
+                assignmentIds: [1],
                 shiftLabel: "D",
-                shiftCodeLabel: "D",
+                assignmentLabel: "D",
                 shiftName: "Day Shift",
                 absenceTypeId: null,
                 focusAreaId: 1,
@@ -150,6 +163,18 @@ describe("ShiftDetailScreen", () => {
                 endTime: "15:00:00",
                 customStartTime: null,
                 customEndTime: null,
+                segments: [
+                  {
+                    shiftName: "Day Shift",
+                    jobName: "Supervisor",
+                    jobColor: "#EEF2FF",
+                    jobBorderColor: "#C7D2FE",
+                    jobTextColor: "#4F46E5",
+                    startTime: "07:00:00",
+                    endTime: "15:00:00",
+                    displayFocusAreaName: "Emergency",
+                  },
+                ],
                 publishedAt: "2026-04-15T18:30:00.000Z",
                 publishedByName: "Mina Diaz",
               },
@@ -157,9 +182,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-1",
                 employeeName: "Alex Kim",
                 date: "2026-04-16",
-                shiftCodeIds: [1],
+                assignmentIds: [1],
                 shiftLabel: "D",
-                shiftCodeLabel: "D",
+                assignmentLabel: "D",
                 shiftName: "Day Shift",
                 absenceTypeId: null,
                 focusAreaId: 2,
@@ -176,9 +201,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-3",
                 employeeName: "Chris Hall",
                 date: "2026-04-17",
-                shiftCodeIds: [2],
+                assignmentIds: [2],
                 shiftLabel: "E",
-                shiftCodeLabel: "E",
+                assignmentLabel: "E",
                 shiftName: "Evening Shift",
                 absenceTypeId: null,
                 focusAreaId: 1,
@@ -207,9 +232,9 @@ describe("ShiftDetailScreen", () => {
               employeeId: "emp-1",
               employeeName: "Alex Kim",
               date: "2026-04-16",
-              shiftCodeIds: [1],
+              assignmentIds: [1],
               shiftLabel: "D",
-              shiftCodeLabel: "D",
+              assignmentLabel: "D",
               shiftName: "Day Shift",
               absenceTypeId: null,
               focusAreaId: 2,
@@ -219,6 +244,18 @@ describe("ShiftDetailScreen", () => {
               endTime: "15:00:00",
               customStartTime: null,
               customEndTime: null,
+              segments: [
+                {
+                  shiftName: "Day Shift",
+                  jobName: "Mentor",
+                  jobColor: "#FFFBEB",
+                  jobBorderColor: "#FDE68A",
+                  jobTextColor: "#B45309",
+                  startTime: "07:00:00",
+                  endTime: "15:00:00",
+                  displayFocusAreaName: "ICU",
+                },
+              ],
               publishedAt: "2026-04-15T18:30:00.000Z",
               publishedByName: "Mina Diaz",
             },
@@ -232,7 +269,7 @@ describe("ShiftDetailScreen", () => {
     });
   });
 
-  it("shows publish metadata for the selected shift", () => {
+  it("shows concise metadata and flat shiftmates for the selected shift", () => {
     useMutation.mockReturnValue({
       error: null,
       isPending: false,
@@ -241,13 +278,18 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
-    expect(screen.getByText("Published by")).toBeInTheDocument();
-    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
-    expect(screen.getByText("Focus Areas")).toBeInTheDocument();
+    expect(
+      screen.getByText("Published Apr 15, 2026, 11:30 AM by Mina Diaz"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Mentor")).toBeInTheDocument();
     expect(screen.getByText("ICU")).toBeInTheDocument();
     expect(screen.getByText("Shiftmates")).toBeInTheDocument();
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
+    expect(screen.getByText("Supervisor")).toBeInTheDocument();
     expect(screen.getByText("Emergency")).toBeInTheDocument();
+    expect(screen.getByText("Bri Shaw").closest("article")).toBeNull();
+    expect(screen.queryByText("Published by")).not.toBeInTheDocument();
+    expect(screen.queryByText("Focus Areas")).not.toBeInTheDocument();
     expect(screen.queryByText("Employee")).not.toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
   });
@@ -281,9 +323,9 @@ describe("ShiftDetailScreen", () => {
             employeeId: "emp-1",
             employeeName: "Alex Kim",
             date: "2026-04-16",
-            shiftCodeIds: [1, 2],
+            assignmentIds: [1, 2],
             shiftLabel: "D/E",
-            shiftCodeLabel: "D/E",
+            assignmentLabel: "D/E",
             shiftName: "Day Shift / Evening Shift",
             absenceTypeId: null,
             focusAreaId: 2,
@@ -342,9 +384,9 @@ describe("ShiftDetailScreen", () => {
             employeeId: "emp-1",
             employeeName: "Alex Kim",
             date: "2026-04-16",
-            shiftCodeIds: [],
+            assignmentIds: [],
             shiftLabel: "Off",
-            shiftCodeLabel: null,
+            assignmentLabel: null,
             shiftName: "Off Day",
             absenceTypeId: 1,
             focusAreaId: null,
@@ -419,9 +461,9 @@ describe("ShiftDetailScreen", () => {
             employeeId: "emp-1",
             employeeName: "Alex Kim",
             date: "2026-04-16",
-            shiftCodeIds: [1],
+            assignmentIds: [1],
             shiftLabel: "D",
-            shiftCodeLabel: "D",
+            assignmentLabel: "D",
             shiftName: "Day Shift",
             absenceTypeId: null,
             focusAreaId: 2,
@@ -454,6 +496,88 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
   });
 
+  it("hides shift actions when an active request already exists for the shift", () => {
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[1] === "requests") {
+        return {
+          data: {
+            requests: [
+              {
+                id: "request-1",
+                requesterEmpId: "emp-1",
+                requesterShiftDate: "2026-04-16",
+                status: "pending_approval",
+                type: "pickup",
+                adminNote: "Reviewing coverage now.",
+              },
+            ],
+            openShifts: [],
+          },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      if (queryKey[2] === "team") {
+        return {
+          data: {
+            entries: [],
+          },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: {
+          entries: [
+            {
+              employeeId: "emp-1",
+              employeeName: "Alex Kim",
+              date: "2026-04-16",
+              assignmentIds: [1],
+              shiftLabel: "D",
+              assignmentLabel: "D",
+              shiftName: "Day Shift",
+              absenceTypeId: null,
+              focusAreaId: 2,
+              focusAreaName: "ICU",
+              displayFocusAreaName: "ICU",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              customStartTime: null,
+              customEndTime: null,
+              publishedAt: "2026-04-15T18:30:00.000Z",
+              publishedByName: "Mina Diaz",
+            },
+          ],
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.getByText("Request already in progress")).toBeInTheDocument();
+    expect(
+      screen.getByText("Manager note: Reviewing coverage now."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
+    expect(screen.queryByText("Swap")).not.toBeInTheDocument();
+  });
+
   it("filters swap options to meaningful published teammate shifts only", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       if (queryKey[2] === "team") {
@@ -464,9 +588,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-2",
                 employeeName: "Bri Shaw",
                 date: "2026-04-16",
-                shiftCodeIds: [1],
+                assignmentIds: [1],
                 shiftLabel: "D",
-                shiftCodeLabel: "D",
+                assignmentLabel: "D",
                 shiftName: "Day Shift",
                 absenceTypeId: null,
                 focusAreaId: 1,
@@ -483,9 +607,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-3",
                 employeeName: "Chris Hall",
                 date: "2026-04-17",
-                shiftCodeIds: [2],
+                assignmentIds: [2],
                 shiftLabel: "E",
-                shiftCodeLabel: "E",
+                assignmentLabel: "E",
                 shiftName: "Evening Shift",
                 absenceTypeId: null,
                 focusAreaId: 1,
@@ -502,9 +626,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-4",
                 employeeName: "Dana Moss",
                 date: "2026-04-17",
-                shiftCodeIds: [3],
+                assignmentIds: [3],
                 shiftLabel: "N",
-                shiftCodeLabel: "N",
+                assignmentLabel: "N",
                 shiftName: "Night Shift",
                 absenceTypeId: null,
                 focusAreaId: 1,
@@ -521,9 +645,9 @@ describe("ShiftDetailScreen", () => {
                 employeeId: "emp-5",
                 employeeName: "Evan Cole",
                 date: "2026-04-17",
-                shiftCodeIds: [],
+                assignmentIds: [],
                 shiftLabel: "OFF",
-                shiftCodeLabel: null,
+                assignmentLabel: null,
                 shiftName: "Sick",
                 absenceTypeId: 1,
                 focusAreaId: null,
@@ -551,9 +675,9 @@ describe("ShiftDetailScreen", () => {
               employeeId: "emp-1",
               employeeName: "Alex Kim",
               date: "2026-04-16",
-              shiftCodeIds: [1],
+              assignmentIds: [1],
               shiftLabel: "D",
-              shiftCodeLabel: "D",
+              assignmentLabel: "D",
               shiftName: "Day Shift",
               absenceTypeId: null,
               focusAreaId: 2,
@@ -607,7 +731,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("You get")).toBeInTheDocument();
     expect(screen.getByText("From Chris Hall")).toBeInTheDocument();
     expect(
-      screen.getByText("Review the trade below, then submit your swap request."),
+      screen.getByText(
+        "Review the trade below, then submit your swap request.",
+      ),
     ).toBeInTheDocument();
   });
 

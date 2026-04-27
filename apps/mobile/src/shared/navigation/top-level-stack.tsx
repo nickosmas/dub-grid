@@ -2,8 +2,9 @@ import type { NativeStackNavigationOptions } from "@react-navigation/native-stac
 import { Platform } from "react-native";
 import { mobileColors } from "../theme/tokens";
 
-const commonOptions: NativeStackNavigationOptions = {
-  headerBackTitleVisible: false,
+export const commonStackOptions: NativeStackNavigationOptions = {
+  headerBackVisible: true,
+  headerBackButtonDisplayMode: "minimal",
   headerShadowVisible: false,
   headerTintColor: mobileColors.textPrimary,
   headerStyle: {
@@ -27,7 +28,7 @@ export function createTopLevelStackOptions(
   title: string,
 ): NativeStackNavigationOptions {
   return {
-    ...commonOptions,
+    ...commonStackOptions,
     title,
     headerLargeTitle: Platform.OS === "ios",
   };
@@ -37,7 +38,7 @@ export function createDetailStackOptions(
   title: string,
 ): NativeStackNavigationOptions {
   return {
-    ...commonOptions,
+    ...commonStackOptions,
     title,
     headerLargeTitle: false,
   };

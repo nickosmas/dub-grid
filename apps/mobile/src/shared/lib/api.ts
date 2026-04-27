@@ -7,6 +7,7 @@ import {
   mobileNotificationsResponseSchema,
   mobileOrgScheduleResponseSchema,
   mobilePeopleResponseSchema,
+  mobilePersonStatusUpdateResponseSchema,
   mobilePushTokenResponseSchema,
   mobileShiftRequestsResponseSchema,
   mobileUpdateShiftRequestResponseSchema,
@@ -14,6 +15,7 @@ import {
   type MobileAuthLoginResponse,
   type MobileCreateShiftRequestBody,
   type MobileBootstrapResponse,
+  type MobilePersonStatusUpdateBody,
   type MobileScheduleRange,
   type MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
@@ -82,10 +84,15 @@ export async function mobileApiRequest<T>(
     "Content-Type": init.body !== undefined ? "application/json" : undefined,
   });
 
-  return mobileRequest(path, {
-    ...init,
-    headers,
-  }, parse, true);
+  return mobileRequest(
+    path,
+    {
+      ...init,
+      headers,
+    },
+    parse,
+    true,
+  );
 }
 
 async function mobilePublicApiRequest<T>(
@@ -176,7 +183,9 @@ function withQuery(
   return `${path}?${searchParams.toString()}`;
 }
 
-export function getBootstrap(accessToken: string): Promise<MobileBootstrapResponse> {
+export function getBootstrap(
+  accessToken: string,
+): Promise<MobileBootstrapResponse> {
   return mobileApiRequest(
     "/api/mobile/v1/bootstrap",
     accessToken,
@@ -232,9 +241,12 @@ export function getOrgSchedule(
   );
 }
 
-export function getShiftRequests(accessToken: string) {
+export function getShiftRequests(
+  accessToken: string,
+  query?: MobileScheduleRange,
+) {
   return mobileApiRequest(
-    "/api/mobile/v1/shift-requests",
+    withQuery("/api/mobile/v1/shift-requests", query),
     accessToken,
     { method: "GET" },
     (value) => mobileShiftRequestsResponseSchema.parse(value),
@@ -281,7 +293,10 @@ export function getNotifications(accessToken: string) {
   );
 }
 
-export function markNotificationRead(accessToken: string, notificationId: string) {
+export function markNotificationRead(
+  accessToken: string,
+  notificationId: string,
+) {
   return mobileApiRequest(
     `/api/mobile/v1/notifications/${notificationId}`,
     accessToken,
@@ -305,6 +320,22 @@ export function getPeople(accessToken: string) {
     accessToken,
     { method: "GET" },
     (value) => mobilePeopleResponseSchema.parse(value),
+  );
+}
+
+export function updateMobilePersonStatus(
+  accessToken: string,
+  personId: string,
+  body: MobilePersonStatusUpdateBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/people/${personId}/status`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+    (value) => mobilePersonStatusUpdateResponseSchema.parse(value),
   );
 }
 

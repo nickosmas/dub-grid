@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -6,16 +7,30 @@ import {
   type ComponentProps,
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type AppStateStatus,
+} from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { Button } from "../../../shared/components/Button";
 import { QueryStateCard } from "../../../shared/components/QueryStateCard";
 import {
   Card,
   Screen,
   type ScreenScrollHandle,
 } from "../../../shared/components/Screen";
-import { getMySchedule, getOrgSchedule } from "../../../shared/lib/api";
+import {
+  getMySchedule,
+  getOrgSchedule,
+  getShiftRequests,
+  updateShiftRequest,
+} from "../../../shared/lib/api";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import {
   mobileColors,
@@ -27,51 +42,76 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   addDaysToIsoDate,
   addMonthsToIsoDate,
+  buildMeShiftRequestSections,
   buildScheduleMonthDays,
   buildScheduleShiftGroups,
   buildScheduleWeekDays,
+  buildUpcomingMeScheduleItems,
+  buildWeeklyHoursSummary,
   buildTeamScheduleFocusAreaTabs,
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
   formatScheduleDayLabel,
   formatScheduleMonthLabel,
   formatScheduleRange,
+  formatScheduleTimeRange,
+  getFeaturedMeScheduleSegment,
   getScheduleEntryBaseTimeRange,
+  getScheduleEntryAbsenceTypeId,
+  getScheduleEntryCategoryKey,
   getScheduleEntryCustomTimeRange,
+  getScheduleEntryCustomStartTime,
+  getScheduleEntryEndTime,
+  getScheduleEntryFocusAreaId,
+  getScheduleEntrySegmentFocusAreaName,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
+  getScheduleEntryMemberTimeRange,
+  getScheduleEntryStartTime,
+  getScheduleEntryTitle,
   getScheduleMonthStartDate,
   getScheduleRangeForDate,
   getScheduleShiftGroupTimeRange,
   getIsoDateInTimeZone,
   sortScheduleEntries,
+  type FeaturedMeScheduleSegment,
   type MobileScheduleMonthDay,
   type MobileScheduleWeekDay,
+  type WeeklyHoursSummary,
 } from "../lib/schedule";
-import type { MobileScheduleEntry } from "@dubgrid/contracts";
+import type {
+  MobileOpenShift,
+  MobileScheduleEntry,
+  MobileShiftRequest,
+} from "@dubgrid/contracts";
 
 const SWIPE_THRESHOLD = 40;
+const MINUTE_IN_MS = 60 * 1000;
+const SCHEDULE_CONTENT_REFRESH_INTERVAL_MS = 15 * 1000;
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const ME_HERO_CARD_BACKGROUND = "#2946C7";
+const ME_HERO_COLLABORATOR_BACKGROUND = "#3A55CB";
 
 type ScheduleScope = "mine" | "team";
 type ShiftTimeRange = {
   start: string;
   end: string;
 };
-type MeHeroState = {
-  entry: MobileScheduleEntry | null;
-  status: "active" | "upcoming" | "scheduled" | "away" | "empty";
-};
-type MeTimelineSection = {
-  date: string;
-  title: string;
-  entries: MobileScheduleEntry[];
-};
 type AvatarTone = {
   backgroundColor: string;
   borderColor: string;
   textColor: string;
 };
+type RequestActionBody =
+  | { action: "claim"; claimerEmpId: string }
+  | {
+      action: "volunteer_open_shift";
+      empId: string;
+      shiftDate: string;
+      focusAreaId: number;
+      state: MobileOpenShift["state"];
+    }
+  | { action: "respond"; empId: string; accept: boolean };
 
 function getFirstDateForFocusArea(
   entries: MobileScheduleEntry[],
@@ -86,29 +126,27 @@ function getFirstDateForFocusArea(
     return null;
   }
 
-  return [...matchingEntries]
-    .sort((left, right) => {
+  return (
+    [...matchingEntries].sort((left, right) => {
       if (left.date !== right.date) {
         return left.date.localeCompare(right.date);
       }
 
-      const leftTime = left.startTime ?? left.customStartTime ?? "99:99:99";
-      const rightTime = right.startTime ?? right.customStartTime ?? "99:99:99";
+      const leftTime =
+        getScheduleEntryStartTime(left) ??
+        getScheduleEntryCustomStartTime(left) ??
+        "99:99:99";
+      const rightTime =
+        getScheduleEntryStartTime(right) ??
+        getScheduleEntryCustomStartTime(right) ??
+        "99:99:99";
       if (leftTime !== rightTime) {
         return leftTime.localeCompare(rightTime);
       }
 
       return left.employeeName.localeCompare(right.employeeName);
-    })[0]?.date ?? null;
-}
-
-function formatVerboseScheduleDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00.000Z`));
+    })[0]?.date ?? null
+  );
 }
 
 function getTimePartsInTimeZone(
@@ -137,18 +175,59 @@ function getCurrentTimeValue(value: Date, timeZone?: string | null): string {
   return `${`${parts.hour}`.padStart(2, "0")}:${`${parts.minute}`.padStart(2, "0")}:${`${parts.second}`.padStart(2, "0")}`;
 }
 
-function getGreetingLabel(value: Date, timeZone?: string | null): string {
-  const { hour } = getTimePartsInTimeZone(value, timeZone);
+function getMillisecondsUntilNextMinute(value: Date): number {
+  const millisecondsIntoMinute =
+    value.getSeconds() * 1000 + value.getMilliseconds();
 
-  if (hour < 12) {
-    return "Good morning";
-  }
+  return millisecondsIntoMinute === 0
+    ? MINUTE_IN_MS
+    : MINUTE_IN_MS - millisecondsIntoMinute;
+}
 
-  if (hour < 17) {
-    return "Good afternoon";
-  }
+function useRealtimeNow(): Date {
+  const [now, setNow] = useState(() => new Date());
 
-  return "Good evening";
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    function clearScheduledTick() {
+      if (timeout != null) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+    }
+
+    function scheduleNextTick() {
+      clearScheduledTick();
+      timeout = setTimeout(() => {
+        setNow(new Date());
+        scheduleNextTick();
+      }, getMillisecondsUntilNextMinute(new Date()));
+    }
+
+    function syncNow() {
+      setNow(new Date());
+      scheduleNextTick();
+    }
+
+    scheduleNextTick();
+
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          syncNow();
+        }
+      },
+    );
+
+    return () => {
+      clearScheduledTick();
+      subscription.remove();
+    };
+  }, []);
+
+  return now;
 }
 
 function getMinutesSinceMidnight(value: string): number | null {
@@ -183,312 +262,37 @@ function expandTimeRange(
   return [{ start: startMinutes, end: endMinutes }];
 }
 
-function getEntryTimeRanges(entry: MobileScheduleEntry): ShiftTimeRange[] {
-  return getDisplaySegments(entry).flatMap((segment) => {
-    if (!segment.startTime || !segment.endTime) {
-      return [];
-    }
-
-    return [
-      {
-        start: segment.startTime,
-        end: segment.endTime,
-      },
-    ];
-  });
-}
-
-function isTimeWithinEntry(
-  entry: MobileScheduleEntry,
-  currentTime: string,
-): boolean {
-  const currentMinutes = getMinutesSinceMidnight(currentTime);
-
-  if (currentMinutes == null) {
-    return false;
-  }
-
-  return getEntryTimeRanges(entry)
-    .flatMap(expandTimeRange)
-    .some(
-      (range) =>
-        currentMinutes >= range.start && currentMinutes < range.end,
-  );
-}
-
-function getDisplaySegments(entry: MobileScheduleEntry) {
-  const segments = getScheduleEntrySegments(entry);
-
-  if (segments.length > 0 && entry.segments && entry.segments.length > 0) {
-    return segments;
-  }
-
-  return [
-    {
-      shiftName: entry.shiftName,
-      startTime: entry.customStartTime ?? entry.startTime,
-      endTime: entry.customEndTime ?? entry.endTime,
-      displayFocusAreaName: entry.displayFocusAreaName ?? null,
-    },
-  ];
-}
-
-function entriesHaveOverlappingTimes(
-  left: MobileScheduleEntry | null,
-  right: MobileScheduleEntry | null,
-): boolean {
-  if (!left || !right) {
-    return false;
-  }
-
-  const leftRanges = getEntryTimeRanges(left).flatMap(expandTimeRange);
-  const rightRanges = getEntryTimeRanges(right).flatMap(expandTimeRange);
-
-  if (leftRanges.length === 0 || rightRanges.length === 0) {
-    return false;
-  }
-
-  return leftRanges.some((leftRange) =>
-    rightRanges.some(
-      (rightRange) =>
-        leftRange.start < rightRange.end &&
-        rightRange.start < leftRange.end,
-    ),
-  );
-}
-
-function getEntrySortTime(entry: MobileScheduleEntry): string {
-  const segmentStart =
-    getDisplaySegments(entry).find((segment) => segment.startTime)
-      ?.startTime ?? null;
-
-  return segmentStart ?? entry.startTime ?? entry.customStartTime ?? "99:99:99";
-}
-
-function sortEntriesChronologically(
-  entries: MobileScheduleEntry[],
-): MobileScheduleEntry[] {
-  return [...entries].sort((left, right) => {
-    if (left.date !== right.date) {
-      return left.date.localeCompare(right.date);
-    }
-
-    const leftTime = getEntrySortTime(left);
-    const rightTime = getEntrySortTime(right);
-
-    if (leftTime !== rightTime) {
-      return leftTime.localeCompare(rightTime);
-    }
-
-    return left.shiftName.localeCompare(right.shiftName);
-  });
-}
-
-function getScheduleEntryKey(entry: MobileScheduleEntry): string {
-  return [
-    entry.employeeId,
-    entry.date,
-    entry.shiftName,
-    entry.shiftLabel,
-    entry.startTime ?? entry.customStartTime ?? "none",
-    entry.endTime ?? entry.customEndTime ?? "none",
-  ].join(":");
-}
-
-function getFeaturedMeEntry({
-  entries,
-  selectedDate,
-  todayDate,
-  currentTime,
-}: {
-  entries: MobileScheduleEntry[];
-  selectedDate: string;
-  todayDate: string;
-  currentTime: string;
-}): MeHeroState {
-  const selectedDayEntries = sortEntriesChronologically(
-    entries.filter((entry) => entry.date === selectedDate),
-  );
-
-  if (selectedDate === todayDate) {
-    const activeEntry =
-      selectedDayEntries.find(
-        (entry) =>
-          entry.absenceTypeId == null &&
-          getEntryTimeRanges(entry).length > 0 &&
-          isTimeWithinEntry(entry, currentTime),
-      ) ?? null;
-
-    if (activeEntry) {
-      return {
-        entry: activeEntry,
-        status: "active",
-      };
-    }
-
-    const upcomingTodayEntry =
-      selectedDayEntries.find((entry) => {
-        if (entry.absenceTypeId != null) {
-          return false;
-        }
-
-        return getEntrySortTime(entry).localeCompare(currentTime) > 0;
-      }) ?? null;
-
-    if (upcomingTodayEntry) {
-      return {
-        entry: upcomingTodayEntry,
-        status: "upcoming",
-      };
-    }
-  }
-
-  const selectedDayEntry = selectedDayEntries[0] ?? null;
-
-  if (selectedDayEntry) {
-    return {
-      entry: selectedDayEntry,
-      status: selectedDayEntry.absenceTypeId != null ? "away" : "scheduled",
-    };
-  }
-
-  const nextEntry =
-    sortEntriesChronologically(
-      entries.filter((entry) => entry.date.localeCompare(selectedDate) > 0),
-    )[0] ?? null;
-
-  if (nextEntry) {
-    return {
-      entry: nextEntry,
-      status: nextEntry.absenceTypeId != null ? "away" : "upcoming",
-    };
-  }
-
-  return {
-    entry: null,
-    status: "empty",
-  };
-}
-
-function buildMeTimelineSections({
-  entries,
-  featuredEntry,
-  selectedDate,
-  timeZone,
-}: {
-  entries: MobileScheduleEntry[];
-  featuredEntry: MobileScheduleEntry | null;
-  selectedDate: string;
-  timeZone?: string | null;
-}): MeTimelineSection[] {
-  const visibleEntries = sortEntriesChronologically(entries).filter(
-    (entry) => entry.date.localeCompare(selectedDate) >= 0,
-  );
-
-  const featuredEntryKey = featuredEntry ? getScheduleEntryKey(featuredEntry) : null;
-  const featuredIndex =
-    featuredEntryKey == null
-      ? -1
-      : visibleEntries.findIndex(
-          (entry) => getScheduleEntryKey(entry) === featuredEntryKey,
-        );
-  const timelineEntries =
-    featuredIndex >= 0 ? visibleEntries.slice(featuredIndex + 1) : visibleEntries;
-  const grouped = new Map<string, MobileScheduleEntry[]>();
-
-  for (const entry of timelineEntries) {
-    const existingEntries = grouped.get(entry.date) ?? [];
-    existingEntries.push(entry);
-    grouped.set(entry.date, existingEntries);
-  }
-
-  return Array.from(grouped.entries()).map(([date, groupedEntries]) => ({
-    date,
-    title: formatScheduleDayLabel(date, new Date(), timeZone),
-    entries: groupedEntries,
-  }));
-}
-
-function getHeroStatusLabel(status: MeHeroState["status"]): string {
-  switch (status) {
-    case "active":
-      return "On Duty";
-    case "upcoming":
-      return "Up Next";
-    case "away":
-      return "Away";
-    case "scheduled":
-      return "Scheduled";
-    default:
-      return "Open Week";
-  }
-}
-
-function getHeroTitle(
-  entry: MobileScheduleEntry | null,
-  _selectedDate: string,
-  todayDate: string,
-): string {
-  if (!entry) {
-    return "Nothing scheduled";
-  }
-
-  const segments = getDisplaySegments(entry);
-
-  if (segments.length > 1) {
-    return entry.date === todayDate ? "Today's shifts" : "Scheduled shifts";
-  }
-
-  return entry.shiftName;
-}
-
 function formatDurationLabel(totalMinutes: number): string {
   const minutes = Math.max(totalMinutes, 0);
   const hoursPart = Math.floor(minutes / 60);
   const minutesPart = minutes % 60;
 
   if (hoursPart === 0) {
-    return `${minutesPart}m remaining`;
+    return `${minutesPart}m left`;
   }
 
   if (minutesPart === 0) {
-    return `${hoursPart}h remaining`;
+    return `${hoursPart}h left`;
   }
 
-  return `${hoursPart}h ${minutesPart}m remaining`;
-}
-
-function getEntryOverallTimeRange(entry: MobileScheduleEntry): ShiftTimeRange | null {
-  const ranges = getEntryTimeRanges(entry);
-  const firstRange = ranges[0] ?? null;
-  const lastRange = ranges[ranges.length - 1] ?? null;
-
-  if (!firstRange || !lastRange) {
-    return null;
-  }
-
-  return {
-    start: firstRange.start,
-    end: lastRange.end,
-  };
+  return `${hoursPart}h ${minutesPart}m left`;
 }
 
 function getHeroProgress(
   entry: MobileScheduleEntry | null,
-  status: MeHeroState["status"],
+  segmentStartTime: string | null,
+  segmentEndTime: string | null,
+  status: "active" | "upcoming" | "scheduled" | "away" | "empty",
   currentTime: string,
 ): { progress: number; remainingLabel: string } | null {
-  if (!entry || status !== "active" || getDisplaySegments(entry).length > 1) {
+  if (!entry || status !== "active" || !segmentStartTime || !segmentEndTime) {
     return null;
   }
 
-  const overallRange = getEntryOverallTimeRange(entry);
-
-  if (!overallRange) {
-    return null;
-  }
-
-  const [normalizedRange] = expandTimeRange(overallRange);
+  const [normalizedRange] = expandTimeRange({
+    start: segmentStartTime,
+    end: segmentEndTime,
+  });
   const currentMinutes = getMinutesSinceMidnight(currentTime);
 
   if (!normalizedRange || currentMinutes == null) {
@@ -511,14 +315,189 @@ function getHeroProgress(
   };
 }
 
+function formatCompactScheduleDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function getCompactScheduleDateParts(value: string): {
+  weekdayLabel: string;
+  dayLabel: string;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).formatToParts(new Date(`${value}T00:00:00.000Z`));
+
+  return {
+    weekdayLabel: (
+      parts.find((part) => part.type === "weekday")?.value ?? ""
+    ).toUpperCase(),
+    dayLabel: parts.find((part) => part.type === "day")?.value ?? "",
+  };
+}
+
+function formatHoursValue(value: number): string {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+function getRequestSegments(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+) {
+  const legacyRequest = request as MobileShiftRequest & {
+    requesterSegments?: MobileShiftRequest["requesterPresentation"]["segments"];
+    targetSegments?:
+      | MobileShiftRequest["requesterPresentation"]["segments"]
+      | null;
+  };
+
+  return which === "requester"
+    ? (request.requesterPresentation?.segments ??
+        legacyRequest.requesterSegments ??
+        [])
+    : (request.targetPresentation?.segments ??
+        legacyRequest.targetSegments ??
+        []);
+}
+
+function getRequestPrimarySegment(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+) {
+  return getRequestSegments(request, which)[0] ?? null;
+}
+
+function getRequestShiftName(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): string {
+  const primarySegment = getRequestPrimarySegment(request, which);
+
+  if (primarySegment?.shiftName) {
+    return primarySegment.shiftName;
+  }
+
+  return which === "requester"
+    ? (request.requesterPresentation?.label ?? "Shift")
+    : (request.targetPresentation?.label ?? "Shift");
+}
+
+function getRequestJobName(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): string | null {
+  return (
+    getRequestSegments(request, which).find((segment) => segment.jobName)
+      ?.jobName ?? null
+  );
+}
+
+function getRequestFocusAreaName(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): string | null {
+  return (
+    getRequestSegments(request, which).find(
+      (segment) => segment.displayFocusAreaName,
+    )?.displayFocusAreaName ?? null
+  );
+}
+
+function getRequestTimeRange(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): string | null {
+  const segments = getRequestSegments(request, which);
+  const firstSegmentWithTime = segments.find(
+    (segment) => segment.startTime && segment.endTime,
+  );
+  const lastSegmentWithTime =
+    [...segments]
+      .reverse()
+      .find((segment) => segment.startTime && segment.endTime) ?? null;
+
+  if (firstSegmentWithTime && lastSegmentWithTime) {
+    return formatScheduleTimeRange(
+      firstSegmentWithTime.startTime,
+      lastSegmentWithTime.endTime,
+    );
+  }
+
+  return which === "requester"
+    ? formatScheduleTimeRange(
+        request.requesterState?.customStartTime ?? null,
+        request.requesterState?.customEndTime ?? null,
+      )
+    : formatScheduleTimeRange(
+        request.targetState?.customStartTime ?? null,
+        request.targetState?.customEndTime ?? null,
+      );
+}
+
+function getOpenShiftPrimarySegment(openShift: MobileOpenShift) {
+  return openShift.presentation.segments[0] ?? null;
+}
+
+function getOpenShiftShiftName(openShift: MobileOpenShift): string {
+  return (
+    getOpenShiftPrimarySegment(openShift)?.shiftName ??
+    openShift.presentation.label ??
+    "Open Shift"
+  );
+}
+
+function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+  const segment = openShift.presentation.segments.find((item) => item.jobName);
+
+  return buildJobChip(segment?.jobName ?? null, segment ?? null);
+}
+
+function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
+  return (
+    openShift.presentation.segments.find(
+      (segment) => segment.displayFocusAreaName,
+    )?.displayFocusAreaName ??
+    openShift.presentation.displayFocusAreaName ??
+    openShift.focusAreaName
+  );
+}
+
+function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
+  const segment = openShift.presentation.segments.find(
+    (item) => item.startTime && item.endTime,
+  );
+
+  if (segment?.startTime && segment.endTime) {
+    return formatScheduleTimeRange(segment.startTime, segment.endTime);
+  }
+
+  if (openShift.presentation.startTime && openShift.presentation.endTime) {
+    return formatScheduleTimeRange(
+      openShift.presentation.startTime,
+      openShift.presentation.endTime,
+    );
+  }
+
+  return null;
+}
+
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
   const bootstrapQuery = useBootstrap(accessToken);
+  const now = useRealtimeNow();
   const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<
     string | null
   >(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [selectedDateOverride, setSelectedDateOverride] = useState<
     string | null
   >(null);
@@ -529,7 +508,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const pendingMeScrollKeyRef = useRef<string | null>(null);
   const swipeStartXRef = useRef<number | null>(null);
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
-  const todayDate = getIsoDateInTimeZone(new Date(), timeZone);
+  const todayDate = getIsoDateInTimeZone(now, timeZone);
   const selectedDate = selectedDateOverride ?? todayDate;
   const range = useMemo(
     () => getScheduleRangeForDate(selectedDate),
@@ -543,6 +522,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const isTeamScope = scope === "team";
   const isBlockedTeamView =
     isTeamScope && !canViewTeamSchedule && Boolean(bootstrapQuery.data);
+  const canLoadSchedule =
+    Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
+  const canLoadRequests = Boolean(accessToken) && !isTeamScope;
+  const canLoadMeTeamSchedule =
+    Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
   const scheduleQuery = useQuery({
     queryKey: [
       "mobile",
@@ -556,8 +540,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       isTeamScope
         ? getOrgSchedule(accessToken!, range)
         : getMySchedule(accessToken!, range),
-    enabled:
-      Boolean(accessToken) && (!isTeamScope || Boolean(canViewTeamSchedule)),
+    enabled: canLoadSchedule,
   });
   const meTeamScheduleQuery = useQuery({
     queryKey: [
@@ -567,10 +550,61 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       accessToken,
       range.startDate,
       range.endDate,
-      "me-collaborators",
     ],
     queryFn: () => getOrgSchedule(accessToken!, range),
-    enabled: Boolean(accessToken) && !isTeamScope && canViewTeamSchedule,
+    enabled: canLoadMeTeamSchedule,
+  });
+  const requestsQuery = useQuery({
+    queryKey: [
+      "mobile",
+      "requests",
+      accessToken,
+      range.startDate,
+      range.endDate,
+    ],
+    queryFn: () => getShiftRequests(accessToken!, range),
+    enabled: canLoadRequests,
+  });
+  const refetchBootstrap = bootstrapQuery.refetch;
+  const refetchSchedule = scheduleQuery.refetch;
+  const refetchMeTeamSchedule = meTeamScheduleQuery.refetch;
+  const refetchRequests = requestsQuery.refetch;
+  const refetchScreenContent = useCallback(async () => {
+    const refreshes: Array<Promise<unknown>> = [refetchBootstrap()];
+
+    if (canLoadSchedule) {
+      refreshes.push(refetchSchedule());
+    }
+
+    if (canLoadRequests) {
+      refreshes.push(refetchRequests());
+    }
+
+    if (canLoadMeTeamSchedule) {
+      refreshes.push(refetchMeTeamSchedule());
+    }
+
+    await Promise.all(refreshes);
+  }, [
+    canLoadMeTeamSchedule,
+    canLoadRequests,
+    canLoadSchedule,
+    refetchBootstrap,
+    refetchMeTeamSchedule,
+    refetchRequests,
+    refetchSchedule,
+  ]);
+  const requestActionMutation = useMutation({
+    mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
+      updateShiftRequest(accessToken!, input.requestId, input.body),
+    onSuccess: async () => {
+      await Promise.all([
+        refetchScreenContent(),
+        queryClient.invalidateQueries({
+          queryKey: ["mobile", "requests", accessToken],
+        }),
+      ]);
+    },
   });
 
   const activeData = scheduleQuery.data;
@@ -580,19 +614,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Area";
   const unreadNotificationCount =
     bootstrapQuery.data?.unreadNotificationCount ?? 0;
-  const selectedDateLabel = formatScheduleDayLabel(
-    selectedDate,
-    new Date(),
-    timeZone,
-  );
-  const selectedDateLongLabel = formatVerboseScheduleDate(selectedDate);
+  const selectedDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
+  const isSelectedToday = selectedDate === todayDate;
   const weekRangeLabel = formatScheduleRange(range, timeZone);
-  const currentTimeValue = getCurrentTimeValue(new Date(), timeZone);
-  const greetingLabel = getGreetingLabel(new Date(), timeZone);
-  const greetingName =
-    linkedEmployee?.firstName ??
-    bootstrapQuery.data?.user?.firstName ??
-    "there";
+  const currentTimeValue = getCurrentTimeValue(now, timeZone);
   const visibleCalendarMonth =
     calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
   const monthCalendarLabel = formatScheduleMonthLabel(
@@ -686,70 +711,90 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         : filterScheduleEntriesByDate(activeEntries, selectedDate),
     [activeEntries, isTeamScope, selectedDate],
   );
-  const meOrderedEntries = useMemo(
-    () => (!isTeamScope ? sortEntriesChronologically(activeEntries) : []),
-    [activeEntries, isTeamScope],
-  );
-  const meHeroState = useMemo<MeHeroState>(
+  const meHeroState = useMemo<FeaturedMeScheduleSegment>(
     () =>
       !isTeamScope
-        ? getFeaturedMeEntry({
-            entries: meOrderedEntries,
+        ? getFeaturedMeScheduleSegment({
+            entries: activeEntries,
+            rangeStartDate: range.startDate,
             selectedDate,
             todayDate,
             currentTime: currentTimeValue,
           })
         : {
-            entry: null,
+            item: null,
             status: "empty",
           },
-    [currentTimeValue, isTeamScope, meOrderedEntries, selectedDate, todayDate],
+    [
+      activeEntries,
+      currentTimeValue,
+      isTeamScope,
+      range.startDate,
+      selectedDate,
+      todayDate,
+    ],
   );
   const meHeroProgress = useMemo(
     () =>
-      !isTeamScope
-        ? getHeroProgress(meHeroState.entry, meHeroState.status, currentTimeValue)
+      !isTeamScope && meHeroState.item
+        ? getHeroProgress(
+            meHeroState.item.entry,
+            meHeroState.item.segment.startTime ??
+              getScheduleEntryStartTime(meHeroState.item.entry),
+            meHeroState.item.segment.endTime ??
+              getScheduleEntryEndTime(meHeroState.item.entry),
+            meHeroState.status,
+            currentTimeValue,
+          )
         : null,
-    [currentTimeValue, isTeamScope, meHeroState.entry, meHeroState.status],
+    [currentTimeValue, isTeamScope, meHeroState.item, meHeroState.status],
   );
-  const meTimelineSections = useMemo(
+  const meHeroShiftmates = useMemo(
+    () =>
+      !isTeamScope && canLoadMeTeamSchedule
+        ? getMeHeroShiftmates(
+            meHeroState.item,
+            meTeamScheduleQuery.data?.entries ?? [],
+          )
+        : [],
+    [
+      canLoadMeTeamSchedule,
+      isTeamScope,
+      meHeroState.item,
+      meTeamScheduleQuery.data?.entries,
+    ],
+  );
+  const meUpcomingItems = useMemo(
     () =>
       !isTeamScope
-        ? buildMeTimelineSections({
-            entries: meOrderedEntries,
-            featuredEntry: meHeroState.entry,
+        ? buildUpcomingMeScheduleItems({
+            entries: activeEntries,
+            featuredItem: meHeroState.item,
             selectedDate,
-            timeZone,
           })
         : [],
-    [isTeamScope, meHeroState.entry, meOrderedEntries, selectedDate, timeZone],
+    [activeEntries, isTeamScope, meHeroState.item, selectedDate],
   );
-  const meCollaborators = useMemo(() => {
-    if (
-      isTeamScope ||
-      !canViewTeamSchedule ||
-      !meHeroState.entry ||
-      meHeroState.entry.absenceTypeId != null
-    ) {
-      return [];
-    }
-
-    return sortEntriesChronologically(
-      (meTeamScheduleQuery.data?.entries ?? []).filter((entry) => {
-        return (
-          entry.employeeId !== meHeroState.entry?.employeeId &&
-          entry.date === meHeroState.entry?.date &&
-          entry.absenceTypeId == null &&
-          entriesHaveOverlappingTimes(meHeroState.entry, entry)
-        );
-      }),
-    );
-  }, [
-    canViewTeamSchedule,
-    isTeamScope,
-    meHeroState.entry,
-    meTeamScheduleQuery.data?.entries,
-  ]);
+  const meRequestSections = useMemo(
+    () =>
+      !isTeamScope
+        ? buildMeShiftRequestSections({
+            linkedEmployeeId: linkedEmployee?.id ?? null,
+            requests: requestsQuery.data?.requests ?? [],
+          })
+        : {
+            coverRequests: [],
+            openShiftRequests: [],
+          },
+    [isTeamScope, linkedEmployee?.id, requestsQuery.data?.requests],
+  );
+  const meOpenShifts = !isTeamScope
+    ? (requestsQuery.data?.openShifts ?? [])
+    : [];
+  const meWeeklyHours = useMemo(
+    () => (!isTeamScope ? buildWeeklyHoursSummary(activeEntries, 40) : null),
+    [activeEntries, isTeamScope],
+  );
   const shiftGroups = useMemo(
     () => buildScheduleShiftGroups(selectedEntries),
     [selectedEntries],
@@ -762,11 +807,48 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const emptyStateTitle = isTeamScope
     ? "No team shifts on this day"
     : "No shifts on this day";
+  const emptyStateDateLabel = formatScheduleDayLabel(
+    selectedDate,
+    now,
+    timeZone,
+  ).toLowerCase();
   const emptyStateBody = isTeamScope
     ? activeTeamFocusAreaTab
-      ? `No assignments are published for ${activeTeamFocusAreaTab.label} on ${formatScheduleDayLabel(selectedDate, new Date(), timeZone).toLowerCase()}.`
-      : `No assignments are published for ${formatScheduleDayLabel(selectedDate, new Date(), timeZone).toLowerCase()}.`
-    : `Nothing is scheduled for ${formatScheduleDayLabel(selectedDate, new Date(), timeZone).toLowerCase()}.`;
+      ? `No assignments are published for ${activeTeamFocusAreaTab.label} on ${emptyStateDateLabel}.`
+      : `No assignments are published for ${emptyStateDateLabel}.`
+    : `Nothing is scheduled for ${emptyStateDateLabel}.`;
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    function refreshIfActive() {
+      if (AppState.currentState !== "active") {
+        return;
+      }
+
+      void refetchScreenContent();
+    }
+
+    const interval = setInterval(
+      refreshIfActive,
+      SCHEDULE_CONTENT_REFRESH_INTERVAL_MS,
+    );
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          void refetchScreenContent();
+        }
+      },
+    );
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [accessToken, refetchScreenContent]);
 
   useEffect(() => {
     if (isTeamScope) {
@@ -850,6 +932,19 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7));
   }
 
+  function handleGoToToday() {
+    setIsFilterOpen(false);
+    setIsCalendarOpen(false);
+    setSelectedDateOverride(null);
+  }
+
+  function handleManualRefresh() {
+    setIsManualRefreshing(true);
+    void refetchScreenContent().finally(() => {
+      setIsManualRefreshing(false);
+    });
+  }
+
   function handleToggleCalendar() {
     setIsFilterOpen(false);
     if (isCalendarOpen) {
@@ -904,12 +999,44 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     );
   }
 
+  const meStickyHeader = !isTeamScope ? (
+    <View style={styles.meWeekNavigator}>
+      <View style={styles.meWeekNavigatorCopy}>
+        <Text style={styles.meWeekNavigatorTitle}>{selectedDateLabel}</Text>
+        <Text style={styles.meWeekNavigatorSubtitle}>{weekRangeLabel}</Text>
+      </View>
+      <View style={styles.meWeekNavigatorActions}>
+        {!isSelectedToday ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleGoToToday}
+            style={({ pressed }) => [
+              styles.meTodayButton,
+              pressed && styles.meTodayButtonPressed,
+            ]}
+          >
+            <Text style={styles.meTodayButtonText}>Today</Text>
+          </Pressable>
+        ) : null}
+        <IconControlButton
+          accessibilityLabel="Previous week"
+          iconName="chevron-back"
+          onPress={handlePreviousWeek}
+        />
+        <IconControlButton
+          accessibilityLabel="Next week"
+          iconName="chevron-forward"
+          onPress={handleNextWeek}
+        />
+        <AlertsChromeButton unreadCount={unreadNotificationCount} />
+      </View>
+    </View>
+  ) : undefined;
+
   const stickyHeader = isTeamScope ? (
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
-        <Text style={styles.teamHeaderTitle}>
-          {activeTeamFocusAreaLabel}
-        </Text>
+        <Text style={styles.teamHeaderTitle}>{activeTeamFocusAreaLabel}</Text>
         <View style={styles.teamHeaderActions}>
           {teamFocusAreaTabs.length > 0 ? (
             <View style={styles.filterMenuAnchor}>
@@ -957,6 +1084,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             <IconControlButton
               accessibilityLabel="Open month calendar"
               iconName="calendar-outline"
+              iconSize={10}
               onPress={handleToggleCalendar}
             />
             {isCalendarOpen ? (
@@ -995,24 +1123,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         ))}
       </View>
     </View>
-  ) : undefined;
+  ) : (
+    meStickyHeader
+  );
 
   return (
     <Screen
-      refreshing={
-        scheduleQuery.isFetching ||
-        bootstrapQuery.isFetching ||
-        (!isTeamScope && meTeamScheduleQuery.isFetching)
-      }
-      onRefresh={() => {
-        void Promise.all([
-          scheduleQuery.refetch(),
-          bootstrapQuery.refetch(),
-          !isTeamScope && canViewTeamSchedule
-            ? meTeamScheduleQuery.refetch()
-            : Promise.resolve(),
-        ]);
-      }}
+      refreshing={isManualRefreshing || requestActionMutation.isPending}
+      onRefresh={handleManualRefresh}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
     >
@@ -1027,10 +1145,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           body={contentState.message}
           actionLabel="Try Again"
           onAction={() => {
-            void Promise.all([
-              scheduleQuery.refetch(),
-              bootstrapQuery.refetch(),
-            ]);
+            void refetchScreenContent();
           }}
         />
       ) : isBlockedTeamView ? (
@@ -1045,62 +1160,84 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         />
       ) : !isTeamScope ? (
         <View style={styles.mePage}>
-          <View style={styles.meTopStack}>
-            <View style={styles.meWelcomeRow}>
-              <View style={styles.meWelcomeCopy}>
-                <Text style={styles.meWelcomeDate}>{selectedDateLongLabel}</Text>
-                <Text style={styles.meWelcomeTitle}>
-                  {`${greetingLabel}, ${greetingName}`}
-                </Text>
-              </View>
-              <AlertsChromeButton unreadCount={unreadNotificationCount} />
-            </View>
-
-            <View style={styles.meWeekNavigator}>
-              <View style={styles.meWeekNavigatorCopy}>
-                <Text style={styles.meWeekNavigatorTitle}>{selectedDateLabel}</Text>
-                <Text style={styles.meWeekNavigatorSubtitle}>{weekRangeLabel}</Text>
-              </View>
-              <View style={styles.meWeekNavigatorActions}>
-                <IconControlButton
-                  accessibilityLabel="Previous week"
-                  iconName="chevron-back"
-                  onPress={handlePreviousWeek}
-                />
-                <IconControlButton
-                  accessibilityLabel="Next week"
-                  iconName="chevron-forward"
-                  onPress={handleNextWeek}
-                />
-              </View>
-            </View>
-          </View>
-
           <MeHeroCard
-            entry={meHeroState.entry}
+            featuredItem={meHeroState.item}
             progress={meHeroProgress}
-            selectedDate={selectedDate}
+            shiftmates={meHeroShiftmates}
             status={meHeroState.status}
-            todayDate={todayDate}
             onPress={
-              meHeroState.entry
-                ? () => handleOpenShiftDetail(meHeroState.entry!)
+              meHeroState.item
+                ? () => handleOpenShiftDetail(meHeroState.item!.entry)
                 : undefined
             }
           />
+          <ShiftCoverRequestsSection
+            isLoading={requestsQuery.isLoading}
+            linkedEmployeeId={linkedEmployee?.id ?? null}
+            mutationPending={requestActionMutation.isPending}
+            onRespond={(requestId, accept) => {
+              if (!linkedEmployee?.id) {
+                return;
+              }
 
-          <MeCollaboratorsCard
-            canViewTeamSchedule={canViewTeamSchedule}
-            collaborators={meCollaborators}
-            entry={meHeroState.entry}
-            isLoading={meTeamScheduleQuery.isLoading}
-            hasError={Boolean(meTeamScheduleQuery.error)}
+              requestActionMutation.mutate({
+                requestId,
+                body: {
+                  action: "respond",
+                  empId: linkedEmployee.id,
+                  accept,
+                },
+              });
+            }}
+            requests={meRequestSections.coverRequests}
+            requestsError={requestsQuery.error}
           />
+          <OpenShiftsSection
+            isLoading={requestsQuery.isLoading}
+            linkedEmployeeId={linkedEmployee?.id ?? null}
+            mutationPending={requestActionMutation.isPending}
+            onClaim={(requestId) => {
+              if (!linkedEmployee?.id) {
+                return;
+              }
 
-          <MeTimelineCard
-            sections={meTimelineSections}
+              requestActionMutation.mutate({
+                requestId,
+                body: {
+                  action: "claim",
+                  claimerEmpId: linkedEmployee.id,
+                },
+              });
+            }}
+            onVolunteer={(openShift) => {
+              if (!linkedEmployee?.id) {
+                return;
+              }
+
+              requestActionMutation.mutate({
+                requestId: openShift.id,
+                body: {
+                  action: "volunteer_open_shift",
+                  empId: linkedEmployee.id,
+                  shiftDate: openShift.date,
+                  focusAreaId: openShift.focusAreaId,
+                  state: openShift.state,
+                },
+              });
+            }}
+            onSeeAll={() => router.push("/(tabs)/requests")}
+            openShifts={meOpenShifts}
+            requests={meRequestSections.openShiftRequests}
+            requestsError={requestsQuery.error}
+          />
+          <UpcomingShiftsSection
+            items={meUpcomingItems}
             onPressEntry={handleOpenShiftDetail}
+            summary={meWeeklyHours}
           />
+          {requestActionMutation.error ? (
+            <SectionStateCard body="We couldn't update that shift request right now." />
+          ) : null}
         </View>
       ) : shiftGroups.length === 0 ? (
         <Card title={emptyStateTitle} body={emptyStateBody} />
@@ -1115,17 +1252,16 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               <View key={group.key} style={styles.shiftGroupBlock}>
                 {index > 0 ? <View style={styles.shiftGroupDivider} /> : null}
                 <View style={styles.shiftGroupHeader}>
-                  <Text style={styles.shiftGroupTitle}>
-                    {groupTimeRange
-                      ? `${group.title} • ${groupTimeRange}`
-                      : group.title}
-                  </Text>
+                  <Text style={styles.shiftGroupTitle}>{group.title}</Text>
+                  {groupTimeRange ? (
+                    <Text style={styles.shiftGroupTime}>{groupTimeRange}</Text>
+                  ) : null}
                 </View>
                 <View style={styles.teamGroupCard}>
                   <View style={styles.teamGroupMembers}>
                     {group.entries.map((entry, memberIndex) => (
                       <TeamShiftMemberRow
-                        key={`${entry.employeeId}-${entry.date}-${entry.shiftLabel}-${entry.focusAreaId ?? "general"}-${entry.startTime ?? "none"}-${entry.endTime ?? "none"}`}
+                        key={`${entry.employeeId}-${entry.date}-${getScheduleEntryTitle(entry)}-${getScheduleEntryFocusAreaId(entry) ?? "general"}-${getScheduleEntryStartTime(entry) ?? "none"}-${getScheduleEntryEndTime(entry) ?? "none"}`}
                         entry={entry}
                         groupTimeRange={groupTimeRange}
                         isFirst={memberIndex === 0}
@@ -1203,12 +1339,14 @@ function MonthCalendar({
         <IconControlButton
           accessibilityLabel="Previous month"
           iconName="chevron-back"
+          iconSize={10}
           onPress={onPreviousMonth}
         />
         <Text style={styles.monthCalendarTitle}>{monthLabel}</Text>
         <IconControlButton
           accessibilityLabel="Next month"
           iconName="chevron-forward"
+          iconSize={10}
           onPress={onNextMonth}
         />
       </View>
@@ -1260,10 +1398,12 @@ function MonthCalendar({
 function IconControlButton({
   accessibilityLabel,
   iconName,
+  iconSize = 20,
   onPress,
 }: {
   accessibilityLabel: string;
   iconName: ComponentProps<typeof Ionicons>["name"];
+  iconSize?: number;
   onPress: () => void;
 }) {
   return (
@@ -1277,7 +1417,11 @@ function IconControlButton({
         pressed && styles.iconControlButtonPressed,
       ]}
     >
-      <Ionicons color={mobileColors.textPrimary} name={iconName} size={20} />
+      <Ionicons
+        color={mobileColors.textPrimary}
+        name={iconName}
+        size={iconSize}
+      />
     </Pressable>
   );
 }
@@ -1318,157 +1462,473 @@ export function TeamScheduleScreen() {
   return <ScheduleScreen scope="team" />;
 }
 
-function MeHeroCard({
-  entry,
-  status,
-  selectedDate,
-  todayDate,
-  progress,
-  onPress,
-}: {
-  entry: MobileScheduleEntry | null;
-  status: MeHeroState["status"];
-  selectedDate: string;
-  todayDate: string;
-  progress: { progress: number; remainingLabel: string } | null;
-  onPress?: () => void;
-}) {
-  const title = getHeroTitle(entry, selectedDate, todayDate);
-  const segments = entry ? getDisplaySegments(entry) : [];
-  const hasMultipleSegments = segments.length > 1;
-  const primarySegment = segments[0] ?? null;
-  const primaryTimeRange = primarySegment
-    ? getScheduleEntrySegmentTimeRange(primarySegment)
-    : null;
-  const secondaryDateLabel =
-    entry && entry.date !== selectedDate
-      ? formatScheduleDayLabel(entry.date)
-      : null;
-  const isMuted = status === "away" || status === "empty";
+export default TeamScheduleScreen;
 
-  const content = (
-    <>
-      <View
+function joinMetaParts(parts: Array<string | null | undefined>): string | null {
+  const values = parts.filter(
+    (part): part is string =>
+      typeof part === "string" && part.trim().length > 0,
+  );
+
+  return values.length > 0 ? values.join(" • ") : null;
+}
+
+function getScheduleItemShiftName(
+  item: FeaturedMeScheduleSegment["item"],
+): string {
+  if (!item) {
+    return "Nothing scheduled";
+  }
+
+  return item.segment.shiftName || getScheduleEntryTitle(item.entry);
+}
+
+function getScheduleItemJobName(
+  item: FeaturedMeScheduleSegment["item"],
+): string | null {
+  if (!item || getScheduleEntryAbsenceTypeId(item.entry) != null) {
+    return null;
+  }
+
+  return item.segment.jobName ?? null;
+}
+
+function getScheduleItemFocusArea(
+  item: FeaturedMeScheduleSegment["item"],
+): string | null {
+  if (!item) {
+    return null;
+  }
+
+  return getScheduleEntrySegmentFocusAreaName(item.entry, item.segment);
+}
+
+type JobColorSource = {
+  jobColor?: string | null;
+  jobBorderColor?: string | null;
+  jobTextColor?: string | null;
+};
+
+type JobChip = AvatarTone & {
+  label: string;
+};
+
+function normalizeScheduleLabel(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function buildJobChip(
+  label: string | null | undefined,
+  colorSource?: JobColorSource | null,
+): JobChip | null {
+  if (!label) {
+    return null;
+  }
+
+  if (
+    colorSource?.jobColor ||
+    colorSource?.jobBorderColor ||
+    colorSource?.jobTextColor
+  ) {
+    return {
+      label,
+      backgroundColor: colorSource.jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: colorSource.jobBorderColor ?? mobileColors.border,
+      textColor: colorSource.jobTextColor ?? mobileColors.textMuted,
+    };
+  }
+
+  const normalizedLabel = label.trim().toLowerCase();
+  const tone =
+    normalizedLabel.includes("supervisor") ||
+    normalizedLabel.includes("lead") ||
+    normalizedLabel.includes("manager")
+      ? {
+          backgroundColor: "#FCE7F3",
+          borderColor: "#FBCFE8",
+          textColor: "#BE185D",
+        }
+      : normalizedLabel.includes("mentor") ||
+          normalizedLabel.includes("trainer")
+        ? {
+            backgroundColor: mobileColors.warningSoft,
+            borderColor: mobileColors.warningBorder,
+            textColor: "#B45309",
+          }
+        : normalizedLabel.includes("nurse") ||
+            normalizedLabel.includes("rn") ||
+            normalizedLabel.includes("lpn")
+          ? {
+              backgroundColor: "#ECFEFF",
+              borderColor: "#A5F3FC",
+              textColor: "#0E7490",
+            }
+          : {
+              backgroundColor: mobileColors.surfaceSecondary,
+              borderColor: mobileColors.border,
+              textColor: mobileColors.textMuted,
+            };
+
+  return {
+    label,
+    ...tone,
+  };
+}
+
+function getScheduleItemJobChip(
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  if (!item) {
+    return null;
+  }
+
+  const jobName = getScheduleItemJobName(item);
+  return buildJobChip(jobName, item.segment);
+}
+
+function getScheduleItemTypeChip(
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  if (!item) {
+    return null;
+  }
+
+  if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
+    return {
+      label: "Absence",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textMuted,
+    };
+  }
+
+  return getScheduleItemJobChip(item);
+}
+
+function getVisibleScheduleItemTypeChip(
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  const typeChip = getScheduleItemTypeChip(item);
+
+  if (!item || !typeChip) {
+    return typeChip;
+  }
+
+  const chipLabel = normalizeScheduleLabel(typeChip.label);
+  const shiftLabels = [
+    getScheduleItemShiftName(item),
+    item.segment.shiftName,
+    item.segment.label,
+    item.entry.presentation?.label,
+  ].map(normalizeScheduleLabel);
+
+  return chipLabel.length > 0 && shiftLabels.includes(chipLabel)
+    ? null
+    : typeChip;
+}
+
+function getScheduleItemTimeRange(
+  item: FeaturedMeScheduleSegment["item"],
+): string | null {
+  if (!item) {
+    return null;
+  }
+
+  const segmentCount = getScheduleEntrySegments(item.entry).length;
+
+  if (segmentCount <= 1) {
+    return (
+      getScheduleEntryCustomTimeRange(item.entry) ??
+      getScheduleEntrySegmentTimeRange(item.segment) ??
+      getScheduleEntryBaseTimeRange(item.entry)
+    );
+  }
+
+  return (
+    getScheduleEntrySegmentTimeRange(item.segment) ??
+    getScheduleEntryBaseTimeRange(item.entry)
+  );
+}
+
+function getMeHeroShiftmates(
+  item: FeaturedMeScheduleSegment["item"],
+  teamEntries: MobileScheduleEntry[],
+): MobileScheduleEntry[] {
+  if (!item || getScheduleEntryAbsenceTypeId(item.entry) != null) {
+    return [];
+  }
+
+  const activeCategoryKey = getScheduleEntryCategoryKey(item.entry);
+  const matchingEntries = teamEntries.filter(
+    (entry) =>
+      entry.date === item.date &&
+      entry.employeeId !== item.entry.employeeId &&
+      getScheduleEntryCategoryKey(entry) === activeCategoryKey,
+  );
+  const matchingGroup = buildScheduleShiftGroups(matchingEntries).find(
+    (group) => group.key === activeCategoryKey,
+  );
+
+  return matchingGroup?.entries ?? sortScheduleEntries(matchingEntries);
+}
+
+function getRequestDateLabel(request: MobileShiftRequest): string {
+  return formatCompactScheduleDate(request.requesterShiftDate);
+}
+
+function getRequestJobChip(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): JobChip | null {
+  const segment =
+    getRequestSegments(request, which).find((item) => item.jobName) ?? null;
+  const jobName = getRequestJobName(request, which);
+  return buildJobChip(jobName, segment);
+}
+
+function SectionStateCard({ body }: { body: string }) {
+  return (
+    <View style={styles.meSurfaceCard}>
+      <Text style={styles.meSectionBody}>{body}</Text>
+    </View>
+  );
+}
+
+function MeSectionHeader({
+  title,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.meSectionHeader}>
+      <View style={styles.meSectionHeaderCopy}>
+        <Text style={styles.meSectionTitle}>{title}</Text>
+      </View>
+      {actionLabel && onAction ? (
+        <Pressable accessibilityRole="button" onPress={onAction}>
+          <Text style={styles.meSectionLink}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function JobPill({
+  chip,
+  compact,
+}: {
+  chip: JobChip | null;
+  compact?: boolean;
+}) {
+  if (!chip) {
+    return null;
+  }
+
+  return (
+    <View
+      accessibilityLabel={`Job ${chip.label}`}
+      style={[
+        styles.jobPill,
+        compact && styles.jobPillCompact,
+        {
+          backgroundColor: chip.backgroundColor,
+          borderColor: chip.borderColor,
+        },
+      ]}
+    >
+      <Text
         style={[
-          styles.meHeroGlow,
-          styles.meHeroGlowLarge,
-          isMuted && styles.meHeroGlowMuted,
+          styles.jobPillText,
+          compact && styles.jobPillTextCompact,
+          { color: chip.textColor },
         ]}
-      />
-      <View
-        style={[
-          styles.meHeroGlow,
-          styles.meHeroGlowSmall,
-          isMuted && styles.meHeroGlowMuted,
-        ]}
-      />
-      <View style={styles.meHeroContent}>
-        <View style={styles.meHeroHeader}>
-          <View style={styles.meHeroHeaderCopy}>
+      >
+        {chip.label}
+      </Text>
+    </View>
+  );
+}
+
+function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const visibleEntries = entries.slice(0, 3);
+  const overflowCount = entries.length - visibleEntries.length;
+
+  return (
+    <View style={styles.meHeroCollaborators}>
+      <View style={styles.meHeroCollaboratorLabelRow}>
+        <Ionicons
+          color="rgba(255, 255, 255, 0.76)"
+          name="people-outline"
+          size={22}
+        />
+        <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
+      </View>
+      <View style={styles.meHeroAvatarStack}>
+        {visibleEntries.map((entry, index) => {
+          const avatarTone = getAvatarTone(entry.employeeId);
+
+          return (
             <View
+              key={`${entry.employeeId}-${entry.date}`}
               style={[
-                styles.meHeroBadge,
-                isMuted && styles.meHeroBadgeMuted,
+                styles.meHeroCollaboratorAvatarFrame,
+                index > 0 && styles.meHeroCollaboratorAvatarFrameOverlap,
               ]}
             >
               <View
                 style={[
-                  styles.meHeroBadgeDot,
-                  status === "active"
-                    ? styles.meHeroBadgeDotActive
-                    : isMuted
-                      ? styles.meHeroBadgeDotMuted
-                      : styles.meHeroBadgeDotScheduled,
-                ]}
-              />
-              <Text
-                style={[
-                  styles.meHeroBadgeText,
-                  isMuted && styles.meHeroBadgeTextMuted,
+                  styles.meHeroCollaboratorAvatar,
+                  {
+                    backgroundColor: avatarTone.backgroundColor,
+                    borderColor: avatarTone.borderColor,
+                  },
                 ]}
               >
-                {getHeroStatusLabel(status)}
-              </Text>
+                <Text
+                  style={[
+                    styles.meHeroCollaboratorAvatarText,
+                    { color: avatarTone.textColor },
+                  ]}
+                >
+                  {getInitials(entry.employeeName)}
+                </Text>
+              </View>
             </View>
-            <Text
-              style={[
-                styles.meHeroTitle,
-                isMuted && styles.meHeroTitleMuted,
-              ]}
-            >
-              {title}
-            </Text>
-            {secondaryDateLabel ? (
-              <Text
-                style={[
-                  styles.meHeroSupportingText,
-                  isMuted && styles.meHeroSupportingTextMuted,
-                ]}
-              >
-                {secondaryDateLabel}
-              </Text>
-            ) : null}
-          </View>
-          {onPress ? (
-            <View
-              style={[
-                styles.meHeroActionIcon,
-                isMuted && styles.meHeroActionIconMuted,
-              ]}
-            >
-              <Ionicons
-                color={isMuted ? mobileColors.textPrimary : mobileColors.textInverse}
-                name="chevron-forward"
-                size={18}
-              />
-            </View>
-          ) : null}
-        </View>
-
-        {!entry ? (
-          <Text
+          );
+        })}
+        {overflowCount > 0 ? (
+          <View
             style={[
-              styles.meHeroEmptyText,
-              isMuted && styles.meHeroEmptyTextMuted,
+              styles.meHeroCollaboratorAvatarFrame,
+              visibleEntries.length > 0 &&
+                styles.meHeroCollaboratorAvatarFrameOverlap,
             ]}
           >
-            Nothing is published for this week yet.
-          </Text>
-        ) : hasMultipleSegments ? (
-          <ScheduleEntrySegmentList entry={entry} variant="hero" />
-        ) : (
-          <View style={styles.meHeroDetails}>
-            {primaryTimeRange ? (
-              <Text
-                style={[
-                  styles.meHeroDetailText,
-                  isMuted && styles.meHeroDetailTextMuted,
-                ]}
-              >
-                {primaryTimeRange}
-              </Text>
-            ) : null}
-            {primarySegment?.displayFocusAreaName ? (
-              <Text
-                style={[
-                  styles.meHeroDetailText,
-                  isMuted && styles.meHeroDetailTextMuted,
-                ]}
-              >
-                {primarySegment.displayFocusAreaName}
-              </Text>
-            ) : null}
-          </View>
-        )}
-
-        {progress ? (
-          <View style={styles.meHeroProgressBlock}>
-            <View style={styles.meHeroProgressRow}>
-              <Text style={styles.meHeroProgressLabel}>Progress</Text>
-              <Text style={styles.meHeroProgressLabel}>
-                {progress.remainingLabel}
+            <View style={styles.meHeroCollaboratorOverflow}>
+              <Text style={styles.meHeroCollaboratorOverflowText}>
+                +{overflowCount}
               </Text>
             </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function MeHeroCard({
+  featuredItem,
+  status,
+  progress,
+  shiftmates,
+  onPress,
+}: {
+  featuredItem: FeaturedMeScheduleSegment["item"];
+  status: FeaturedMeScheduleSegment["status"];
+  progress: { progress: number; remainingLabel: string } | null;
+  shiftmates: MobileScheduleEntry[];
+  onPress?: () => void;
+}) {
+  const badgeLabel = !featuredItem
+    ? "No Shift"
+    : status === "active"
+      ? "On Duty"
+      : status === "away"
+        ? "Away"
+        : status === "upcoming"
+          ? "Upcoming"
+          : "Scheduled";
+  const displayedShiftDate = featuredItem?.date ?? null;
+  const heroDateLabel = displayedShiftDate
+    ? formatCompactScheduleDate(displayedShiftDate)
+    : null;
+  const heroDateParts = displayedShiftDate
+    ? getCompactScheduleDateParts(displayedShiftDate)
+    : null;
+  const shiftName = getScheduleItemShiftName(featuredItem);
+  const typeChip = getVisibleScheduleItemTypeChip(featuredItem);
+  const focusAreaName = getScheduleItemFocusArea(featuredItem);
+  const timeRange = getScheduleItemTimeRange(featuredItem);
+  const badgeDotStyle =
+    status === "active"
+      ? styles.meHeroBadgeDotActive
+      : status === "away" || status === "empty"
+        ? styles.meHeroBadgeDotMuted
+        : styles.meHeroBadgeDotScheduled;
+
+  const cardContent = (
+    <View style={styles.meHeroContent}>
+      <View style={styles.meHeroHeader}>
+        <View style={styles.meHeroBadge}>
+          {featuredItem ? (
+            <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
+          ) : null}
+          <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+        </View>
+        {heroDateParts ? (
+          <View
+            accessibilityLabel={heroDateLabel ?? undefined}
+            style={styles.meHeroDateTile}
+          >
+            <Text style={styles.meHeroDateWeekday}>
+              {heroDateParts.weekdayLabel}
+            </Text>
+            <Text style={styles.meHeroDateDay}>{heroDateParts.dayLabel}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {!featuredItem ? (
+        <View style={styles.meHeroEmptyBlock}>
+          <Text style={styles.meHeroTitle}>{shiftName}</Text>
+          <Text style={styles.meHeroEmptyText}>
+            Published jobs for this selected week will appear here.
+          </Text>
+        </View>
+      ) : (
+        <>
+          {focusAreaName ? (
+            <View style={styles.meHeroAreaRow}>
+              <Ionicons
+                color="rgba(255, 255, 255, 0.82)"
+                name="location-outline"
+                size={18}
+              />
+              <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
+            </View>
+          ) : null}
+          <Text style={styles.meHeroTitle}>{shiftName}</Text>
+          {typeChip ? (
+            <View style={styles.meHeroRoleRow}>
+              <JobPill chip={typeChip} compact />
+            </View>
+          ) : null}
+          {timeRange ? (
+            <View style={styles.meHeroScheduleRow}>
+              <View style={styles.meHeroTimeRow}>
+                <Ionicons
+                  color="rgba(255, 255, 255, 0.82)"
+                  name="time-outline"
+                  size={24}
+                />
+                <Text style={styles.meHeroTimeText}>{timeRange}</Text>
+              </View>
+              {progress ? (
+                <Text style={styles.meHeroProgressLabel}>
+                  {progress.remainingLabel}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+          {progress ? (
             <View style={styles.meHeroProgressTrack}>
               <View
                 style={[
@@ -1477,181 +1937,386 @@ function MeHeroCard({
                 ]}
               />
             </View>
+          ) : null}
+          <MeHeroShiftmates entries={shiftmates} />
+        </>
+      )}
+    </View>
+  );
+
+  return (
+    <View style={styles.meSectionBlock}>
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPress}
+          style={({ pressed }) => [
+            styles.meHeroCard,
+            pressed && styles.meHeroCardPressed,
+          ]}
+        >
+          {cardContent}
+        </Pressable>
+      ) : (
+        <View style={styles.meHeroCard}>{cardContent}</View>
+      )}
+    </View>
+  );
+}
+
+function UpcomingShiftsSection({
+  items,
+  onPressEntry,
+  summary,
+}: {
+  items: ReturnType<typeof buildUpcomingMeScheduleItems>;
+  onPressEntry: (entry: MobileScheduleEntry) => void;
+  summary: WeeklyHoursSummary | null;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const hoursLabel =
+    summary && summary.scheduledHours > 0
+      ? `${formatHoursValue(summary.scheduledHours)}h this week`
+      : null;
+
+  return (
+    <View style={styles.upcomingSectionBlock}>
+      <View style={styles.upcomingSectionHeader}>
+        <Text style={styles.upcomingSectionTitle}>Your Week</Text>
+        {hoursLabel ? (
+          <View style={styles.upcomingHoursBadge}>
+            <Text style={styles.upcomingHoursBadgeText}>{hoursLabel}</Text>
           </View>
         ) : null}
       </View>
-    </>
-  );
 
-  if (!onPress) {
-    return (
-      <View
-        style={[styles.meHeroCard, isMuted && styles.meHeroCardMuted]}
-      >
-        {content}
+      <View style={styles.upcomingShiftsCard}>
+        {items.map((item, index) => {
+          const dateParts = getCompactScheduleDateParts(item.date);
+          const typeChip = getScheduleItemTypeChip(item);
+          const focusAreaName = getScheduleItemFocusArea(item);
+          const timeRange = getScheduleItemTimeRange(item);
+
+          return (
+            <Pressable
+              key={item.key}
+              accessibilityRole="button"
+              onPress={() => onPressEntry(item.entry)}
+              style={[
+                styles.upcomingShiftRow,
+                index > 0 && styles.upcomingShiftRowBorder,
+              ]}
+            >
+              <View style={styles.upcomingDateTile}>
+                <Text style={styles.upcomingDateWeekday}>
+                  {dateParts.weekdayLabel}
+                </Text>
+                <Text style={styles.upcomingDateDay}>{dateParts.dayLabel}</Text>
+              </View>
+
+              <View style={styles.upcomingShiftCopy}>
+                <Text style={styles.upcomingShiftTitle}>
+                  {getScheduleItemShiftName(item)}
+                </Text>
+                {focusAreaName ? (
+                  <Text style={styles.upcomingShiftArea}>{focusAreaName}</Text>
+                ) : null}
+                <JobPill chip={typeChip} compact />
+                {timeRange ? (
+                  <View style={styles.upcomingShiftTime}>
+                    <Ionicons
+                      color={mobileColors.textMuted}
+                      name="time-outline"
+                      size={18}
+                    />
+                    <Text style={styles.upcomingShiftTimeText}>
+                      {timeRange}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.upcomingShiftAction}>
+                <Ionicons
+                  color={mobileColors.textMuted}
+                  name="swap-horizontal-outline"
+                  size={24}
+                />
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
-    );
-  }
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.meHeroCard,
-        isMuted && styles.meHeroCardMuted,
-        pressed && styles.meHeroCardPressed,
-      ]}
-    >
-      {content}
-    </Pressable>
+    </View>
   );
 }
 
-function MeCollaboratorsCard({
-  canViewTeamSchedule,
-  collaborators,
-  entry,
+function OpenShiftsSection({
+  requests,
+  openShifts,
+  linkedEmployeeId,
   isLoading,
-  hasError,
+  mutationPending,
+  requestsError,
+  onClaim,
+  onVolunteer,
+  onSeeAll,
 }: {
-  canViewTeamSchedule: boolean;
-  collaborators: MobileScheduleEntry[];
-  entry: MobileScheduleEntry | null;
+  requests: MobileShiftRequest[];
+  openShifts: MobileOpenShift[];
+  linkedEmployeeId: string | null;
   isLoading: boolean;
-  hasError: boolean;
+  mutationPending: boolean;
+  requestsError: unknown;
+  onClaim: (requestId: string) => void;
+  onVolunteer: (openShift: MobileOpenShift) => void;
+  onSeeAll: () => void;
 }) {
-  let body: string | null = null;
-
-  if (!entry) {
-    body = "Teammates will appear here once a shift is on the board.";
-  } else if (entry.absenceTypeId != null) {
-    body = "There are no on-duty teammates attached to an absence entry.";
-  } else if (!canViewTeamSchedule) {
-    body = "Team visibility is unavailable for this mobile role.";
-  } else if (isLoading) {
-    body = "Loading teammates working in the same window.";
-  } else if (hasError) {
-    body = "We couldn't load teammates right now.";
-  } else if (collaborators.length === 0) {
-    body = "No other teammates overlap this shift yet.";
+  if (
+    !isLoading &&
+    !requestsError &&
+    requests.length === 0 &&
+    openShifts.length === 0
+  ) {
+    return null;
   }
 
   return (
     <View style={styles.meSectionBlock}>
-      <View style={styles.meSectionHeader}>
-        <Text style={styles.meSectionTitle}>Working with you</Text>
-        <Text style={styles.meSectionCaption}>Same window</Text>
-      </View>
+      <MeSectionHeader
+        actionLabel="See all"
+        onAction={onSeeAll}
+        title="Open Shifts"
+      />
 
-      <View style={styles.meSurfaceCard}>
-        {body ? (
-          <Text style={styles.meSectionBody}>{body}</Text>
-        ) : (
-          <View style={styles.meCollaboratorList}>
-            {collaborators.map((collaborator, index) => (
-              <MeCollaboratorRow
-                key={`${collaborator.employeeId}-${collaborator.date}`}
-                collaborator={collaborator}
-                isFirst={index === 0}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function MeCollaboratorRow({
-  collaborator,
-  isFirst,
-}: {
-  collaborator: MobileScheduleEntry;
-  isFirst: boolean;
-}) {
-  const avatarTone = getAvatarTone(collaborator.employeeId);
-
-  return (
-    <View
-      style={[
-        styles.meCollaboratorRow,
-        !isFirst && styles.meCollaboratorRowBorder,
-      ]}
-    >
-      <View
-        style={[
-          styles.meCollaboratorAvatar,
-          {
-            backgroundColor: avatarTone.backgroundColor,
-            borderColor: avatarTone.borderColor,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            styles.meCollaboratorAvatarText,
-            { color: avatarTone.textColor },
-          ]}
+      {isLoading ? (
+        <SectionStateCard body="Loading open shifts you can claim." />
+      ) : requestsError ? (
+        <SectionStateCard body="We couldn't load open shifts right now." />
+      ) : (
+        <ScrollView
+          horizontal
+          contentContainerStyle={styles.openShiftScrollContent}
+          showsHorizontalScrollIndicator={false}
         >
-          {getInitials(collaborator.employeeName)}
-        </Text>
-      </View>
-      <View style={styles.meCollaboratorCopy}>
-        <Text style={styles.meCollaboratorName}>
-          {collaborator.employeeName}
-        </Text>
-        <ScheduleEntrySegmentList entry={collaborator} variant="compact" />
-      </View>
+          {openShifts.map((openShift) => {
+            const jobChip = getOpenShiftJobChip(openShift);
+            const focusAreaName = getOpenShiftFocusAreaName(openShift);
+            const timeRange = getOpenShiftTimeRange(openShift);
+
+            return (
+              <View key={openShift.id} style={styles.openShiftCard}>
+                <Text style={styles.scheduleRowDate}>
+                  {formatCompactScheduleDate(openShift.date)}
+                </Text>
+                <Text style={styles.scheduleRowTitle}>
+                  {getOpenShiftShiftName(openShift)}
+                </Text>
+                {jobChip || focusAreaName ? (
+                  <View style={styles.scheduleRowContext}>
+                    <JobPill chip={jobChip} compact />
+                    {focusAreaName ? (
+                      <Text style={styles.scheduleRowMeta}>
+                        {focusAreaName}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {timeRange ? (
+                  <View style={styles.scheduleRowTime}>
+                    <Ionicons
+                      color={mobileColors.textMuted}
+                      name="time-outline"
+                      size={18}
+                    />
+                    <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+                  </View>
+                ) : null}
+                <Button
+                  disabled={mutationPending || !linkedEmployeeId}
+                  label="Volunteer"
+                  leadingAccessory={
+                    <Ionicons
+                      color={mobileColors.brand}
+                      name="add-circle-outline"
+                      size={18}
+                    />
+                  }
+                  onPress={() => onVolunteer(openShift)}
+                  tone="secondary"
+                />
+              </View>
+            );
+          })}
+          {requests.map((request) => {
+            const jobChip = getRequestJobChip(request, "requester");
+            const focusAreaName = getRequestFocusAreaName(request, "requester");
+            const timeRange = getRequestTimeRange(request, "requester");
+
+            return (
+              <View key={request.id} style={styles.openShiftCard}>
+                <Text style={styles.scheduleRowDate}>
+                  {getRequestDateLabel(request)}
+                </Text>
+                <Text style={styles.scheduleRowTitle}>
+                  {getRequestShiftName(request, "requester")}
+                </Text>
+                {jobChip || focusAreaName ? (
+                  <View style={styles.scheduleRowContext}>
+                    <JobPill chip={jobChip} compact />
+                    {focusAreaName ? (
+                      <Text style={styles.scheduleRowMeta}>
+                        {focusAreaName}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {timeRange ? (
+                  <View style={styles.scheduleRowTime}>
+                    <Ionicons
+                      color={mobileColors.textMuted}
+                      name="time-outline"
+                      size={18}
+                    />
+                    <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+                  </View>
+                ) : null}
+                <Button
+                  disabled={mutationPending || !linkedEmployeeId}
+                  label="Claim Shift"
+                  leadingAccessory={
+                    <Ionicons
+                      color={mobileColors.brand}
+                      name="add-circle-outline"
+                      size={18}
+                    />
+                  }
+                  onPress={() => onClaim(request.id)}
+                  tone="secondary"
+                />
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
-function MeTimelineCard({
-  sections,
-  onPressEntry,
+function ShiftCoverRequestsSection({
+  requests,
+  linkedEmployeeId,
+  isLoading,
+  mutationPending,
+  requestsError,
+  onRespond,
 }: {
-  sections: MeTimelineSection[];
-  onPressEntry: (entry: MobileScheduleEntry) => void;
+  requests: MobileShiftRequest[];
+  linkedEmployeeId: string | null;
+  isLoading: boolean;
+  mutationPending: boolean;
+  requestsError: unknown;
+  onRespond: (requestId: string, accept: boolean) => void;
 }) {
+  if (!isLoading && !requestsError && requests.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.meSectionBlock}>
-      <View style={styles.meSectionHeader}>
-        <Text style={styles.meSectionTitle}>Up Next</Text>
-        <Text style={styles.meSectionCaption}>Later this week</Text>
-      </View>
+      <MeSectionHeader title="Needs Your Response" />
 
-      {sections.length === 0 ? (
-        <View style={styles.meSurfaceCard}>
-          <Text style={styles.meSectionBody}>
-            Nothing else is scheduled for this week.
-          </Text>
-        </View>
+      {isLoading ? (
+        <SectionStateCard body="Loading shift cover requests." />
+      ) : requestsError ? (
+        <SectionStateCard body="We couldn't load cover requests right now." />
       ) : (
-        <View style={styles.timelineList}>
-          {sections.map((section) => (
-            <View key={section.date} style={styles.timelineSection}>
-              <View style={styles.timelineSectionHeader}>
-                <View style={styles.timelineDot} />
-                <Text style={styles.timelineSectionTitle}>{section.title}</Text>
+        <View style={styles.requestList}>
+          {requests.map((request) => {
+            const avatarTone = getAvatarTone(request.requesterEmpId);
+            const jobChip = getRequestJobChip(request, "requester");
+            const focusAreaName = getRequestFocusAreaName(request, "requester");
+            const timeRange = getRequestTimeRange(request, "requester");
+
+            return (
+              <View key={request.id} style={styles.requestCard}>
+                <View style={styles.requestHeaderRow}>
+                  <View style={styles.requestHeaderCopy}>
+                    <View
+                      style={[
+                        styles.requestAvatar,
+                        {
+                          backgroundColor: avatarTone.backgroundColor,
+                          borderColor: avatarTone.borderColor,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.requestAvatarText,
+                          { color: avatarTone.textColor },
+                        ]}
+                      >
+                        {getInitials(request.requesterName)}
+                      </Text>
+                    </View>
+                    <View style={styles.requestHeaderTextStack}>
+                      <Text style={styles.requestHeaderText}>
+                        {request.requesterName}
+                      </Text>
+                      <Text style={styles.requestHeaderSubtext}>
+                        Needs shift coverage
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.requestDateText}>
+                    {getRequestDateLabel(request)}
+                  </Text>
+                </View>
+
+                <Text style={styles.scheduleRowTitle}>
+                  {getRequestShiftName(request, "requester")}
+                </Text>
+                {jobChip || focusAreaName ? (
+                  <View style={styles.scheduleRowContext}>
+                    <JobPill chip={jobChip} compact />
+                    {focusAreaName ? (
+                      <Text style={styles.scheduleRowMeta}>
+                        {focusAreaName}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {timeRange ? (
+                  <View style={styles.scheduleRowTime}>
+                    <Ionicons
+                      color={mobileColors.textMuted}
+                      name="time-outline"
+                      size={18}
+                    />
+                    <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.requestActions}>
+                  <Button
+                    disabled={mutationPending || !linkedEmployeeId}
+                    label="Accept"
+                    onPress={() => onRespond(request.id, true)}
+                  />
+                  <Button
+                    disabled={mutationPending || !linkedEmployeeId}
+                    label="Decline"
+                    onPress={() => onRespond(request.id, false)}
+                    tone="neutral"
+                  />
+                </View>
               </View>
-              <View style={styles.timelineSectionEntries}>
-                {section.entries.map((entry) => (
-                  <Pressable
-                    key={getScheduleEntryKey(entry)}
-                    accessibilityRole="button"
-                    onPress={() => onPressEntry(entry)}
-                    style={({ pressed }) => [
-                      styles.timelineEntryCard,
-                      pressed && styles.timelineEntryCardPressed,
-                    ]}
-                  >
-                    <ScheduleEntrySegmentList entry={entry} variant="timeline" />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -1669,18 +2334,12 @@ function TeamShiftMemberRow({
   isFirst: boolean;
   onPress: () => void;
 }) {
-  const customTimeRange = getScheduleEntryCustomTimeRange(entry);
-  const baseTimeRange = getScheduleEntryBaseTimeRange(entry);
-  const segments = getDisplaySegments(entry);
-  const overrideTimeRange =
-    customTimeRange &&
-    customTimeRange !== (groupTimeRange ?? baseTimeRange ?? null)
-      ? customTimeRange
-      : null;
-  const overrideShiftSummary = overrideTimeRange
-    ? `${entry.shiftName} • ${overrideTimeRange}`
-    : null;
   const avatarTone = getAvatarTone(entry.employeeId);
+  const memberTimeRange = getScheduleEntryMemberTimeRange(
+    entry,
+    groupTimeRange,
+  );
+  const roleChip = getTeamMemberRoleChip(entry);
 
   return (
     <Pressable
@@ -1698,26 +2357,109 @@ function TeamShiftMemberRow({
         ]}
       >
         <Text
-          style={[
-            styles.teamMemberAvatarText,
-            { color: avatarTone.textColor },
-          ]}
+          style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
         >
           {getInitials(entry.employeeName)}
         </Text>
       </View>
-      <View style={styles.teamMemberCopy}>
-        <Text style={styles.teamMemberName}>{entry.employeeName}</Text>
-        {segments.length > 1 ? (
-          <ScheduleEntrySegmentList entry={entry} variant="compact" />
-        ) : overrideShiftSummary ? (
-          <Text style={styles.teamMemberTimeOverride}>
-            {overrideShiftSummary}
-          </Text>
+      <View style={styles.teamMemberMain}>
+        <View style={styles.teamMemberCopy}>
+          <Text style={styles.teamMemberName}>{entry.employeeName}</Text>
+          {memberTimeRange ? (
+            <Text style={styles.teamMemberTime}>{memberTimeRange}</Text>
+          ) : null}
+        </View>
+        {roleChip ? (
+          <View
+            style={[
+              styles.teamMemberRoleChip,
+              {
+                backgroundColor: roleChip.backgroundColor,
+                borderColor: roleChip.borderColor,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.teamMemberRoleChipText,
+                { color: roleChip.textColor },
+              ]}
+            >
+              {roleChip.label}
+            </Text>
+          </View>
         ) : null}
       </View>
     </Pressable>
   );
+}
+
+function getTeamMemberRoleChip(entry: MobileScheduleEntry):
+  | (AvatarTone & {
+      label: string;
+    })
+  | null {
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return {
+      label: "Absence",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textMuted,
+    };
+  }
+
+  const segment =
+    getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
+  const label = segment?.jobName ?? null;
+
+  if (!segment || !label) {
+    return null;
+  }
+
+  if (segment.jobColor || segment.jobBorderColor || segment.jobTextColor) {
+    return {
+      label,
+      backgroundColor: segment.jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: segment.jobBorderColor ?? mobileColors.border,
+      textColor: segment.jobTextColor ?? mobileColors.textMuted,
+    };
+  }
+
+  const normalizedLabel = label.trim().toLowerCase();
+  const tone =
+    normalizedLabel.includes("supervisor") ||
+    normalizedLabel.includes("lead") ||
+    normalizedLabel.includes("manager")
+      ? {
+          backgroundColor: "#EEF2FF",
+          borderColor: "#C7D2FE",
+          textColor: "#4F46E5",
+        }
+      : normalizedLabel.includes("mentor") ||
+          normalizedLabel.includes("trainer")
+        ? {
+            backgroundColor: mobileColors.warningSoft,
+            borderColor: mobileColors.warningBorder,
+            textColor: "#B45309",
+          }
+        : normalizedLabel.includes("nurse") ||
+            normalizedLabel.includes("rn") ||
+            normalizedLabel.includes("lpn")
+          ? {
+              backgroundColor: "#ECFEFF",
+              borderColor: "#A5F3FC",
+              textColor: "#0E7490",
+            }
+          : {
+              backgroundColor: mobileColors.surfaceSecondary,
+              borderColor: mobileColors.border,
+              textColor: mobileColors.textMuted,
+            };
+
+  return {
+    label,
+    ...tone,
+  };
 }
 
 function getInitials(name: string): string {
@@ -1757,89 +2499,6 @@ function getAvatarTone(seed: string): AvatarTone {
   };
 }
 
-function ScheduleEntrySegmentList({
-  entry,
-  variant,
-}: {
-  entry: MobileScheduleEntry;
-  variant: "compact" | "hero" | "timeline";
-}) {
-  const segments = getScheduleEntrySegments(entry);
-
-  return (
-    <View
-      style={
-        variant === "hero"
-          ? styles.heroSegmentList
-          : variant === "timeline"
-            ? styles.timelineSegmentList
-            : styles.compactSegmentList
-      }
-    >
-      {segments.map((segment, index) => {
-        const timeRange = getScheduleEntrySegmentTimeRange(segment);
-
-        return (
-          <View
-            key={`${segment.shiftName}-${index}`}
-            style={[
-              variant === "hero"
-                ? styles.heroSegmentBlock
-                : variant === "timeline"
-                  ? styles.timelineSegmentBlock
-                  : styles.compactSegmentBlock,
-              index > 0 &&
-                (variant === "hero"
-                  ? styles.heroSegmentDivider
-                  : variant === "timeline"
-                    ? styles.timelineSegmentDivider
-                    : styles.compactSegmentDivider),
-            ]}
-          >
-            <Text
-              style={
-                variant === "hero"
-                  ? styles.heroSegmentTitle
-                  : variant === "timeline"
-                    ? styles.timelineSegmentTitle
-                    : styles.compactSegmentTitle
-              }
-            >
-              {segment.shiftName}
-            </Text>
-            {timeRange ? (
-              <Text
-                style={
-                  variant === "hero"
-                    ? styles.heroSegmentMeta
-                    : variant === "timeline"
-                      ? styles.timelineSegmentMeta
-                      : styles.compactSegmentMeta
-                }
-              >
-                {timeRange}
-              </Text>
-            ) : null}
-            {segment.displayFocusAreaName ? (
-              <Text
-                style={
-                  variant === "hero"
-                    ? styles.heroSegmentMeta
-                    : variant === "timeline"
-                      ? styles.timelineSegmentMeta
-                      : styles.compactSegmentMeta
-                }
-              >
-                {segment.displayFocusAreaName}
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   stickyControlsSection: {
     gap: 16,
@@ -1868,29 +2527,16 @@ const styles = StyleSheet.create({
   },
   meWelcomeTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "800",
-    lineHeight: 34,
+    lineHeight: 25,
   },
   meWeekNavigator: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 14,
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
+    paddingVertical: 2,
   },
   meWeekNavigatorCopy: {
     flex: 1,
@@ -1898,7 +2544,7 @@ const styles = StyleSheet.create({
   },
   meWeekNavigatorTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
   },
   meWeekNavigatorSubtitle: {
@@ -1911,21 +2557,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  meTodayButton: {
+    minHeight: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: mobileColors.brandBorder,
+    backgroundColor: mobileColors.brandSoft,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  meTodayButtonPressed: {
+    opacity: 0.82,
+  },
+  meTodayButtonText: {
+    color: mobileColors.brand,
+    fontSize: 13,
+    fontWeight: "800",
+  },
   meHeroCard: {
     position: "relative",
     overflow: "hidden",
-    backgroundColor: "#1D4ED8",
-    borderRadius: 30,
-    padding: 24,
-    minHeight: 250,
-    shadowColor: "rgba(37, 99, 235, 0.28)",
+    backgroundColor: ME_HERO_CARD_BACKGROUND,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    shadowColor: "rgba(37, 99, 235, 0.3)",
     shadowOffset: {
       width: 0,
       height: 14,
     },
     shadowOpacity: 1,
     shadowRadius: 28,
-    elevation: 4,
+    elevation: 5,
   },
   meHeroCardMuted: {
     backgroundColor: "#E2E8F0",
@@ -1956,35 +2619,42 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.22)",
   },
   meHeroContent: {
-    gap: 20,
+    gap: 11,
   },
   meHeroHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 16,
+    gap: 12,
   },
   meHeroHeaderCopy: {
     flex: 1,
     gap: 10,
+  },
+  meHeroStatusStack: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
   },
   meHeroBadge: {
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: mobileRadii.pill,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   meHeroBadgeMuted: {
     backgroundColor: "rgba(255, 255, 255, 0.55)",
   },
   meHeroBadgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   meHeroBadgeDotActive: {
     backgroundColor: "#86EFAC",
@@ -1997,19 +2667,59 @@ const styles = StyleSheet.create({
   },
   meHeroBadgeText: {
     color: mobileColors.textInverse,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   meHeroBadgeTextMuted: {
     color: mobileColors.textPrimary,
   },
+  meHeroDateTile: {
+    minWidth: 58,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.22)",
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  meHeroDateWeekday: {
+    color: "rgba(255, 255, 255, 0.72)",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  meHeroDateDay: {
+    color: mobileColors.textInverse,
+    fontSize: 24,
+    fontWeight: "800",
+    lineHeight: 28,
+  },
+  meHeroDateText: {
+    alignSelf: "flex-start",
+    color: "rgba(255, 255, 255, 0.86)",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 18,
+  },
   meHeroTitle: {
     color: mobileColors.textInverse,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
-    lineHeight: 34,
+    lineHeight: 30,
+  },
+  meHeroHeading: {
+    color: mobileColors.textInverse,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  meHeroHeadingMuted: {
+    color: mobileColors.textSecondary,
   },
   meHeroTitleMuted: {
     color: mobileColors.textPrimary,
@@ -2022,10 +2732,79 @@ const styles = StyleSheet.create({
   meHeroSupportingTextMuted: {
     color: mobileColors.textMuted,
   },
+  meHeroAreaLabel: {
+    color: "rgba(255, 255, 255, 0.86)",
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  meHeroAreaLabelMuted: {
+    color: mobileColors.textSecondary,
+  },
+  meHeroMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  meHeroAreaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  meHeroRoleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  meHeroScheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 6,
+  },
+  meHeroTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 9,
+    minWidth: 0,
+  },
+  meHeroTimeText: {
+    color: mobileColors.textInverse,
+    flexShrink: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  meHeroTimePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(29, 78, 216, 0.22)",
+    borderRadius: mobileRadii.control,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  meHeroTimePillMuted: {
+    backgroundColor: "rgba(255, 255, 255, 0.58)",
+  },
+  meHeroTimePillText: {
+    color: mobileColors.textInverse,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  meHeroTimePillTextMuted: {
+    color: mobileColors.textSecondary,
+  },
   meHeroActionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255, 255, 255, 0.18)",
@@ -2035,9 +2814,12 @@ const styles = StyleSheet.create({
   },
   meHeroEmptyText: {
     color: "rgba(255, 255, 255, 0.84)",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    lineHeight: 22,
+    lineHeight: 20,
+  },
+  meHeroEmptyBlock: {
+    gap: 10,
   },
   meHeroEmptyTextMuted: {
     color: mobileColors.textSecondary,
@@ -2047,9 +2829,9 @@ const styles = StyleSheet.create({
   },
   meHeroDetailText: {
     color: "rgba(255, 255, 255, 0.88)",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    lineHeight: 22,
+    lineHeight: 20,
   },
   meHeroDetailTextMuted: {
     color: mobileColors.textSecondary,
@@ -2065,12 +2847,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   meHeroProgressLabel: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 12,
-    fontWeight: "700",
+    color: "rgba(255, 255, 255, 0.86)",
+    flexShrink: 0,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
   },
   meHeroProgressTrack: {
-    height: 9,
+    height: 7,
     borderRadius: 999,
     backgroundColor: "rgba(15, 23, 42, 0.24)",
     overflow: "hidden",
@@ -2078,27 +2862,222 @@ const styles = StyleSheet.create({
   meHeroProgressFill: {
     height: "100%",
     borderRadius: 999,
-    backgroundColor: mobileColors.textInverse,
+    backgroundColor: "#42E878",
+  },
+  meHeroCollaborators: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: ME_HERO_COLLABORATOR_BACKGROUND,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginTop: 6,
+  },
+  meHeroCollaboratorLabelRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  meHeroCollaboratorLabel: {
+    color: "rgba(255, 255, 255, 0.84)",
+    flexShrink: 1,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  meHeroAvatarStack: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  meHeroCollaboratorAvatarFrame: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ME_HERO_COLLABORATOR_BACKGROUND,
+    padding: 2,
+  },
+  meHeroCollaboratorAvatarFrameOverlap: {
+    marginLeft: -14,
+  },
+  meHeroCollaboratorAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: "#2946C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  meHeroCollaboratorAvatarText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  meHeroCollaboratorOverflow: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: "#93C5FD",
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  meHeroCollaboratorOverflowText: {
+    color: "#1D4ED8",
+    fontSize: 14,
+    fontWeight: "800",
   },
   meSectionBlock: {
     gap: 12,
   },
+  upcomingSectionBlock: {
+    gap: 18,
+  },
+  upcomingSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+  upcomingSectionTitle: {
+    flex: 1,
+    color: mobileColors.textPrimary,
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 24,
+  },
+  upcomingHoursBadge: {
+    borderRadius: 12,
+    backgroundColor: mobileColors.brandSoft,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  upcomingHoursBadgeText: {
+    color: mobileColors.brand,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  upcomingShiftsCard: {
+    backgroundColor: mobileColors.surface,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    paddingHorizontal: 20,
+    shadowColor: mobileColors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 3,
+  },
+  upcomingShiftRow: {
+    minHeight: 132,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+    paddingVertical: 18,
+  },
+  upcomingShiftRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: mobileColors.borderSubtle,
+  },
+  upcomingDateTile: {
+    width: 60,
+    height: 68,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  upcomingDateWeekday: {
+    color: mobileColors.textSubtle,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  upcomingDateDay: {
+    color: mobileColors.textSecondary,
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 24,
+  },
+  upcomingShiftCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 9,
+  },
+  upcomingShiftTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  upcomingShiftArea: {
+    color: mobileColors.textSecondary,
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  upcomingShiftTime: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  upcomingShiftTimeText: {
+    color: mobileColors.textSubtle,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  upcomingShiftAction: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.surface,
+    shadowColor: mobileColors.shadowStrong,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   meSectionHeader: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 12,
   },
-  meSectionTitle: {
+  meSectionHeaderCopy: {
     flex: 1,
+    gap: 4,
+  },
+  meSectionTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 21,
+    fontSize: 18,
     fontWeight: "800",
   },
-  meSectionCaption: {
+  meSectionLink: {
     color: mobileColors.brand,
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
   },
   meSurfaceCard: {
     backgroundColor: mobileColors.surface,
@@ -2120,6 +3099,173 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,
+  },
+  scheduleListRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 16,
+  },
+  scheduleListRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: mobileColors.borderSubtle,
+  },
+  scheduleListCopy: {
+    flex: 1,
+    gap: 8,
+  },
+  scheduleRowDate: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  scheduleRowTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  scheduleRowMeta: {
+    color: mobileColors.textSecondary,
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  scheduleRowContext: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  scheduleRowTime: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  scheduleRowTimeText: {
+    color: mobileColors.textMuted,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  scheduleRowArrow: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.surfaceSecondary,
+  },
+  openShiftScrollContent: {
+    gap: 14,
+    paddingRight: 4,
+  },
+  openShiftCard: {
+    width: 296,
+    gap: 12,
+    backgroundColor: mobileColors.surface,
+    borderRadius: mobileRadii.card,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    padding: 18,
+    shadowColor: mobileColors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 2,
+  },
+  requestList: {
+    gap: 14,
+  },
+  requestCard: {
+    gap: 14,
+    backgroundColor: mobileColors.surface,
+    borderRadius: mobileRadii.card,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    padding: 18,
+    shadowColor: mobileColors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 2,
+  },
+  requestHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  requestHeaderCopy: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  requestAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  requestAvatarText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  requestHeaderText: {
+    color: mobileColors.textPrimary,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  requestHeaderTextStack: {
+    flex: 1,
+    gap: 2,
+  },
+  requestHeaderSubtext: {
+    color: mobileColors.textSecondary,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  requestDateText: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  requestActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  jobPill: {
+    alignSelf: "flex-start",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  jobPillCompact: {
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  jobPillText: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  jobPillTextCompact: {
+    fontSize: 12,
   },
   meCollaboratorList: {
     gap: 0,
@@ -2155,7 +3301,7 @@ const styles = StyleSheet.create({
   },
   meCollaboratorName: {
     color: mobileColors.textPrimary,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "800",
   },
   timelineList: {
@@ -2184,7 +3330,7 @@ const styles = StyleSheet.create({
   },
   timelineSectionTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
   },
   timelineSectionEntries: {
@@ -2236,16 +3382,16 @@ const styles = StyleSheet.create({
   meSelectedDateTitle: {
     flex: 1,
     color: mobileColors.textPrimary,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
     textAlign: "left",
-    lineHeight: 28,
+    lineHeight: 23,
   },
   teamHeaderTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
-    lineHeight: 28,
+    lineHeight: 23,
     textAlign: "left",
     flexShrink: 1,
     minWidth: 0,
@@ -2343,7 +3489,7 @@ const styles = StyleSheet.create({
   monthCalendarTitle: {
     flex: 1,
     color: mobileColors.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
     textAlign: "center",
   },
@@ -2477,26 +3623,30 @@ const styles = StyleSheet.create({
     gap: mobileSpacing.sectionGap,
   },
   shiftGroupsList: {
-    gap: 20,
+    gap: 28,
   },
   shiftGroupBlock: {
-    gap: 18,
+    gap: 12,
   },
   shiftGroupDivider: {
     height: 1,
     backgroundColor: mobileColors.borderSubtle,
   },
   shiftGroupHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 12,
+    gap: 6,
+    paddingHorizontal: 8,
   },
   shiftGroupTitle: {
-    flex: 1,
     color: mobileColors.textPrimary,
     fontSize: 18,
     fontWeight: "800",
-    lineHeight: 22,
+    lineHeight: 23,
+  },
+  shiftGroupTime: {
+    color: mobileColors.textSubtle,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 19,
   },
   weekDaySection: {
     gap: 12,
@@ -2506,7 +3656,7 @@ const styles = StyleSheet.create({
   },
   weekDayTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: "800",
   },
   weekDayEmptyState: {
@@ -2527,11 +3677,11 @@ const styles = StyleSheet.create({
   },
   teamGroupCard: {
     backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: mobileColors.borderSubtle,
-    paddingHorizontal: 18,
-    paddingVertical: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     shadowColor: mobileColors.shadowStrong,
     shadowOffset: {
       width: 0,
@@ -2547,17 +3697,18 @@ const styles = StyleSheet.create({
   teamMemberRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
+    gap: 16,
+    minHeight: 72,
+    paddingVertical: 16,
   },
   teamMemberRowBorder: {
     borderTopWidth: 1,
     borderTopColor: mobileColors.borderSubtle,
   },
   teamMemberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: mobileColors.brandSoft,
     borderWidth: 1,
     borderColor: mobileColors.brandBorder,
@@ -2566,13 +3717,20 @@ const styles = StyleSheet.create({
   },
   teamMemberAvatarText: {
     color: mobileColors.brand,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
-    letterSpacing: 0.4,
+  },
+  teamMemberMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   teamMemberCopy: {
     flex: 1,
-    gap: 6,
+    minWidth: 0,
+    gap: 5,
   },
   teamMemberName: {
     color: mobileColors.textPrimary,
@@ -2580,10 +3738,23 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 21,
   },
-  teamMemberTimeOverride: {
-    color: mobileColors.textMuted,
-    fontSize: 13,
-    fontWeight: "600",
+  teamMemberTime: {
+    color: mobileColors.textSubtle,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 18,
+  },
+  teamMemberRoleChip: {
+    borderWidth: 1,
+    borderRadius: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  teamMemberRoleChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   compactSegmentList: {
     gap: 8,
@@ -2619,9 +3790,9 @@ const styles = StyleSheet.create({
   },
   heroSegmentTitle: {
     color: mobileColors.textInverse,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
-    lineHeight: 23,
+    lineHeight: 21,
   },
   heroSegmentMeta: {
     color: "rgba(255, 255, 255, 0.84)",
@@ -2641,9 +3812,9 @@ const styles = StyleSheet.create({
   },
   timelineSegmentTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
-    lineHeight: 21,
+    lineHeight: 20,
   },
   timelineSegmentMeta: {
     color: mobileColors.textMuted,
@@ -2671,9 +3842,9 @@ const styles = StyleSheet.create({
   },
   entryTitle: {
     color: mobileColors.textPrimary,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "800",
-    lineHeight: 22,
+    lineHeight: 21,
   },
   entryMetaText: {
     color: mobileColors.textMuted,

@@ -6,14 +6,17 @@ import {
   createScreenModule,
 } from "../../../test/native";
 
+const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();
+const useBootstrap = vi.fn();
 
 vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
 );
 
 vi.mock("@tanstack/react-query", () => ({
+  useMutation,
   useQuery,
 }));
 
@@ -29,6 +32,10 @@ vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
 }));
 
+vi.mock("../../auth/hooks/useBootstrap", () => ({
+  useBootstrap,
+}));
+
 let PeopleScreen: (typeof import("./PeopleScreen"))["default"];
 
 beforeAll(async () => {
@@ -37,9 +44,34 @@ beforeAll(async () => {
 
 describe("PeopleScreen", () => {
   beforeEach(() => {
+    useMutation.mockReset();
     useQuery.mockReset();
     useAccessToken.mockReset();
+    useBootstrap.mockReset();
+
     useAccessToken.mockReturnValue("token-123");
+    useBootstrap.mockReturnValue({
+      data: {
+        focusAreas: [
+          {
+            id: 2,
+            name: "Skilled Nursing",
+          },
+        ],
+        permissions: {
+          canManageEmployees: true,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
   });
 
   it("shows the loading state while the directory is being fetched", () => {
@@ -70,7 +102,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Directory unavailable")).toBeInTheDocument();
   });
 
-  it("shows the empty state when the user lacks staff visibility", () => {
+  it("shows the empty state when the workspace has no teammates yet", () => {
     useQuery.mockReturnValue({
       data: {
         people: [],
@@ -83,6 +115,56 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    expect(screen.getByText("Directory unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No teammates yet")).toBeInTheDocument();
+  });
+
+  it("shows person details and lets managers bench teammates", () => {
+    const mutate = vi.fn();
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0100",
+            email: "mina@dubgrid.com",
+            status: "active",
+            focusAreaIds: [2],
+            roleIds: [3],
+            departmentIds: [4],
+            contactNotes: "Weekend availability",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate,
+    });
+
+    render(<PeopleScreen />);
+
+    expect(
+      screen.getByText(/Focus areas:\s*Skilled Nursing/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Details"));
+
+    expect(screen.getByText("Weekend availability")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Bench"));
+
+    expect(mutate).toHaveBeenCalledWith({
+      personId: "emp-1",
+      action: "bench",
+      expectedVersion: 7,
+    });
   });
 });

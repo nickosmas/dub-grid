@@ -2,7 +2,33 @@ import type {
   MobileFocusArea,
   MobileScheduleEntry,
   MobileScheduleEntrySegment,
+  MobileShiftRequest,
 } from "@dubgrid/contracts";
+
+export type ScheduleEntryLike = {
+  employeeId: string;
+  employeeName: string;
+  employeeSeniority?: number | null;
+  date: string;
+  state?: MobileScheduleEntry["state"];
+  presentation?: MobileScheduleEntry["presentation"];
+  shiftIds?: ReadonlyArray<number | null>;
+  jobIds?: ReadonlyArray<number>;
+  shiftLabel?: string | null;
+  assignmentLabel?: string | null;
+  shiftName?: string;
+  absenceTypeId?: number | null;
+  focusAreaId?: number | null;
+  focusAreaName?: string | null;
+  displayFocusAreaName?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  customStartTime?: string | null;
+  customEndTime?: string | null;
+  segments?: ReadonlyArray<MobileScheduleEntrySegment>;
+  publishedAt?: string | null;
+  publishedByName?: string | null;
+};
 
 export const TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY = "all";
 
@@ -53,6 +79,37 @@ export type MobileScheduleShiftGroup = {
   entries: MobileScheduleEntry[];
 };
 
+export type MeScheduleSegmentStatus =
+  | "active"
+  | "upcoming"
+  | "scheduled"
+  | "away"
+  | "empty";
+
+export type MeScheduleSegmentItem = {
+  key: string;
+  date: string;
+  entry: MobileScheduleEntry;
+  segment: MobileScheduleEntrySegment;
+};
+
+export type FeaturedMeScheduleSegment = {
+  item: MeScheduleSegmentItem | null;
+  status: MeScheduleSegmentStatus;
+};
+
+export type WeeklyHoursSummary = {
+  scheduledHours: number;
+  targetHours: number;
+  progress: number;
+  statusLabel: string;
+};
+
+export type MeShiftRequestSections = {
+  coverRequests: MobileShiftRequest[];
+  openShiftRequests: MobileShiftRequest[];
+};
+
 function parseIsoDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));
@@ -94,7 +151,10 @@ export function addMonthsToIsoDate(value: string, months: number): string {
   return formatIsoDateUtc(date);
 }
 
-export function getDaysBetweenIsoDates(startDate: string, endDate: string): number {
+export function getDaysBetweenIsoDates(
+  startDate: string,
+  endDate: string,
+): number {
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   return Math.round(
     (parseIsoDate(endDate).getTime() - parseIsoDate(startDate).getTime()) /
@@ -238,40 +298,111 @@ export function formatScheduleTimeRange(
   return `${formatScheduleTimeValue(start)} - ${formatScheduleTimeValue(end)}`;
 }
 
-export function getScheduleEntryBaseTimeRange(
-  entry: Pick<MobileScheduleEntry, "startTime" | "endTime">,
+export function getScheduleEntryStartTime(
+  entry: ScheduleEntryLike,
 ): string | null {
-  return formatScheduleTimeRange(entry.startTime, entry.endTime);
+  return entry.presentation?.startTime ?? entry.startTime ?? null;
+}
+
+export function getScheduleEntryEndTime(
+  entry: ScheduleEntryLike,
+): string | null {
+  return entry.presentation?.endTime ?? entry.endTime ?? null;
+}
+
+export function getScheduleEntryCustomStartTime(
+  entry: ScheduleEntryLike,
+): string | null {
+  return entry.state?.customStartTime ?? entry.customStartTime ?? null;
+}
+
+export function getScheduleEntryCustomEndTime(
+  entry: ScheduleEntryLike,
+): string | null {
+  return entry.state?.customEndTime ?? entry.customEndTime ?? null;
+}
+
+export function getScheduleEntryAbsenceTypeId(
+  entry: ScheduleEntryLike,
+): number | null {
+  if (entry.state) {
+    return entry.state.kind === "absence" ? entry.state.absenceTypeId : null;
+  }
+
+  return entry.absenceTypeId ?? null;
+}
+
+export function getScheduleEntryTitle(entry: ScheduleEntryLike): string {
+  return (
+    entry.presentation?.shiftName ??
+    entry.presentation?.label ??
+    entry.shiftName ??
+    entry.shiftLabel ??
+    "Shift"
+  );
+}
+
+export function getScheduleEntryFocusAreaId(
+  entry: ScheduleEntryLike,
+): number | null {
+  return entry.presentation?.focusAreaId ?? entry.focusAreaId ?? null;
+}
+
+export function getScheduleEntryFocusAreaName(
+  entry: ScheduleEntryLike,
+): string | null {
+  return entry.presentation?.focusAreaName ?? entry.focusAreaName ?? null;
+}
+
+export function getScheduleEntryDisplayFocusAreaName(
+  entry: ScheduleEntryLike,
+): string | null {
+  return (
+    entry.presentation?.displayFocusAreaName ??
+    entry.displayFocusAreaName ??
+    null
+  );
+}
+
+export function getScheduleEntryBaseTimeRange(
+  entry: ScheduleEntryLike,
+): string | null {
+  return formatScheduleTimeRange(
+    getScheduleEntryStartTime(entry),
+    getScheduleEntryEndTime(entry),
+  );
 }
 
 export function getScheduleEntrySegments(
-  entry: Pick<
-    MobileScheduleEntry,
-    | "displayFocusAreaName"
-    | "endTime"
-    | "segments"
-    | "shiftName"
-    | "startTime"
-  >,
+  entry: ScheduleEntryLike,
 ): MobileScheduleEntrySegment[] {
+  const presentationSegments = entry.presentation?.segments ?? [];
+  if (presentationSegments.length > 0) {
+    return [...presentationSegments];
+  }
+
   if (entry.segments && entry.segments.length > 0) {
-    return entry.segments;
+    return [...entry.segments];
   }
 
   return [
     {
-      shiftName: entry.shiftName,
-      startTime: entry.startTime,
-      endTime: entry.endTime,
-      displayFocusAreaName: entry.displayFocusAreaName ?? null,
+      label: entry.presentation?.label ?? getScheduleEntryTitle(entry),
+      shiftName: getScheduleEntryTitle(entry),
+      startTime: getScheduleEntryStartTime(entry),
+      endTime: getScheduleEntryEndTime(entry),
+      displayFocusAreaName: getScheduleEntryDisplayFocusAreaName(entry),
     },
   ];
 }
 
 export function getScheduleEntryCustomTimeRange(
-  entry: Pick<MobileScheduleEntry, "customStartTime" | "customEndTime">,
+  entry: ScheduleEntryLike,
 ): string | null {
-  return formatScheduleTimeRange(entry.customStartTime, entry.customEndTime);
+  return formatScheduleTimeRange(
+    getScheduleEntryCustomStartTime(entry),
+    getScheduleEntryCustomEndTime(entry),
+  );
 }
 
 export function getScheduleEntrySegmentTimeRange(
@@ -280,21 +411,36 @@ export function getScheduleEntrySegmentTimeRange(
   return formatScheduleTimeRange(segment.startTime, segment.endTime);
 }
 
-export function getScheduleEntryTimeRange(
-  entry: Pick<
-    MobileScheduleEntry,
-    "startTime" | "endTime" | "customStartTime" | "customEndTime"
-  >,
+export function getScheduleEntrySegmentShiftTimeRange(
+  segment: Pick<MobileScheduleEntrySegment, "shiftStartTime" | "shiftEndTime">,
 ): string | null {
   return formatScheduleTimeRange(
-    entry.customStartTime ?? entry.startTime,
-    entry.customEndTime ?? entry.endTime,
+    segment.shiftStartTime ?? null,
+    segment.shiftEndTime ?? null,
+  );
+}
+
+export function getScheduleEntryTimeRange(
+  entry: ScheduleEntryLike,
+): string | null {
+  return formatScheduleTimeRange(
+    getScheduleEntryCustomStartTime(entry) ?? getScheduleEntryStartTime(entry),
+    getScheduleEntryCustomEndTime(entry) ?? getScheduleEntryEndTime(entry),
   );
 }
 
 export function getScheduleShiftGroupTimeRange(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
 ): string | null {
+  for (const entry of entries) {
+    for (const segment of getScheduleEntrySegments(entry)) {
+      const shiftTimeRange = getScheduleEntrySegmentShiftTimeRange(segment);
+      if (shiftTimeRange) {
+        return shiftTimeRange;
+      }
+    }
+  }
+
   for (const entry of entries) {
     const baseTimeRange = getScheduleEntryBaseTimeRange(entry);
     if (baseTimeRange) {
@@ -312,6 +458,44 @@ export function getScheduleShiftGroupTimeRange(
   return null;
 }
 
+function getEntryResolvedSegmentTimeRange(
+  entry: ScheduleEntryLike,
+): string | null {
+  const segmentsWithTime = getScheduleEntrySegments(entry).filter(
+    (segment) => segment.startTime && segment.endTime,
+  );
+  const firstSegment = segmentsWithTime[0] ?? null;
+  const lastSegment = segmentsWithTime[segmentsWithTime.length - 1] ?? null;
+
+  if (!firstSegment || !lastSegment) {
+    return null;
+  }
+
+  return formatScheduleTimeRange(firstSegment.startTime, lastSegment.endTime);
+}
+
+export function getScheduleEntryMemberTimeRange(
+  entry: ScheduleEntryLike,
+  groupTimeRange: string | null,
+): string | null {
+  const customTimeRange = getScheduleEntryCustomTimeRange(entry);
+  if (customTimeRange && customTimeRange !== groupTimeRange) {
+    return customTimeRange;
+  }
+
+  const segmentTimeRange =
+    getEntryResolvedSegmentTimeRange(entry) ?? getScheduleEntryTimeRange(entry);
+  if (
+    segmentTimeRange &&
+    groupTimeRange &&
+    segmentTimeRange !== groupTimeRange
+  ) {
+    return segmentTimeRange;
+  }
+
+  return null;
+}
+
 function getSortableTime(value: string | null): string | null {
   if (!value) {
     return null;
@@ -321,11 +505,16 @@ function getSortableTime(value: string | null): string | null {
 }
 
 export function sortScheduleEntries(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
 ): MobileScheduleEntry[] {
   return [...entries].sort((left, right) => {
-    const leftTime = getSortableTime(left.startTime ?? left.customStartTime);
-    const rightTime = getSortableTime(right.startTime ?? right.customStartTime);
+    const leftTime = getSortableTime(
+      getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left),
+    );
+    const rightTime = getSortableTime(
+      getScheduleEntryStartTime(right) ??
+        getScheduleEntryCustomStartTime(right),
+    );
 
     if (leftTime !== rightTime) {
       if (!leftTime) return 1;
@@ -334,7 +523,7 @@ export function sortScheduleEntries(
     }
 
     return left.employeeName.localeCompare(right.employeeName);
-  });
+  }) as MobileScheduleEntry[];
 }
 
 export function formatScheduleTimeValue(value: string): string {
@@ -402,15 +591,497 @@ export function formatScheduleMonthLabel(
   return formatDate(date, { month: "long", year: "numeric" }, timeZone);
 }
 
+export function formatSchedulePillDateLabel(
+  date: string,
+  today = new Date(),
+  timeZone?: string | null,
+): string {
+  const isoToday = getIsoDateInTimeZone(today, timeZone);
+
+  if (date === isoToday) {
+    return "Today";
+  }
+
+  if (date === addDaysToIsoDate(isoToday, 1)) {
+    return "Tomorrow";
+  }
+
+  return formatDate(
+    date,
+    { weekday: "short", month: "short", day: "numeric" },
+    timeZone,
+  );
+}
+
 export function filterScheduleEntriesByDate(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
   date: string,
 ): MobileScheduleEntry[] {
-  return entries.filter((entry) => entry.date === date);
+  return entries.filter(
+    (entry) => entry.date === date,
+  ) as MobileScheduleEntry[];
+}
+
+function getMinutesSinceMidnight(value: string): number | null {
+  const [rawHours, rawMinutes] = value.split(":");
+  const hours = Number(rawHours);
+  const minutes = Number(rawMinutes);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function expandTimeRange(
+  start: string | null,
+  end: string | null,
+): Array<{ start: number; end: number }> {
+  const startMinutes = start ? getMinutesSinceMidnight(start) : null;
+  const endMinutes = end ? getMinutesSinceMidnight(end) : null;
+
+  if (startMinutes == null || endMinutes == null) {
+    return [];
+  }
+
+  if (endMinutes <= startMinutes) {
+    return [
+      { start: startMinutes, end: 24 * 60 },
+      { start: 0, end: endMinutes },
+    ];
+  }
+
+  return [{ start: startMinutes, end: endMinutes }];
+}
+
+function isTimeWithinRange(
+  start: string | null,
+  end: string | null,
+  currentTime: string,
+): boolean {
+  const currentMinutes = getMinutesSinceMidnight(currentTime);
+
+  if (currentMinutes == null) {
+    return false;
+  }
+
+  return expandTimeRange(start, end).some(
+    (range) => currentMinutes >= range.start && currentMinutes < range.end,
+  );
+}
+
+function getRangeDurationMinutes(
+  start: string | null,
+  end: string | null,
+): number {
+  return expandTimeRange(start, end).reduce(
+    (total, range) => total + Math.max(range.end - range.start, 0),
+    0,
+  );
+}
+
+function splitPipeParts(value: string | null | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function hasPipeParts(value: string | null | undefined): boolean {
+  return Boolean(value?.includes("|"));
+}
+
+function getDurationFieldMinutes(
+  value: Pick<
+    MobileScheduleEntrySegment,
+    "defaultDurationHours" | "defaultDurationMinutes"
+  >,
+): number {
+  if (
+    value.defaultDurationHours == null &&
+    value.defaultDurationMinutes == null
+  ) {
+    return 0;
+  }
+
+  return Math.max(
+    (value.defaultDurationHours ?? 0) * 60 +
+      (value.defaultDurationMinutes ?? 0),
+    0,
+  );
+}
+
+function subtractBreakMinutes(
+  minutes: number,
+  breakMinutes: number | null | undefined,
+): number {
+  return Math.max(minutes - (breakMinutes ?? 0), 0);
+}
+
+function getSegmentScheduledMinutes(
+  entry: ScheduleEntryLike,
+  segment: MobileScheduleEntrySegment,
+  startOverride?: string | null,
+  endOverride?: string | null,
+): number {
+  const rangeMinutes = getRangeDurationMinutes(
+    startOverride ?? segment.startTime ?? getScheduleEntryStartTime(entry),
+    endOverride ?? segment.endTime ?? getScheduleEntryEndTime(entry),
+  );
+  const minutes =
+    rangeMinutes > 0 ? rangeMinutes : getDurationFieldMinutes(segment);
+
+  return subtractBreakMinutes(minutes, segment.breakMinutes);
+}
+
+function formatHoursValue(totalMinutes: number): number {
+  return Math.round((Math.max(totalMinutes, 0) / 60) * 10) / 10;
+}
+
+function getEntrySegmentSortTime(
+  entry: ScheduleEntryLike,
+  segment: MobileScheduleEntrySegment,
+): string {
+  return (
+    segment.startTime ??
+    getScheduleEntryStartTime(entry) ??
+    getScheduleEntryCustomStartTime(entry) ??
+    "99:99:99"
+  );
+}
+
+export function getScheduleEntrySegmentFocusAreaName(
+  entry: ScheduleEntryLike,
+  segment: Pick<MobileScheduleEntrySegment, "displayFocusAreaName">,
+): string | null {
+  if ("displayFocusAreaName" in segment) {
+    return segment.displayFocusAreaName ?? null;
+  }
+
+  return (
+    getScheduleEntryDisplayFocusAreaName(entry) ??
+    getScheduleEntryFocusAreaName(entry)
+  );
+}
+
+export function buildMeScheduleSegmentItems(
+  entries: ReadonlyArray<ScheduleEntryLike>,
+): MeScheduleSegmentItem[] {
+  const items: MeScheduleSegmentItem[] = [];
+
+  const orderedEntries = [...entries].sort((left, right) => {
+    if (left.date !== right.date) {
+      return left.date.localeCompare(right.date);
+    }
+
+    const leftTime = getSortableTime(
+      getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left),
+    );
+    const rightTime = getSortableTime(
+      getScheduleEntryStartTime(right) ??
+        getScheduleEntryCustomStartTime(right),
+    );
+
+    if (leftTime !== rightTime) {
+      if (!leftTime) return 1;
+      if (!rightTime) return -1;
+      return leftTime.localeCompare(rightTime);
+    }
+
+    return left.employeeName.localeCompare(right.employeeName);
+  });
+
+  for (const entry of orderedEntries) {
+    const segments = getScheduleEntrySegments(entry);
+
+    segments.forEach((segment, index) => {
+      items.push({
+        key: [
+          entry.employeeId,
+          entry.date,
+          segment.shiftName,
+          segment.jobId ?? "none",
+          segment.startTime ?? "none",
+          index,
+        ].join(":"),
+        date: entry.date,
+        entry: entry as MobileScheduleEntry,
+        segment,
+      });
+    });
+  }
+
+  return items.sort((left, right) => {
+    if (left.date !== right.date) {
+      return left.date.localeCompare(right.date);
+    }
+
+    const leftTime = getEntrySegmentSortTime(left.entry, left.segment);
+    const rightTime = getEntrySegmentSortTime(right.entry, right.segment);
+
+    if (leftTime !== rightTime) {
+      return leftTime.localeCompare(rightTime);
+    }
+
+    return left.entry.employeeName.localeCompare(right.entry.employeeName);
+  });
+}
+
+export function getFeaturedMeScheduleSegment(input: {
+  currentTime: string;
+  entries: ScheduleEntryLike[];
+  rangeStartDate?: string;
+  selectedDate: string;
+  todayDate: string;
+}): FeaturedMeScheduleSegment {
+  const items = buildMeScheduleSegmentItems(input.entries);
+  const selectedDayItems = items.filter(
+    (item) => item.date === input.selectedDate,
+  );
+
+  if (
+    input.rangeStartDate &&
+    input.rangeStartDate.localeCompare(input.todayDate) > 0
+  ) {
+    const firstWeekItem =
+      items.find((item) => getScheduleEntryAbsenceTypeId(item.entry) == null) ??
+      null;
+
+    if (firstWeekItem) {
+      return {
+        item: firstWeekItem,
+        status: "upcoming",
+      };
+    }
+
+    return {
+      item: null,
+      status: "empty",
+    };
+  }
+
+  if (input.selectedDate === input.todayDate) {
+    const activeItem =
+      selectedDayItems.find(
+        (item) =>
+          getScheduleEntryAbsenceTypeId(item.entry) == null &&
+          isTimeWithinRange(
+            item.segment.startTime ?? getScheduleEntryStartTime(item.entry),
+            item.segment.endTime ?? getScheduleEntryEndTime(item.entry),
+            input.currentTime,
+          ),
+      ) ?? null;
+
+    if (activeItem) {
+      return {
+        item: activeItem,
+        status: "active",
+      };
+    }
+
+    const upcomingTodayItem =
+      selectedDayItems.find((item) => {
+        if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
+          return false;
+        }
+
+        return (
+          getEntrySegmentSortTime(item.entry, item.segment).localeCompare(
+            input.currentTime,
+          ) > 0
+        );
+      }) ?? null;
+
+    if (upcomingTodayItem) {
+      return {
+        item: upcomingTodayItem,
+        status: "upcoming",
+      };
+    }
+  }
+
+  const selectedDayItem = selectedDayItems[0] ?? null;
+
+  if (selectedDayItem) {
+    return {
+      item: selectedDayItem,
+      status:
+        getScheduleEntryAbsenceTypeId(selectedDayItem.entry) != null
+          ? "away"
+          : "scheduled",
+    };
+  }
+
+  const nextItem =
+    items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ??
+    null;
+
+  if (nextItem) {
+    return {
+      item: nextItem,
+      status:
+        getScheduleEntryAbsenceTypeId(nextItem.entry) != null
+          ? "away"
+          : "upcoming",
+    };
+  }
+
+  return {
+    item: null,
+    status: "empty",
+  };
+}
+
+export function buildUpcomingMeScheduleItems(input: {
+  entries: ReadonlyArray<ScheduleEntryLike>;
+  featuredItem: MeScheduleSegmentItem | null;
+  selectedDate: string;
+}): MeScheduleSegmentItem[] {
+  return buildMeScheduleSegmentItems(input.entries);
+}
+
+function getRequestPrimarySegment(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): MobileScheduleEntrySegment | null {
+  const segments =
+    which === "requester"
+      ? request.requesterPresentation.segments
+      : (request.targetPresentation?.segments ?? []);
+
+  return segments[0] ?? null;
+}
+
+function getRequestSortTime(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): string {
+  const primarySegment = getRequestPrimarySegment(request, which);
+
+  return (
+    primarySegment?.startTime ??
+    (which === "requester"
+      ? request.requesterState.customStartTime
+      : request.targetState?.customStartTime) ??
+    "99:99:99"
+  );
+}
+
+export function buildMeShiftRequestSections(input: {
+  linkedEmployeeId: string | null;
+  requests: MobileShiftRequest[];
+}): MeShiftRequestSections {
+  if (!input.linkedEmployeeId) {
+    return {
+      openShiftRequests: [],
+      coverRequests: [],
+    };
+  }
+
+  const sortRequests = (
+    left: MobileShiftRequest,
+    right: MobileShiftRequest,
+  ) => {
+    if (left.requesterShiftDate !== right.requesterShiftDate) {
+      return left.requesterShiftDate.localeCompare(right.requesterShiftDate);
+    }
+
+    return getRequestSortTime(left, "requester").localeCompare(
+      getRequestSortTime(right, "requester"),
+    );
+  };
+
+  return {
+    openShiftRequests: input.requests
+      .filter(
+        (request) =>
+          request.status === "open" &&
+          request.type === "pickup" &&
+          request.requesterEmpId !== input.linkedEmployeeId,
+      )
+      .sort(sortRequests),
+    coverRequests: input.requests
+      .filter(
+        (request) =>
+          request.status === "open" &&
+          request.targetEmpId === input.linkedEmployeeId,
+      )
+      .sort(sortRequests),
+  };
+}
+
+export function buildWeeklyHoursSummary(
+  entries: ReadonlyArray<ScheduleEntryLike>,
+  targetHours = 40,
+): WeeklyHoursSummary {
+  const scheduledMinutes = entries.reduce((total, entry) => {
+    if (getScheduleEntryAbsenceTypeId(entry) != null) {
+      return total;
+    }
+
+    const segments = getScheduleEntrySegments(entry);
+    const customStartTime = getScheduleEntryCustomStartTime(entry);
+    const customEndTime = getScheduleEntryCustomEndTime(entry);
+
+    if (
+      customStartTime &&
+      customEndTime &&
+      !hasPipeParts(customStartTime) &&
+      !hasPipeParts(customEndTime)
+    ) {
+      return (
+        total +
+        subtractBreakMinutes(
+          getRangeDurationMinutes(customStartTime, customEndTime),
+          segments[0]?.breakMinutes,
+        )
+      );
+    }
+
+    const customStartTimes = splitPipeParts(customStartTime);
+    const customEndTimes = splitPipeParts(customEndTime);
+
+    return (
+      total +
+      segments.reduce(
+        (segmentTotal, segment, index) =>
+          segmentTotal +
+          getSegmentScheduledMinutes(
+            entry,
+            segment,
+            customStartTimes[index] ?? null,
+            customEndTimes[index] ?? null,
+          ),
+        0,
+      )
+    );
+  }, 0);
+
+  const scheduledHours = formatHoursValue(scheduledMinutes);
+  const progress =
+    targetHours > 0 ? Math.min(scheduledHours / targetHours, 1) : 0;
+  const statusLabel =
+    progress >= 0.8
+      ? "On track"
+      : progress >= 0.5
+        ? "In progress"
+        : "Needs attention";
+
+  return {
+    scheduledHours,
+    targetHours,
+    progress,
+    statusLabel,
+  };
 }
 
 export function buildScheduleTimeGroups(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
 ): MobileScheduleTimeGroup[] {
   const grouped = new Map<
     string,
@@ -424,7 +1095,10 @@ export function buildScheduleTimeGroups(
   const sortedEntries = sortScheduleEntries(entries);
 
   for (const entry of sortedEntries) {
-    const sortTime = getSortableTime(entry.startTime ?? entry.customStartTime);
+    const sortTime = getSortableTime(
+      getScheduleEntryStartTime(entry) ??
+        getScheduleEntryCustomStartTime(entry),
+    );
     const key = sortTime ?? "unscheduled";
     const title = sortTime ? formatScheduleTimeValue(sortTime) : "Unscheduled";
     const group = grouped.get(key) ?? {
@@ -432,7 +1106,7 @@ export function buildScheduleTimeGroups(
       sortKey: sortTime ?? "99:99:99",
       entries: [],
     };
-    group.entries.push(entry);
+    group.entries.push(entry as MobileScheduleEntry);
     grouped.set(key, group);
   }
 
@@ -445,32 +1119,110 @@ export function buildScheduleTimeGroups(
     }));
 }
 
-export function getScheduleEntryCategoryKey(
-  entry: MobileScheduleEntry,
-): string {
-  if (entry.absenceTypeId != null) {
-    return `absence:${entry.absenceTypeId}:${entry.shiftName}`;
+export function getScheduleEntryCategoryKey(entry: ScheduleEntryLike): string {
+  const title = getScheduleEntryTitle(entry);
+
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return `absence:${getScheduleEntryAbsenceTypeId(entry)}:${title}`;
   }
 
-  if (entry.shiftCodeIds.length > 0) {
-    return `shift:${entry.shiftCodeIds.join(",")}:${entry.shiftName}`;
+  const canonicalSegments = entry.state?.segments ?? [];
+  const shiftIds =
+    canonicalSegments.length > 0
+      ? canonicalSegments.map((segment) =>
+          segment.shiftId == null ? "null" : String(segment.shiftId),
+        )
+      : (entry.shiftIds ?? []).map((shiftId) =>
+          shiftId == null ? "null" : String(shiftId),
+        );
+  if (shiftIds.some((shiftId) => shiftId !== "null")) {
+    return `shift:${shiftIds.join(",")}`;
   }
 
-  if (entry.shiftLabel) {
-    return `label:${entry.shiftLabel}:${entry.shiftName}`;
+  return `name:${title}`;
+}
+
+function getShiftOnlySegmentTitle(
+  segment: MobileScheduleEntrySegment,
+): string | null {
+  const title = segment.shiftName ?? segment.label ?? null;
+  const jobName = segment.jobName?.trim();
+
+  if (!title) {
+    return null;
   }
 
-  return `name:${entry.shiftName}`;
+  if (jobName && title.endsWith(` ${jobName}`)) {
+    return title.slice(0, -jobName.length).trim();
+  }
+
+  return title;
+}
+
+function getScheduleEntryPrimaryJobSort(entry: ScheduleEntryLike): {
+  sortOrder: number;
+  name: string;
+} {
+  const segment =
+    getScheduleEntrySegments(entry).find((item) => item.jobName) ??
+    getScheduleEntrySegments(entry)[0] ??
+    null;
+
+  return {
+    sortOrder: segment?.jobSortOrder ?? Number.MAX_SAFE_INTEGER,
+    name: segment?.jobName ?? "",
+  };
+}
+
+function getScheduleEntrySeniority(entry: ScheduleEntryLike): number {
+  return entry.employeeSeniority ?? Number.MAX_SAFE_INTEGER;
+}
+
+function sortTeamShiftGroupEntries(
+  entries: MobileScheduleEntry[],
+): MobileScheduleEntry[] {
+  return [...entries].sort((left, right) => {
+    const leftJob = getScheduleEntryPrimaryJobSort(left);
+    const rightJob = getScheduleEntryPrimaryJobSort(right);
+
+    if (leftJob.sortOrder !== rightJob.sortOrder) {
+      return leftJob.sortOrder - rightJob.sortOrder;
+    }
+
+    const jobComparison = leftJob.name.localeCompare(rightJob.name);
+    if (jobComparison !== 0) {
+      return jobComparison;
+    }
+
+    const seniorityComparison =
+      getScheduleEntrySeniority(left) - getScheduleEntrySeniority(right);
+    if (seniorityComparison !== 0) {
+      return seniorityComparison;
+    }
+
+    return left.employeeName.localeCompare(right.employeeName);
+  });
 }
 
 export function getScheduleEntryCategoryTitle(
-  entry: MobileScheduleEntry,
+  entry: ScheduleEntryLike,
 ): string {
-  return entry.shiftName;
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return getScheduleEntryTitle(entry);
+  }
+
+  const shiftTitles = getScheduleEntrySegments(entry)
+    .map(getShiftOnlySegmentTitle)
+    .filter((title): title is string => Boolean(title))
+    .filter((title, index, titles) => titles.indexOf(title) === index);
+
+  return shiftTitles.length > 0
+    ? shiftTitles.join(" / ")
+    : getScheduleEntryTitle(entry);
 }
 
 export function buildScheduleShiftGroups(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
 ): MobileScheduleShiftGroup[] {
   const grouped = new Map<
     string,
@@ -486,7 +1238,10 @@ export function buildScheduleShiftGroups(
   for (const entry of sortedEntries) {
     const key = getScheduleEntryCategoryKey(entry);
     const sortTime =
-      getSortableTime(entry.startTime ?? entry.customStartTime) ?? "99:99:99";
+      getSortableTime(
+        getScheduleEntryStartTime(entry) ??
+          getScheduleEntryCustomStartTime(entry),
+      ) ?? "99:99:99";
     const existing = grouped.get(key) ?? {
       title: getScheduleEntryCategoryTitle(entry),
       sortKey: sortTime,
@@ -497,7 +1252,7 @@ export function buildScheduleShiftGroups(
       existing.sortKey = sortTime;
     }
 
-    existing.entries.push(entry);
+    existing.entries.push(entry as MobileScheduleEntry);
     grouped.set(key, existing);
   }
 
@@ -513,13 +1268,13 @@ export function buildScheduleShiftGroups(
     .map(([key, value]) => ({
       key,
       title: value.title,
-      entries: value.entries,
+      entries: sortTeamShiftGroupEntries(value.entries),
     }));
 }
 
 export function buildTeamScheduleFocusAreaTabs(
-  focusAreas: MobileFocusArea[],
-  entries: MobileScheduleEntry[],
+  focusAreas: ReadonlyArray<MobileFocusArea>,
+  entries: ReadonlyArray<ScheduleEntryLike>,
 ): TeamScheduleFocusAreaTab[] {
   if (entries.length === 0 && focusAreas.length === 0) {
     return [];
@@ -532,26 +1287,28 @@ export function buildTeamScheduleFocusAreaTabs(
   }
 
   for (const entry of entries) {
+    const focusAreaId = getScheduleEntryFocusAreaId(entry);
+    const focusAreaName = getScheduleEntryFocusAreaName(entry);
     if (
-      entry.focusAreaId != null &&
-      entry.focusAreaName &&
-      !focusAreasById.has(entry.focusAreaId)
+      focusAreaId != null &&
+      focusAreaName &&
+      !focusAreasById.has(focusAreaId)
     ) {
-      focusAreasById.set(entry.focusAreaId, {
-        id: entry.focusAreaId,
-        name: entry.focusAreaName,
+      focusAreasById.set(focusAreaId, {
+        id: focusAreaId,
+        name: focusAreaName,
       });
     }
   }
 
-  const tabs = Array.from(focusAreasById.values())
-    .map((focusArea) => ({
-      key: `focus-area:${focusArea.id}`,
-      label: focusArea.name,
-      count: entries.filter((entry) => entry.focusAreaId === focusArea.id)
-        .length,
-      focusAreaId: focusArea.id,
-    }));
+  const tabs = Array.from(focusAreasById.values()).map((focusArea) => ({
+    key: `focus-area:${focusArea.id}`,
+    label: focusArea.name,
+    count: entries.filter(
+      (entry) => getScheduleEntryFocusAreaId(entry) === focusArea.id,
+    ).length,
+    focusAreaId: focusArea.id,
+  }));
 
   if (focusAreas.length > 0) {
     return tabs;
@@ -561,25 +1318,27 @@ export function buildTeamScheduleFocusAreaTabs(
 }
 
 export function filterTeamScheduleEntriesByFocusArea(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
   activeTabKey: string,
 ): MobileScheduleEntry[] {
   // If no key or 'all', return all entries unfiltered
   if (activeTabKey === TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY) {
-    return entries;
+    return [...entries] as MobileScheduleEntry[];
   }
 
   const match = /^focus-area:(\d+)$/.exec(activeTabKey);
   if (!match) {
-    return entries;
+    return [...entries] as MobileScheduleEntry[];
   }
 
   const focusAreaId = Number(match[1]);
-  return entries.filter((entry) => entry.focusAreaId === focusAreaId);
+  return entries.filter(
+    (entry) => getScheduleEntryFocusAreaId(entry) === focusAreaId,
+  ) as MobileScheduleEntry[];
 }
 
 export function buildScheduleSections(
-  entries: MobileScheduleEntry[],
+  entries: ReadonlyArray<ScheduleEntryLike>,
   scope: "mine" | "team",
   timeZone?: string | null,
 ): MobileScheduleSection[] {
@@ -590,8 +1349,13 @@ export function buildScheduleSections(
       return left.date.localeCompare(right.date);
     }
 
-    const leftTime = getSortableTime(left.startTime ?? left.customStartTime);
-    const rightTime = getSortableTime(right.startTime ?? right.customStartTime);
+    const leftTime = getSortableTime(
+      getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left),
+    );
+    const rightTime = getSortableTime(
+      getScheduleEntryStartTime(right) ??
+        getScheduleEntryCustomStartTime(right),
+    );
     if (leftTime !== rightTime) {
       if (!leftTime) return 1;
       if (!rightTime) return -1;
@@ -601,7 +1365,7 @@ export function buildScheduleSections(
     return left.employeeName.localeCompare(right.employeeName);
   })) {
     const existing = grouped.get(entry.date) ?? [];
-    existing.push(entry);
+    existing.push(entry as MobileScheduleEntry);
     grouped.set(entry.date, existing);
   }
 

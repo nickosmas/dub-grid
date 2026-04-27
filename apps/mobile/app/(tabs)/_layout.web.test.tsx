@@ -7,7 +7,7 @@ const useBootstrap = vi.fn();
 vi.mock("expo-router", async () => {
   const React = await import("react");
 
-  const Tabs = ({ children }: { children: unknown }) =>
+  const Tabs = ({ children }: { children: React.ReactNode }) =>
     React.createElement("div", {}, children);
 
   Tabs.Screen = ({

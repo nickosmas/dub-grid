@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("mobileApiRequest", () => {
   beforeEach(() => {
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
+    vi.stubEnv(
+      "EXPO_PUBLIC_SUPABASE_URL",
+      "https://example-project.supabase.co",
+    );
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://app.dubgrid.com");
   });
@@ -67,6 +70,29 @@ describe("mobileApiRequest", () => {
     );
   });
 
+  it("adds shift request query params when a mobile date range is supplied", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        requests: [],
+        openShifts: [],
+      }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { getShiftRequests } = await import("./api");
+
+    await getShiftRequests("token-123", {
+      startDate: "2026-04-19",
+      endDate: "2026-04-25",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://app.dubgrid.com/api/mobile/v1/shift-requests?startDate=2026-04-19&endDate=2026-04-25",
+      expect.any(Object),
+    );
+  });
+
   it("parses bootstrap responses that omit linked employee focusAreaIds", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -116,8 +142,8 @@ describe("mobileApiRequest", () => {
           canManageEmployees: true,
           canViewFocusAreas: true,
           canManageFocusAreas: false,
-          canViewShiftCodes: false,
-          canManageShiftCodes: false,
+          canViewScheduleDefinitions: false,
+          canManageScheduleDefinitions: false,
           canViewIndicatorTypes: false,
           canManageIndicatorTypes: false,
           canManageOrgSettings: false,
@@ -239,5 +265,55 @@ describe("mobileApiRequest", () => {
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const headers = new Headers(request.headers);
     expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("updates teammate status through the mobile people endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        person: {
+          id: "00000000-0000-0000-0000-000000000001",
+          firstName: "Mina",
+          lastName: "Diaz",
+          phone: "555-0100",
+          email: "mina@dubgrid.com",
+          status: "benched",
+          focusAreaIds: [1, 2],
+          contactNotes: "Weekend availability",
+          statusChangedAt: "2026-04-24T12:00:00.000Z",
+          statusNote: "Coverage hold",
+          version: 8,
+        },
+      }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateMobilePersonStatus } = await import("./api");
+
+    await updateMobilePersonStatus(
+      "token-123",
+      "00000000-0000-0000-0000-000000000001",
+      {
+        action: "bench",
+        expectedVersion: 7,
+        note: "Coverage hold",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://app.dubgrid.com/api/mobile/v1/people/00000000-0000-0000-0000-000000000001/status",
+      expect.any(Object),
+    );
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(request.method).toBe("PATCH");
+    expect(request.body).toBe(
+      JSON.stringify({
+        action: "bench",
+        expectedVersion: 7,
+        note: "Coverage hold",
+      }),
+    );
   });
 });

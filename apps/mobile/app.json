@@ -5,11 +5,8 @@
     "scheme": "dubgridmobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "plugins": [
-      "expo-router",
-      "expo-secure-store",
-      "expo-notifications"
-    ],
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dubgrid.mobile"

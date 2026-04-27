@@ -10,6 +10,7 @@ const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
+const useLocalSearchParams = vi.fn();
 
 vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
@@ -18,6 +19,10 @@ vi.mock("react-native", async () =>
 vi.mock("@tanstack/react-query", () => ({
   useMutation,
   useQuery,
+}));
+
+vi.mock("expo-router", () => ({
+  useLocalSearchParams,
 }));
 
 vi.mock("../../../shared/components/Screen", async () =>
@@ -48,8 +53,10 @@ describe("RequestsScreen", () => {
     useQuery.mockReset();
     useAccessToken.mockReset();
     useBootstrap.mockReset();
+    useLocalSearchParams.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
+    useLocalSearchParams.mockReturnValue({});
     useBootstrap.mockReturnValue({
       data: {
         linkedEmployee: {
@@ -124,6 +131,76 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("No request activity yet")).toBeInTheDocument();
   });
 
+  it("shows coverage-gap open shifts and volunteers from the requests tab", () => {
+    const mutate = vi.fn();
+    const openShift = {
+      id: "coverage-gap-1",
+      date: "2026-04-19",
+      focusAreaId: 2,
+      focusAreaName: "Skilled Nursing",
+      needed: 1,
+      state: {
+        kind: "worked",
+        segments: [{ shiftId: 1, jobId: 20, position: 0 }],
+        absenceTypeId: null,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
+      presentation: {
+        label: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 20,
+            shiftName: "Day Shift",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      },
+    };
+    useQuery.mockReturnValue({
+      data: {
+        openShifts: [openShift],
+        requests: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate,
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Day Shift • 2026-04-19")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Volunteer"));
+
+    expect(mutate).toHaveBeenCalledWith({
+      requestId: "coverage-gap-1",
+      body: {
+        action: "volunteer_open_shift",
+        empId: "emp-1",
+        shiftDate: "2026-04-19",
+        focusAreaId: 2,
+        state: openShift.state,
+      },
+    });
+  });
+
   it("surfaces mutation errors above existing request content", () => {
     useQuery.mockReturnValue({
       data: {
@@ -155,5 +232,37 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("Could not update request")).toBeInTheDocument();
     expect(screen.getByText("Already resolved")).toBeInTheDocument();
+  });
+
+  it("defaults managers into the approval tab when a request is waiting for review", () => {
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "req-2",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-17",
+            status: "pending_approval",
+            type: "pickup",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: null,
+            requesterPresentation: {
+              label: "Day Shift",
+            },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
   });
 });

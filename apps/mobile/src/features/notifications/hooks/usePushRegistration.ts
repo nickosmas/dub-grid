@@ -49,7 +49,11 @@ async function getStoredOrFreshPushDevice(): Promise<StoredPushDevice> {
 export function usePushRegistration(
   accessToken: string | null,
   currentOrgId: string | null | undefined,
+  options?: {
+    autoRegister?: boolean;
+  },
 ) {
+  const autoRegister = options?.autoRegister ?? true;
   const [permissionState, setPermissionState] =
     useState<PushPermissionState>(
       Platform.OS === "web" ? "unsupported" : "undetermined",
@@ -114,7 +118,7 @@ export function usePushRegistration(
   }
 
   useEffect(() => {
-    if (!accessToken || !currentOrgId || Platform.OS === "web") {
+    if (!autoRegister || !accessToken || !currentOrgId || Platform.OS === "web") {
       return;
     }
 
@@ -125,7 +129,7 @@ export function usePushRegistration(
 
     attemptedKeyRef.current = nextKey;
     void refreshPushRegistration({ requestPermission: true });
-  }, [accessToken, currentOrgId]);
+  }, [accessToken, autoRegister, currentOrgId]);
 
   useEffect(() => {
     if (!accessToken || !currentOrgId || Platform.OS === "web") {

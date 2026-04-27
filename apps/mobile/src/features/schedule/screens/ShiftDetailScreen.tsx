@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { MobileScheduleEntry } from "@dubgrid/contracts";
+import type {
+  MobileScheduleEntry,
+  MobileScheduleEntrySegment,
+  MobileShiftRequest,
+} from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
 import { QueryStateCard } from "../../../shared/components/QueryStateCard";
 import { Card, Screen } from "../../../shared/components/Screen";
@@ -10,6 +14,7 @@ import {
   createShiftRequest,
   getMySchedule,
   getOrgSchedule,
+  getShiftRequests,
 } from "../../../shared/lib/api";
 import {
   getMobileQueryContentState,
@@ -20,10 +25,14 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   buildScheduleSections,
+  buildScheduleShiftGroups,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
   getScheduleEntryCategoryKey,
   getScheduleEntryTimeRange,
+  getScheduleEntryAbsenceTypeId,
+  getScheduleEntryDisplayFocusAreaName,
+  getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
 
@@ -32,6 +41,15 @@ type CoverageRequestType = "pickup" | "calloff" | null;
 type ShiftTimeRange = {
   start: string;
   end: string;
+};
+const ACTIVE_SHIFT_REQUEST_STATUSES = new Set<MobileShiftRequest["status"]>([
+  "open",
+  "pending_approval",
+]);
+type ChipTone = {
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
 };
 
 function readParam(value: string | string[] | undefined): string | null {
@@ -67,6 +85,43 @@ function formatPublishedAt(value: string | null, timeZone?: string | null) {
   }).format(new Date(value));
 }
 
+function formatPublishedSummary(
+  publishedByName: string | null,
+  publishedAtLabel: string | null,
+): string | null {
+  if (publishedByName && publishedAtLabel) {
+    return `Published ${publishedAtLabel} by ${publishedByName}`;
+  }
+
+  if (publishedAtLabel) {
+    return `Published ${publishedAtLabel}`;
+  }
+
+  if (publishedByName) {
+    return `Published by ${publishedByName}`;
+  }
+
+  return null;
+}
+
+function formatShiftRequestStatus(status: MobileShiftRequest["status"]): string {
+  return status === "pending_approval"
+    ? "Pending approval"
+    : status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatShiftRequestType(type: MobileShiftRequest["type"]): string {
+  if (type === "pickup") {
+    return "Pickup";
+  }
+
+  if (type === "swap") {
+    return "Swap";
+  }
+
+  return "Calloff";
+}
+
 function getEntryTimeRanges(entry: MobileScheduleEntry): ShiftTimeRange[] {
   return getScheduleEntrySegments(entry).flatMap((segment) => {
     if (!segment.startTime || !segment.endTime) {
@@ -80,6 +135,16 @@ function getEntryTimeRanges(entry: MobileScheduleEntry): ShiftTimeRange[] {
       },
     ];
   });
+}
+
+function hasWorkedAssignment(entry: MobileScheduleEntry): boolean {
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return false;
+  }
+
+  return entry.state
+    ? entry.state.kind === "worked" && entry.state.segments.length > 0
+    : getScheduleEntrySegments(entry).length > 0;
 }
 
 function getMinutesSinceMidnight(value: string): number | null {
@@ -132,10 +197,113 @@ function entriesHaveOverlappingTimes(
   return leftRanges.some((leftRange) =>
     rightRanges.some(
       (rightRange) =>
-        leftRange.start < rightRange.end &&
-        rightRange.start < leftRange.end,
+        leftRange.start < rightRange.end && rightRange.start < leftRange.end,
     ),
   );
+}
+
+function getInitials(name: string): string {
+  const parts =
+    name.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ?? [];
+
+  if (parts.length === 0) {
+    return "?";
+  }
+
+  const first = parts[0]?.charAt(0).toUpperCase() ?? "";
+  const last =
+    parts.length > 1
+      ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "")
+      : "";
+
+  return `${first}${last}` || "?";
+}
+
+function hashCode(value: string): number {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
+  }
+
+  return Math.abs(hash);
+}
+
+function getAvatarTone(seed: string): ChipTone {
+  const hue = hashCode(seed) % 360;
+
+  return {
+    backgroundColor: `hsl(${hue}, 70%, 92%)`,
+    borderColor: `hsl(${hue}, 70%, 85%)`,
+    textColor: `hsl(${hue}, 70%, 35%)`,
+  };
+}
+
+function getEntryJobChip(entry: MobileScheduleEntry):
+  | (ChipTone & {
+      label: string;
+    })
+  | null {
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return {
+      label: "Absence",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textMuted,
+    };
+  }
+
+  const segment =
+    getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
+  const label = segment?.jobName?.trim() ?? "";
+
+  if (!label) {
+    return null;
+  }
+
+  if (segment?.jobColor || segment?.jobBorderColor || segment?.jobTextColor) {
+    return {
+      label,
+      backgroundColor: segment.jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: segment.jobBorderColor ?? mobileColors.border,
+      textColor: segment.jobTextColor ?? mobileColors.textMuted,
+    };
+  }
+
+  return {
+    label,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
+  };
+}
+
+function buildSegmentJobChip(segment: MobileScheduleEntrySegment):
+  | (ChipTone & {
+      label: string;
+    })
+  | null {
+  const label = segment.jobName?.trim() ?? "";
+
+  if (!label) {
+    return null;
+  }
+
+  if (segment.jobColor || segment.jobBorderColor || segment.jobTextColor) {
+    return {
+      label,
+      backgroundColor: segment.jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: segment.jobBorderColor ?? mobileColors.border,
+      textColor: segment.jobTextColor ?? mobileColors.textMuted,
+    };
+  }
+
+  return {
+    label,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
+  };
 }
 
 export default function ShiftDetailScreen() {
@@ -166,8 +334,6 @@ export default function ShiftDetailScreen() {
   };
   const source = readParam(params.source) === "team" ? "team" : "mine";
   const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
-  const focusAreaLabel =
-    bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Area";
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
   const canViewTeamSchedule = bootstrapQuery.data
     ? bootstrapQuery.data.effectiveRole !== "user" ||
@@ -209,6 +375,21 @@ export default function ShiftDetailScreen() {
       (canViewTeamSchedule ||
         needsTeamScheduleForShift ||
         requestMode === "swap"),
+  });
+  const requestsQuery = useQuery({
+    queryKey: [
+      "mobile",
+      "requests",
+      accessToken,
+      range.startDate,
+      range.endDate,
+    ],
+    queryFn: () => getShiftRequests(accessToken!, range),
+    enabled:
+      Boolean(accessToken) &&
+      Boolean(linkedEmployeeId) &&
+      Boolean(range.startDate) &&
+      Boolean(range.endDate),
   });
   const createRequestMutation = useMutation({
     mutationFn: (input: {
@@ -255,6 +436,37 @@ export default function ShiftDetailScreen() {
     scheduleEntries.find((entry) => {
       return entry.employeeId === employeeId && entry.date === shiftDate;
     }) ?? null;
+  const shouldCheckExistingRequests = Boolean(
+    shiftEntry && linkedEmployeeId && shiftEntry.employeeId === linkedEmployeeId,
+  );
+  const activeShiftRequest = useMemo(() => {
+    if (!shouldCheckExistingRequests || !shiftEntry || !linkedEmployeeId) {
+      return null;
+    }
+
+    return (
+      (requestsQuery.data?.requests ?? []).find(
+        (request) =>
+          request.requesterEmpId === linkedEmployeeId &&
+          request.requesterShiftDate === shiftEntry.date &&
+          ACTIVE_SHIFT_REQUEST_STATUSES.has(request.status),
+      ) ?? null
+    );
+  }, [
+    linkedEmployeeId,
+    requestsQuery.data?.requests,
+    shiftEntry,
+    shouldCheckExistingRequests,
+  ]);
+  const isCheckingExistingRequests =
+    shouldCheckExistingRequests && requestsQuery.isLoading;
+  const shiftRequestCheckError =
+    shouldCheckExistingRequests && requestsQuery.error
+      ? getQueryErrorMessage(
+          requestsQuery.error,
+          "We couldn't verify existing requests for this shift.",
+        )
+      : null;
   const shiftmates = useMemo(() => {
     if (!shiftEntry) {
       return [];
@@ -262,15 +474,20 @@ export default function ShiftDetailScreen() {
 
     const activeCategoryKey = getScheduleEntryCategoryKey(shiftEntry);
 
-    return sortScheduleEntries(
-      (teamScheduleQuery.data?.entries ?? []).filter((entry) => {
+    const matchingEntries = (teamScheduleQuery.data?.entries ?? []).filter(
+      (entry) => {
         return (
           entry.date === shiftEntry.date &&
           entry.employeeId !== shiftEntry.employeeId &&
           getScheduleEntryCategoryKey(entry) === activeCategoryKey
         );
-      }),
+      },
     );
+    const matchingGroup = buildScheduleShiftGroups(matchingEntries).find(
+      (group) => group.key === activeCategoryKey,
+    );
+
+    return matchingGroup?.entries ?? sortScheduleEntries(matchingEntries);
   }, [shiftEntry, teamScheduleQuery.data?.entries]);
   const swapTargetOptions = useMemo(() => {
     if (!shiftEntry || !linkedEmployeeId) {
@@ -283,8 +500,8 @@ export default function ShiftDetailScreen() {
       if (
         entry.employeeId === linkedEmployeeId ||
         entry.publishedAt == null ||
-        entry.absenceTypeId != null ||
-        entry.shiftCodeIds.length === 0
+        getScheduleEntryAbsenceTypeId(entry) != null ||
+        !hasWorkedAssignment(entry)
       ) {
         return false;
       }
@@ -316,7 +533,12 @@ export default function ShiftDetailScreen() {
 
       return !entriesHaveOverlappingTimes(targetExistingShift, shiftEntry);
     });
-  }, [linkedEmployeeId, scheduleEntries, shiftEntry, teamScheduleQuery.data?.entries]);
+  }, [
+    linkedEmployeeId,
+    scheduleEntries,
+    shiftEntry,
+    teamScheduleQuery.data?.entries,
+  ]);
   const swapSections = useMemo(
     () => buildScheduleSections(swapTargetOptions, "team", timeZone),
     [swapTargetOptions, timeZone],
@@ -324,25 +546,28 @@ export default function ShiftDetailScreen() {
   const selectedTargetEntry =
     selectedTargetShift == null
       ? null
-      : swapTargetOptions.find((entry) => {
+      : (swapTargetOptions.find((entry) => {
           return (
             entry.employeeId === selectedTargetShift.employeeId &&
             entry.date === selectedTargetShift.date
           );
-        }) ?? null;
+        }) ?? null);
   const canCreateRequestsForShift = Boolean(
     shiftEntry &&
     linkedEmployeeId &&
     shiftEntry.employeeId === linkedEmployeeId &&
     shiftEntry.publishedAt != null &&
-    shiftEntry.absenceTypeId == null &&
-    shiftEntry.shiftCodeIds.length > 0,
+    getScheduleEntryAbsenceTypeId(shiftEntry) == null &&
+    hasWorkedAssignment(shiftEntry) &&
+    !isCheckingExistingRequests &&
+    !shiftRequestCheckError &&
+    !activeShiftRequest,
   );
   const canSubmitRequest = Boolean(
     linkedEmployeeId &&
-      shiftEntry &&
-      requestMode === "swap" &&
-      selectedTargetEntry,
+    shiftEntry &&
+    requestMode === "swap" &&
+    selectedTargetEntry,
   );
   const createError = createRequestMutation.error
     ? getQueryErrorMessage(
@@ -371,15 +596,28 @@ export default function ShiftDetailScreen() {
   const publishedAtLabel = shiftEntry
     ? formatPublishedAt(shiftEntry.publishedAt, timeZone)
     : null;
+  const publishedSummary = shiftEntry
+    ? formatPublishedSummary(shiftEntry.publishedByName, publishedAtLabel)
+    : null;
+  const focusAreaName = shiftEntry
+    ? getScheduleEntryDisplayFocusAreaName(shiftEntry)
+    : null;
+  const jobChip = shiftEntry ? getEntryJobChip(shiftEntry) : null;
   const shouldShowEmployeeSummary = Boolean(
     shiftEntry && shiftEntry.employeeId !== linkedEmployeeId,
   );
   const shouldShowShiftmates = Boolean(
-    canViewTeamSchedule && shiftEntry && shiftEntry.absenceTypeId == null,
+    canViewTeamSchedule &&
+    shiftEntry &&
+    getScheduleEntryAbsenceTypeId(shiftEntry) == null,
   );
-  const activeAbsenceTypes = absenceTypes.filter(
-    (absenceType) => !absenceType.archivedAt,
+  const shouldRenderShiftmatesSection = Boolean(
+    shouldShowShiftmates &&
+    (teamScheduleQuery.isLoading ||
+      teamScheduleQuery.error ||
+      shiftmates.length > 0),
   );
+  const activeAbsenceTypes = absenceTypes;
 
   function resetRequestMode(nextMode: RequestMode) {
     setRequestMode(nextMode);
@@ -436,11 +674,13 @@ export default function ShiftDetailScreen() {
       return;
     }
 
-    const shiftLabel = shiftEntry.shiftName;
+    const shiftLabel = getScheduleEntryTitle(shiftEntry);
     const shiftDateLabel = formatShiftDate(shiftEntry.date);
 
     Alert.alert(
-      type === "pickup" ? "Offer shift for pickup?" : "Submit call off request?",
+      type === "pickup"
+        ? "Offer shift for pickup?"
+        : "Submit call off request?",
       type === "pickup"
         ? `Offer your ${shiftLabel} shift on ${shiftDateLabel} for pickup?`
         : `Submit a ${options?.absenceTypeLabel ?? "selected"} absence request for your ${shiftLabel} shift on ${shiftDateLabel}?`,
@@ -452,8 +692,7 @@ export default function ShiftDetailScreen() {
         {
           text: type === "pickup" ? "Offer for pickup" : "Submit call off",
           style: type === "calloff" ? "destructive" : "default",
-          onPress: () =>
-            submitCoverageRequest(type, options?.absenceTypeId),
+          onPress: () => submitCoverageRequest(type, options?.absenceTypeId),
         },
       ],
       { cancelable: true },
@@ -465,8 +704,8 @@ export default function ShiftDetailScreen() {
       return;
     }
 
-    const requesterLabel = shiftEntry.shiftName;
-    const targetLabel = selectedTargetEntry.shiftName;
+    const requesterLabel = getScheduleEntryTitle(shiftEntry);
+    const targetLabel = getScheduleEntryTitle(selectedTargetEntry);
 
     Alert.alert(
       "Submit swap request?",
@@ -492,13 +731,15 @@ export default function ShiftDetailScreen() {
       refreshing={
         bootstrapQuery.isFetching ||
         myScheduleQuery.isFetching ||
-        teamScheduleQuery.isFetching
+        teamScheduleQuery.isFetching ||
+        requestsQuery.isFetching
       }
       onRefresh={() => {
         void Promise.all([
           bootstrapQuery.refetch(),
           myScheduleQuery.refetch(),
           teamScheduleQuery.refetch(),
+          requestsQuery.refetch(),
         ]);
       }}
     >
@@ -528,7 +769,9 @@ export default function ShiftDetailScreen() {
       ) : (
         <>
           <Card
-            title={hasMultipleSegments ? "Shifts" : shiftEntry.shiftName}
+            title={
+              hasMultipleSegments ? "Shifts" : getScheduleEntryTitle(shiftEntry)
+            }
             body={formatShiftDate(shiftEntry.date)}
             detail={
               <View style={styles.detailGroup}>
@@ -542,61 +785,51 @@ export default function ShiftDetailScreen() {
                     }
                   />
                 ) : null}
-                {!shouldShowEmployeeSummary && !hasMultipleSegments && timeRange ? (
+                {!shouldShowEmployeeSummary &&
+                !hasMultipleSegments &&
+                timeRange ? (
                   <Text style={styles.detailSummaryText}>{timeRange}</Text>
                 ) : null}
                 {hasMultipleSegments ? (
                   <ShiftEntrySegmentList entry={shiftEntry} variant="detail" />
                 ) : null}
-                {!hasMultipleSegments && shiftEntry.displayFocusAreaName ? (
-                  <DetailRow
-                    label={focusAreaLabel}
-                    value={shiftEntry.displayFocusAreaName}
-                  />
+                {!hasMultipleSegments ? <DetailJobPill chip={jobChip} /> : null}
+                {!hasMultipleSegments && focusAreaName ? (
+                  <Text style={styles.detailMetaText}>{focusAreaName}</Text>
                 ) : null}
-                {shiftEntry.publishedByName ? (
-                  <DetailRow
-                    label="Published by"
-                    value={shiftEntry.publishedByName}
-                  />
-                ) : null}
-                {publishedAtLabel ? (
-                  <DetailRow label="Published at" value={publishedAtLabel} />
+                {publishedSummary ? (
+                  <Text style={styles.detailFootnote}>{publishedSummary}</Text>
                 ) : null}
               </View>
             }
           />
 
-          {shouldShowShiftmates ? (
-            <Card
-              title="Shiftmates"
-              body={
-                teamScheduleQuery.isLoading
-                  ? "Loading other teammates in this shift category."
-                  : teamScheduleQuery.error
-                    ? getQueryErrorMessage(
-                        teamScheduleQuery.error,
-                        "We couldn't load shiftmates right now.",
-                      )
-                    : shiftmates.length === 0
-                      ? "No other shiftmates are assigned in this shift category."
-                      : undefined
-              }
-              detail={
-                !teamScheduleQuery.isLoading &&
-                !teamScheduleQuery.error &&
-                shiftmates.length > 0 ? (
-                  <View style={styles.shiftmatesList}>
-                    {shiftmates.map((entry) => (
-                      <ShiftmateCard
-                        key={`${entry.employeeId}-${entry.date}`}
-                        entry={entry}
-                      />
-                    ))}
-                  </View>
-                ) : undefined
-              }
-            />
+          {shouldRenderShiftmatesSection ? (
+            <View style={styles.sectionBlock}>
+              <Text style={styles.sectionTitle}>Shiftmates</Text>
+              {teamScheduleQuery.isLoading ? (
+                <Text style={styles.sectionBody}>Loading shiftmates.</Text>
+              ) : teamScheduleQuery.error ? (
+                <Text style={styles.sectionBody}>
+                  {getQueryErrorMessage(
+                    teamScheduleQuery.error,
+                    "We couldn't load shiftmates right now.",
+                  )}
+                </Text>
+              ) : (
+                <View style={styles.shiftmatesList}>
+                  {shiftmates.map((entry, index) => (
+                    <ShiftmateRow
+                      key={`${entry.employeeId}-${entry.date}`}
+                      entry={entry}
+                      groupFocusAreaName={focusAreaName}
+                      groupTimeRange={timeRange}
+                      isFirst={index === 0}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
           ) : null}
 
           {successMessage ? (
@@ -611,6 +844,35 @@ export default function ShiftDetailScreen() {
                 void queryClient.invalidateQueries({
                   queryKey: ["mobile", "requests"],
                 });
+              }}
+            />
+          ) : null}
+          {isCheckingExistingRequests ? (
+            <Card
+              title="Checking existing requests"
+              body="Making sure this shift does not already have a request in progress."
+            />
+          ) : null}
+          {activeShiftRequest ? (
+            <Card
+              title="Request already in progress"
+              body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
+              detail={
+                activeShiftRequest.adminNote ? (
+                  <Text style={styles.detailFootnote}>
+                    Manager note: {activeShiftRequest.adminNote}
+                  </Text>
+                ) : undefined
+              }
+            />
+          ) : null}
+          {shiftRequestCheckError ? (
+            <QueryStateCard
+              title="Could not verify existing requests"
+              body={shiftRequestCheckError}
+              actionLabel="Refresh"
+              onAction={() => {
+                void requestsQuery.refetch();
               }}
             />
           ) : null}
@@ -728,8 +990,8 @@ export default function ShiftDetailScreen() {
                     </Text>
                   ) : swapTargetOptions.length === 0 ? (
                     <Text style={styles.subsectionBody}>
-                      No eligible teammate shifts are available in this
-                      schedule range yet.
+                      No eligible teammate shifts are available in this schedule
+                      range yet.
                     </Text>
                   ) : (
                     <View style={styles.swapSectionList}>
@@ -804,15 +1066,6 @@ export default function ShiftDetailScreen() {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
-    </View>
-  );
-}
-
 function EmployeeSummary({
   name,
   subtitle,
@@ -830,11 +1083,104 @@ function EmployeeSummary({
   );
 }
 
-function ShiftmateCard({ entry }: { entry: MobileScheduleEntry }) {
+function DetailJobPill({
+  chip,
+}: {
+  chip:
+    | (ChipTone & {
+        label: string;
+      })
+    | null;
+}) {
+  if (!chip) {
+    return null;
+  }
+
   return (
-    <View style={styles.shiftmateCard}>
-      <Text style={styles.shiftmateName}>{entry.employeeName}</Text>
-      <ShiftEntrySegmentList entry={entry} variant="supporting" />
+    <View
+      style={[
+        styles.detailJobChip,
+        {
+          backgroundColor: chip.backgroundColor,
+          borderColor: chip.borderColor,
+        },
+      ]}
+    >
+      <Text style={[styles.detailJobChipText, { color: chip.textColor }]}>
+        {chip.label}
+      </Text>
+    </View>
+  );
+}
+
+function ShiftmateRow({
+  entry,
+  groupFocusAreaName,
+  groupTimeRange,
+  isFirst,
+}: {
+  entry: MobileScheduleEntry;
+  groupFocusAreaName: string | null;
+  groupTimeRange: string | null;
+  isFirst: boolean;
+}) {
+  const avatarTone = getAvatarTone(entry.employeeId);
+  const jobChip = getEntryJobChip(entry);
+  const entryTimeRange = getScheduleEntryTimeRange(entry);
+  const entryFocusAreaName = getScheduleEntryDisplayFocusAreaName(entry);
+  const segments = getScheduleEntrySegments(entry);
+  const shouldShowSegments = segments.length > 1;
+  const metaItems = [
+    entryTimeRange && entryTimeRange !== groupTimeRange ? entryTimeRange : null,
+    entryFocusAreaName && entryFocusAreaName !== groupFocusAreaName
+      ? entryFocusAreaName
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <View style={[styles.shiftmateRow, !isFirst && styles.shiftmateRowBorder]}>
+      <View
+        style={[
+          styles.shiftmateAvatar,
+          {
+            backgroundColor: avatarTone.backgroundColor,
+            borderColor: avatarTone.borderColor,
+          },
+        ]}
+      >
+        <Text
+          style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
+        >
+          {getInitials(entry.employeeName)}
+        </Text>
+      </View>
+      <View style={styles.shiftmateContent}>
+        <View style={styles.shiftmateHeader}>
+          <Text style={styles.shiftmateName}>{entry.employeeName}</Text>
+          {jobChip ? (
+            <View
+              style={[
+                styles.shiftmateChip,
+                {
+                  backgroundColor: jobChip.backgroundColor,
+                  borderColor: jobChip.borderColor,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.detailJobChipText, { color: jobChip.textColor }]}
+              >
+                {jobChip.label}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {shouldShowSegments ? (
+          <ShiftEntrySegmentList entry={entry} variant="supporting" />
+        ) : metaItems.length > 0 ? (
+          <Text style={styles.shiftmateMeta}>{metaItems.join(" · ")}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -952,11 +1298,15 @@ function SwapSummaryCard({
     ? getScheduleEntrySegmentTimeRange(primarySegment)
     : null;
   const timeRange = getScheduleEntryTimeRange(entry);
+  const jobChip = getEntryJobChip(entry);
 
   return (
     <View style={styles.swapSummaryCard}>
       <Text style={styles.swapSummaryLabel}>{label}</Text>
-      <Text style={styles.swapSummaryTitle}>{entry.shiftName}</Text>
+      <Text style={styles.swapSummaryTitle}>
+        {getScheduleEntryTitle(entry)}
+      </Text>
+      <DetailJobPill chip={jobChip} />
       <Text style={styles.swapSummaryDate}>{formatShiftDate(entry.date)}</Text>
       {summaryNote ? (
         <Text style={styles.swapSummaryNote}>{summaryNote}</Text>
@@ -1043,6 +1393,7 @@ function ShiftEntrySegmentList({
                 {timeRange}
               </Text>
             ) : null}
+            <DetailJobPill chip={buildSegmentJobChip(segment)} />
             {segment.displayFocusAreaName ? (
               <Text
                 style={
@@ -1078,25 +1429,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  detailRow: {
-    gap: 4,
-  },
-  detailLabel: {
-    color: mobileColors.textSubtle,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  detailValue: {
-    color: mobileColors.textPrimary,
-    fontSize: 15,
-    fontWeight: "600",
-  },
   detailSummaryText: {
     color: mobileColors.textMuted,
     fontSize: 14,
     fontWeight: "600",
+  },
+  detailMetaText: {
+    color: mobileColors.textSecondary,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  detailFootnote: {
+    color: mobileColors.textSubtle,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  detailJobChip: {
+    alignSelf: "flex-start",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  detailJobChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   detailSegmentList: {
     gap: 12,
@@ -1122,20 +1482,70 @@ const styles = StyleSheet.create({
   actionsPanel: {
     gap: 12,
   },
-  shiftmatesList: {
-    gap: 10,
+  sectionBlock: {
+    gap: 12,
   },
-  shiftmateCard: {
-    backgroundColor: mobileColors.surfaceSecondary,
+  sectionBody: {
+    color: mobileColors.textMuted,
+    lineHeight: 21,
+  },
+  shiftmatesList: {
+    backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    overflow: "hidden",
+  },
+  shiftmateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 6,
+    paddingVertical: 13,
+  },
+  shiftmateRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: mobileColors.borderSubtle,
+  },
+  shiftmateAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shiftmateAvatarText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  shiftmateContent: {
+    flex: 1,
+    gap: 5,
+    minWidth: 0,
+  },
+  shiftmateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
   },
   shiftmateName: {
     color: mobileColors.textPrimary,
     fontSize: 15,
     fontWeight: "700",
+    flex: 1,
+  },
+  shiftmateMeta: {
+    color: mobileColors.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  shiftmateChip: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   supportingSegmentList: {
     gap: 8,

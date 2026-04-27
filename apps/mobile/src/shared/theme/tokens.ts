@@ -67,4 +67,4 @@ export const dubGridNavigationTheme = {
       fontWeight: "700",
     },
   },
-};
+} as const;

@@ -80,7 +80,6 @@ export default function TabsLayout() {
       tintColor={mobileColors.brand}
     >
       <NativeTabs.Trigger
-        disableTransparentOnScrollEdge
         name="me"
         options={{
           title: "Me",
@@ -97,7 +96,6 @@ export default function TabsLayout() {
       </NativeTabs.Trigger>
       {canViewTeamSchedule ? (
         <NativeTabs.Trigger
-          disableTransparentOnScrollEdge
           name="team"
           options={{
             title: "Schedule",
@@ -114,7 +112,6 @@ export default function TabsLayout() {
         </NativeTabs.Trigger>
       ) : null}
       <NativeTabs.Trigger
-        disableTransparentOnScrollEdge
         name="requests"
         options={{
           title: "Requests",
@@ -130,7 +127,6 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger
-        disableTransparentOnScrollEdge
         name="people"
         options={{
           title: "People",
@@ -146,7 +142,6 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger
-        disableTransparentOnScrollEdge
         name="profile"
         options={{
           title: "Profile",

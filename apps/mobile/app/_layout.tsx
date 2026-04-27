@@ -8,7 +8,10 @@ import { ConfigurationScreen } from "../src/shared/components/ConfigurationScree
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
 import { AuthSessionProvider } from "../src/shared/providers/AuthSessionProvider";
-import { createDetailStackOptions } from "../src/shared/navigation/top-level-stack";
+import {
+  commonStackOptions,
+  createDetailStackOptions,
+} from "../src/shared/navigation/top-level-stack";
 import { dubGridNavigationTheme } from "../src/shared/theme/tokens";
 
 export default function RootLayout() {
@@ -24,11 +27,8 @@ export default function RootLayout() {
           <ThemeProvider value={dubGridNavigationTheme}>
             <QueryClientProvider client={queryClient}>
               <AuthSessionProvider>
-                <Stack>
-                  <Stack.Screen
-                    name="index"
-                    options={{ headerShown: false }}
-                  />
+                <Stack screenOptions={commonStackOptions}>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
                   <Stack.Screen
                     name="(auth)/login"
                     options={{ headerShown: false }}
